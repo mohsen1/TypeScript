@@ -3017,3 +3017,300 @@ class Point {
         output
     );
 }
+
+#[test]
+fn test_class_es5_async_static_method() {
+    // Test class with async static method
+    let source = r#"
+class DataService {
+    static cache: Map<string, any> = new Map();
+
+    static async fetchData(url: string): Promise<any> {
+        if (this.cache.has(url)) {
+            return this.cache.get(url);
+        }
+        const response = await fetch(url);
+        const data = await response.json();
+        this.cache.set(url, data);
+        return data;
+    }
+
+    static async clearCache(): Promise<void> {
+        this.cache.clear();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // DataService should emit as function
+    assert!(
+        output.contains("function DataService"),
+        "Expected DataService class to emit as function: {}",
+        output
+    );
+
+    // Static async method should be assigned to class
+    assert!(
+        output.contains("DataService.fetchData") || output.contains("DataService[\"fetchData\"]"),
+        "Expected static fetchData method: {}",
+        output
+    );
+
+    // Note: Async transformation is separate from class ES5 transform
+    // The class ES5 emitter just converts the class structure, not async methods
+    // Static clearCache method should also be assigned
+    assert!(
+        output.contains("DataService.clearCache") || output.contains("DataService[\"clearCache\"]"),
+        "Expected static clearCache method: {}",
+        output
+    );
+
+    // Static cache property should be initialized
+    assert!(
+        output.contains("DataService.cache"),
+        "Expected static cache property: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_with_decorators_syntax() {
+    // Test class with decorator-like patterns (decorators need experimental support)
+    // This tests the class structure when decorators are present
+    let source = r#"
+class LoggedClass {
+    // Simulating decorator metadata
+    static __decorators__ = [];
+
+    value: number = 0;
+
+    setValue(val: number) {
+        console.log("Setting value to", val);
+        this.value = val;
+    }
+
+    getValue(): number {
+        console.log("Getting value");
+        return this.value;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // LoggedClass should emit as function
+    assert!(
+        output.contains("function LoggedClass"),
+        "Expected LoggedClass to emit as function: {}",
+        output
+    );
+
+    // Static decorator metadata should be on class
+    assert!(
+        output.contains("LoggedClass.__decorators__"),
+        "Expected static __decorators__ property: {}",
+        output
+    );
+
+    // Methods should be on prototype
+    assert!(
+        output.contains(".prototype.setValue") || output.contains("prototype[\"setValue\"]"),
+        "Expected setValue method on prototype: {}",
+        output
+    );
+    assert!(
+        output.contains(".prototype.getValue") || output.contains("prototype[\"getValue\"]"),
+        "Expected getValue method on prototype: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_parameter_decorator_pattern() {
+    // Test class structure that would have parameter decorators
+    // Parameter decorators apply to constructor/method parameters
+    // This tests the class structure that decorator metadata would augment
+    let source = r#"
+class Injectable {
+    private service: any;
+    private logger: any;
+
+    constructor(service: any, logger: any) {
+        this.service = service;
+        this.logger = logger;
+    }
+
+    execute(input: string, options: any): void {
+        this.logger.log("Executing with input:", input);
+        this.service.process(input, options);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Injectable should emit as function constructor
+    assert!(
+        output.contains("function Injectable"),
+        "Expected Injectable class to emit as function: {}",
+        output
+    );
+
+    // Constructor should accept parameters
+    assert!(
+        output.contains("Injectable(service, logger)") || output.contains("function Injectable(service"),
+        "Expected constructor with parameters: {}",
+        output
+    );
+
+    // Private fields should be assigned in constructor
+    assert!(
+        output.contains("this.service = service"),
+        "Expected service assignment in constructor: {}",
+        output
+    );
+    assert!(
+        output.contains("this.logger = logger"),
+        "Expected logger assignment in constructor: {}",
+        output
+    );
+
+    // Execute method should be on prototype
+    assert!(
+        output.contains(".prototype.execute") || output.contains("prototype[\"execute\"]"),
+        "Expected execute method on prototype: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_property_decorator_pattern() {
+    // Test class structure that would have property decorators
+    // Property decorators apply to class properties (e.g., @observable, @Input)
+    // This tests the class structure that property decorator metadata would augment
+    let source = r#"
+class ObservableModel {
+    // Properties that would typically have decorators like @observable, @Input, @Column
+    id: number = 0;
+    name: string = "";
+    isActive: boolean = true;
+
+    // Computed property getter (would have @computed decorator)
+    get displayName(): string {
+        return this.name + " (" + this.id + ")";
+    }
+
+    // Setter for property
+    set displayName(value: string) {
+        this.name = value;
+    }
+
+    // Method that modifies properties (would have @action decorator)
+    updateName(newName: string): void {
+        this.name = newName;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // ObservableModel should emit as function constructor
+    assert!(
+        output.contains("function ObservableModel"),
+        "Expected ObservableModel class to emit as function: {}",
+        output
+    );
+
+    // Instance properties should be initialized in constructor
+    assert!(
+        output.contains("this.id = 0"),
+        "Expected id property initialization: {}",
+        output
+    );
+    assert!(
+        output.contains("this.name = \"\""),
+        "Expected name property initialization: {}",
+        output
+    );
+    assert!(
+        output.contains("this.isActive = true"),
+        "Expected isActive property initialization: {}",
+        output
+    );
+
+    // Getters and setters should use Object.defineProperty
+    assert!(
+        output.contains("Object.defineProperty") || output.contains("defineProperty"),
+        "Expected Object.defineProperty for getter/setter: {}",
+        output
+    );
+    assert!(
+        output.contains("displayName"),
+        "Expected displayName accessor: {}",
+        output
+    );
+
+    // Method should be on prototype
+    assert!(
+        output.contains(".prototype.updateName") || output.contains("prototype[\"updateName\"]"),
+        "Expected updateName method on prototype: {}",
+        output
+    );
+}
