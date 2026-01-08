@@ -7,12 +7,13 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] Add decorator transform source map tests in `wasm/src/source_map_tests.rs` covering class decorators, method decorators, and parameter decorators. Run `./wasm/test.sh source_map`.
+- [EM: Assign next task]
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added decorator transform source map tests (class, method, parameter, property, accessor, factory, mixed decorators); `./wasm/test.sh source_map` passes.
 - [x] Lowered async ES5 computed `super[...]` calls (async emitter + ThinPrinter) and updated integration tests; `./wasm/test.sh` fails at `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`.
 - [x] Added JS + d.ts source map `file`/`sourcesContent`/`sourceRoot` assertions in `wasm/src/cli/driver_tests.rs` plus ES5 transform name mapping coverage in `wasm/src/source_map_tests.rs`; `./wasm/test.sh` fails at `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`.
 - [x] Relaxed export-assignment class declaration assertion to accept ES6 class output; `./wasm/test.sh test_export_assignment_suppresses_other_exports`.
