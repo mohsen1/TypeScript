@@ -36,6 +36,17 @@ Priority: 5
   - `test_conditional_distributive_literal_union` - distributive over literal union
   - `test_conditional_extends_any` - T extends any
   - `test_conditional_infer_constraint_mismatch_edge` - infer with constraint mismatch
+- [x] Added 10 Application expansion edge case tests in `evaluate_tests.rs`:
+  - `test_application_ref_expansion_with_array_body` - ArrayOf<T> = T[]
+  - `test_application_ref_expansion_with_readonly_property` - ReadonlyBox<T> = { readonly value: T }
+  - `test_application_ref_expansion_with_optional_property` - OptionalBox<T> = { value?: T }
+  - `test_application_ref_expansion_with_method` - WithMethod<T> = { get(): T }
+  - `test_application_ref_expansion_with_rest_param` - VarArgs<T> = (...args: T[]) => void
+  - `test_application_ref_expansion_with_index_signature` - Dict<T> = { [key: string]: T }
+  - `test_application_ref_expansion_with_number_index_signature` - NumericDict<T> = { [index: number]: T }
+  - `test_application_ref_expansion_with_literal_arg` - Box<"hello">
+  - `test_application_ref_expansion_with_numeric_literal_arg` - Box<42>
+  - `test_application_ref_expansion_with_multiple_refs_to_same_param` - Pair<T> = { first: T; second: T }
 
 ### Circular Reference Root Cause (for Worker 1)
 
