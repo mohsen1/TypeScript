@@ -13,6 +13,7 @@ Priority: 2
 - [ ] [EM: Add queued tasks]
 
 ## Completed
+- [x] Added parity test for computed property names ES5 downlevel in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (17 tests).
 - [x] Added parity test for template literal ES5 downlevel in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (16 tests).
 - [x] Added parity test for for-await-of with destructuring in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (15 tests).
 - [x] Added parity test for async iteration (for await...of) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (14 tests).
