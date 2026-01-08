@@ -75,6 +75,7 @@ Priority: 4
 - [x] Add class private fields source-map test. Tests: `./wasm/test.sh private_fields_mapping`
 - [x] Add nullish coalescing source-map test. Tests: `./wasm/test.sh nullish_coalescing_mapping`
 - [x] Add numeric separators source-map test. Tests: `./wasm/test.sh numeric_separators_mapping`
+- [x] Add import.meta source-map test. Tests: `./wasm/test.sh import_meta_mapping`
 
 ## Ready for Merge
 Yes
