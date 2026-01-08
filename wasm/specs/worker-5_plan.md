@@ -11,7 +11,6 @@ Priority: 5
 
 ## Task Queue
 - [ ] Add async compound assignment mapping with a different operator (e.g., `*=`).
-- [ ] Add async nullish coalescing await regression (`(await foo()) ?? bar()`); expect mapping for `foo` and fallback to function anchor.
 
 ## Completed
 - [x] Added ES5 for-of source map mapping test in `wasm/src/source_map_tests.rs`; no fixes needed in source map writer/generator.
@@ -210,6 +209,8 @@ Priority: 5
       Tests: `./wasm/test.sh test_source_map_es5_transform_async_sequence_mixed_await_mapping`.
 - [x] Added ES5 async optional chaining await source map mapping test in `wasm/src/source_map_tests.rs`.
       Tests: `./wasm/test.sh test_source_map_es5_transform_async_optional_chaining_await_mapping`.
+- [x] Added ES5 async nullish coalescing await source map mapping test in `wasm/src/source_map_tests.rs`.
+      Tests: `./wasm/test.sh test_source_map_es5_transform_async_nullish_coalescing_await_mapping`.
 - [x] Added ES5 async ternary consequent await source map mapping test in `wasm/src/source_map_tests.rs`.
       Tests: `./wasm/test.sh test_source_map_es5_transform_async_ternary_consequent_await_mapping`.
 
