@@ -7,7 +7,7 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- Complete: Expanded async await detection across loop/try/switch constructs in `wasm/src/transforms/async_es5.rs` and added coverage in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
+- Complete: Added switch-case await detection test in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 
 ## Task Queue
 - [ ] (empty)
@@ -19,6 +19,7 @@ Priority: 5
 - [x] Added lexical-this capture test in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Added awaited lexical-this capture test in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Expanded await detection for loops, switch, try/catch/finally, and with/labeled in `wasm/src/transforms/async_es5.rs`; added tests in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
+- [x] Added switch-case await detection test in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 
 ## Ready for Merge
 Yes
