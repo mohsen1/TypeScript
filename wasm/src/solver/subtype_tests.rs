@@ -4277,6 +4277,71 @@ fn test_mapped_type_readonly_modifier_add_subtyping() {
 }
 
 #[test]
+fn test_mapped_type_optional_readonly_add_subtyping() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let key_a = interner.literal_string("a");
+    let key_b = interner.literal_string("b");
+    let keys = interner.union(vec![key_a, key_b]);
+
+    let mapped = interner.mapped(MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint: keys,
+        name_type: None,
+        template: TypeId::NUMBER,
+        readonly_modifier: Some(MappedModifier::Add),
+        optional_modifier: Some(MappedModifier::Add),
+    });
+
+    let name_a = interner.intern_string("a");
+    let name_b = interner.intern_string("b");
+    let optional_readonly_target = interner.object(vec![
+        PropertyInfo {
+            name: name_a,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: true,
+            readonly: true,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: name_b,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: true,
+            readonly: true,
+            is_method: false,
+        },
+    ]);
+    let mutable_required_target = interner.object(vec![
+        PropertyInfo {
+            name: name_a,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: name_b,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    assert!(checker.is_subtype_of(mapped, optional_readonly_target));
+    assert!(!checker.is_subtype_of(mapped, mutable_required_target));
+}
+
+#[test]
 fn test_mapped_type_optional_modifier_remove_subtyping() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
