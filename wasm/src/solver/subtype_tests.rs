@@ -3701,6 +3701,19 @@ fn test_keyof_deferred_not_subtype_of_string_number_union() {
 }
 
 #[test]
+fn test_keyof_any_subtyping_union() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let keyof_any = interner.intern(TypeKey::KeyOf(TypeId::ANY));
+    let key_union = interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::SYMBOL]);
+    let string_number_union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    assert!(checker.is_subtype_of(keyof_any, key_union));
+    assert!(!checker.is_subtype_of(keyof_any, string_number_union));
+}
+
+#[test]
 fn test_intersection_reduction_disjoint_discriminant_subtyping() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);

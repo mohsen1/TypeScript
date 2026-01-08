@@ -44,6 +44,7 @@ Priority: 3
 - [x] Solver unsoundness: keyof union overlapping keys regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_keyof_union_overlapping_keys_is_common`.
 - [x] Solver unsoundness: keyof union string index + literal narrowing regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_keyof_union_string_index_and_literal_narrows`.
 - [x] Solver unsoundness: keyof intersection union-of-keys regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_keyof_intersection_union_of_keys`.
+- [x] Solver unsoundness: keyof any union regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_keyof_any_subtyping_union`.
 - [x] Solver unsoundness: mapped type over primitive number keys regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_over_number_keys_subtyping`.
 - [x] Solver unsoundness: mapped type over primitive string keys regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_over_string_keys_subtyping`.
 - [x] Solver unsoundness: index signature consistency regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_object_to_indexed_property_mismatch_string_index`.
