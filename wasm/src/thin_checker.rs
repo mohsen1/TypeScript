@@ -3356,20 +3356,6 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
-    fn widen_literal_type(&self, type_id: TypeId) -> TypeId {
-        use crate::solver::{LiteralValue, TypeKey};
-
-        match self.ctx.types.lookup(type_id) {
-            Some(TypeKey::Literal(literal)) => match literal {
-                LiteralValue::String(_) => TypeId::STRING,
-                LiteralValue::Number(_) => TypeId::NUMBER,
-                LiteralValue::BigInt(_) => TypeId::BIGINT,
-                LiteralValue::Boolean(_) => TypeId::BOOLEAN,
-            },
-            _ => type_id,
-        }
-    }
-
     /// Get type of binary expression.
     fn get_type_of_binary_expression(&mut self, idx: NodeIndex) -> TypeId {
         use crate::solver::{BinaryOpEvaluator, BinaryOpResult};
