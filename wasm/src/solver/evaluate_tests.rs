@@ -1029,7 +1029,6 @@ fn test_conditional_infer_object_property_function_return_distributive() {
     }));
 
     // T extends { a: () => infer R } ? R : never, with T = { a: () => string } | { a: () => number }.
-    // TODO: Function return inference inside object properties is not implemented; current behavior yields never.
     let extends_fn = interner.function(FunctionShape {
         params: Vec::new(),
         this_type: None,
@@ -1093,7 +1092,8 @@ fn test_conditional_infer_object_property_function_return_distributive() {
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::NEVER);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -3968,7 +3968,6 @@ fn test_conditional_infer_object_property_intersection_check() {
     }));
 
     // T extends { a: infer R } ? R : never, with T = { a: string } & { b: number }.
-    // TODO: Intersection object inference currently yields never; TypeScript infers string.
     let extends_obj = interner.object(vec![PropertyInfo {
         name: interner.intern_string("a"),
         type_id: infer_r,
@@ -4009,7 +4008,7 @@ fn test_conditional_infer_object_property_intersection_check() {
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::NEVER);
+    assert_eq!(result, TypeId::STRING);
 }
 
 #[test]
@@ -4553,7 +4552,6 @@ fn test_conditional_infer_function_return_distributive() {
     }));
 
     // T extends () => infer R ? R : never, with T = (() => string) | (() => number).
-    // TODO: Function return inference is not implemented; current behavior yields never.
     let extends_fn = interner.function(FunctionShape {
         params: Vec::new(),
         this_type: None,
@@ -4593,7 +4591,8 @@ fn test_conditional_infer_function_return_distributive() {
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::NEVER);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -4615,7 +4614,6 @@ fn test_conditional_infer_function_return_non_distributive_union_input() {
     }));
 
     // [T] extends [() => infer R] ? R : never, with T = (() => string) | (() => number).
-    // TODO: Non-distributive function return inference is not implemented; current behavior yields never.
     let extends_fn = interner.function(FunctionShape {
         params: Vec::new(),
         this_type: None,
@@ -4665,7 +4663,8 @@ fn test_conditional_infer_function_return_non_distributive_union_input() {
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::NEVER);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert_eq!(result, expected);
 }
 
 #[test]
