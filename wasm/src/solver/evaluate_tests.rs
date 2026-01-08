@@ -2771,7 +2771,6 @@ fn test_conditional_infer_nested_object_property_non_distributive_union_input() 
     }));
 
     // T extends { a: { b: infer R } } ? R : never, with T = { a: { b: string } } | { a: { b: number } } (no distribution).
-    // TODO: Non-distributive nested object inference over unions yields never.
     let extends_inner = interner.object(vec![PropertyInfo {
         name: interner.intern_string("b"),
         type_id: infer_r,
@@ -2834,8 +2833,9 @@ fn test_conditional_infer_nested_object_property_non_distributive_union_input() 
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
 
-    assert_eq!(result, TypeId::NEVER);
+    assert_eq!(result, expected);
 }
 
 #[test]

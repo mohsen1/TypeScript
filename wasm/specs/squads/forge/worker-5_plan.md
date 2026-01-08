@@ -23,6 +23,7 @@ Priority: 5
 - [x] Added non-distributive tuple union inference (tests not run).
 - [x] Updated non-distributive optional property inference expectation (tests not run).
 - [x] Added index signature inference from object properties (tests not run).
+- [x] Updated non-distributive nested object inference expectation (tests not run).
 
 ## Ready for Merge
 Yes
