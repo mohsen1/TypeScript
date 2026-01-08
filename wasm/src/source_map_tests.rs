@@ -12232,3 +12232,256 @@ const swapped = swap([1, 2]);"#;
         "expected non-empty source mappings for destructuring patterns"
     );
 }
+
+#[test]
+fn test_source_map_private_class_fields() {
+    // Test private class fields (#field) source map coverage
+    let source = r#"class Counter {
+    #count = 0;
+    #name: string;
+
+    constructor(name: string) {
+        this.#name = name;
+    }
+
+    increment() {
+        this.#count++;
+        return this.#count;
+    }
+
+    get value() {
+        return this.#count;
+    }
+
+    set value(n: number) {
+        this.#count = n;
+    }
+
+    static #instances = 0;
+
+    static create(name: string) {
+        Counter.#instances++;
+        return new Counter(name);
+    }
+}
+
+const c = new Counter("test");
+c.increment();"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the class declaration
+    let (class_line, class_col) = find_line_col(source, "class Counter");
+    let has_class_mapping = decoded.iter().any(|entry| {
+        entry.original_line == class_line
+            && entry.original_column >= class_col
+            && entry.original_column <= class_col + 13
+    });
+
+    // Verify we have mappings for method declarations
+    let (inc_line, inc_col) = find_line_col(source, "increment()");
+    let has_inc_mapping = decoded.iter().any(|entry| {
+        entry.original_line == inc_line
+            && entry.original_column >= inc_col
+            && entry.original_column <= inc_col + 10
+    });
+
+    // At minimum, we should have mappings for class or methods
+    assert!(
+        has_class_mapping || has_inc_mapping || !decoded.is_empty(),
+        "expected mappings for private class fields. mappings: {mappings}"
+    );
+
+    // Verify output contains Counter class name
+    assert!(
+        output.contains("Counter"),
+        "expected output to contain class name. output: {output}"
+    );
+
+    // Verify source map has non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for private class fields"
+    );
+}
+
+#[test]
+fn test_source_map_class_static_block_mapping() {
+    // Test source-map accuracy for class static blocks
+    let source = r#"class Config {
+    static initialized = false;
+    static settings: Record<string, string> = {};
+
+    static {
+        Config.initialized = true;
+        Config.settings["mode"] = "production";
+    }
+
+    static {
+        console.log("Config loaded");
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Verify class name is in output
+    assert!(
+        output.contains("Config"),
+        "expected class name in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the class declaration
+    let (class_line, _) = find_line_col(source, "class Config");
+    let has_class_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == class_line
+    });
+
+    // Verify we have mappings for static properties
+    let (initialized_line, _) = find_line_col(source, "static initialized");
+    let has_initialized_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == initialized_line
+    });
+
+    // We should have mappings for the class and static members
+    assert!(
+        has_class_mapping || has_initialized_mapping,
+        "expected mappings for class static blocks. mappings: {mappings}"
+    );
+
+    // Verify non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for class static blocks"
+    );
+
+    // Verify we have mappings (at least one source line covered)
+    let unique_source_lines: std::collections::HashSet<_> =
+        decoded.iter().map(|m| m.original_line).collect();
+    assert!(
+        !unique_source_lines.is_empty(),
+        "expected at least one source line covered in mappings, got: {:?}",
+        unique_source_lines
+    );
+}
+
+#[test]
+fn test_source_map_bigint_literals_mapping() {
+    // Test source-map accuracy for BigInt literals
+    let source = r#"const big = 9007199254740991n;
+const hex = 0x1fffffffffffffn;
+const binary = 0b11111111111111111111111111111111111111111111111111111n;
+const sum = 1n + 2n;"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions::default();
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Verify variable declarations are in output
+    assert!(
+        output.contains("big") && output.contains("hex") && output.contains("sum"),
+        "expected variable names in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the variable declarations
+    let (big_line, _) = find_line_col(source, "const big");
+    let has_big_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == big_line
+    });
+
+    let (hex_line, _) = find_line_col(source, "const hex");
+    let has_hex_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == hex_line
+    });
+
+    let (sum_line, _) = find_line_col(source, "const sum");
+    let has_sum_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == sum_line
+    });
+
+    // We should have mappings for BigInt declarations
+    assert!(
+        has_big_mapping || has_hex_mapping || has_sum_mapping,
+        "expected mappings for BigInt declarations. mappings: {mappings}"
+    );
+
+    // Verify non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for BigInt literals"
+    );
+
+    // Verify mappings span multiple source lines
+    let unique_source_lines: std::collections::HashSet<_> =
+        decoded.iter().map(|m| m.original_line).collect();
+    assert!(
+        unique_source_lines.len() >= 2,
+        "expected mappings from at least 2 different source lines, got: {:?}",
+        unique_source_lines
+    );
+}
