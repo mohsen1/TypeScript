@@ -4308,6 +4308,78 @@ fn test_function_fixed_to_rest_subtyping() {
 }
 
 #[test]
+fn test_function_fixed_to_rest_extra_param_accepts_undefined() {
+    use std::sync::Arc;
+
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let num_or_undef = interner.union(vec![TypeId::NUMBER, TypeId::UNDEFINED]);
+
+    let source = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo { name: Some(interner.intern_string("name")), type_id: TypeId::STRING, optional: false, rest: false },
+            ParamInfo { name: Some(interner.intern_string("value")), type_id: num_or_undef, optional: false, rest: false },
+        ],
+        this_type: None,
+        return_type: TypeId::ANY,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let number_array = interner.array(TypeId::NUMBER);
+    let target = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo { name: Some(interner.intern_string("name")), type_id: TypeId::STRING, optional: false, rest: false },
+            ParamInfo { name: Some(interner.intern_string("args")), type_id: number_array, optional: false, rest: true },
+        ],
+        this_type: None,
+        return_type: TypeId::ANY,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    assert!(checker.is_subtype_of(source, target));
+}
+
+#[test]
+fn test_function_fixed_to_rest_extra_param_rejects_undefined() {
+    use std::sync::Arc;
+
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let source = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo { name: Some(interner.intern_string("name")), type_id: TypeId::STRING, optional: false, rest: false },
+            ParamInfo { name: Some(interner.intern_string("value")), type_id: TypeId::NUMBER, optional: false, rest: false },
+        ],
+        this_type: None,
+        return_type: TypeId::ANY,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let number_array = interner.array(TypeId::NUMBER);
+    let target = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo { name: Some(interner.intern_string("name")), type_id: TypeId::STRING, optional: false, rest: false },
+            ParamInfo { name: Some(interner.intern_string("args")), type_id: number_array, optional: false, rest: true },
+        ],
+        this_type: None,
+        return_type: TypeId::ANY,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    assert!(!checker.is_subtype_of(source, target));
+}
+
+#[test]
 fn test_function_rest_tuple_to_rest_array_subtyping() {
     use std::sync::Arc;
 
