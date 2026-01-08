@@ -19,6 +19,7 @@ Priority: 5
 - [x] Added type predicate circular reference repro tests in `wasm/src/thin_checker_tests.rs`: `test_type_predicate_self_referential_guard` and `test_type_predicate_interface_self_reference`.
 - [x] Added detailed doc comment on `get_type_of_symbol` in `thin_checker.rs:2769-2804` explaining the circular reference issue, call chain, why interfaces work but functions don't, and fix approaches for Worker 1.
 - [x] Added 9 type predicate tests in `narrowing_tests.rs`: TypePredicate structure tests (basic, asserts, this target, asserts without type), FunctionShape/CallSignature with predicates, and narrowing simulations for true/false branches and interface types.
+- [x] **Application Type Expansion Analysis for Worker 2**: Investigated Ref(5)/Ref(6) not expanding in redux test. Root cause: `TypeEvaluator::evaluate()` in `evaluate.rs:210-241` doesn't handle `TypeKey::Application` - Application types pass through unchanged. Added detailed doc comment with fix approach.
 
 ### Circular Reference Root Cause (for Worker 1)
 
