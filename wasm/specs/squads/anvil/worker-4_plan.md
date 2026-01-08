@@ -21,7 +21,7 @@ Priority: 4
 - [x] Add async await initializer assignment coverage. Tests: `./wasm/test.sh async_es5`
 
 ## Ready for Merge
-Yes - branch `worker/anvil-4` is ready for merge.
+No
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
