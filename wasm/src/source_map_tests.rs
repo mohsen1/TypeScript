@@ -10141,3 +10141,57 @@ const instance = new Derived();
         "expected at least 3 identifiers with accurate roundtrip mappings, got {verified}. mappings: {mappings}"
     );
 }
+
+#[test]
+fn test_source_map_multiple_files() {
+    use crate::source_map::SourceMapGenerator;
+
+    let mut generator = SourceMapGenerator::new("bundle.js".to_string());
+
+    // Add multiple source files
+    let file1_idx = generator.add_source_with_content(
+        "utils.ts".to_string(),
+        "export function add(a: number, b: number) { return a + b; }".to_string(),
+    );
+    let file2_idx = generator.add_source_with_content(
+        "main.ts".to_string(),
+        "import { add } from './utils';\nconst result = add(1, 2);".to_string(),
+    );
+
+    // Add mappings from different source files
+    // Line 0: from utils.ts (file1)
+    generator.add_simple_mapping(0, 0, file1_idx, 0, 0); // function add
+    generator.add_simple_mapping(0, 9, file1_idx, 0, 16); // add identifier
+
+    // Line 1: from main.ts (file2)
+    generator.add_simple_mapping(1, 0, file2_idx, 1, 0); // const result
+    generator.add_simple_mapping(1, 6, file2_idx, 1, 6); // result identifier
+    generator.add_simple_mapping(1, 15, file2_idx, 1, 16); // add call
+
+    let map = generator.generate();
+
+    // Verify multiple sources are tracked
+    assert_eq!(map.sources.len(), 2, "expected 2 source files");
+    assert_eq!(map.sources[0], "utils.ts");
+    assert_eq!(map.sources[1], "main.ts");
+
+    // Verify source content is preserved
+    let contents = map.sources_content.expect("expected sources_content");
+    assert_eq!(contents.len(), 2);
+    assert!(contents[0].contains("function add"));
+    assert!(contents[1].contains("import { add }"));
+
+    // Verify mappings string is non-empty
+    assert!(!map.mappings.is_empty(), "expected non-empty mappings");
+
+    // Decode and verify mappings reference correct source indices
+    let decoded = decode_mappings(&map.mappings);
+    assert!(!decoded.is_empty(), "expected decoded mappings");
+
+    // Check that we have mappings for both source files
+    let has_file1_mapping = decoded.iter().any(|m| m.source_index == 0);
+    let has_file2_mapping = decoded.iter().any(|m| m.source_index == 1);
+
+    assert!(has_file1_mapping, "expected mapping from utils.ts (index 0)");
+    assert!(has_file2_mapping, "expected mapping from main.ts (index 1)");
+}
