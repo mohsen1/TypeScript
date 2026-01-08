@@ -11730,3 +11730,68 @@ console.log(import.meta);"#;
         "expected non-empty source mappings for import.meta code"
     );
 }
+
+#[test]
+fn test_source_map_export_star_as_namespace_mapping() {
+    // Test source maps with export * as namespace syntax
+    let source = r#"export * as utils from './utils';
+export * as helpers from './helpers';
+export * as types from './types';"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions::default();
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Verify export statements are in the output
+    assert!(
+        output.contains("export") && output.contains("utils"),
+        "expected export and namespace in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the export declarations
+    let (utils_line, _) = find_line_col(source, "utils");
+    let has_utils_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == utils_line
+    });
+
+    let (helpers_line, _) = find_line_col(source, "helpers");
+    let has_helpers_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == helpers_line
+    });
+
+    let (types_line, _) = find_line_col(source, "types");
+    let has_types_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == types_line
+    });
+
+    // We should have mappings for the export * as namespace declarations
+    assert!(
+        has_utils_mapping || has_helpers_mapping || has_types_mapping,
+        "expected mappings for export * as namespace lines. mappings: {mappings}"
+    );
+
+    // Verify non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for export * as namespace code"
+    );
+}
