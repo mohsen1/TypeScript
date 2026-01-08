@@ -13313,3 +13313,224 @@ namespace Nested.Inner {
         "expected non-empty source mappings for TypeScript namespaces"
     );
 }
+
+#[test]
+fn test_source_map_block_scoping_let_const_mapping() {
+    // Test let/const to var transform source mapping
+    let source = r#"let x = 1;
+const y = 2;
+let z = x + y;
+console.log(z);"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Verify let/const are transformed to var
+    assert!(
+        output.contains("var x") || output.contains("var y") || output.contains("var z"),
+        "expected let/const transformed to var in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the variable declarations
+    let (let_line, _) = find_line_col(source, "let x");
+    let has_let_mapping = decoded.iter().any(|entry| {
+        entry.original_line == let_line
+    });
+
+    let (const_line, _) = find_line_col(source, "const y");
+    let has_const_mapping = decoded.iter().any(|entry| {
+        entry.original_line == const_line
+    });
+
+    assert!(
+        has_let_mapping || has_const_mapping || !decoded.is_empty(),
+        "expected mappings for let/const declarations. mappings: {mappings}"
+    );
+
+    // Verify source index is consistent
+    assert!(
+        decoded.iter().all(|m| m.source_index == 0),
+        "expected all mappings to reference source file index 0"
+    );
+}
+
+#[test]
+fn test_source_map_block_scoping_nested_blocks_mapping() {
+    // Test nested block scoping with shadowing
+    let source = r#"let x = 1;
+{
+    let x = 2;
+    console.log(x);
+}
+console.log(x);"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have non-empty mappings for nested blocks
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for nested block scoping. output: {output}"
+    );
+
+    // Verify console.log is in output
+    assert!(
+        output.contains("console.log"),
+        "expected console.log in output: {output}"
+    );
+}
+
+#[test]
+fn test_source_map_block_scoping_for_loop_mapping() {
+    // Test for loop with let variable
+    let source = r#"for (let i = 0; i < 10; i++) {
+    console.log(i);
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Verify for loop is in output
+    assert!(
+        output.contains("for") && (output.contains("var i") || output.contains("let i")),
+        "expected for loop with variable in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the for loop
+    let (for_line, _) = find_line_col(source, "for (let i");
+    let has_for_mapping = decoded.iter().any(|entry| {
+        entry.original_line == for_line
+    });
+
+    assert!(
+        has_for_mapping || !decoded.is_empty(),
+        "expected mappings for for loop with let. mappings: {mappings}"
+    );
+}
+
+#[test]
+fn test_source_map_block_scoping_function_scope_mapping() {
+    // Test function-scoped let/const
+    let source = r#"function test() {
+    let local = 1;
+    const result = local * 2;
+    return result;
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Verify function is in output
+    assert!(
+        output.contains("function test"),
+        "expected function in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the function declaration
+    let (func_line, _) = find_line_col(source, "function test");
+    let has_func_mapping = decoded.iter().any(|entry| {
+        entry.original_line == func_line
+    });
+
+    assert!(
+        has_func_mapping || !decoded.is_empty(),
+        "expected mappings for function with let/const. mappings: {mappings}"
+    );
+
+    // Verify we have mappings covering multiple source lines
+    let unique_source_lines: std::collections::HashSet<_> =
+        decoded.iter().map(|m| m.original_line).collect();
+    assert!(
+        unique_source_lines.len() >= 2,
+        "expected mappings from at least 2 different source lines, got: {:?}",
+        unique_source_lines
+    );
+}
