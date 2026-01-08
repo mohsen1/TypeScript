@@ -5384,3 +5384,304 @@ class Derived extends Base {
         output
     );
 }
+
+// =============================================================================
+// Abstract Class Tests
+// =============================================================================
+
+#[test]
+fn test_class_es5_abstract_class_basic() {
+    // Test basic abstract class with abstract method
+    let source = r#"
+abstract class Shape {
+    abstract getArea(): number;
+    abstract getPerimeter(): number;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Abstract class should emit as function (abstract modifier stripped)
+    assert!(
+        output.contains("function Shape"),
+        "Expected Shape to emit as function: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_abstract_class_with_implemented_methods() {
+    // Test abstract class with both abstract and implemented methods
+    let source = r#"
+abstract class Animal {
+    name: string;
+
+    constructor(name: string) {
+        this.name = name;
+    }
+
+    abstract makeSound(): string;
+
+    describe(): string {
+        return "Animal: " + this.name;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Abstract class should emit as function
+    assert!(
+        output.contains("function Animal"),
+        "Expected Animal to emit as function: {}",
+        output
+    );
+
+    // Constructor should set name
+    assert!(
+        output.contains("this.name = name") || output.contains("this.name"),
+        "Expected name assignment in constructor: {}",
+        output
+    );
+
+    // Implemented method should be on prototype
+    assert!(
+        output.contains(".prototype.describe") || output.contains("describe"),
+        "Expected describe method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_abstract_class_with_abstract_property() {
+    // Test abstract class with abstract property
+    let source = r#"
+abstract class Vehicle {
+    abstract readonly wheels: number;
+    abstract brand: string;
+
+    describe(): string {
+        return this.brand + " has " + this.wheels + " wheels";
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Abstract class should emit as function
+    assert!(
+        output.contains("function Vehicle"),
+        "Expected Vehicle to emit as function: {}",
+        output
+    );
+
+    // Implemented method should be on prototype
+    assert!(
+        output.contains(".prototype.describe") || output.contains("describe"),
+        "Expected describe method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_concrete_extends_abstract() {
+    // Test concrete class extending abstract class
+    let source = r#"
+abstract class Shape {
+    abstract getArea(): number;
+}
+
+class Circle extends Shape {
+    radius: number;
+
+    constructor(radius: number) {
+        super();
+        this.radius = radius;
+    }
+
+    getArea(): number {
+        return Math.PI * this.radius * this.radius;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    // Get Circle class (second statement)
+    let class_idx = *source_file.statements.nodes.get(1).expect("expected Circle class");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Concrete class should emit as function
+    assert!(
+        output.contains("function Circle"),
+        "Expected Circle to emit as function: {}",
+        output
+    );
+
+    // Should call super constructor
+    assert!(
+        output.contains("_super.call(this") || output.contains("Shape.call(this"),
+        "Expected super() call: {}",
+        output
+    );
+
+    // getArea should be on prototype
+    assert!(
+        output.contains(".prototype.getArea") || output.contains("getArea"),
+        "Expected getArea method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_abstract_class_with_static_members() {
+    // Test abstract class with static members
+    let source = r#"
+abstract class Logger {
+    static logLevel: string = "info";
+    static instanceCount: number = 0;
+
+    abstract log(message: string): void;
+
+    static setLevel(level: string): void {
+        Logger.logLevel = level;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Abstract class should emit as function
+    assert!(
+        output.contains("function Logger"),
+        "Expected Logger to emit as function: {}",
+        output
+    );
+
+    // Static fields should be on constructor
+    assert!(
+        output.contains("Logger.logLevel") || output.contains("logLevel"),
+        "Expected logLevel static field: {}",
+        output
+    );
+    assert!(
+        output.contains("Logger.instanceCount") || output.contains("instanceCount"),
+        "Expected instanceCount static field: {}",
+        output
+    );
+
+    // Static method should be on constructor
+    assert!(
+        output.contains("Logger.setLevel") || output.contains("setLevel"),
+        "Expected setLevel static method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_abstract_class_with_constructor() {
+    // Test abstract class with constructor and initialization
+    let source = r#"
+abstract class Entity {
+    id: string;
+    createdAt: Date;
+
+    constructor(id: string) {
+        this.id = id;
+        this.createdAt = new Date();
+    }
+
+    abstract save(): Promise<void>;
+    abstract delete(): Promise<void>;
+
+    getId(): string {
+        return this.id;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Abstract class should emit as function
+    assert!(
+        output.contains("function Entity"),
+        "Expected Entity to emit as function: {}",
+        output
+    );
+
+    // Constructor should initialize fields
+    assert!(
+        output.contains("this.id = id") || output.contains("this.id"),
+        "Expected id assignment: {}",
+        output
+    );
+    assert!(
+        output.contains("this.createdAt") || output.contains("new Date"),
+        "Expected createdAt initialization: {}",
+        output
+    );
+
+    // getId method should be on prototype
+    assert!(
+        output.contains(".prototype.getId") || output.contains("getId"),
+        "Expected getId method: {}",
+        output
+    );
+}
