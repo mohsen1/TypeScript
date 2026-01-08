@@ -174,6 +174,44 @@ fn test_apparent_string_member_subtyping() {
 }
 
 #[test]
+fn test_apparent_boolean_member_subtyping() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let method = |return_type| {
+        interner.function(FunctionShape {
+            params: Vec::new(),
+            this_type: None,
+            return_type,
+            type_params: Vec::new(),
+            type_predicate: None,
+            is_constructor: false,
+        })
+    };
+
+    let value_of = interner.intern_string("valueOf");
+    let target = interner.object(vec![PropertyInfo {
+        name: value_of,
+        type_id: method(TypeId::BOOLEAN),
+        write_type: method(TypeId::BOOLEAN),
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+    let mismatch = interner.object(vec![PropertyInfo {
+        name: value_of,
+        type_id: method(TypeId::NUMBER),
+        write_type: method(TypeId::NUMBER),
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    assert!(checker.is_subtype_of(TypeId::BOOLEAN, target));
+    assert!(!checker.is_subtype_of(TypeId::BOOLEAN, mismatch));
+}
+
+#[test]
 fn test_object_trifecta_subtyping() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
