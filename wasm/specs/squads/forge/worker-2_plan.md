@@ -11,9 +11,10 @@ Priority: 2
 
 ## Task Queue
 - [x] Reproduce the rest-parameter mismatch failure and confirm expected `SubtypeFailureReason`.
-- [ ] Ensure rest-parameter assignability still matches `tsc` for both `unknown[]` and `number[]` cases.
+- [x] Ensure rest-parameter assignability still matches `tsc` for both `unknown[]` and `number[]` cases.
 
 ## Completed
+- [x] Added rest number[] assignability guard test; ran `./wasm/test.sh` (fails: missing `AsyncES5Emitter::set_use_this_capture` in `es5_helpers.rs` and `class_es5.rs`).
 - [x] Refactored compat subtype configuration and tightened rest mismatch diagnostics assertions; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Added rest-parameter explain_failure coverage for source rest mismatches; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Implemented template-literal infer matching (including union-aware bindings) and updated conditional template inference tests. Ran `./wasm/test.sh` (fails: solver::compat::tests::test_explain_failure_reports_rest_mismatch).
