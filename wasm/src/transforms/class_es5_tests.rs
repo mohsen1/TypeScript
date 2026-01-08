@@ -7405,3 +7405,384 @@ class ViewModel {
         output
     );
 }
+
+// =============================================================================
+// Override Keyword Tests
+// =============================================================================
+
+#[test]
+fn test_class_es5_override_method_basic() {
+    // Basic override method - override keyword should be erased
+    let source = r#"
+class Animal {
+    speak(): string {
+        return "...";
+    }
+}
+
+class Dog extends Animal {
+    override speak(): string {
+        return "Woof!";
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Second statement is the Dog class
+    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Class should emit with extends
+    assert!(
+        output.contains("function Dog"),
+        "Expected Dog class: {}",
+        output
+    );
+
+    // Override keyword should be erased
+    assert!(
+        !output.contains("override"),
+        "override keyword should be erased: {}",
+        output
+    );
+
+    // Method should be on prototype
+    assert!(
+        output.contains("speak"),
+        "Expected speak method: {}",
+        output
+    );
+
+    // Should have inheritance pattern
+    assert!(
+        output.contains("__extends") || output.contains("_super"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_override_accessor() {
+    // Override getter/setter - override keyword should be erased
+    let source = r#"
+class Base {
+    protected _value: number = 0;
+
+    get value(): number {
+        return this._value;
+    }
+
+    set value(v: number) {
+        this._value = v;
+    }
+}
+
+class Derived extends Base {
+    override get value(): number {
+        return this._value * 2;
+    }
+
+    override set value(v: number) {
+        this._value = v / 2;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Second statement is the Derived class
+    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function Derived"),
+        "Expected Derived class: {}",
+        output
+    );
+
+    // Override keyword should be erased
+    assert!(
+        !output.contains("override"),
+        "override keyword should be erased: {}",
+        output
+    );
+
+    // Accessor should use Object.defineProperty
+    assert!(
+        output.contains("value") || output.contains("defineProperty"),
+        "Expected value accessor: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_override_multiple_methods() {
+    // Multiple override methods
+    let source = r#"
+class Shape {
+    getArea(): number { return 0; }
+    getPerimeter(): number { return 0; }
+    describe(): string { return "Shape"; }
+}
+
+class Rectangle extends Shape {
+    width: number;
+    height: number;
+
+    constructor(w: number, h: number) {
+        super();
+        this.width = w;
+        this.height = h;
+    }
+
+    override getArea(): number {
+        return this.width * this.height;
+    }
+
+    override getPerimeter(): number {
+        return 2 * (this.width + this.height);
+    }
+
+    override describe(): string {
+        return "Rectangle";
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Second statement is the Rectangle class
+    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function Rectangle"),
+        "Expected Rectangle class: {}",
+        output
+    );
+
+    // Override keyword should be erased
+    assert!(
+        !output.contains("override"),
+        "override keyword should be erased: {}",
+        output
+    );
+
+    // All methods should be present
+    assert!(
+        output.contains("getArea") && output.contains("getPerimeter") && output.contains("describe"),
+        "Expected all override methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_override_multilevel_inheritance() {
+    // Override in multi-level inheritance chain
+    let source = r#"
+class A {
+    foo(): string { return "A"; }
+}
+
+class B extends A {
+    override foo(): string { return "B"; }
+}
+
+class C extends B {
+    override foo(): string { return "C"; }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Third statement is class C
+    let class_idx = source_file.statements.nodes.get(2).expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function C"),
+        "Expected C class: {}",
+        output
+    );
+
+    // Override keyword should be erased
+    assert!(
+        !output.contains("override"),
+        "override keyword should be erased: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("foo"),
+        "Expected foo method: {}",
+        output
+    );
+
+    // Should have inheritance
+    assert!(
+        output.contains("__extends") || output.contains("_super"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_override_with_super_call() {
+    // Override method that calls super
+    let source = r#"
+class Logger {
+    log(message: string): void {
+        console.log(message);
+    }
+}
+
+class TimestampLogger extends Logger {
+    override log(message: string): void {
+        const timestamp = new Date().toISOString();
+        super.log("[" + timestamp + "] " + message);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Second statement is the TimestampLogger class
+    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function TimestampLogger"),
+        "Expected TimestampLogger class: {}",
+        output
+    );
+
+    // Override keyword should be erased
+    assert!(
+        !output.contains("override"),
+        "override keyword should be erased: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("log"),
+        "Expected log method: {}",
+        output
+    );
+
+    // Super call should be transformed
+    assert!(
+        output.contains("_super") || output.contains("prototype"),
+        "Expected super call pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_override_abstract_method() {
+    // Override abstract method
+    let source = r#"
+abstract class Component {
+    abstract render(): string;
+    abstract update(): void;
+}
+
+class Button extends Component {
+    override render(): string {
+        return "<button>Click me</button>";
+    }
+
+    override update(): void {
+        console.log("Button updated");
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Second statement is the Button class
+    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function Button"),
+        "Expected Button class: {}",
+        output
+    );
+
+    // Override keyword should be erased
+    assert!(
+        !output.contains("override"),
+        "override keyword should be erased: {}",
+        output
+    );
+
+    // Abstract keyword should be erased
+    assert!(
+        !output.contains("abstract"),
+        "abstract keyword should be erased: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("render") && output.contains("update"),
+        "Expected render and update methods: {}",
+        output
+    );
+}
