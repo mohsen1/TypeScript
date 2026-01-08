@@ -7,7 +7,7 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [x] Add solver tests for infer in template literal positions (`${infer Head}${infer Tail}` patterns). **Done:** Added 11 tests covering string parsing patterns with template literal infer.
+- [x] Add solver tests for recursive conditional types (Flatten, Awaited patterns). **Done:** Added 14 tests covering recursive type patterns.
 
 ## Task Queue
 (empty - awaiting next assignment)
@@ -97,6 +97,7 @@ Priority: 4
 - [x] Added solver coverage for template literal union distribution with infer. Tests: `./wasm/test.sh`.
 - [x] Added solver coverage for template literal kebab-to-camel pattern. Tests: `./wasm/test.sh`.
 - [x] Added solver coverage for template literal dot notation parse. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for recursive conditional types (Flatten, Awaited, DeepReadonly patterns). Tests: `./wasm/test.sh`.
 
 ## Ready for Merge
 Yes
