@@ -1955,7 +1955,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 }
 
                 let mut match_function_this = |source_type: TypeId,
-                                               source_fn_id: FunctionId,
+                                               source_fn_id: FunctionShapeId,
                                                bindings: &mut FxHashMap<Atom, TypeId>|
                  -> bool {
                     let source_fn = self.interner.function_shape(source_fn_id);

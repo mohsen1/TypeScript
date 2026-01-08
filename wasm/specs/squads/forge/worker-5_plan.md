@@ -15,6 +15,7 @@ Priority: 5
 - [ ] Follow up with remaining `infer` placeholder vs `never` TODOs in solver tests that block non-distributive inference.
 
 ## Completed
+- [x] Fixed FunctionId typo in `wasm/src/solver/evaluate.rs`; `./wasm/test.sh` failed: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`.
 - [x] Updated infer TODO expectations in `wasm/src/solver/evaluate_tests.rs` (tuple rest inference note + this-parameter TODO cleanup); `./wasm/test.sh` failed: missing `FunctionId` in `wasm/src/solver/evaluate.rs`.
 - [x] Implemented this-parameter bounds checking + conditional inference; added non-distributive optional tuple/property inference; updated tests (tests not run).
 - [x] Added `this`-parameter inference tests in `wasm/src/solver/infer_tests.rs` (tests not run).
