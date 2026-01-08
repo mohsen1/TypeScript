@@ -19,9 +19,9 @@ CODEX_RESTART_DELAY="${CODEX_RESTART_DELAY:-2}"
 CODEX_AUTO_UPDATE="${CODEX_AUTO_UPDATE:-1}"
 CODEX_UPDATE_CMD="${CODEX_UPDATE_CMD:-npm install -g @openai/codex}"
 
-# Idle monitoring
-DIRECTOR_IDLE_SECONDS="${DIRECTOR_IDLE_SECONDS:-120}"
-DIRECTOR_POKE="${DIRECTOR_POKE:-continue}"
+# Idle monitoring (Director should be mostly idle - hands-off management)
+DIRECTOR_IDLE_SECONDS="${DIRECTOR_IDLE_SECONDS:-600}"
+DIRECTOR_POKE="${DIRECTOR_POKE:-Check if any intervention is needed. If EMs are working, do nothing.}"
 EM_IDLE_SECONDS="${EM_IDLE_SECONDS:-90}"
 EM_POKE="${EM_POKE:-continue}"
 WORKER_IDLE_SECONDS="${WORKER_IDLE_SECONDS:-180}"
@@ -307,69 +307,93 @@ fi
 tmux new-session -d -s "$SESSION" -n "director" -c "$ROOT_DIR"
 
 # =============================================================================
-# Window 1: Director
+# Window 1: Director + EMs (Director left, EMs stacked on right)
 # =============================================================================
-echo "Setting up Director window..."
-tmux send-keys -t "$SESSION:director" "bash -lc '$director_cmd'" C-m
+echo "Setting up Director window with EMs..."
+
+# Pane 0: Director (left side)
+tmux send-keys -t "$SESSION:director.0" "bash -lc '$director_cmd'" C-m
 tmux select-pane -t "$SESSION:director.0" -T "director" 2>/dev/null || true
+
+# Split right for EM-Forge (pane 1)
+tmux split-window -h -t "$SESSION:director.0" -c "$ROOT_DIR"
+tmux send-keys -t "$SESSION:director.1" "export SQUAD_NAME=forge && bash -lc '$em_cmd'" C-m
+tmux select-pane -t "$SESSION:director.1" -T "em-forge" 2>/dev/null || true
+
+# Split below EM-Forge for EM-Anvil (pane 2)
+tmux split-window -v -t "$SESSION:director.1" -c "$ROOT_DIR"
+tmux send-keys -t "$SESSION:director.2" "export SQUAD_NAME=anvil && bash -lc '$em_cmd'" C-m
+tmux select-pane -t "$SESSION:director.2" -T "em-anvil" 2>/dev/null || true
+
+# Wait for director and EMs to boot
 sleep "$START_PAUSE"
+
+# Send start prompts to Director and EMs
 tmux send-keys -t "$SESSION:director.0" "$DIRECTOR_START_PROMPT"
 sleep "$SEND_ENTER_PAUSE"
 tmux send-keys -t "$SESSION:director.0" C-m
 
+tmux send-keys -t "$SESSION:director.1" "$EM_START_PROMPT"
+sleep "$SEND_ENTER_PAUSE"
+tmux send-keys -t "$SESSION:director.1" C-m
+
+tmux send-keys -t "$SESSION:director.2" "$EM_START_PROMPT"
+sleep "$SEND_ENTER_PAUSE"
+tmux send-keys -t "$SESSION:director.2" C-m
+
 # =============================================================================
-# Helper: Setup squad window (EM + 5 workers)
+# Helper: Setup squad window (5 workers only, EM is in director window)
 # =============================================================================
 setup_squad_window() {
   local squad="$1"
   local window="$squad"
 
-  echo "Setting up $squad squad window..."
+  echo "Setting up $squad squad window (workers only)..."
 
-  # Create window for squad
+  # Create window for squad workers
   tmux new-window -t "$SESSION" -n "$window" -c "$ROOT_DIR"
 
-  # Pane 0: EM - start codex with squad identity
-  tmux send-keys -t "$SESSION:$window.0" "export SQUAD_NAME=$squad && bash -lc '$em_cmd'" C-m
-  tmux select-pane -t "$SESSION:$window.0" -T "em-$squad" 2>/dev/null || true
-
-  # Create 5 worker panes - just start the shell, codex will be started after layout is set
+  # Create 5 worker panes
   local worker_dir
-  for n in 1 2 3 4 5; do
+
+  # First worker in pane 0
+  worker_dir="$(get_worktree_dir "$squad" 1)"
+  [ -z "$worker_dir" ] && worker_dir="$ROOT_DIR"
+  tmux send-keys -t "$SESSION:$window.0" "cd '$worker_dir'" C-m
+
+  # Workers 2-5 via splits
+  for n in 2 3 4 5; do
     worker_dir="$(get_worktree_dir "$squad" "$n")"
     [ -z "$worker_dir" ] && worker_dir="$ROOT_DIR"
-
-    # Split pane (starts with shell, not codex yet)
     tmux split-window -t "$SESSION:$window" -c "$worker_dir"
     tmux select-layout -t "$SESSION:$window" tiled
-  done
-
-  # Rename panes for clarity (pane 0 is EM, panes 1-5 are workers)
-  tmux select-pane -t "$SESSION:$window.0" -T "em-$squad" 2>/dev/null || true
-  for n in 1 2 3 4 5; do
-    tmux select-pane -t "$SESSION:$window.$n" -T "${squad}-${n}" 2>/dev/null || true
   done
 
   # Final layout balance
   tmux select-layout -t "$SESSION:$window" tiled
 
-  # Now start codex in each worker pane (staggered so they don't all boot at once)
-  for n in 1 2 3 4 5; do
-    tmux send-keys -t "$SESSION:$window.$n" "export SQUAD_NAME=$squad WORKER_NUM=$n && bash -lc '$worker_cmd'" C-m
+  # Rename panes (panes 0-4 are workers 1-5)
+  for n in 0 1 2 3 4; do
+    local worker_num=$((n + 1))
+    tmux select-pane -t "$SESSION:$window.$n" -T "${squad}-${worker_num}" 2>/dev/null || true
+  done
+
+  # Start codex in each worker pane (staggered)
+  for n in 0 1 2 3 4; do
+    local worker_num=$((n + 1))
+    local worker_dir
+    worker_dir="$(get_worktree_dir "$squad" "$worker_num")"
+    [ -z "$worker_dir" ] && worker_dir="$ROOT_DIR"
+    tmux send-keys -t "$SESSION:$window.$n" "cd '$worker_dir' && export SQUAD_NAME=$squad WORKER_NUM=$worker_num && bash -lc '$worker_cmd'" C-m
     sleep 2  # Small delay between starting each codex
   done
 
-  # Wait for all codex instances to boot
+  # Wait for codex instances to boot
   echo "  Waiting ${START_PAUSE}s for codex to boot in $squad squad..."
   sleep "$START_PAUSE"
 
-  # Send start prompts to EM
-  tmux send-keys -t "$SESSION:$window.0" "$EM_START_PROMPT"
-  sleep "$SEND_ENTER_PAUSE"
-  tmux send-keys -t "$SESSION:$window.0" C-m
-
   # Send start prompts to workers (staggered)
-  for pane in 1 2 3 4 5; do
+  for pane in 0 1 2 3 4; do
     sleep "$STAGGER_PAUSE"
     tmux send-keys -t "$SESSION:$window.$pane" "$WORKER_START_PROMPT"
     sleep "$SEND_ENTER_PAUSE"
@@ -547,9 +571,9 @@ echo "=============================================="
 echo "Session: $SESSION"
 echo ""
 echo "Windows:"
-echo "  1. director  - Director agent"
-echo "  2. forge     - EM-Forge + 5 Workers (type system)"
-echo "  3. anvil     - EM-Anvil + 5 Workers (output)"
+echo "  1. director  - Director (pane 0) + EM-Forge (pane 1) + EM-Anvil (pane 2)"
+echo "  2. forge     - 5 Workers (type system, panes 0-4)"
+echo "  3. anvil     - 5 Workers (output, panes 0-4)"
 echo ""
 echo "Worktrees:"
 for squad in forge anvil; do
