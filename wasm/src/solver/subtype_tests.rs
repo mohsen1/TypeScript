@@ -2414,6 +2414,36 @@ fn test_function_variance_return_covariance() {
 }
 
 #[test]
+fn test_void_return_exception_subtype() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let returns_number = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::NUMBER,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let returns_void = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    assert!(!checker.is_subtype_of(returns_number, returns_void));
+
+    checker.allow_void_return = true;
+    assert!(checker.is_subtype_of(returns_number, returns_void));
+    assert!(!checker.is_subtype_of(returns_void, returns_number));
+}
+
+#[test]
 fn test_this_parameter_variance() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
