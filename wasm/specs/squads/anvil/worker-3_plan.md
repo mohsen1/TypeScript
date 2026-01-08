@@ -19,7 +19,7 @@ Priority: 3
 - [x] Added JS + d.ts source map `file`/`sourcesContent` assertions in `wasm/src/cli/driver_tests.rs`; `./wasm/test.sh` fails at `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`.
 
 ## Ready for Merge
-No
+Yes - worker/anvil-3 ready for merge.
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize emitter fidelity (ES5 downleveling/source maps) before new features.
