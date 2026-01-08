@@ -191,6 +191,34 @@ fn test_apparent_string_member_subtyping() {
 }
 
 #[test]
+fn test_apparent_string_number_index_subtyping() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let target = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+    });
+    let mismatch = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    assert!(checker.is_subtype_of(TypeId::STRING, target));
+    assert!(!checker.is_subtype_of(TypeId::STRING, mismatch));
+}
+
+#[test]
 fn test_apparent_boolean_member_subtyping() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);

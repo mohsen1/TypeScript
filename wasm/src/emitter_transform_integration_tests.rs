@@ -973,6 +973,63 @@ class Derived extends Base {
 }
 
 #[test]
+fn test_two_phase_emission_es5_class_async_return_nested_arrow_super_computed_key_this_arguments_capture() {
+    let source = r#"
+class Base { m(x) { return x; } }
+class Derived extends Base {
+    async method() {
+        const key = "m";
+        return () => () => super[key](this.x + arguments[0]);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("return __awaiter"),
+        "ES5 output should emit __awaiter for async method: {}",
+        output
+    );
+    // TODO: async ES5 emission should preserve returned nested arrow bodies with computed super access.
+    assert!(
+        output.contains("return [2 /*return*/]"),
+        "ES5 output currently drops returned nested arrow body: {}",
+        output
+    );
+    assert!(
+        !output.contains("_this.x"),
+        "ES5 output currently drops this capture in returned nested arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("arguments[0]"),
+        "ES5 output currently drops arguments usage in returned nested arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("super[key]"),
+        "ES5 output should not contain computed super element access when body is dropped: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel returned nested arrow: {}",
+        output
+    );
+}
+
+#[test]
 fn test_two_phase_emission_es5_class_async_arrow_arguments_capture() {
     let source = r#"
 class Base {}
