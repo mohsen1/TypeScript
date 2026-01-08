@@ -1971,6 +1971,11 @@ fn test_commonjs_import_side_effect() {
         "Expected side-effect require in CommonJS output: {}",
         output
     );
+    assert!(
+        output.contains("__esModule"),
+        "Expected __esModule marker in CommonJS output: {}",
+        output
+    );
 }
 
 #[test]
