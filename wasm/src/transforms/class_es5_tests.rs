@@ -2109,3 +2109,69 @@ class Derived extends Base {
         output
     );
 }
+
+#[test]
+fn test_class_es5_try_catch_finally() {
+    let source = r#"
+class ErrorHandler {
+    safeExecute(fn: () => void) {
+        try {
+            fn();
+            return true;
+        } catch (error) {
+            console.error(error);
+            return false;
+        } finally {
+            console.log("done");
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Should emit as a function (ES5 class pattern)
+    assert!(
+        output.contains("function ErrorHandler"),
+        "Expected ErrorHandler constructor function: {}",
+        output
+    );
+
+    // Should have try/catch/finally blocks
+    assert!(
+        output.contains("try"),
+        "Expected try block in output: {}",
+        output
+    );
+    assert!(
+        output.contains("catch"),
+        "Expected catch block in output: {}",
+        output
+    );
+    assert!(
+        output.contains("finally"),
+        "Expected finally block in output: {}",
+        output
+    );
+
+    // Method should be on prototype
+    assert!(
+        output.contains(".prototype.safeExecute") || output.contains("prototype[\"safeExecute\"]"),
+        "Expected safeExecute method on prototype: {}",
+        output
+    );
+}
