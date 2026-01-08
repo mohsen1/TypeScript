@@ -58,6 +58,7 @@ Blocked: Awaiting next EM-Anvil assignment.
 - [x] Added computed property in object literal ES5 test; verifies `{ [key]: value }` uses bracket notation assignment. Ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Added class inheritance extends ES5 test; verifies `class Dog extends Animal` uses __extends helper and _super pattern. Ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Added nullish coalescing ES5 test; verifies `??` operator is transformed for ES5 output. Ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
+- [x] Added optional chaining ES5 test; verifies `?.` operator is transformed for ES5 output. Ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Added class expression ES5 tests (anonymous and named); verifies class expressions emit correctly with properties and methods on prototype. Ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 
 ## Ready for Merge

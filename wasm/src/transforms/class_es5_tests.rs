@@ -1584,6 +1584,47 @@ class Config {
 }
 
 #[test]
+fn test_class_es5_optional_chaining() {
+    let source = r#"
+class DataProcessor {
+    process(data: { value?: { nested?: string } } | null) {
+        return data?.value?.nested;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Should NOT contain ?. operator (ES5 doesn't support it)
+    assert!(
+        !output.contains("?."),
+        "Expected optional chaining to be transformed, not raw ?. syntax: {}",
+        output
+    );
+
+    // Method should be on prototype
+    assert!(
+        output.contains(".prototype.process") || output.contains("prototype[\"process\"]"),
+        "Expected process method on prototype: {}",
+        output
+    );
+}
+
+#[test]
 fn test_class_es5_class_expression() {
     let source = r#"
 const MyClass = class {
