@@ -634,12 +634,26 @@ impl<'a> ClassES5Emitter<'a> {
 
         // First, find and emit the super() call as _super.call(this, ...)
         let mut found_super = false;
+        let mut super_stmt_idx = None;
         for &stmt_idx in &block.statements.nodes {
             if self.is_super_call_statement(stmt_idx) {
-                self.emit_super_call_as_this_assignment(stmt_idx);
+                super_stmt_idx = Some(stmt_idx);
                 found_super = true;
                 break;
             }
+        }
+
+        if let Some(super_idx) = super_stmt_idx {
+            // Emit statements before super() unchanged.
+            for &stmt_idx in &block.statements.nodes {
+                if stmt_idx == super_idx {
+                    break;
+                }
+                self.write_indent();
+                self.emit_statement(stmt_idx);
+                self.write_line();
+            }
+            self.emit_super_call_as_this_assignment(super_idx);
         }
 
         self.emit_param_destructuring_prologue(param_transforms);
