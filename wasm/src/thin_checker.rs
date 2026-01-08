@@ -3797,11 +3797,13 @@ impl<'a> ThinCheckerState<'a> {
         // Also populate the type environment for Application expansion
         if result != TypeId::ANY && result != TypeId::ERROR {
             let type_params = self.get_type_params_for_symbol(sym_id);
+            eprintln!("[DEBUG get_type_of_symbol] sym_id={} type_params.len()={}", sym_id.0, type_params.len());
             let mut env = self.ctx.type_env.borrow_mut();
             if type_params.is_empty() {
                 env.insert(SymbolRef(sym_id.0), result);
             } else {
-                env.insert_with_params(SymbolRef(sym_id.0), result, type_params);
+                env.insert_with_params(SymbolRef(sym_id.0), result, type_params.clone());
+                eprintln!("[DEBUG get_type_of_symbol] Inserted sym_id={} with {} type_params", sym_id.0, type_params.len());
             }
         }
 
@@ -5813,17 +5815,55 @@ impl<'a> ThinCheckerState<'a> {
             return type_id;
         }
 
-        let needs_env = self.ctx.type_environment.borrow().is_none();
-        if needs_env {
-            let env = self.build_type_environment();
-            *self.ctx.type_environment.borrow_mut() = Some(env);
-        }
-        let env_ref = std::cell::Ref::map(
-            self.ctx.type_environment.borrow(),
-            |env| env.as_ref().expect("type environment"),
-        );
-        let evaluator = TypeEvaluator::with_resolver(self.ctx.types, &*env_ref);
+        // Ensure all Ref symbols in Application types are resolved first
+        self.ensure_application_refs_resolved(type_id);
+
+        // Use the incrementally-populated type_env which has type params
+        // registered during type checking
+        let env = self.ctx.type_env.borrow();
+        let evaluator = TypeEvaluator::with_resolver(self.ctx.types, &*env);
         evaluator.evaluate(type_id)
+    }
+
+    /// Ensure that any Ref symbols in Application types are resolved (populating type_env).
+    fn ensure_application_refs_resolved(&mut self, type_id: TypeId) {
+        use crate::solver::{TypeKey, SymbolRef};
+
+        if type_id.is_intrinsic() {
+            return;
+        }
+
+        let Some(key) = self.ctx.types.lookup(type_id) else {
+            return;
+        };
+
+        match key {
+            TypeKey::Application(app_id) => {
+                let app = self.ctx.types.type_application(app_id);
+                // Check if base is a Ref and resolve it
+                if let Some(TypeKey::Ref(SymbolRef(sym_id))) = self.ctx.types.lookup(app.base) {
+                    let symbol_id = SymbolId(sym_id);
+                    // Check if this symbol is already in type_env
+                    let has_params = self.ctx.type_env.borrow().get_params(SymbolRef(sym_id)).is_some();
+                    if !has_params {
+                        // Resolve the symbol to populate type_env
+                        let _ = self.get_type_of_symbol(symbol_id);
+                    }
+                }
+                // Recursively check args
+                let args = app.args.clone();
+                for arg in args {
+                    self.ensure_application_refs_resolved(arg);
+                }
+            }
+            TypeKey::Union(members) | TypeKey::Intersection(members) => {
+                let members_list = self.ctx.types.type_list(members).to_vec();
+                for member in members_list {
+                    self.ensure_application_refs_resolved(member);
+                }
+            }
+            _ => {}
+        }
     }
 
 

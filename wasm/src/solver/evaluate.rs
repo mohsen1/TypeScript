@@ -241,9 +241,12 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         // If the base is a Ref, try to resolve and instantiate
         if let TypeKey::Ref(symbol) = base_key {
             // Try to get the type parameters for this symbol
-            if let Some(type_params) = self.resolver.get_type_params(symbol) {
+            let type_params = self.resolver.get_type_params(symbol);
+            let resolved = self.resolver.resolve_ref(symbol, self.interner);
+
+            if let Some(type_params) = type_params {
                 // Resolve the base type to get the body
-                if let Some(resolved) = self.resolver.resolve_ref(symbol, self.interner) {
+                if let Some(resolved) = resolved {
                     // Instantiate the resolved type with the type arguments
                     let instantiated = instantiate_generic(
                         self.interner,
@@ -254,11 +257,96 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     // Recursively evaluate the result
                     return self.evaluate(instantiated);
                 }
+            } else if let Some(resolved) = resolved {
+                // Fallback: try to extract type params from the resolved type's properties
+                let extracted_params = self.extract_type_params_from_type(resolved);
+                if !extracted_params.is_empty() && extracted_params.len() == app.args.len() {
+                    let instantiated = instantiate_generic(
+                        self.interner,
+                        resolved,
+                        &extracted_params,
+                        &app.args,
+                    );
+                    return self.evaluate(instantiated);
+                } else if symbol.0 == 29 {
+                    eprintln!("[DEBUG evaluate_application] Ref(29) fallback: extracted_params.len()={}, args.len()={}",
+                        extracted_params.len(), app.args.len());
+                }
             }
         }
 
         // If we can't expand, return the original application
         self.interner.application(app.base, app.args.clone())
+    }
+
+    /// Extract type parameter infos from a type by scanning for TypeParameter types.
+    fn extract_type_params_from_type(&self, type_id: TypeId) -> Vec<TypeParamInfo> {
+        let mut seen = std::collections::HashSet::new();
+        let mut params = Vec::new();
+        self.collect_type_params(type_id, &mut seen, &mut params);
+        params
+    }
+
+    /// Recursively collect TypeParameter types from a type.
+    fn collect_type_params(
+        &self,
+        type_id: TypeId,
+        seen: &mut std::collections::HashSet<Atom>,
+        params: &mut Vec<TypeParamInfo>,
+    ) {
+        if type_id.is_intrinsic() {
+            return;
+        }
+
+        let Some(key) = self.interner.lookup(type_id) else {
+            return;
+        };
+
+        match key {
+            TypeKey::TypeParameter(ref info) => {
+                if !seen.contains(&info.name) {
+                    seen.insert(info.name);
+                    params.push(info.clone());
+                }
+            }
+            TypeKey::Object(shape_id) | TypeKey::ObjectWithIndex(shape_id) => {
+                let shape = self.interner.object_shape(shape_id);
+                for prop in &shape.properties {
+                    self.collect_type_params(prop.type_id, seen, params);
+                }
+            }
+            TypeKey::Function(shape_id) => {
+                let shape = self.interner.function_shape(shape_id);
+                for param in &shape.params {
+                    self.collect_type_params(param.type_id, seen, params);
+                }
+                self.collect_type_params(shape.return_type, seen, params);
+            }
+            TypeKey::Union(members) | TypeKey::Intersection(members) => {
+                let members = self.interner.type_list(members);
+                for &member in members.iter() {
+                    self.collect_type_params(member, seen, params);
+                }
+            }
+            TypeKey::Array(elem) => {
+                self.collect_type_params(elem, seen, params);
+            }
+            TypeKey::Conditional(cond_id) => {
+                let cond = self.interner.conditional_type(cond_id);
+                self.collect_type_params(cond.check_type, seen, params);
+                self.collect_type_params(cond.extends_type, seen, params);
+                self.collect_type_params(cond.true_type, seen, params);
+                self.collect_type_params(cond.false_type, seen, params);
+            }
+            TypeKey::Application(app_id) => {
+                let app = self.interner.type_application(app_id);
+                self.collect_type_params(app.base, seen, params);
+                for &arg in &app.args {
+                    self.collect_type_params(arg, seen, params);
+                }
+            }
+            _ => {}
+        }
     }
 
     /// Evaluate a conditional type: T extends U ? X : Y
