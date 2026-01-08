@@ -106,6 +106,8 @@ Priority: 4
 - [x] Add ES5 mixin pattern test. Tests: `./wasm/test.sh mixin_pattern`
 - [x] Add ES5 method overloads test. Tests: `./wasm/test.sh method_overloads`
 - [x] Add ES5 computed method names test. Tests: `./wasm/test.sh computed_method_names`
+- [x] Add ES5 optional and readonly properties test. Tests: `./wasm/test.sh optional_and_readonly`
+- [x] Add ES5 constructor overloads test. Tests: `./wasm/test.sh constructor_overloads`
 
 ## Ready for Merge
 Yes
