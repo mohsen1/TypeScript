@@ -52,6 +52,12 @@ Phase 8 - Conformance, Convergence, and Hardening: Output fidelity across the in
 - Use Docker for tests: `./wasm/test.sh`
 - Focus on regression tests to guard against breakage
 
+## Management Strategy
+Per Project Direction: **Autocratic Scheduling**
+- The Manager is the single source of truth for priority
+- Squads are generic workers - if Emitter needs more workers, they get assigned regardless of previous track
+- Zero-Idle: If a high-priority task is blocked, swarm it
+
 ## Squad Status
 - Last EM Report: 2026-01-08 - All workers assigned and active
 - Workers Active: 5/5
