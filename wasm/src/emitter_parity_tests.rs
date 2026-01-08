@@ -638,3 +638,63 @@ fn test_parity_es5_default_export_class() {
         output
     );
 }
+
+/// Parity test for ES5 async iteration (for await...of).
+/// Async iteration should be downleveled using __asyncValues helper.
+#[test]
+fn test_parity_es5_async_iteration() {
+    let source = "async function process(items) { for await (const item of items) { console.log(item); } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 async iteration downlevel
+    assert!(
+        output.contains("__awaiter"),
+        "ES5 output should include __awaiter helper: {}",
+        output
+    );
+    assert!(
+        output.contains("__generator"),
+        "ES5 output should include __generator helper: {}",
+        output
+    );
+    assert!(
+        output.contains("function process"),
+        "ES5 output should define process function: {}",
+        output
+    );
+    // Should reference items in some form
+    assert!(
+        output.contains("items"),
+        "ES5 output should reference items: {}",
+        output
+    );
+    // No async function syntax
+    assert!(
+        !output.contains("async function"),
+        "ES5 output should not contain async function syntax: {}",
+        output
+    );
+    // No for await syntax
+    assert!(
+        !output.contains("for await"),
+        "ES5 output should not contain for await syntax: {}",
+        output
+    );
+}
