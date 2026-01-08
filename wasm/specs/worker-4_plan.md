@@ -24,6 +24,7 @@ Priority: 4
 - [x] ES5 async class method returns arrow with computed super key + arguments (current behavior, dropped body); test `./wasm/test.sh class_async_return_arrow_super_computed_key_arguments_capture`.
 - [x] ES5 async class nested arrow super + this + arguments capture; test `./wasm/test.sh class_async_nested_arrow_super_this_arguments_capture`.
 - [x] ES5 async class method arrow uses computed super key + arguments (current behavior); test `./wasm/test.sh class_async_arrow_super_computed_key_arguments_capture`.
+- [x] ES5 async class method arrow uses computed super key + this capture (current behavior); test `./wasm/test.sh class_async_arrow_super_computed_key_this_capture`.
 - [x] ES5 async class nested arrow super + this capture; test `./wasm/test.sh class_async_nested_arrow_super_this_capture`.
 - [x] ES5 async class nested arrow super + arguments capture; test `./wasm/test.sh class_async_nested_arrow_super_arguments`.
 - [x] ES5 async class nested arrow super call without args; test `./wasm/test.sh class_async_nested_arrow_super_call_no_args`.
@@ -72,3 +73,4 @@ Priority: 4
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
 - Use Docker for Rust tests (`./wasm/test.sh`), never `cargo test` directly.
 - Update this plan after each task and keep it accurate.
+- Ready for merge.
