@@ -2274,6 +2274,85 @@ fn test_conditional_infer_template_literal_union_input_distributive() {
 }
 
 #[test]
+fn test_conditional_infer_template_literal_from_string_input() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends `${infer R}` ? R : never, with T = string.
+    // TODO: Template literal inference is not implemented; current behavior yields never.
+    let extends_template = interner.template_literal(vec![TemplateSpan::Type(infer_r)]);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_template,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, TypeId::STRING);
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_template_literal_from_template_string_input() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends `${infer R}` ? R : never, with T = `${string}`.
+    // TODO: Template literal inference is not implemented; current behavior yields never.
+    let extends_template = interner.template_literal(vec![TemplateSpan::Type(infer_r)]);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_template,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let template_string = interner.template_literal(vec![TemplateSpan::Type(TypeId::STRING)]);
+    subst.insert(t_name, template_string);
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
 fn test_conditional_infer_template_literal_with_middle_infer_distributive() {
     let interner = TypeInterner::new();
 
