@@ -241,6 +241,35 @@ fn test_weak_type_detection_requires_overlap() {
 }
 
 #[test]
+fn test_exact_optional_property_types_toggle() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let name = interner.intern_string("x");
+    let target = interner.object(vec![PropertyInfo {
+        name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+    let source = interner.object(vec![PropertyInfo {
+        name,
+        type_id: TypeId::UNDEFINED,
+        write_type: TypeId::UNDEFINED,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(checker.is_subtype_of(source, target));
+
+    checker.exact_optional_property_types = true;
+    assert!(!checker.is_subtype_of(source, target));
+}
+
+#[test]
 fn test_unique_symbol_subtyping() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
