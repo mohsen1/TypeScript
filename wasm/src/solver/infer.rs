@@ -1305,6 +1305,20 @@ impl<'a> InferenceContext<'a> {
         }
     }
 
+    fn are_this_parameters_compatible(
+        &self,
+        source: Option<TypeId>,
+        target: Option<TypeId>,
+        bivariant: bool,
+    ) -> bool {
+        if source.is_none() && target.is_none() {
+            return true;
+        }
+        let source = source.unwrap_or(TypeId::ANY);
+        let target = target.unwrap_or(TypeId::ANY);
+        self.are_parameters_compatible(source, target, bivariant)
+    }
+
     fn is_numeric_property_name(&self, name: Atom) -> bool {
         let prop_name = self.interner.resolve_atom_ref(name);
         Self::is_numeric_literal_name(prop_name.as_ref())
@@ -1448,6 +1462,9 @@ impl<'a> InferenceContext<'a> {
         if source.is_constructor != target.is_constructor {
             return false;
         }
+        if !self.are_this_parameters_compatible(source.this_type, target.this_type, false) {
+            return false;
+        }
 
         self.function_like_subtype_of(
             &source.params,
@@ -1463,6 +1480,9 @@ impl<'a> InferenceContext<'a> {
         target: &CallSignature,
         bivariant: bool,
     ) -> bool {
+        if !self.are_this_parameters_compatible(source.this_type, target.this_type, bivariant) {
+            return false;
+        }
         self.function_like_subtype_of_with_variance(
             &source.params,
             source.return_type,

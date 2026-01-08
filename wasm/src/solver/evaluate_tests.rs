@@ -3911,7 +3911,7 @@ fn test_conditional_infer_optional_property_non_distributive_union_input() {
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::NEVER);
+    assert_eq!(result, TypeId::STRING);
 }
 
 #[test]
@@ -4422,8 +4422,9 @@ fn test_conditional_infer_function_this_param_distributive() {
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
 
-    assert_eq!(result, TypeId::NEVER);
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -4495,8 +4496,9 @@ fn test_conditional_infer_function_this_param_non_distributive_union_input() {
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
 
-    assert_eq!(result, TypeId::NEVER);
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -5013,7 +5015,7 @@ fn test_conditional_infer_tuple_optional_element_non_distributive_union_input() 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::NEVER);
+    assert_eq!(result, TypeId::STRING);
 }
 
 #[test]

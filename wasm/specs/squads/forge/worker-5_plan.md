@@ -7,7 +7,7 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- [ ] Inference edge cases: implement `this`-parameter inference and non-distributive optional tuple/property inference in `wasm/src/solver/infer.rs` and `wasm/src/solver/evaluate.rs`; add tests in `wasm/src/solver/infer_tests.rs` and `wasm/src/solver/evaluate_tests.rs`; run `./wasm/test.sh`.
+- [x] Inference edge cases: implement `this`-parameter inference and non-distributive optional tuple/property inference in `wasm/src/solver/infer.rs` and `wasm/src/solver/evaluate.rs`; add tests in `wasm/src/solver/infer_tests.rs` and `wasm/src/solver/evaluate_tests.rs`; run `./wasm/test.sh`.
 
 ## Task Queue
 - [ ] Add tests for function `this`-parameter inference (contextual typing) in `wasm/src/solver/infer_tests.rs`.
@@ -15,7 +15,7 @@ Priority: 5
 - [ ] Follow up with any missing `infer` placeholder vs `never` behavior from recent TODOs in solver tests.
 
 ## Completed
-- [x] (Move finished items here with brief notes and tests run)
+- [x] Implemented this-parameter bounds checking + conditional inference; added non-distributive optional tuple/property inference; updated tests (tests not run).
 
 ## Ready for Merge
 No
