@@ -55,18 +55,18 @@ const DEFAULT_IDLE_THRESHOLDS: IdleThresholds = {
 
 const DEFAULT_POKE_MESSAGES: PokeMessages = {
   director:
-    'Run `git fetch origin` and check for new commits on squad branches. Merge any squad branches that have new commits into rust. No need to coordinate with EMs or workers.',
-  em: 'Check worker status: 1) Run `git fetch origin` and merge any new commits from worker branches (origin/worker/$SQUAD_NAME-*) into your squad branch. 2) Check tmux panes for idle workers waiting for tasks. 3) If any worker is idle, assign them a task from the backlog in wasm/specs/squads/$SQUAD_NAME/. Update their worker plan file.',
+    'Run `git fetch origin` and check for new commits on squad branches. Merge any squad branches that have new commits into rust AND PUSH TO origin/rust. Always push after merging.',
+  em: 'Check worker status: 1) Run `git fetch origin` and merge any new commits from worker branches (origin/worker/$SQUAD_NAME-*) into your squad branch AND PUSH to origin/squad/$SQUAD_NAME. 2) Check tmux panes for idle workers waiting for tasks. 3) If any worker is idle, assign them a task from the backlog in wasm/specs/squads/$SQUAD_NAME/. Update their worker plan file.',
   worker:
-    'How is your task going? If stuck, describe the issue.',
+    'How is your task going? If you have working code, commit and push to origin NOW. Push frequently - at least every 10-15 minutes. If stuck, describe the issue.',
 };
 
 const DEFAULT_STARTUP_PROMPTS: StartupPrompts = {
   director:
-    "Read .role/AGENTS.md for your instructions. Merge EM branches (em/forge, em/anvil) into rust when they have blocker fixes. Be hands-off otherwise.",
-  em: "You are EM for squad $SQUAD_NAME. Read .role/AGENTS.md for your instructions. You have your own worktree on branch em/$SQUAD_NAME. FIRST: run ./wasm/test.sh 2>&1 | head -50 to check build. If build fails, FIX IT YOURSELF before assigning worker tasks.",
+    "Read .role/AGENTS.md for your instructions. Merge squad branches into rust frequently and ALWAYS PUSH to origin/rust after merging. Check every few minutes for new commits.",
+  em: "You are EM for squad $SQUAD_NAME. Read .role/AGENTS.md for your instructions. You have your own worktree on branch em/$SQUAD_NAME. FIRST: run ./wasm/test.sh 2>&1 | head -50 to check build. If build fails, FIX IT YOURSELF before assigning worker tasks. ALWAYS PUSH to origin/squad/$SQUAD_NAME after merging worker branches.",
   worker:
-    "You are worker $WORKER_NUM in squad $SQUAD_NAME. Read .role/AGENTS.md then your plan at wasm/specs/squads/$SQUAD_NAME/worker-${WORKER_NUM}_plan.md. Switch to branch worker/$SQUAD_NAME-$WORKER_NUM and work on your current assignment.",
+    "You are worker $WORKER_NUM in squad $SQUAD_NAME. Read .role/AGENTS.md then your plan at wasm/specs/squads/$SQUAD_NAME/worker-${WORKER_NUM}_plan.md. Switch to branch worker/$SQUAD_NAME-$WORKER_NUM and work on your current assignment. IMPORTANT: Commit and push to origin every 10-15 minutes. Do not let work accumulate locally.",
 };
 
 const DEFAULT_TIMING: TimingConfig = {
