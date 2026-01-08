@@ -11536,3 +11536,73 @@ const z = fn?.(5);"#;
         "expected non-empty source mappings for optional chaining code"
     );
 }
+
+#[test]
+fn test_source_map_logical_assignment_operators() {
+    // Test logical assignment operators: ||= &&= ??=
+    let source = r#"let a = null;
+let b = 0;
+let c = "hello";
+a ||= "default";
+b &&= 10;
+c ??= "fallback";"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the variable declarations
+    let (a_line, a_col) = find_line_col(source, "let a");
+    let has_a_mapping = decoded.iter().any(|entry| {
+        entry.original_line == a_line
+            && entry.original_column >= a_col
+            && entry.original_column <= a_col + 5
+    });
+
+    let (b_line, b_col) = find_line_col(source, "let b");
+    let has_b_mapping = decoded.iter().any(|entry| {
+        entry.original_line == b_line
+            && entry.original_column >= b_col
+            && entry.original_column <= b_col + 5
+    });
+
+    // At minimum, we should have mappings for the declarations
+    assert!(
+        has_a_mapping || has_b_mapping,
+        "expected mappings for logical assignment declarations. mappings: {mappings}"
+    );
+
+    // Verify output contains the variable names
+    assert!(
+        output.contains("var a") || output.contains("var b") || output.contains("var c"),
+        "expected output to contain variable declarations. output: {output}"
+    );
+
+    // Verify source map has non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for logical assignment code"
+    );
+}
