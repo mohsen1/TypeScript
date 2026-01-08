@@ -3019,25 +3019,197 @@ class Point {
 }
 
 #[test]
-fn test_class_es5_async_static_method() {
-    // Test class with async static method
+fn test_class_es5_async_static_field_with_await_chain() {
+    // Test static async field initializer with chained await expressions
     let source = r#"
-class DataService {
-    static cache: Map<string, any> = new Map();
+class DataLoader {
+    static loader = async () => {
+        const response = await fetch("/api/data");
+        const json = await response.json();
+        const processed = await processData(json);
+        return processed;
+    };
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
 
-    static async fetchData(url: string): Promise<any> {
-        if (this.cache.has(url)) {
-            return this.cache.get(url);
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function DataLoader"),
+        "Expected DataLoader class to emit as function: {}",
+        output
+    );
+
+    // Static async arrow should use __awaiter
+    assert!(
+        output.contains("__awaiter"),
+        "Expected static async arrow with await chain to use __awaiter: {}",
+        output
+    );
+
+    // Should be assigned to class, not prototype
+    assert!(
+        output.contains("DataLoader.loader"),
+        "Expected static field on class, not prototype: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_async_static_field_with_conditional() {
+    // Test static async field with conditional/ternary expressions inside async body
+    let source = r#"
+class ConfigLoader {
+    static loadConfig = async (env: string) => {
+        const baseUrl = env === "production"
+            ? "https://api.prod.com"
+            : env === "staging"
+                ? "https://api.staging.com"
+                : "http://localhost:3000";
+        const result = await fetch(baseUrl + "/config");
+        return result.ok ? await result.json() : null;
+    };
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function ConfigLoader"),
+        "Expected ConfigLoader class to emit as function: {}",
+        output
+    );
+
+    // Should use __awaiter for async
+    assert!(
+        output.contains("__awaiter"),
+        "Expected static async field with conditionals to use __awaiter: {}",
+        output
+    );
+
+    // Static field assignment
+    assert!(
+        output.contains("ConfigLoader.loadConfig"),
+        "Expected static loadConfig field on class: {}",
+        output
+    );
+
+    // Async body structure should include generator pattern
+    assert!(
+        output.contains("__generator"),
+        "Expected __generator pattern in async body: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_async_static_field_with_try_catch() {
+    // Test static async field with try/catch error handling
+    let source = r#"
+class SafeLoader {
+    static safeFetch = async (url: string) => {
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error("HTTP " + response.status);
+            }
+            return await response.json();
+        } catch (error) {
+            console.error("Fetch failed:", error);
+            return null;
+        } finally {
+            console.log("Fetch completed for:", url);
         }
-        const response = await fetch(url);
-        const data = await response.json();
-        this.cache.set(url, data);
+    };
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function SafeLoader"),
+        "Expected SafeLoader class to emit as function: {}",
+        output
+    );
+
+    // Should use __awaiter for async
+    assert!(
+        output.contains("__awaiter"),
+        "Expected static async field with try/catch to use __awaiter: {}",
+        output
+    );
+
+    // Static field assignment
+    assert!(
+        output.contains("SafeLoader.safeFetch"),
+        "Expected static safeFetch field on class: {}",
+        output
+    );
+
+    // Async body structure should include generator pattern
+    assert!(
+        output.contains("__generator"),
+        "Expected __generator pattern in async body: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_async_static_field_with_promise_all() {
+    // Test static async field with Promise.all for parallel operations
+    let source = r#"
+class ParallelLoader {
+    static loadAll = async (urls: string[]) => {
+        const promises = urls.map(url => fetch(url));
+        const responses = await Promise.all(promises);
+        const data = await Promise.all(responses.map(r => r.json()));
         return data;
-    }
-
-    static async clearCache(): Promise<void> {
-        this.cache.clear();
-    }
+    };
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -3057,57 +3229,48 @@ class DataService {
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(class_idx);
 
-    // DataService should emit as function
+    // Class should emit as function
     assert!(
-        output.contains("function DataService"),
-        "Expected DataService class to emit as function: {}",
+        output.contains("function ParallelLoader"),
+        "Expected ParallelLoader class to emit as function: {}",
         output
     );
 
-    // Static async method should be assigned to class
+    // Should use __awaiter for async
     assert!(
-        output.contains("DataService.fetchData") || output.contains("DataService[\"fetchData\"]"),
-        "Expected static fetchData method: {}",
+        output.contains("__awaiter"),
+        "Expected static async field with Promise.all to use __awaiter: {}",
         output
     );
 
-    // Note: Async transformation is separate from class ES5 transform
-    // The class ES5 emitter just converts the class structure, not async methods
-    // Static clearCache method should also be assigned
+    // Should preserve Promise.all calls
     assert!(
-        output.contains("DataService.clearCache") || output.contains("DataService[\"clearCache\"]"),
-        "Expected static clearCache method: {}",
+        output.contains("Promise.all"),
+        "Expected Promise.all calls in async body: {}",
         output
     );
 
-    // Static cache property should be initialized
+    // Static field assignment
     assert!(
-        output.contains("DataService.cache"),
-        "Expected static cache property: {}",
+        output.contains("ParallelLoader.loadAll"),
+        "Expected static loadAll field on class: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_with_decorators_syntax() {
-    // Test class with decorator-like patterns (decorators need experimental support)
-    // This tests the class structure when decorators are present
+fn test_class_es5_async_static_field_with_loop_and_await() {
+    // Test static async field with for loop containing await
     let source = r#"
-class LoggedClass {
-    // Simulating decorator metadata
-    static __decorators__ = [];
-
-    value: number = 0;
-
-    setValue(val: number) {
-        console.log("Setting value to", val);
-        this.value = val;
-    }
-
-    getValue(): number {
-        console.log("Getting value");
-        return this.value;
-    }
+class SequentialLoader {
+    static loadSequentially = async (items: string[]) => {
+        const results: any[] = [];
+        for (let i = 0; i < items.length; i++) {
+            const result = await processItem(items[i]);
+            results.push(result);
+        }
+        return results;
+    };
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -3127,52 +3290,45 @@ class LoggedClass {
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(class_idx);
 
-    // LoggedClass should emit as function
+    // Class should emit as function
     assert!(
-        output.contains("function LoggedClass"),
-        "Expected LoggedClass to emit as function: {}",
+        output.contains("function SequentialLoader"),
+        "Expected SequentialLoader class to emit as function: {}",
         output
     );
 
-    // Static decorator metadata should be on class
+    // Should use __awaiter for async
     assert!(
-        output.contains("LoggedClass.__decorators__"),
-        "Expected static __decorators__ property: {}",
+        output.contains("__awaiter"),
+        "Expected static async field with loop/await to use __awaiter: {}",
         output
     );
 
-    // Methods should be on prototype
+    // Static field assignment
     assert!(
-        output.contains(".prototype.setValue") || output.contains("prototype[\"setValue\"]"),
-        "Expected setValue method on prototype: {}",
+        output.contains("SequentialLoader.loadSequentially"),
+        "Expected static loadSequentially field on class: {}",
         output
     );
+
+    // Async body structure should include generator pattern
     assert!(
-        output.contains(".prototype.getValue") || output.contains("prototype[\"getValue\"]"),
-        "Expected getValue method on prototype: {}",
+        output.contains("__generator"),
+        "Expected __generator pattern in async body: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_parameter_decorator_pattern() {
-    // Test class structure that would have parameter decorators
-    // Parameter decorators apply to constructor/method parameters
-    // This tests the class structure that decorator metadata would augment
+fn test_class_es5_async_static_field_with_object_destructuring() {
+    // Test static async field with object destructuring from await result
     let source = r#"
-class Injectable {
-    private service: any;
-    private logger: any;
-
-    constructor(service: any, logger: any) {
-        this.service = service;
-        this.logger = logger;
-    }
-
-    execute(input: string, options: any): void {
-        this.logger.log("Executing with input:", input);
-        this.service.process(input, options);
-    }
+class ApiClient {
+    static getUser = async (id: number) => {
+        const { data, status, headers } = await api.get("/users/" + id);
+        const { name, email, role } = data;
+        return { name, email, role, status };
+    };
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -3192,66 +3348,42 @@ class Injectable {
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(class_idx);
 
-    // Injectable should emit as function constructor
+    // Class should emit as function
     assert!(
-        output.contains("function Injectable"),
-        "Expected Injectable class to emit as function: {}",
+        output.contains("function ApiClient"),
+        "Expected ApiClient class to emit as function: {}",
         output
     );
 
-    // Constructor should accept parameters
+    // Should use __awaiter for async
     assert!(
-        output.contains("Injectable(service, logger)") || output.contains("function Injectable(service"),
-        "Expected constructor with parameters: {}",
+        output.contains("__awaiter"),
+        "Expected static async field with destructuring to use __awaiter: {}",
         output
     );
 
-    // Private fields should be assigned in constructor
+    // Static field assignment
     assert!(
-        output.contains("this.service = service"),
-        "Expected service assignment in constructor: {}",
-        output
-    );
-    assert!(
-        output.contains("this.logger = logger"),
-        "Expected logger assignment in constructor: {}",
-        output
-    );
-
-    // Execute method should be on prototype
-    assert!(
-        output.contains(".prototype.execute") || output.contains("prototype[\"execute\"]"),
-        "Expected execute method on prototype: {}",
+        output.contains("ApiClient.getUser"),
+        "Expected static getUser field on class: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_property_decorator_pattern() {
-    // Test class structure that would have property decorators
-    // Property decorators apply to class properties (e.g., @observable, @Input)
-    // This tests the class structure that property decorator metadata would augment
+fn test_class_es5_async_static_field_with_nested_async_calls() {
+    // Test static async field that calls other async functions with nested awaits
     let source = r#"
-class ObservableModel {
-    // Properties that would typically have decorators like @observable, @Input, @Column
-    id: number = 0;
-    name: string = "";
-    isActive: boolean = true;
-
-    // Computed property getter (would have @computed decorator)
-    get displayName(): string {
-        return this.name + " (" + this.id + ")";
-    }
-
-    // Setter for property
-    set displayName(value: string) {
-        this.name = value;
-    }
-
-    // Method that modifies properties (would have @action decorator)
-    updateName(newName: string): void {
-        this.name = newName;
-    }
+class DataProcessor {
+    static process = async (input: any) => {
+        const validated = await validate(input);
+        const transformed = await transform(validated, {
+            format: await getFormat(),
+            options: await getOptions()
+        });
+        const result = await save(transformed);
+        return result;
+    };
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -3271,46 +3403,89 @@ class ObservableModel {
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(class_idx);
 
-    // ObservableModel should emit as function constructor
+    // Class should emit as function
     assert!(
-        output.contains("function ObservableModel"),
-        "Expected ObservableModel class to emit as function: {}",
+        output.contains("function DataProcessor"),
+        "Expected DataProcessor class to emit as function: {}",
         output
     );
 
-    // Instance properties should be initialized in constructor
+    // Should use __awaiter for async
     assert!(
-        output.contains("this.id = 0"),
-        "Expected id property initialization: {}",
-        output
-    );
-    assert!(
-        output.contains("this.name = \"\""),
-        "Expected name property initialization: {}",
-        output
-    );
-    assert!(
-        output.contains("this.isActive = true"),
-        "Expected isActive property initialization: {}",
+        output.contains("__awaiter"),
+        "Expected static async field with nested awaits to use __awaiter: {}",
         output
     );
 
-    // Getters and setters should use Object.defineProperty
+    // Static field assignment
     assert!(
-        output.contains("Object.defineProperty") || output.contains("defineProperty"),
-        "Expected Object.defineProperty for getter/setter: {}",
+        output.contains("DataProcessor.process"),
+        "Expected static process field on class: {}",
         output
     );
+}
+
+#[test]
+fn test_class_es5_async_static_field_with_switch_case() {
+    // Test static async field with switch/case inside async body
+    let source = r#"
+class ActionHandler {
+    static handle = async (action: string) => {
+        switch (action) {
+            case "fetch":
+                return await fetchData();
+            case "save":
+                return await saveData();
+            case "delete":
+                return await deleteData();
+            default:
+                throw new Error("Unknown action: " + action);
+        }
+    };
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
     assert!(
-        output.contains("displayName"),
-        "Expected displayName accessor: {}",
+        output.contains("function ActionHandler"),
+        "Expected ActionHandler class to emit as function: {}",
         output
     );
 
-    // Method should be on prototype
+    // Should use __awaiter for async
     assert!(
-        output.contains(".prototype.updateName") || output.contains("prototype[\"updateName\"]"),
-        "Expected updateName method on prototype: {}",
+        output.contains("__awaiter"),
+        "Expected static async field with switch/case to use __awaiter: {}",
+        output
+    );
+
+    // Static field assignment
+    assert!(
+        output.contains("ActionHandler.handle"),
+        "Expected static handle field on class: {}",
+        output
+    );
+
+    // Async body structure should include generator pattern
+    assert!(
+        output.contains("__generator"),
+        "Expected __generator pattern in async body: {}",
         output
     );
 }

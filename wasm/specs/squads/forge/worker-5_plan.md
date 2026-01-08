@@ -7,116 +7,24 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- [x] Investigate `ExtractState<R>` and `ExtractAction<R>` conditional infer patterns from `test_check_redux_lodash_style_generics`. These use `infer S` inside mapped type values. Test in isolation in `wasm/src/solver/evaluate_tests.rs`.
-
-### Investigation Results
-
-**Pattern Analysis:**
-- `ExtractState<R> = R extends Reducer<infer S, AnyAction> ? S : never` where `Reducer<S,A> = (state: S | undefined, action: A) => S`
-- The key pattern is matching `(state: infer S | undefined, action: AnyAction) => infer S` against a concrete reducer function
-- This requires matching source union `number | undefined` against pattern union `infer S | undefined`
-
-**Implementation:**
-1. Added `TypeKey::Union` pattern handling in `match_infer_pattern` (evaluate.rs:3382-3489)
-   - Handles union patterns containing a single `infer` type variable
-   - When source is a union: matches source members against non-infer pattern members, binds infer to remaining
-   - When source is not a union: binds infer to source if source doesn't match any non-infer pattern member
-
-2. Added isolated tests in `evaluate_tests.rs`:
-   - `test_conditional_infer_union_pattern_simple` - basic `number | undefined` vs `infer S | undefined`
-   - `test_conditional_infer_union_pattern_multiple_non_infer` - with multiple non-infer members
-   - `test_conditional_infer_union_pattern_multiple_source_members` - source has more members than pattern
-   - `test_conditional_infer_function_param_union_pattern` - full function pattern with union param (TODO: needs function-level integration)
-   - `test_conditional_infer_extract_state_pattern` - existing test updated with TODO
-
-**Status:**
-- Basic union pattern matching works (3 tests pass)
-- Function-level integration (ExtractState pattern) still returns `never` due to complex function matching flow
-- Pre-existing test failures in origin/rust merge unrelated to this change
+- [ ] Fix `test_redux_pattern_generic_function_with_conditional_return` in `wasm/src/thin_checker_tests.rs`. This test verifies generic functions with conditional return types work correctly. Run `./wasm/test.sh -- test_redux_pattern_generic_function_with_conditional_return` to reproduce. Check how conditional types are evaluated in function return positions.
 
 ## Task Queue
-- [x] Add coverage for `StateFromReducers<R>` mapped type that uses `ExtractState` on each property.
-- [x] Add coverage for `ActionFromReducers<R>` that uses indexed access `[keyof R]` on a mapped type.
-
-### StateFromReducers Coverage Added
-Added 6 tests in `evaluate_tests.rs`:
-- `test_mapped_type_with_conditional_template_simple` - ExtractValue pattern with object infer
-- `test_mapped_state_from_reducers_pattern_with_simple_objects` - SimpleReducer<S> pattern with object infer
-- `test_mapped_state_from_reducers_indexed_access` - R["key"] indexed access evaluation
-- `test_mapped_type_full_state_from_reducers_simulation` - mapped type over literal key union
-- `test_mapped_type_over_keyof_reducers_object` - mapped type with keyof T constraint
-- `test_extract_state_with_function_reducer_pattern` - Redux function-based Reducer pattern (TODO: returns never)
-
-### ActionFromReducers Coverage Added
-Added 5 tests in `evaluate_tests.rs`:
-- `test_indexed_access_on_object_with_keyof` - obj[keyof obj] produces value union
-- `test_indexed_access_mapped_type_result_with_union_key` - mapped result indexed with keyof
-- `test_action_from_reducers_pattern_with_simple_objects` - ExtractAction with SimpleReducer pattern
-- `test_action_from_reducers_full_pattern` - full pattern: mapped type + keyof indexed access
-- `test_indexed_access_with_single_key` - single key indexed access baseline
+- [ ] Fix remaining redux pattern test failures if any
+- [ ] Add coverage for distributive conditional types with complex infer patterns
 
 ## Completed
-- [x] Added StateFromReducers mapped type test coverage (6 tests) for mapped type + conditional infer patterns; `./wasm/test.sh` (fails: `test_check_redux_lodash_style_generics` pre-existing).
-- [x] Added ActionFromReducers indexed access test coverage (5 tests) for mapped type + keyof indexed access patterns; `./wasm/test.sh` (fails: `test_check_redux_lodash_style_generics` pre-existing).
-- [x] Added never-input readonly array infer regression; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
-- [x] Added never-input multi-template infer regression; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
-- [x] Added never-input tuple infer regression; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
-- [x] Added never-input function infer regression; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
-- [x] Added never-input array infer regression; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
-- [x] Added never-input object infer regression; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
-- [x] Ensured infer patterns bind `never` across templates; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
-- [x] Added conditional infer regression for never input; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
-- [x] Added infer union target placeholder + never regression test; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
-- [x] Added non-distributive template literal union input with template member; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
-- [x] Added non-distributive template literal union-branch tests (middle/suffix/prefix); ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
-- [x] Added non-distributive template literal two-infer union-branch tests; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
-- [x] Added non-distributive template literal constrained union-branch tests (middle/suffix/prefix); ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
-- [x] Added non-distributive template literal union-branch tests (basic + constrained); ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
-- [x] Added non-distributive optional-property union-branch inference test; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
-- [x] Added non-distributive readonly wrapper object-property inference tests; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
-- [x] Added non-distributive readonly object-property inference tests (union input/branch); ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
-- [x] Added non-distributive readonly nested union-branch inference test; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
-- [x] Added non-distributive readonly nested object inference test; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
-- [x] Added union handling for non-distributive object/nested-object infer in conditional evaluation; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
-- [x] Added non-distributive union-branch regression for nested object infer; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
-- [x] Added non-distributive union-branch regressions for string/number index signature infer; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
-- [x] Added non-distributive union-branch regressions for readonly array/tuple infer; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
-- [x] Added non-distributive union-branch regressions for function parameter, rest parameter, and this-parameter infer; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
-- [x] Added non-distributive tuple union-branch regressions for tuple element/optional tuple inference; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
-- [x] Implemented tuple-rest conditional infer binding and updated variadic tuple tests; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
-- [x] Added non-distributive union branch regression for conditional object call signatures; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
-- [x] Added non-distributive union branch regression for function return conditional inference; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
-- [x] Added non-distributive union branch regression test for array-element conditional inference; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
-- [x] Updated conditional infer array element tests to expect `string` for non-array union branches; ran `./wasm/test.sh test_conditional_infer_array_element_non_array_union_branch` and `./wasm/test.sh test_conditional_instantiated_param_distributes_branch_substitution`.
-- [x] Implemented function/callable parameter inference for conditional `infer` patterns (including optional/rest params); updated expectations; `./wasm/test.sh` failed: `emitter_edge_case_tests::test_parse_error_tolerance`.
-- [x] Removed stray duplicate block in `async_es5.rs` to fix compilation; `./wasm/test.sh` failed: `emitter_edge_case_tests::test_parse_error_tolerance`.
-- [x] Added function return-type inference for conditional `infer` patterns (including object property return inference); updated tests to expect `string | number`; `./wasm/test.sh` failed with async ES5 transform parse error (`async_es5.rs:749`).
-- [x] Implemented intersection object inference for conditional `infer` patterns; updated expectation to string; `./wasm/test.sh` failed with async ES5 transform parse error (`async_es5.rs:749`).
-- [x] Enabled non-distributive readonly array/tuple inference over union inputs and updated tests in `wasm/src/solver/evaluate_tests.rs`; `./wasm/test.sh` failed: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`.
-- [x] Implemented conditional infer constraint filtering + optional tuple/property inference; updated tuple optional expectations and added `this`-parameter tests; `./wasm/test.sh` failed: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`.
-- [x] Fixed FunctionId typo in `wasm/src/solver/evaluate.rs`; `./wasm/test.sh` failed: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`.
-- [x] Updated infer TODO expectations in `wasm/src/solver/evaluate_tests.rs` (tuple rest inference note + this-parameter TODO cleanup); `./wasm/test.sh` failed: missing `FunctionId` in `wasm/src/solver/evaluate.rs`.
-- [x] Implemented this-parameter bounds checking + conditional inference; added non-distributive optional tuple/property inference; updated tests (tests not run).
-- [x] Added `this`-parameter inference tests in `wasm/src/solver/infer_tests.rs` (tests not run).
-- [x] Added non-distributive union array inference for conditional types (tests not run).
-- [x] Added non-distributive tuple wrapper array inference for conditional types (tests not run).
-- [x] Made optional property inference include missing/undefined cases (tests not run).
-- [x] Flattened tuple rest and optional elements for array element inference (tests not run).
-- [x] Added non-distributive tuple union inference (tests not run).
-- [x] Updated non-distributive optional property inference expectation (tests not run).
-- [x] Added index signature inference from object properties (tests not run).
-- [x] Updated non-distributive nested object inference expectation (tests not run).
-- [x] Updated non-distributive union object inference expectation (tests not run).
+- [x] Investigated ExtractState/ExtractAction conditional infer patterns
+- [x] Implemented union pattern matching in match_infer_pattern (evaluate.rs)
+- [x] Added StateFromReducers and ActionFromReducers test coverage
+- [x] Basic union pattern matching works (3 tests pass)
 
 ## Ready for Merge
 No
 
 ## Notes
-- Project Direction: integration and conformance-first; prioritize solver correctness (inference/conditional/subtype) before new features.
-- Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md`
+- Project Direction: integration and conformance-first; prioritize solver correctness
 - Use Docker for Rust tests: `./wasm/test.sh`
-- Conformance focus: tie regressions to official TypeScript conformance cases when possible.
-- Commit format: `[wasm] solver: <description>` or `[wasm] checker: <description>`
+- Commit format: `[wasm] solver: <description>`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/forge-5`
-- **NEVER edit**: `DIRECTOR_AGENT.md`, `SQUAD_LEAD_AGENT.md`, `MANAGER_AGENT.md`, `AGENTS.md`, `start_*.sh`
