@@ -2275,6 +2275,48 @@ fn test_mapped_type_over_number_keys_assignable() {
 }
 
 #[test]
+fn test_mapped_type_over_string_keys_assignable() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let constraint = interner.intern(TypeKey::KeyOf(TypeId::STRING));
+    let mapped = interner.mapped(MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint,
+        name_type: None,
+        template: TypeId::BOOLEAN,
+        readonly_modifier: None,
+        optional_modifier: None,
+    });
+
+    let to_upper = interner.intern_string("toUpperCase");
+    let expected = interner.object(vec![PropertyInfo {
+        name: to_upper,
+        type_id: TypeId::BOOLEAN,
+        write_type: TypeId::BOOLEAN,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let mismatch = interner.object(vec![PropertyInfo {
+        name: to_upper,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(checker.is_assignable(mapped, expected));
+    assert!(!checker.is_assignable(mapped, mismatch));
+    assert!(!checker.is_assignable(expected, mapped));
+}
+
+#[test]
 fn test_mapped_type_key_remap_filters_keys() {
     let interner = TypeInterner::new();
     let mut checker = CompatChecker::new(&interner);
@@ -2436,6 +2478,50 @@ fn test_keyof_union_index_signature_assignable() {
 
     assert!(checker.is_assignable(keyof_union, TypeId::NUMBER));
     assert!(!checker.is_assignable(keyof_union, TypeId::STRING));
+}
+
+#[test]
+fn test_keyof_union_intersection_only_shared_keys() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let prop_a = PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    };
+    let prop_b = PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    };
+    let prop_c = PropertyInfo {
+        name: interner.intern_string("c"),
+        type_id: TypeId::BOOLEAN,
+        write_type: TypeId::BOOLEAN,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    };
+
+    let obj_ab = interner.object(vec![prop_a.clone(), prop_b]);
+    let obj_ac = interner.object(vec![prop_a, prop_c]);
+    let union = interner.union(vec![obj_ab, obj_ac]);
+    let keyof_union = interner.intern(TypeKey::KeyOf(union));
+
+    let key_a = interner.literal_string("a");
+    let key_b = interner.literal_string("b");
+    let key_c = interner.literal_string("c");
+
+    assert!(checker.is_assignable(key_a, keyof_union));
+    assert!(!checker.is_assignable(key_b, keyof_union));
+    assert!(!checker.is_assignable(key_c, keyof_union));
 }
 
 #[test]
