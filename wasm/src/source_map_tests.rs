@@ -21070,3 +21070,555 @@ console.log(accumulator, squared, cubed, complex);"#;
         "expected mappings to reference source file"
     );
 }
+
+// ============================================================================
+// BigInt Literal Source Map Tests
+// ============================================================================
+
+#[test]
+fn test_source_map_bigint_basic() {
+    // Test basic BigInt literal
+    let source = r#"const value = 123n;
+console.log(value);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify output contains variable name
+    assert!(
+        output.contains("value"),
+        "expected output to contain variable name. output: {output}"
+    );
+
+    // Verify we have source mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for basic BigInt"
+    );
+
+    // Verify at least some mappings reference the source file
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_bigint_with_variables() {
+    // Test BigInt with variable operations
+    let source = r#"const a = 100n;
+const b = 200n;
+const sum = a + b;
+console.log(sum);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify output contains variable names
+    assert!(
+        output.contains("sum"),
+        "expected output to contain variable name. output: {output}"
+    );
+
+    // Verify we have source mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for BigInt with variables"
+    );
+
+    // Verify at least some mappings reference the source file
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_bigint_arithmetic() {
+    // Test BigInt arithmetic operations
+    let source = r#"const a = 10n;
+const b = 3n;
+const add = a + b;
+const sub = a - b;
+const mul = a * b;
+const div = a / b;
+const mod = a % b;
+console.log(add, sub, mul, div, mod);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify output contains variable names
+    assert!(
+        output.contains("add"),
+        "expected output to contain variable name. output: {output}"
+    );
+
+    // Verify we have source mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for BigInt arithmetic"
+    );
+
+    // Verify at least some mappings reference the source file
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_bigint_comparison() {
+    // Test BigInt comparison operations
+    let source = r#"const a = 10n;
+const b = 20n;
+const isLess = a < b;
+const isEqual = a === 10n;
+const isGreater = b > a;
+console.log(isLess, isEqual, isGreater);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify output contains variable names
+    assert!(
+        output.contains("isLess"),
+        "expected output to contain variable name. output: {output}"
+    );
+
+    // Verify we have source mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for BigInt comparison"
+    );
+
+    // Verify at least some mappings reference the source file
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_bigint_constructor() {
+    // Test BigInt constructor
+    let source = r#"const fromNumber = BigInt(42);
+const fromString = BigInt("12345678901234567890");
+console.log(fromNumber, fromString);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify output contains variable names
+    assert!(
+        output.contains("fromNumber"),
+        "expected output to contain variable name. output: {output}"
+    );
+
+    // Verify we have source mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for BigInt constructor"
+    );
+
+    // Verify at least some mappings reference the source file
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_bigint_in_function() {
+    // Test BigInt in function body
+    let source = r#"function factorial(n: bigint): bigint {
+    if (n <= 1n) return 1n;
+    return n * factorial(n - 1n);
+}
+const result = factorial(10n);
+console.log(result);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify output contains function name
+    assert!(
+        output.contains("factorial"),
+        "expected output to contain function name. output: {output}"
+    );
+
+    // Verify we have source mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for BigInt in function"
+    );
+
+    // Verify at least some mappings reference the source file
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_bigint_large_numbers() {
+    // Test BigInt with large numbers
+    let source = r#"const large = 9007199254740991n;
+const veryLarge = 123456789012345678901234567890n;
+const sum = large + veryLarge;
+console.log(sum);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify output contains variable names
+    assert!(
+        output.contains("large"),
+        "expected output to contain variable name. output: {output}"
+    );
+
+    // Verify we have source mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for BigInt large numbers"
+    );
+
+    // Verify at least some mappings reference the source file
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_bigint_negative() {
+    // Test BigInt with negative numbers
+    let source = r#"const negative = -42n;
+const alsoNegative = -100n;
+const result = negative + alsoNegative;
+console.log(result);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify output contains variable names
+    assert!(
+        output.contains("negative"),
+        "expected output to contain variable name. output: {output}"
+    );
+
+    // Verify we have source mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for BigInt negative"
+    );
+
+    // Verify at least some mappings reference the source file
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_bigint_in_array_object() {
+    // Test BigInt in arrays and objects
+    let source = r#"const arr = [1n, 2n, 3n, 4n, 5n];
+const obj = { small: 10n, large: 1000000000000000000n };
+console.log(arr, obj.small, obj.large);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify output contains variable names
+    assert!(
+        output.contains("arr"),
+        "expected output to contain variable name. output: {output}"
+    );
+
+    // Verify we have source mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for BigInt in array/object"
+    );
+
+    // Verify at least some mappings reference the source file
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_bigint_combined() {
+    // Test combined BigInt patterns
+    let source = r#"const base = 2n;
+const exponent = 10n;
+let power = 1n;
+for (let i = 0n; i < exponent; i++) {
+    power = power * base;
+}
+const asNumber = Number(power);
+console.log(power, asNumber);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify output contains variable names
+    assert!(
+        output.contains("power"),
+        "expected output to contain variable name. output: {output}"
+    );
+
+    // Verify we have source mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for combined BigInt"
+    );
+
+    // Verify at least some mappings reference the source file
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
