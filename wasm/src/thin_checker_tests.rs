@@ -139,6 +139,60 @@ takesFoo(obj);
 }
 
 #[test]
+fn test_array_literal_best_common_type() {
+    use crate::thin_parser::ThinParserState;
+    use crate::parser::syntax_kind_ext;
+
+    let source = r#"
+const numbers = [1, 2];
+const mixed = [1, "a"];
+numbers;
+mixed;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let arena = parser.get_arena();
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+
+    let expr_stmts: Vec<_> = source_file
+        .statements
+        .nodes
+        .iter()
+        .copied()
+        .filter(|&idx| arena.get(idx).map_or(false, |node| node.kind == syntax_kind_ext::EXPRESSION_STATEMENT))
+        .collect();
+    assert_eq!(expr_stmts.len(), 2, "Expected two expression statements");
+
+    let numbers_expr = arena
+        .get_expression_statement(arena.get(expr_stmts[0]).expect("numbers expr node"))
+        .expect("numbers expr");
+    let mixed_expr = arena
+        .get_expression_statement(arena.get(expr_stmts[1]).expect("mixed expr node"))
+        .expect("mixed expr");
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let numbers_type = checker.get_type_of_node(numbers_expr.expression);
+    let mixed_type = checker.get_type_of_node(mixed_expr.expression);
+
+    let number_array = checker.ctx.types.array(TypeId::NUMBER);
+    let number_or_string = checker.ctx.types.union(vec![TypeId::NUMBER, TypeId::STRING]);
+    let mixed_array = checker.ctx.types.array(number_or_string);
+
+    assert_eq!(numbers_type, number_array);
+    assert_eq!(mixed_type, mixed_array);
+}
+
+#[test]
 fn test_thin_checker_resolves_function_parameter_from_bound_state() {
     use crate::binder::SymbolTable;
     use crate::checker::types::diagnostics::diagnostic_codes;
@@ -5093,6 +5147,37 @@ if (typeof x === "string") {
 
     let narrowed = checker.get_type_of_node(expr_stmt.expression);
     assert_eq!(narrowed, TypeId::STRING);
+}
+
+#[test]
+fn test_flow_narrowing_not_applied_in_closure() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let x: string | number;
+if (typeof x === "string") {
+    const run = () => {
+        x.toUpperCase();
+    };
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        codes.contains(&2339),
+        "Expected error 2339 for closure without narrowing, got: {:?}",
+        codes
+    );
 }
 
 #[test]

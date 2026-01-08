@@ -2130,6 +2130,140 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             TypeKey::Infer(info) => self.bind_infer(&info, source, bindings, checker),
             TypeKey::Function(pattern_fn_id) => {
                 let pattern_fn = self.interner.function_shape(pattern_fn_id);
+                let has_param_infer = pattern_fn
+                    .params
+                    .iter()
+                    .any(|param| self.type_contains_infer(param.type_id));
+                let has_return_infer = self.type_contains_infer(pattern_fn.return_type);
+
+                if pattern_fn.this_type.is_none() && has_param_infer && !has_return_infer {
+                    let mut match_function_params = |source_type: TypeId,
+                                                     source_fn_id: FunctionShapeId,
+                                                     bindings: &mut FxHashMap<Atom, TypeId>|
+                     -> bool {
+                        let source_fn = self.interner.function_shape(source_fn_id);
+                        if source_fn.params.len() != pattern_fn.params.len() {
+                            return false;
+                        }
+                        let mut local_visited = FxHashSet::default();
+                        for (source_param, pattern_param) in source_fn
+                            .params
+                            .iter()
+                            .zip(pattern_fn.params.iter())
+                        {
+                            if source_param.optional != pattern_param.optional
+                                || source_param.rest != pattern_param.rest
+                            {
+                                return false;
+                            }
+                            let source_param_type = if source_param.optional {
+                                self.interner
+                                    .union2(source_param.type_id, TypeId::UNDEFINED)
+                            } else {
+                                source_param.type_id
+                            };
+                            if !self.match_infer_pattern(
+                                source_param_type,
+                                pattern_param.type_id,
+                                bindings,
+                                &mut local_visited,
+                                checker,
+                            ) {
+                                return false;
+                            }
+                        }
+                        let substituted = self.substitute_infer(pattern, bindings);
+                        checker.is_subtype_of(source_type, substituted)
+                    };
+
+                    return match self.interner.lookup(source) {
+                        Some(TypeKey::Function(source_fn_id)) => {
+                            match_function_params(source, source_fn_id, bindings)
+                        }
+                        Some(TypeKey::Union(members)) => {
+                            let members = self.interner.type_list(members);
+                            let mut combined = FxHashMap::default();
+                            for &member in members.iter() {
+                                let Some(TypeKey::Function(source_fn_id)) =
+                                    self.interner.lookup(member)
+                                else {
+                                    return false;
+                                };
+                                let mut member_bindings = FxHashMap::default();
+                                if !match_function_params(member, source_fn_id, &mut member_bindings)
+                                {
+                                    return false;
+                                }
+                                for (name, ty) in member_bindings {
+                                    combined
+                                        .entry(name)
+                                        .and_modify(|existing| {
+                                            *existing = self.interner.union2(*existing, ty);
+                                        })
+                                        .or_insert(ty);
+                                }
+                            }
+                            bindings.extend(combined);
+                            true
+                        }
+                        _ => false,
+                    };
+                }
+
+                if pattern_fn.this_type.is_none() && !has_param_infer && has_return_infer {
+                    let mut match_function_return = |source_type: TypeId,
+                                                     source_fn_id: FunctionShapeId,
+                                                     bindings: &mut FxHashMap<Atom, TypeId>|
+                     -> bool {
+                        let source_fn = self.interner.function_shape(source_fn_id);
+                        let mut local_visited = FxHashSet::default();
+                        if !self.match_infer_pattern(
+                            source_fn.return_type,
+                            pattern_fn.return_type,
+                            bindings,
+                            &mut local_visited,
+                            checker,
+                        ) {
+                            return false;
+                        }
+                        let substituted = self.substitute_infer(pattern, bindings);
+                        checker.is_subtype_of(source_type, substituted)
+                    };
+
+                    return match self.interner.lookup(source) {
+                        Some(TypeKey::Function(source_fn_id)) => {
+                            match_function_return(source, source_fn_id, bindings)
+                        }
+                        Some(TypeKey::Union(members)) => {
+                            let members = self.interner.type_list(members);
+                            let mut combined = FxHashMap::default();
+                            for &member in members.iter() {
+                                let Some(TypeKey::Function(source_fn_id)) =
+                                    self.interner.lookup(member)
+                                else {
+                                    return false;
+                                };
+                                let mut member_bindings = FxHashMap::default();
+                                if !match_function_return(member, source_fn_id, &mut member_bindings)
+                                {
+                                    return false;
+                                }
+                                for (name, ty) in member_bindings {
+                                    combined
+                                        .entry(name)
+                                        .and_modify(|existing| {
+                                            *existing = self.interner.union2(*existing, ty);
+                                        })
+                                        .or_insert(ty);
+                                }
+                            }
+                            bindings.extend(combined);
+                            true
+                        }
+                        _ => false,
+                    };
+                }
+
                 let Some(pattern_this) = pattern_fn.this_type else {
                     return checker.is_subtype_of(source, pattern);
                 };
@@ -2137,12 +2271,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     return checker.is_subtype_of(source, pattern);
                 }
 
-                if pattern_fn
-                    .params
-                    .iter()
-                    .any(|param| self.type_contains_infer(param.type_id))
-                    || self.type_contains_infer(pattern_fn.return_type)
-                {
+                if has_param_infer || has_return_infer {
                     return false;
                 }
 
@@ -2197,6 +2326,106 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     }
                     _ => false,
                 }
+            }
+            TypeKey::Callable(pattern_shape_id) => {
+                let pattern_shape = self.interner.callable_shape(pattern_shape_id);
+                if pattern_shape.call_signatures.len() != 1
+                    || !pattern_shape.construct_signatures.is_empty()
+                    || !pattern_shape.properties.is_empty()
+                {
+                    return checker.is_subtype_of(source, pattern);
+                }
+                let pattern_sig = &pattern_shape.call_signatures[0];
+                let has_param_infer = pattern_sig
+                    .params
+                    .iter()
+                    .any(|param| self.type_contains_infer(param.type_id));
+                let has_return_infer = self.type_contains_infer(pattern_sig.return_type);
+                if pattern_sig.this_type.is_none() && has_param_infer && !has_return_infer {
+                    let mut match_callable_params = |source_type: TypeId,
+                                                     source_shape_id: CallableShapeId,
+                                                     bindings: &mut FxHashMap<Atom, TypeId>|
+                     -> bool {
+                        let source_shape = self.interner.callable_shape(source_shape_id);
+                        if source_shape.call_signatures.len() != 1
+                            || !source_shape.construct_signatures.is_empty()
+                            || !source_shape.properties.is_empty()
+                        {
+                            return false;
+                        }
+                        let source_sig = &source_shape.call_signatures[0];
+                        if source_sig.params.len() != pattern_sig.params.len() {
+                            return false;
+                        }
+                        let mut local_visited = FxHashSet::default();
+                        for (source_param, pattern_param) in source_sig
+                            .params
+                            .iter()
+                            .zip(pattern_sig.params.iter())
+                        {
+                            if source_param.optional != pattern_param.optional
+                                || source_param.rest != pattern_param.rest
+                            {
+                                return false;
+                            }
+                            let source_param_type = if source_param.optional {
+                                self.interner
+                                    .union2(source_param.type_id, TypeId::UNDEFINED)
+                            } else {
+                                source_param.type_id
+                            };
+                            if !self.match_infer_pattern(
+                                source_param_type,
+                                pattern_param.type_id,
+                                bindings,
+                                &mut local_visited,
+                                checker,
+                            ) {
+                                return false;
+                            }
+                        }
+                        let substituted = self.substitute_infer(pattern, bindings);
+                        checker.is_subtype_of(source_type, substituted)
+                    };
+
+                    return match self.interner.lookup(source) {
+                        Some(TypeKey::Callable(source_shape_id)) => {
+                            match_callable_params(source, source_shape_id, bindings)
+                        }
+                        Some(TypeKey::Union(members)) => {
+                            let members = self.interner.type_list(members);
+                            let mut combined = FxHashMap::default();
+                            for &member in members.iter() {
+                                let Some(TypeKey::Callable(source_shape_id)) =
+                                    self.interner.lookup(member)
+                                else {
+                                    return false;
+                                };
+                                let mut member_bindings = FxHashMap::default();
+                                if !match_callable_params(
+                                    member,
+                                    source_shape_id,
+                                    &mut member_bindings,
+                                ) {
+                                    return false;
+                                }
+                                for (name, ty) in member_bindings {
+                                    combined
+                                        .entry(name)
+                                        .and_modify(|existing| {
+                                            *existing = self.interner.union2(*existing, ty);
+                                        })
+                                        .or_insert(ty);
+                                }
+                            }
+                            bindings.extend(combined);
+                            true
+                        }
+                        _ => false,
+                    };
+                }
+
+                checker.is_subtype_of(source, pattern)
             }
             TypeKey::Array(pattern_elem) => match self.interner.lookup(source) {
                 Some(TypeKey::Array(source_elem)) => self.match_infer_pattern(
@@ -2326,6 +2555,61 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                             return false;
                         };
                         let source_type = self.optional_property_type(source_prop);
+                        if !self.match_infer_pattern(
+                            source_type,
+                            pattern_prop.type_id,
+                            bindings,
+                            visited,
+                            checker,
+                        ) {
+                            return false;
+                        }
+                    }
+                    true
+                }
+                Some(TypeKey::Intersection(members)) => {
+                    let members = self.interner.type_list(members);
+                    let pattern_shape = self.interner.object_shape(pattern_shape_id);
+                    for pattern_prop in &pattern_shape.properties {
+                        let mut merged_type = None;
+                        for &member in members.iter() {
+                            let shape_id = match self.interner.lookup(member) {
+                                Some(TypeKey::Object(shape_id))
+                                | Some(TypeKey::ObjectWithIndex(shape_id)) => shape_id,
+                                _ => return false,
+                            };
+                            let shape = self.interner.object_shape(shape_id);
+                            if let Some(source_prop) = shape
+                                .properties
+                                .iter()
+                                .find(|prop| prop.name == pattern_prop.name)
+                            {
+                                let source_type = self.optional_property_type(source_prop);
+                                merged_type = Some(match merged_type {
+                                    Some(existing) => self.interner.intersection2(existing, source_type),
+                                    None => source_type,
+                                });
+                            }
+                        }
+
+                        let Some(source_type) = merged_type else {
+                            if pattern_prop.optional {
+                                if self.type_contains_infer(pattern_prop.type_id)
+                                    && !self.match_infer_pattern(
+                                        TypeId::UNDEFINED,
+                                        pattern_prop.type_id,
+                                        bindings,
+                                        visited,
+                                        checker,
+                                    )
+                                {
+                                    return false;
+                                }
+                                continue;
+                            }
+                            return false;
+                        };
+
                         if !self.match_infer_pattern(
                             source_type,
                             pattern_prop.type_id,

@@ -61,7 +61,7 @@ Phase 8 - Conformance, Convergence, and Hardening: solver correctness in the int
 ## Squad Status
 - Last EM Report: 2026-01-08
 - Workers Active: 5/5
-- Branches Pending Merge: worker/forge-1 (blocked by management-file edits)
+- Branches Pending Merge: worker/forge-1, worker/forge-4 (blocked by management-file edits)
 - Current Focus: conditional type evaluation (function + template literal inference), subtype `this` variance, end-to-end generic regressions, optional/variadic tuple inference
 - Direction: Conformance-first integration; solver correctness before feature work
-- Blockers: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports` failure; worker/forge-1 contains management-file edits
+- Blockers: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports` failure; worker/forge-1/forge-4 contain management-file edits
