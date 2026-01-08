@@ -154,6 +154,42 @@ fn test_template_literal_apparent_member_subtyping() {
 }
 
 #[test]
+fn test_template_literal_number_index_subtyping() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let red = interner.literal_string("red");
+    let blue = interner.literal_string("blue");
+    let colors = interner.union(vec![red, blue]);
+    let template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("color-")),
+        TemplateSpan::Type(colors),
+    ]);
+
+    let target = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+    });
+    let mismatch = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    assert!(checker.is_subtype_of(template, target));
+    assert!(!checker.is_subtype_of(template, mismatch));
+}
+
+#[test]
 fn test_apparent_number_member_subtyping() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
