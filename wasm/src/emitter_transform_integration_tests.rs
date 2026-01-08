@@ -253,6 +253,1872 @@ class Derived extends Base {
 }
 
 #[test]
+fn test_two_phase_emission_es5_class_super_method_arguments() {
+    let source = r#"
+class Base { m(x) { return x; } }
+class Derived extends Base {
+    method() { return super.m(arguments[0]); }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("__extends(Derived, _super)"),
+        "ES5 output should call __extends for Derived: {}",
+        output
+    );
+    assert!(
+        output.contains("_super.prototype.m.call(this, arguments[0])"),
+        "ES5 output should lower super method call with arguments: {}",
+        output
+    );
+    assert!(
+        !output.contains("super.m"),
+        "ES5 output should not contain super method access: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_super_computed_method_arguments() {
+    let source = r#"
+class Base { m(x) { return x; } }
+class Derived extends Base {
+    method() { return super["m"](arguments[0]); }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("_super.prototype[\"m\"].call(this, arguments[0])"),
+        "ES5 output should lower computed super method call with arguments: {}",
+        output
+    );
+    assert!(
+        !output.contains("super[\"m\"]"),
+        "ES5 output should not contain super element access: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_super_arrow_this_capture() {
+    let source = r#"
+class Base {}
+class Derived extends Base {
+    constructor() {
+        super();
+        const f = () => this.x;
+        f();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("var _this = _super.call(this"),
+        "ES5 output should initialize _this from super: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.x"),
+        "ES5 output should capture this inside arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel arrow: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_method_arrow_super_this_capture() {
+    let source = r#"
+class Base { m(x) { return x; } }
+class Derived extends Base {
+    method() {
+        const f = () => super.m(this.x);
+        return f();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("_super.prototype.m.call(_this"),
+        "ES5 output should lower super call with lexical this: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.x"),
+        "ES5 output should capture this inside arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("super.m"),
+        "ES5 output should not contain super method access: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel arrow: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_method_nested_arrow_super_this_capture() {
+    let source = r#"
+class Base { m(x) { return x; } }
+class Derived extends Base {
+    method() {
+        const f = () => () => super.m(this.x);
+        return f()();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("_super.prototype.m.call(_this"),
+        "ES5 output should lower super call with lexical this: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.x"),
+        "ES5 output should capture this inside nested arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("super.m"),
+        "ES5 output should not contain super method access: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel nested arrow: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_method_arrow_super_arguments_capture() {
+    let source = r#"
+class Base { m(x) { return x; } }
+class Derived extends Base {
+    method() {
+        const f = () => super.m(arguments[0]);
+        return f();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("_super.prototype.m.call(_this, arguments[0])"),
+        "ES5 output should lower super call with lexical this: {}",
+        output
+    );
+    assert!(
+        !output.contains("super.m"),
+        "ES5 output should not contain super method access: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel arrow: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_ctor_arrow_super_call() {
+    let source = r#"
+class Base { m() { return this.x; } }
+class Derived extends Base {
+    constructor() {
+        super();
+        const f = () => super.m();
+        return f();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("var _this = _super.call(this"),
+        "ES5 output should initialize _this from super: {}",
+        output
+    );
+    assert!(
+        output.contains("_super.prototype.m.call(_this"),
+        "ES5 output should lower super call with lexical this: {}",
+        output
+    );
+    assert!(
+        !output.contains("super.m"),
+        "ES5 output should not contain super method access: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel arrow: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_super_nested_arrow_this_capture() {
+    let source = r#"
+class Base {}
+class Derived extends Base {
+    constructor() {
+        super();
+        const f = () => () => this.x;
+        f()();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("var _this = _super.call(this"),
+        "ES5 output should initialize _this from super: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.x"),
+        "ES5 output should capture this inside nested arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel nested arrow: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_async_super_this_capture() {
+    let source = r#"
+class Base { m(x) { return x; } }
+class Derived extends Base {
+    async method() {
+        const f = () => this.x;
+        await f();
+        return super.m(arguments[0]);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("return __awaiter"),
+        "ES5 output should emit __awaiter for async method: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.x"),
+        "ES5 output should capture this inside arrow: {}",
+        output
+    );
+    assert!(
+        output.contains("_super.prototype.m.call(this, arguments[0])"),
+        "ES5 output should lower super method call: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel arrow: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_async_super_computed_method_arguments() {
+    let source = r#"
+class Base { m(x) { return x; } }
+class Derived extends Base {
+    async method() {
+        return super["m"](arguments[0]);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("return __awaiter"),
+        "ES5 output should emit __awaiter for async method: {}",
+        output
+    );
+    // TODO: async ES5 emission should lower computed super element access.
+    assert!(
+        output.contains("void 0[\"m\"](arguments[0])"),
+        "ES5 output currently leaves computed super element access unlowered: {}",
+        output
+    );
+    assert!(
+        !output.contains("super[\"m\"]"),
+        "ES5 output should not contain super element access: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_async_super_computed_method_this_arguments() {
+    let source = r#"
+class Base { m(x) { return x; } }
+class Derived extends Base {
+    async method() {
+        return super["m"](this.x + arguments[0]);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("return __awaiter"),
+        "ES5 output should emit __awaiter for async method: {}",
+        output
+    );
+    // TODO: async ES5 emission should lower computed super element access.
+    assert!(
+        output.contains("void 0[\"m\"]"),
+        "ES5 output currently leaves computed super element access unlowered: {}",
+        output
+    );
+    assert!(
+        output.contains("this.x"),
+        "ES5 output should preserve this usage in computed super call: {}",
+        output
+    );
+    assert!(
+        output.contains("arguments[0]"),
+        "ES5 output should preserve arguments usage in computed super call: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_async_return_arrow_super_computed_arguments() {
+    let source = r#"
+class Base { m(x) { return x; } }
+class Derived extends Base {
+    async method() {
+        return () => super["m"](arguments[0]);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("return __awaiter"),
+        "ES5 output should emit __awaiter for async method: {}",
+        output
+    );
+    // TODO: async ES5 emission should lower computed super element access in arrows.
+    assert!(
+        output.contains("super[\"m\"]"),
+        "ES5 output currently leaves computed super element access in returned arrow: {}",
+        output
+    );
+    assert!(
+        output.contains("arguments[0]"),
+        "ES5 output should preserve arguments usage in returned arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel returned arrow: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_async_return_arrow_super_computed_this_arguments_capture() {
+    let source = r#"
+class Base { m(x) { return x; } }
+class Derived extends Base {
+    async method() {
+        return () => super["m"](this.x + arguments[0]);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("return __awaiter"),
+        "ES5 output should emit __awaiter for async method: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.x"),
+        "ES5 output should capture this inside returned arrow: {}",
+        output
+    );
+    assert!(
+        output.contains("arguments[0]"),
+        "ES5 output should preserve arguments usage in returned arrow: {}",
+        output
+    );
+    // TODO: async ES5 emission should lower computed super element access in arrows.
+    assert!(
+        output.contains("super[\"m\"]"),
+        "ES5 output currently leaves computed super element access in returned arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel returned arrow: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_async_return_arrow_super_computed_key_this_arguments_capture() {
+    let source = r#"
+class Base { m(x) { return x; } }
+class Derived extends Base {
+    async method() {
+        const key = "m";
+        return () => super[key](this.x + arguments[0]);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("return __awaiter"),
+        "ES5 output should emit __awaiter for async method: {}",
+        output
+    );
+    // TODO: async ES5 emission should preserve returned arrow bodies with computed super access.
+    assert!(
+        output.contains("return [2 /*return*/]"),
+        "ES5 output currently drops returned arrow body: {}",
+        output
+    );
+    assert!(
+        !output.contains("_this.x"),
+        "ES5 output currently drops this capture in returned arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("arguments[0]"),
+        "ES5 output currently drops arguments usage in returned arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("super[key]"),
+        "ES5 output should not contain computed super element access when body is dropped: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel returned arrow: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_async_return_arrow_super_computed_key_arguments_capture() {
+    let source = r#"
+class Base { m(x) { return x; } }
+class Derived extends Base {
+    async method() {
+        const key = "m";
+        return () => super[key](arguments[0]);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("return __awaiter"),
+        "ES5 output should emit __awaiter for async method: {}",
+        output
+    );
+    // TODO: async ES5 emission should preserve returned arrow bodies with computed super access.
+    assert!(
+        output.contains("return [2 /*return*/]"),
+        "ES5 output currently drops returned arrow body: {}",
+        output
+    );
+    assert!(
+        !output.contains("arguments[0]"),
+        "ES5 output currently drops arguments usage in returned arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("super[key]"),
+        "ES5 output should not contain computed super element access when body is dropped: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel returned arrow: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_async_arrow_arguments_capture() {
+    let source = r#"
+class Base {}
+class Derived extends Base {
+    async method(a: number) {
+        const f = () => this.x + arguments[0];
+        return await f();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("return __awaiter"),
+        "ES5 output should emit __awaiter for async method: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.x"),
+        "ES5 output should capture this inside arrow: {}",
+        output
+    );
+    assert!(
+        output.contains("arguments[0]"),
+        "ES5 output should preserve arguments usage in arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel arrow: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_async_arrow_super_this_capture() {
+    let source = r#"
+class Base { m(x) { return x; } }
+class Derived extends Base {
+    async method() {
+        const f = () => super.m(this.x);
+        return await f();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("return __awaiter"),
+        "ES5 output should emit __awaiter for async method: {}",
+        output
+    );
+    assert!(
+        output.contains("_super.prototype.m.call(_this"),
+        "ES5 output should lower super call with lexical this: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.x"),
+        "ES5 output should capture this inside arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("super.m"),
+        "ES5 output should not contain super method access: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel arrow: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_async_arrow_super_call_no_args() {
+    let source = r#"
+class Base { m() { return 1; } }
+class Derived extends Base {
+    async method() {
+        const f = () => super.m();
+        return await f();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("return __awaiter"),
+        "ES5 output should emit __awaiter for async method: {}",
+        output
+    );
+    assert!(
+        output.contains("_super.prototype.m.call(_this"),
+        "ES5 output should lower super call with lexical this: {}",
+        output
+    );
+    assert!(
+        !output.contains("super.m"),
+        "ES5 output should not contain super method access: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel arrow: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_async_arrow_super_computed_call_no_args() {
+    let source = r#"
+class Base { m() { return 1; } }
+class Derived extends Base {
+    async method() {
+        const f = () => super["m"]();
+        return await f();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("return __awaiter"),
+        "ES5 output should emit __awaiter for async method: {}",
+        output
+    );
+    // TODO: async ES5 emission should lower computed super element access in arrows.
+    assert!(
+        output.contains("super[\"m\"]"),
+        "ES5 output currently leaves computed super element access in arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel arrow: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_async_arrow_super_computed_key_arguments_capture() {
+    let source = r#"
+class Base { m(x) { return x; } }
+class Derived extends Base {
+    async method() {
+        const key = "m";
+        const f = () => super[key](arguments[0]);
+        return await f();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("return __awaiter"),
+        "ES5 output should emit __awaiter for async method: {}",
+        output
+    );
+    assert!(
+        output.contains("arguments[0]"),
+        "ES5 output should preserve arguments usage in arrow: {}",
+        output
+    );
+    // TODO: async ES5 emission should lower computed super element access in arrows.
+    assert!(
+        output.contains("super[key]"),
+        "ES5 output currently leaves computed super element access in arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel arrow: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_async_arrow_super_arguments_capture() {
+    let source = r#"
+class Base { m(x) { return x; } }
+class Derived extends Base {
+    async method() {
+        const f = () => super.m(arguments[0]);
+        return await f();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("return __awaiter"),
+        "ES5 output should emit __awaiter for async method: {}",
+        output
+    );
+    assert!(
+        output.contains("_super.prototype.m.call(_this, arguments[0])"),
+        "ES5 output should lower super call with lexical this: {}",
+        output
+    );
+    assert!(
+        !output.contains("super.m"),
+        "ES5 output should not contain super method access: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel arrow: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_async_arrow_super_this_arguments_capture() {
+    let source = r#"
+class Base { m(x) { return x; } }
+class Derived extends Base {
+    async method() {
+        const f = () => super.m(this.x + arguments[0]);
+        return await f();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("return __awaiter"),
+        "ES5 output should emit __awaiter for async method: {}",
+        output
+    );
+    assert!(
+        output.contains("_super.prototype.m.call(_this"),
+        "ES5 output should lower super call with lexical this: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.x"),
+        "ES5 output should capture this inside arrow: {}",
+        output
+    );
+    assert!(
+        output.contains("arguments[0]"),
+        "ES5 output should preserve arguments usage in arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("super.m"),
+        "ES5 output should not contain super method access: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel arrow: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_async_nested_arrow_super_arguments() {
+    let source = r#"
+class Base { m(x) { return x; } }
+class Derived extends Base {
+    async method() {
+        const f = () => () => super.m(arguments[0]);
+        return await f()();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("return __awaiter"),
+        "ES5 output should emit __awaiter for async method: {}",
+        output
+    );
+    assert!(
+        output.contains("_super.prototype.m.call(_this, arguments[0])"),
+        "ES5 output should lower super call with lexical this: {}",
+        output
+    );
+    assert!(
+        !output.contains("super.m"),
+        "ES5 output should not contain super method access: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel nested arrow: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_async_nested_arrow_super_call_no_args() {
+    let source = r#"
+class Base { m() { return 1; } }
+class Derived extends Base {
+    async method() {
+        const f = () => () => super.m();
+        return await f()();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("return __awaiter"),
+        "ES5 output should emit __awaiter for async method: {}",
+        output
+    );
+    assert!(
+        output.contains("_super.prototype.m.call(_this"),
+        "ES5 output should lower super call with lexical this: {}",
+        output
+    );
+    assert!(
+        !output.contains("super.m"),
+        "ES5 output should not contain super method access: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel nested arrow: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_async_nested_arrow_super_this_capture() {
+    let source = r#"
+class Base { m(x) { return x; } }
+class Derived extends Base {
+    async method() {
+        const f = () => () => super.m(this.x);
+        return await f()();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("return __awaiter"),
+        "ES5 output should emit __awaiter for async method: {}",
+        output
+    );
+    assert!(
+        output.contains("_super.prototype.m.call(_this"),
+        "ES5 output should lower super call with lexical this: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.x"),
+        "ES5 output should capture this inside nested arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("super.m"),
+        "ES5 output should not contain super method access: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel nested arrow: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_async_nested_arrow_super_this_arguments_capture() {
+    let source = r#"
+class Base { m(x) { return x; } }
+class Derived extends Base {
+    async method() {
+        const f = () => () => super.m(this.x + arguments[0]);
+        return await f()();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("return __awaiter"),
+        "ES5 output should emit __awaiter for async method: {}",
+        output
+    );
+    assert!(
+        output.contains("_super.prototype.m.call(_this"),
+        "ES5 output should lower super call with lexical this: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.x"),
+        "ES5 output should capture this inside nested arrow: {}",
+        output
+    );
+    assert!(
+        output.contains("arguments[0]"),
+        "ES5 output should preserve arguments usage in nested arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("super.m"),
+        "ES5 output should not contain super method access: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel nested arrow: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_async_nested_arrow_super_computed() {
+    let source = r#"
+class Base { m(x) { return x; } }
+class Derived extends Base {
+    async method() {
+        const f = () => () => super["m"](arguments[0]);
+        return await f()();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("return __awaiter"),
+        "ES5 output should emit __awaiter for async method: {}",
+        output
+    );
+    // TODO: async ES5 emission should lower computed super element access in arrows.
+    assert!(
+        output.contains("super[\"m\"]"),
+        "ES5 output currently leaves computed super element access in nested arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel nested arrow: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_async_nested_arrow_super_computed_this_capture() {
+    let source = r#"
+class Base { m(x) { return x; } }
+class Derived extends Base {
+    async method() {
+        const f = () => () => super["m"](this.x);
+        return await f()();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("return __awaiter"),
+        "ES5 output should emit __awaiter for async method: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.x"),
+        "ES5 output should capture this inside nested arrow: {}",
+        output
+    );
+    // TODO: async ES5 emission should lower computed super element access in arrows.
+    assert!(
+        output.contains("super[\"m\"]"),
+        "ES5 output currently leaves computed super element access in nested arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel nested arrow: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_async_nested_arrow_super_computed_this_arguments_capture() {
+    let source = r#"
+class Base { m(x) { return x; } }
+class Derived extends Base {
+    async method() {
+        const f = () => () => super["m"](this.x + arguments[0]);
+        return await f()();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("return __awaiter"),
+        "ES5 output should emit __awaiter for async method: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.x"),
+        "ES5 output should capture this inside nested arrow: {}",
+        output
+    );
+    assert!(
+        output.contains("arguments[0]"),
+        "ES5 output should preserve arguments usage in nested arrow: {}",
+        output
+    );
+    // TODO: async ES5 emission should lower computed super element access in arrows.
+    assert!(
+        output.contains("super[\"m\"]"),
+        "ES5 output currently leaves computed super element access in nested arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel nested arrow: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_async_nested_arrow_super_computed_arguments() {
+    let source = r#"
+class Base { m(x) { return x; } }
+class Derived extends Base {
+    async method() {
+        const f = () => () => super["m"](arguments[0]);
+        return await f()();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("return __awaiter"),
+        "ES5 output should emit __awaiter for async method: {}",
+        output
+    );
+    // TODO: async ES5 emission should lower computed super element access in arrows.
+    assert!(
+        output.contains("super[\"m\"]"),
+        "ES5 output currently leaves computed super element access in nested arrow: {}",
+        output
+    );
+    assert!(
+        output.contains("arguments[0]"),
+        "ES5 output should preserve arguments usage in nested arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel nested arrow: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_async_super_nested_arrow() {
+    let source = r#"
+class Base { m(x) { return x; } }
+class Derived extends Base {
+    async method() {
+        const f = () => () => super.m(arguments[0]);
+        return await f()();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("return __awaiter"),
+        "ES5 output should emit __awaiter for async method: {}",
+        output
+    );
+    assert!(
+        output.contains("_super.prototype.m.call"),
+        "ES5 output should lower super method call in nested arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("super.m"),
+        "ES5 output should not contain super method access: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel nested arrow: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_method_nested_arrow_arguments_capture() {
+    let source = r#"
+class Foo {
+    method(a) {
+        const f = () => () => this.x + arguments[0];
+        return f()();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("_this.x"),
+        "ES5 output should capture this inside nested arrow: {}",
+        output
+    );
+    assert!(
+        output.contains("arguments[0]"),
+        "ES5 output should preserve arguments usage in nested arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel nested arrow: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_derived_prop_init_after_super() {
+    let source = r#"
+class Base {}
+class Derived extends Base {
+    foo = 1;
+    constructor() {
+        super();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    let super_pos = output.find("var _this = _super.call(this");
+    let prop_pos = output.find("_this.foo = 1");
+    assert!(
+        super_pos.is_some() && prop_pos.is_some(),
+        "ES5 output should include super call and property initializer: {}",
+        output
+    );
+    assert!(
+        super_pos.unwrap() < prop_pos.unwrap(),
+        "ES5 output should emit property initializer after super: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_async_derived_prop_arrow_capture() {
+    let source = r#"
+class Base {}
+class Derived extends Base {
+    foo = () => this.x;
+    constructor() {
+        super();
+    }
+    async method() {
+        await this.foo();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    let super_pos = output.find("var _this = _super.call(this");
+    let prop_pos = output.find("_this.foo = function");
+    assert!(
+        super_pos.is_some() && prop_pos.is_some(),
+        "ES5 output should include super call and arrow initializer: {}",
+        output
+    );
+    assert!(
+        super_pos.unwrap() < prop_pos.unwrap(),
+        "ES5 output should emit arrow initializer after super: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.x"),
+        "ES5 output should capture this inside arrow: {}",
+        output
+    );
+    assert!(
+        output.contains("return __awaiter"),
+        "ES5 output should emit __awaiter for async method: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel arrow: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_derived_default_arrow_field_capture() {
+    let source = r#"
+class Base {}
+class Derived extends Base {
+    field = () => this.x;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("var _this = _super !== null && _super.apply(this, arguments) || this;"),
+        "ES5 output should capture this for derived default ctor: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.field = function"),
+        "ES5 output should emit arrow field initializer: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.x"),
+        "ES5 output should capture this inside arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel arrow: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_field_nested_arrow_this_capture() {
+    let source = r#"
+class Foo {
+    field = () => () => this.x;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("var _this = this"),
+        "ES5 output should capture this for field initializer: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.x"),
+        "ES5 output should capture this inside nested arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel nested arrow: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_field_multi_arrow_this_capture() {
+    let source = r#"
+class Foo {
+    first = () => this.x;
+    second = () => () => this.y;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("var _this = this"),
+        "ES5 output should capture this for field initializers: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.x"),
+        "ES5 output should capture this in first arrow: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.y"),
+        "ES5 output should capture this in nested arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel arrows: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_static_field_no_this_capture() {
+    let source = r#"
+class Foo {
+    static field = () => this.x;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        !output.contains("var _this = this"),
+        "ES5 output should not capture this for static field: {}",
+        output
+    );
+    assert!(
+        output.contains("Foo.field = function"),
+        "ES5 output should emit static field initializer: {}",
+        output
+    );
+    assert!(
+        output.contains("this.x"),
+        "ES5 output should preserve this usage in static arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel arrow: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_derived_field_arrow_super_call() {
+    let source = r#"
+class Base { m() { return this.x; } }
+class Derived extends Base {
+    field = () => super.m();
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("_super.prototype.m.call(_this"),
+        "ES5 output should lower super call with lexical this: {}",
+        output
+    );
+    assert!(
+        !output.contains("super.m"),
+        "ES5 output should not contain super method access: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel arrow: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_derived_field_arrow_super_and_this() {
+    let source = r#"
+class Base { m() { return this.x; } }
+class Derived extends Base {
+    field = () => super.m() + this.x;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("_super.prototype.m.call(_this"),
+        "ES5 output should lower super call with lexical this: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.x"),
+        "ES5 output should capture this inside arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("super.m"),
+        "ES5 output should not contain super method access: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel arrow: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_derived_field_arrow_super_computed_call() {
+    let source = r#"
+class Base { m(x) { return x; } }
+class Derived extends Base {
+    field = () => super["m"](this.x);
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("_super.prototype[\"m\"].call(_this"),
+        "ES5 output should lower computed super call with lexical this: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.x"),
+        "ES5 output should capture this inside arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("super[\"m\"]"),
+        "ES5 output should not contain super element access: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel arrow: {}",
+        output
+    );
+}
+
+#[test]
 fn test_two_phase_emission_es6_class_no_transform() {
     // Parse source
     let source = "class Point { constructor(x, y) { this.x = x; this.y = y; } }";
@@ -1439,6 +3305,158 @@ fn test_two_phase_emission_es5_async_function() {
     assert!(
         output.contains("var __generator"),
         "ES5 async output should contain '__generator' helper: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_async_function_nested_arrow_this_capture() {
+    let source = "async function foo() { const bar = () => this.x; await bar(); }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("_this.x"),
+        "ES5 async output should capture this inside nested arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 async output should downlevel nested arrow: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_async_function_multi_decl_this_capture() {
+    let source = "async function foo() { const a = 1, bar = () => this.x; await bar(); }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("a = 1"),
+        "ES5 async output should emit first declarator: {}",
+        output
+    );
+    assert!(
+        output.contains("bar = ")
+            && output.contains("_this.x"),
+        "ES5 async output should downlevel arrow and capture this: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 async output should downlevel nested arrow: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_async_function_let_arrow_this_capture() {
+    let source = "async function foo() { let bar = () => this.x; await bar(); }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("bar = ")
+            && output.contains("_this.x"),
+        "ES5 async output should downlevel arrow and capture this: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 async output should downlevel nested arrow: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_async_function_deep_nested_arrow_this_capture() {
+    let source = "async function foo() { const bar = () => () => this.x; await bar()(); }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("_this.x"),
+        "ES5 async output should capture this inside nested arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 async output should downlevel nested arrow: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_async_function_nested_arrow_arguments_capture() {
+    let source = "async function foo(a) { const bar = () => () => this.x + arguments[0]; await bar()(); }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("_this.x"),
+        "ES5 async output should capture this inside nested arrow: {}",
+        output
+    );
+    assert!(
+        output.contains("arguments[0]"),
+        "ES5 async output should preserve arguments usage in nested arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 async output should downlevel nested arrow: {}",
         output
     );
 }

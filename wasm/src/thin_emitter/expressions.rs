@@ -1,5 +1,6 @@
 use super::{get_operator_text, ThinPrinter};
-use crate::parser::thin_node::ThinNode;
+use crate::parser::{syntax_kind_ext, thin_node::ThinNode};
+use crate::scanner::SyntaxKind;
 
 impl<'a> ThinPrinter<'a> {
     // =========================================================================
@@ -40,6 +41,35 @@ impl<'a> ThinPrinter<'a> {
         let Some(call) = self.arena.get_call_expr(node) else {
             return;
         };
+
+        if self.ctx.target_es5 {
+            if let Some(expr_node) = self.arena.get(call.expression) {
+                if expr_node.kind == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION {
+                    if let Some(access) = self.arena.get_access_expr(expr_node) {
+                        if let Some(base) = self.arena.get(access.expression) {
+                            if base.kind == SyntaxKind::SuperKeyword as u16 {
+                                self.write("_super.prototype.");
+                                self.emit(access.name_or_argument);
+                                self.write(".call(");
+                                if self.ctx.arrow_state.this_capture_depth > 0 {
+                                    self.write("_this");
+                                } else {
+                                    self.write("this");
+                                }
+                                if let Some(ref args) = call.arguments {
+                                    for &arg_idx in &args.nodes {
+                                        self.write(", ");
+                                        self.emit(arg_idx);
+                                    }
+                                }
+                                self.write(")");
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         self.emit(call.expression);
         self.write("(");

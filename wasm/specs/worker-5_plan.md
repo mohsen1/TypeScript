@@ -13,6 +13,14 @@ Priority: 5
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 for-of source map mapping test in `wasm/src/source_map_tests.rs`; no fixes needed in source map writer/generator.
+      Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_class_extends_helper`).
+- [x] Added ES5 async/await source map mapping test in `wasm/src/source_map_tests.rs` for downlevel emit.
+      Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_class_extends_helper`).
+- [x] Added ES5 class downlevel source map regression for class name mapping; emit now maps class names in ES5 class output.
+      Tests: `./wasm/test.sh test_source_map_es5_transform_class_mapping`.
+- [x] Updated `test_class_extends_helper` to run ES5 transforms via LoweringPass so __extends helper emits.
+      Tests: `./wasm/test.sh emitter_edge_case_tests::test_class_extends_helper`.
 - [x] Added ES5 async/await source map mapping test in `wasm/src/source_map_tests.rs`.
       Tests: `./wasm/test.sh test_source_map_es5_transform_async_await_mapping`.
 - [x] Added ES5 class extends source map mapping test in `wasm/src/source_map_tests.rs`.

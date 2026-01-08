@@ -6,8 +6,10 @@
 //! - Module transforms
 //! - Helper emission ordering
 
+use crate::emit_context::EmitContext;
+use crate::lowering_pass::LoweringPass;
+use crate::thin_emitter::{ModuleKind, PrinterOptions, ScriptTarget, ThinPrinter};
 use crate::thin_parser::ThinParserState;
-use crate::thin_emitter::{ThinPrinter, PrinterOptions, ModuleKind};
 
 #[test]
 fn test_comment_with_utf8_emoji() {
@@ -225,9 +227,15 @@ class Derived extends Base {}
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut printer = ThinPrinter::new(&parser.arena);
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_source_text(parser.get_source_text());
-    printer.set_target_es5(true);
+    printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
     let output = printer.get_output();
 

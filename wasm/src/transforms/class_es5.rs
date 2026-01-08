@@ -37,6 +37,7 @@ use crate::parser::{NodeIndex, NodeList};
 use crate::parser::syntax_kind_ext;
 use crate::scanner::SyntaxKind;
 use crate::transforms::arrow_es5::contains_this_reference;
+use crate::transforms::async_es5::AsyncES5Emitter;
 use crate::transforms::emit_utils;
 use crate::transforms::private_fields_es5::{PrivateFieldInfo, collect_private_fields, is_private_identifier};
 
@@ -403,6 +404,12 @@ impl<'a> ClassES5Emitter<'a> {
                 self.write_line();
             } else {
                 // Non-derived class - emit private fields then instance property initializers
+                let needs_capture = self.needs_this_capture(&instance_props);
+                if needs_capture {
+                    self.write_indent();
+                    self.write("var _this = this;");
+                    self.write_line();
+                }
                 self.emit_private_field_initializations(false);
 
                 for &prop_idx in &instance_props {
@@ -633,12 +640,26 @@ impl<'a> ClassES5Emitter<'a> {
 
         // First, find and emit the super() call as _super.call(this, ...)
         let mut found_super = false;
+        let mut super_stmt_idx = None;
         for &stmt_idx in &block.statements.nodes {
             if self.is_super_call_statement(stmt_idx) {
-                self.emit_super_call_as_this_assignment(stmt_idx);
+                super_stmt_idx = Some(stmt_idx);
                 found_super = true;
                 break;
             }
+        }
+
+        if let Some(super_idx) = super_stmt_idx {
+            // Emit statements before super() unchanged.
+            for &stmt_idx in &block.statements.nodes {
+                if stmt_idx == super_idx {
+                    break;
+                }
+                self.write_indent();
+                self.emit_statement(stmt_idx);
+                self.write_line();
+            }
+            self.emit_super_call_as_this_assignment(super_idx);
         }
 
         self.emit_param_destructuring_prologue(param_transforms);
@@ -862,6 +883,7 @@ impl<'a> ClassES5Emitter<'a> {
                 self.write(" = function (");
                 let param_transforms = self.emit_parameters(&method_data.parameters);
                 self.write(") ");
+                let is_async = self.is_async(&method_data.modifiers) && !method_data.asterisk_token;
 
                 // Check if body is empty - only empty bodies go on single line
                 let body_node = self.arena.get(method_data.body);
@@ -875,7 +897,16 @@ impl<'a> ClassES5Emitter<'a> {
                     false
                 };
 
-                if is_empty_body && param_transforms.is_empty() {
+                if is_async {
+                    self.write("{");
+                    self.write_line();
+                    self.increase_indent();
+                    self.emit_param_destructuring_prologue(&param_transforms);
+                    self.emit_async_body(method_data.body);
+                    self.decrease_indent();
+                    self.write_indent();
+                    self.write("}");
+                } else if is_empty_body && param_transforms.is_empty() {
                     self.write("{ }");
                 } else {
                     self.write("{");
@@ -1286,6 +1317,28 @@ impl<'a> ClassES5Emitter<'a> {
                 }
             }
         }
+    }
+
+    fn emit_async_body(&mut self, body: NodeIndex) {
+        let mut async_emitter = AsyncES5Emitter::new(self.arena);
+        async_emitter.set_indent_level(self.indent_level + 1);
+
+        let generator_body = if async_emitter.body_contains_await(body) {
+            async_emitter.emit_generator_body_with_await(body)
+        } else {
+            async_emitter.emit_simple_generator_body(body)
+        };
+
+        self.write_indent();
+        self.write("return __awaiter(this, void 0, void 0, function () {");
+        self.write_line();
+        self.increase_indent();
+        self.write(&generator_body);
+        self.decrease_indent();
+        self.write_line();
+        self.write_indent();
+        self.write("});");
+        self.write_line();
     }
 
     fn emit_param_default_assignment(&mut self, name: &str, initializer: NodeIndex) {
@@ -2668,6 +2721,8 @@ impl<'a> ClassES5Emitter<'a> {
                     // Check if this is super.method(args) - transform to _super.prototype.method.call(this, args)
                     if self.is_super_method_call(call.expression) {
                         self.emit_super_method_call(call.expression, &call.arguments);
+                    } else if self.is_super_element_call(call.expression) {
+                        self.emit_super_element_call(call.expression, &call.arguments);
                     } else {
                         self.emit_expression(call.expression);
                         self.write("(");
@@ -3461,6 +3516,19 @@ impl<'a> ClassES5Emitter<'a> {
         false
     }
 
+    fn is_async(&self, modifiers: &Option<NodeList>) -> bool {
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(mod_node) = self.arena.get(mod_idx) {
+                    if mod_node.kind == SyntaxKind::AsyncKeyword as u16 {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
     fn is_abstract(&self, modifiers: &Option<NodeList>) -> bool {
         if let Some(mods) = modifiers {
             for &mod_idx in &mods.nodes {
@@ -3530,6 +3598,44 @@ impl<'a> ClassES5Emitter<'a> {
         base_node.kind == SyntaxKind::SuperKeyword as u16
     }
 
+    /// Check if expression is super[expr] (element access on super)
+    fn is_super_element_call(&self, expr_idx: NodeIndex) -> bool {
+        let Some(expr_node) = self.arena.get(expr_idx) else { return false };
+
+        if expr_node.kind != syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION {
+            return false;
+        }
+
+        let Some(access) = self.arena.get_access_expr(expr_node) else { return false };
+        let Some(base_node) = self.arena.get(access.expression) else { return false };
+
+        base_node.kind == SyntaxKind::SuperKeyword as u16
+    }
+
+    /// Emit super[expr](args) as _super.prototype[expr].call(this, args)
+    fn emit_super_element_call(&mut self, callee_idx: NodeIndex, args: &Option<NodeList>) {
+        let Some(callee_node) = self.arena.get(callee_idx) else { return };
+        let Some(access) = self.arena.get_access_expr(callee_node) else { return };
+
+        self.write("_super.prototype[");
+        self.emit_expression(access.name_or_argument);
+        self.write("].call(");
+        if self.use_this_capture {
+            self.write("_this");
+        } else {
+            self.write("this");
+        }
+
+        if let Some(arg_list) = args {
+            for &arg_idx in &arg_list.nodes {
+                self.write(", ");
+                self.emit_expression(arg_idx);
+            }
+        }
+
+        self.write(")");
+    }
+
     /// Emit super.method(args) as _super.prototype.method.call(this, args)
     fn emit_super_method_call(&mut self, callee_idx: NodeIndex, args: &Option<NodeList>) {
         let Some(callee_node) = self.arena.get(callee_idx) else { return };
@@ -3539,7 +3645,12 @@ impl<'a> ClassES5Emitter<'a> {
         // Emit _super.prototype.method.call(this, args)
         self.write("_super.prototype.");
         self.write_identifier_text(access.name_or_argument);
-        self.write(".call(this");
+        self.write(".call(");
+        if self.use_this_capture {
+            self.write("_this");
+        } else {
+            self.write("this");
+        }
 
         if let Some(arg_list) = args {
             for &arg_idx in &arg_list.nodes {
