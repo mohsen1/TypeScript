@@ -96,6 +96,10 @@ Priority: 4
 - [x] Add TypeScript namespace source-map test. Tests: `./wasm/test.sh typescript_namespace_mapping`
 - [x] Add ES5 computed super[] edge case tests. Tests: `./wasm/test.sh computed_super`
 - [x] Add ES5 super property access tests. Tests: `./wasm/test.sh super_property`
+- [x] Add ES5 abstract class lowering test. Tests: `./wasm/test.sh abstract_class_lowering`
+- [x] Add ES5 class with index signature test. Tests: `./wasm/test.sh class_with_index_signature`
+- [x] Add ES5 class expression test. Tests: `./wasm/test.sh class_expression`
+- [x] Add ES5 Symbol-keyed methods test. Tests: `./wasm/test.sh symbol_keyed_methods`
 
 ## Ready for Merge
 Yes
