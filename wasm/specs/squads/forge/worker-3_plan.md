@@ -7,12 +7,13 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] Structural compatibility/variance: fix covariance/contravariance edge cases in `wasm/src/solver/subtype.rs`; add tests in `wasm/src/solver/subtype_tests.rs`; run `./wasm/test.sh`.
+- [ ] Structural compatibility/variance (Objective 3): fix covariance/contravariance edge cases in `wasm/src/solver/subtype.rs`; add tests in `wasm/src/solver/subtype_tests.rs`; run `./wasm/test.sh`.
 
 ## Task Queue
 - [ ] Add regressions for function parameter variance across unions/intersections in `wasm/src/solver/subtype_tests.rs`.
 - [ ] Confirm method vs function-property variance in `wasm/src/solver/subtype.rs` matches `tsc`, add coverage if missing.
 - [ ] Pull next unsoundness case from `wasm/specs/TS_UNSOUNDNESS_CATALOG.md` and add a subtype regression test.
+- [ ] Add covariance check for return-position `this` types with `--strictFunctionTypes` parity.
 
 ## Completed
 - [x] (Move finished items here with brief notes and tests run)
@@ -23,6 +24,7 @@ No
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
+- Conformance focus: tie regressions to official TypeScript conformance cases when possible.
 - Commit format: `[wasm] solver: <description>` or `[wasm] checker: <description>`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/forge-3`

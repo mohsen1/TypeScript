@@ -23,6 +23,7 @@ No
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
+- Conformance focus: tie regressions to official TypeScript conformance cases when possible.
 - Commit format: `[wasm] emitter: <description>` or `[wasm] cli: <description>`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/anvil-1`
