@@ -10436,3 +10436,340 @@ fn test_conditional_omit_this_parameter_no_this() {
     let result = evaluate_conditional(&interner, &cond);
     assert!(result != TypeId::ERROR, "OmitThisParameter with no this should not produce error");
 }
+
+#[test]
+fn test_mapped_type_partial_pattern() {
+    let interner = TypeInterner::new();
+
+    // Test Partial<T> pattern: { [K in keyof T]?: T[K] }
+    // This makes all properties optional
+    // For T = { a: string, b: number }, Partial<T> = { a?: string, b?: number }
+
+    // Create the source object type { a: string, b: number }
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Create keyof T (for our object: "a" | "b")
+    let keyof_t = interner.intern(TypeKey::KeyOf(source_obj));
+
+    // Create the type parameter K
+    let k_param = TypeParamInfo {
+        name: interner.intern_string("K"),
+        constraint: None,
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    // Create T[K] (index access)
+    let t_k = interner.intern(TypeKey::IndexAccess(source_obj, k_type));
+
+    // Partial<T> = { [K in keyof T]?: T[K] }
+    let mapped = MappedType {
+        type_param: k_param,
+        constraint: keyof_t,
+        name_type: None,
+        template: t_k,
+        readonly_modifier: None,
+        optional_modifier: Some(MappedModifier::Add), // +? makes properties optional
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Result should be { a?: string, b?: number }
+    let key = interner.lookup(result);
+    assert!(key.is_some(), "Partial pattern should produce valid type");
+
+    if let Some(TypeKey::Object(shape_id)) = key {
+        let shape = interner.object_shape(shape_id);
+        assert_eq!(shape.properties.len(), 2, "Should have 2 properties");
+        for prop in &shape.properties {
+            assert!(prop.optional, "All properties should be optional in Partial<T>");
+        }
+    }
+}
+
+#[test]
+fn test_mapped_type_readonly_pattern() {
+    let interner = TypeInterner::new();
+
+    // Test Readonly<T> pattern: { readonly [K in keyof T]: T[K] }
+    // This makes all properties readonly
+    // For T = { a: string, b: number }, Readonly<T> = { readonly a: string, readonly b: number }
+
+    // Create the source object type { a: string, b: number }
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Create keyof T
+    let keyof_t = interner.intern(TypeKey::KeyOf(source_obj));
+
+    // Create the type parameter K
+    let k_param = TypeParamInfo {
+        name: interner.intern_string("K"),
+        constraint: None,
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    // Create T[K]
+    let t_k = interner.intern(TypeKey::IndexAccess(source_obj, k_type));
+
+    // Readonly<T> = { readonly [K in keyof T]: T[K] }
+    let mapped = MappedType {
+        type_param: k_param,
+        constraint: keyof_t,
+        name_type: None,
+        template: t_k,
+        readonly_modifier: Some(MappedModifier::Add), // +readonly
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Result should be { readonly a: string, readonly b: number }
+    let key = interner.lookup(result);
+    assert!(key.is_some(), "Readonly pattern should produce valid type");
+
+    if let Some(TypeKey::Object(shape_id)) = key {
+        let shape = interner.object_shape(shape_id);
+        assert_eq!(shape.properties.len(), 2, "Should have 2 properties");
+        for prop in &shape.properties {
+            assert!(prop.readonly, "All properties should be readonly in Readonly<T>");
+        }
+    }
+}
+
+#[test]
+fn test_mapped_type_mutable_removes_readonly() {
+    let interner = TypeInterner::new();
+
+    // Test -readonly modifier pattern: { -readonly [K in keyof T]: T[K] }
+    // This removes readonly from all properties (Mutable<T> pattern)
+    // For T = { readonly a: string, readonly b: number }, result = { a: string, b: number }
+
+    // Create the source object with readonly properties
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: true, // readonly property
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: true, // readonly property
+            is_method: false,
+        },
+    ]);
+
+    // Create keyof T
+    let keyof_t = interner.intern(TypeKey::KeyOf(source_obj));
+
+    // Create the type parameter K
+    let k_param = TypeParamInfo {
+        name: interner.intern_string("K"),
+        constraint: None,
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    // Create T[K]
+    let t_k = interner.intern(TypeKey::IndexAccess(source_obj, k_type));
+
+    // { -readonly [K in keyof T]: T[K] }
+    let mapped = MappedType {
+        type_param: k_param,
+        constraint: keyof_t,
+        name_type: None,
+        template: t_k,
+        readonly_modifier: Some(MappedModifier::Remove), // -readonly
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Result should have readonly removed from all properties
+    let key = interner.lookup(result);
+    assert!(key.is_some(), "-readonly modifier should produce valid type");
+
+    if let Some(TypeKey::Object(shape_id)) = key {
+        let shape = interner.object_shape(shape_id);
+        assert_eq!(shape.properties.len(), 2, "Should have 2 properties");
+        for prop in &shape.properties {
+            assert!(!prop.readonly, "Properties should not be readonly after -readonly modifier");
+        }
+    }
+}
+
+#[test]
+fn test_mapped_type_combined_modifiers() {
+    let interner = TypeInterner::new();
+
+    // Test combined modifiers: { -readonly [K in keyof T]-?: T[K] }
+    // This removes both readonly and optional from all properties
+    // For T = { readonly a?: string, readonly b?: number }, result = { a: string, b: number }
+
+    // Create the source object with readonly and optional properties
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: true,
+            readonly: true,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: true,
+            readonly: true,
+            is_method: false,
+        },
+    ]);
+
+    // Create keyof T
+    let keyof_t = interner.intern(TypeKey::KeyOf(source_obj));
+
+    // Create the type parameter K
+    let k_param = TypeParamInfo {
+        name: interner.intern_string("K"),
+        constraint: None,
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    // Create T[K]
+    let t_k = interner.intern(TypeKey::IndexAccess(source_obj, k_type));
+
+    // { -readonly [K in keyof T]-?: T[K] }
+    let mapped = MappedType {
+        type_param: k_param,
+        constraint: keyof_t,
+        name_type: None,
+        template: t_k,
+        readonly_modifier: Some(MappedModifier::Remove), // -readonly
+        optional_modifier: Some(MappedModifier::Remove), // -?
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Result should have both readonly and optional removed
+    let key = interner.lookup(result);
+    assert!(key.is_some(), "Combined modifiers should produce valid type");
+
+    if let Some(TypeKey::Object(shape_id)) = key {
+        let shape = interner.object_shape(shape_id);
+        assert_eq!(shape.properties.len(), 2, "Should have 2 properties");
+        for prop in &shape.properties {
+            assert!(!prop.readonly, "Properties should not be readonly after -readonly");
+            assert!(!prop.optional, "Properties should not be optional after -?");
+        }
+    }
+}
+
+#[test]
+fn test_mapped_type_add_both_modifiers() {
+    let interner = TypeInterner::new();
+
+    // Test adding both modifiers: { +readonly [K in keyof T]+?: T[K] }
+    // This adds both readonly and optional to all properties
+    // For T = { a: string, b: number }, result = { readonly a?: string, readonly b?: number }
+
+    // Create the source object without modifiers
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Create keyof T
+    let keyof_t = interner.intern(TypeKey::KeyOf(source_obj));
+
+    // Create the type parameter K
+    let k_param = TypeParamInfo {
+        name: interner.intern_string("K"),
+        constraint: None,
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    // Create T[K]
+    let t_k = interner.intern(TypeKey::IndexAccess(source_obj, k_type));
+
+    // { +readonly [K in keyof T]+?: T[K] }
+    let mapped = MappedType {
+        type_param: k_param,
+        constraint: keyof_t,
+        name_type: None,
+        template: t_k,
+        readonly_modifier: Some(MappedModifier::Add), // +readonly
+        optional_modifier: Some(MappedModifier::Add), // +?
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Result should have both readonly and optional added
+    let key = interner.lookup(result);
+    assert!(key.is_some(), "Adding both modifiers should produce valid type");
+
+    if let Some(TypeKey::Object(shape_id)) = key {
+        let shape = interner.object_shape(shape_id);
+        assert_eq!(shape.properties.len(), 2, "Should have 2 properties");
+        for prop in &shape.properties {
+            assert!(prop.readonly, "Properties should be readonly after +readonly");
+            assert!(prop.optional, "Properties should be optional after +?");
+        }
+    }
+}
