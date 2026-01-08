@@ -7,10 +7,10 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [x] Add tests for ES5 class downleveling edge cases with computed super[] access.
+- [ ] Add ES5 class tests for parameter decorators and property decorators in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
 
 ## Task Queue
-- [ ] [EM: Add queued tasks]
+- [ ] (empty)
 
 ## Completed
 - [x] Add async/class ES5 transform source-map mappings and offsets. Tests: `./wasm/test.sh source_map`

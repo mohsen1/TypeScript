@@ -8,12 +8,10 @@ Priority: 1
 Blocked: Awaiting next EM-Anvil assignment.
 
 ## Current Assignment
-- Complete: Added switch/case ES5 test; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` - pre-existing Forge domain failure).
+- [ ] Add ES5 class tests for async static field initializers with complex expressions in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
 
 ## Task Queue
-- [x] Inspect `wasm/src/emitter_edge_case_tests.rs` to capture the failing case and expected output.
-- [x] Trace emit path for parse error recovery (likely `ThinParser`/`ThinPrinter`); fix missing declaration emission.
-- [x] Add/update a focused regression if needed; run `./wasm/test.sh`.
+- [ ] (empty)
 
 ## Completed
 - [x] Fixed private field access in async methods (was emitting `this.void 0` instead of `__classPrivateFieldGet`); added `class_name` tracking to AsyncES5Emitter; added 2 tests. Ran `./wasm/test.sh emitter_transform_integration_tests` (all 124 pass).
