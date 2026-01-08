@@ -1525,3 +1525,58 @@ fn test_parity_es5_commonjs_named_exports() {
         output
     );
 }
+
+/// Parity test for ES5 class with static property initialization.
+/// Static properties should be assigned after the class IIFE.
+#[test]
+fn test_parity_es5_class_static_property() {
+    let source = "class Config { static version = '1.0.0'; static count = 0; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 static property initialization
+    assert!(
+        output.contains("function Config") || output.contains("var Config"),
+        "ES5 output should define Config as function: {}",
+        output
+    );
+    // Static properties should be assigned on the class constructor
+    assert!(
+        output.contains("Config.version") && (output.contains("'1.0.0'") || output.contains("\"1.0.0\"")),
+        "ES5 output should assign static version property: {}",
+        output
+    );
+    assert!(
+        output.contains("Config.count") && output.contains("0"),
+        "ES5 output should assign static count property: {}",
+        output
+    );
+    // No class syntax
+    assert!(
+        !output.contains("class Config"),
+        "ES5 output should not contain class syntax: {}",
+        output
+    );
+    // No static keyword in output
+    assert!(
+        !output.contains("static version") && !output.contains("static count"),
+        "ES5 output should not contain static keyword: {}",
+        output
+    );
+}
