@@ -190,6 +190,4713 @@ fn test_conditional_instantiated_param_distributes() {
 }
 
 #[test]
+fn test_conditional_instantiated_param_distributes_branch_substitution() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends string ? T : never, with T = string | number
+    // Distributes to: (string extends string ? string : never) |
+    //                 (number extends string ? number : never)
+    // Result should be string.
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: TypeId::STRING,
+        true_type: t_param,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let string_or_number = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, string_or_number);
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_conditional_distributive_nested_extends() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends string ? (T extends "a" ? 1 : 2) : 3, with T = "a" | "b"
+    // Distributes to 1 | 2.
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+    let lit_one = interner.literal_number(1.0);
+    let lit_two = interner.literal_number(2.0);
+    let lit_three = interner.literal_number(3.0);
+
+    let inner_cond = interner.conditional(ConditionalType {
+        check_type: t_param,
+        extends_type: lit_a,
+        true_type: lit_one,
+        false_type: lit_two,
+        is_distributive: false,
+    });
+
+    let outer_cond = ConditionalType {
+        check_type: t_param,
+        extends_type: TypeId::STRING,
+        true_type: inner_cond,
+        false_type: lit_three,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(outer_cond);
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, interner.union(vec![lit_a, lit_b]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![lit_one, lit_two]);
+
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_conditional_distributive_infer_extends_nested() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    // T extends infer R extends string ? (R extends "a" ? "yes" : "no") : "fallback"
+    // with T = "a" | "b" | number.
+    let lit_a = interner.literal_string("a");
+    let lit_yes = interner.literal_string("yes");
+    let lit_no = interner.literal_string("no");
+    let lit_fallback = interner.literal_string("fallback");
+
+    let inner_cond = interner.conditional(ConditionalType {
+        check_type: infer_r,
+        extends_type: lit_a,
+        true_type: lit_yes,
+        false_type: lit_no,
+        is_distributive: false,
+    });
+
+    let outer_cond = ConditionalType {
+        check_type: t_param,
+        extends_type: infer_r,
+        true_type: inner_cond,
+        false_type: lit_fallback,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(outer_cond);
+    let mut subst = TypeSubstitution::new();
+    subst.insert(
+        t_name,
+        interner.union(vec![lit_a, interner.literal_string("b"), TypeId::NUMBER]),
+    );
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![lit_yes, lit_no, lit_fallback]);
+
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_conditional_infer_true_branch_substitution() {
+    let interner = TypeInterner::new();
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    // "a" extends infer R extends string ? R : never
+    let lit_a = interner.literal_string("a");
+    let cond = ConditionalType {
+        check_type: lit_a,
+        extends_type: infer_r,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, lit_a);
+}
+
+#[test]
+fn test_conditional_infer_false_branch_substitution() {
+    let interner = TypeInterner::new();
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    // number extends infer R extends string ? string : R
+    let cond = ConditionalType {
+        check_type: TypeId::NUMBER,
+        extends_type: infer_r,
+        true_type: TypeId::STRING,
+        false_type: infer_r,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_conditional_infer_array_element_extraction() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends (infer R)[] ? R : never, with T = string[] | number[].
+    let extends_array = interner.array(infer_r);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_array,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    subst.insert(
+        t_name,
+        interner.union(vec![
+            interner.array(TypeId::STRING),
+            interner.array(TypeId::NUMBER),
+        ]),
+    );
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_conditional_infer_array_element_non_array_union_branch() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends (infer R)[] ? R : never, with T = string[] | number.
+    let extends_array = interner.array(infer_r);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_array,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    subst.insert(
+        t_name,
+        interner.union(vec![interner.array(TypeId::STRING), TypeId::NUMBER]),
+    );
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_conditional_infer_array_element_non_distributive_union_input() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends (infer R)[] ? R : never, with T = string[] | number[] (no distribution).
+    // TODO: Non-distributive inference over union array inputs yields never.
+    let extends_array = interner.array(infer_r);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_array,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    subst.insert(
+        t_name,
+        interner.union(vec![
+            interner.array(TypeId::STRING),
+            interner.array(TypeId::NUMBER),
+        ]),
+    );
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_array_element_from_tuple_rest() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends (infer R)[] ? R : never, with T = [string, ...number[]].
+    let extends_array = interner.array(infer_r);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_array,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let number_array = interner.array(TypeId::NUMBER);
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: number_array,
+            name: None,
+            optional: false,
+            rest: true,
+        },
+    ]);
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, tuple);
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_conditional_infer_array_element_from_tuple_rest_tuple() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends (infer R)[] ? R : never, with T = [string, ...[number, boolean]].
+    // TODO: Current inference keeps the rest tuple as a single element (string | [number, boolean]).
+    let extends_array = interner.array(infer_r);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_array,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let rest_tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: rest_tuple,
+            name: None,
+            optional: false,
+            rest: true,
+        },
+    ]);
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, tuple);
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![TypeId::STRING, rest_tuple]);
+
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_conditional_infer_array_element_from_optional_tuple_element() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends (infer R)[] ? R : never, with T = [string?].
+    // TODO: Optional tuple elements currently infer without undefined.
+    let extends_array = interner.array(infer_r);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_array,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let optional_tuple = interner.tuple(vec![TupleElement {
+        type_id: TypeId::STRING,
+        name: None,
+        optional: true,
+        rest: false,
+    }]);
+    subst.insert(t_name, optional_tuple);
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_conditional_infer_array_element_with_constraint() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    // T extends (infer R extends string)[] ? R : never, with T = number[] | string[].
+    let extends_array = interner.array(infer_r);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_array,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    subst.insert(
+        t_name,
+        interner.union(vec![
+            interner.array(TypeId::NUMBER),
+            interner.array(TypeId::STRING),
+        ]),
+    );
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_conditional_infer_array_element_non_distributive() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // (T[]) extends (infer R)[] ? R : never, with T = string | number (no distribution).
+    let check_array = interner.array(t_param);
+    let extends_array = interner.array(infer_r);
+    let cond = ConditionalType {
+        check_type: check_array,
+        extends_type: extends_array,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, interner.union(vec![TypeId::STRING, TypeId::NUMBER]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_conditional_infer_array_element_non_distributive_tuple_wrapper() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // [T] extends [(infer R)[]] ? R : never, with T = string[] | number[].
+    // TODO: Non-distributive tuple wrapper inference does not extract union elements yet.
+    let check_tuple = interner.tuple(vec![TupleElement {
+        type_id: t_param,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
+    let extends_tuple = interner.tuple(vec![TupleElement {
+        type_id: interner.array(infer_r),
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
+    let cond = ConditionalType {
+        check_type: check_tuple,
+        extends_type: extends_tuple,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    subst.insert(
+        t_name,
+        interner.union(vec![
+            interner.array(TypeId::STRING),
+            interner.array(TypeId::NUMBER),
+        ]),
+    );
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_object_property_distributive() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends { a: infer R } ? R : never, with T = { a: string } | { a: number } | { b: boolean }.
+    let extends_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: infer_r,
+        write_type: infer_r,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_obj,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_c = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::BOOLEAN,
+        write_type: TypeId::BOOLEAN,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    subst.insert(t_name, interner.union(vec![obj_a, obj_b, obj_c]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_conditional_infer_object_property_with_constraint() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    // T extends { a: infer R extends string } ? R : never, with T = { a: string } | { a: number }.
+    let extends_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: infer_r,
+        write_type: infer_r,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_obj,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    subst.insert(t_name, interner.union(vec![obj_a, obj_b]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_conditional_infer_object_property_readonly() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends { readonly a: infer R } ? R : never, with T = { a: string } | { readonly a: number }.
+    let extends_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: infer_r,
+        write_type: infer_r,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_obj,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let obj_string = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_number = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+    subst.insert(t_name, interner.union(vec![obj_string, obj_number]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_conditional_infer_object_property_function_return_distributive() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends { a: () => infer R } ? R : never, with T = { a: () => string } | { a: () => number }.
+    // TODO: Function return inference inside object properties is not implemented; current behavior yields never.
+    let extends_fn = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: None,
+        return_type: infer_r,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let extends_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: extends_fn,
+        write_type: extends_fn,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_obj,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let string_fn = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let number_fn = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::NUMBER,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let obj_string = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: string_fn,
+        write_type: string_fn,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_number = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: number_fn,
+        write_type: number_fn,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    subst.insert(t_name, interner.union(vec![obj_string, obj_number]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_template_literal_distributive() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends `${infer R}` ? R : never, with T = "foo" | "bar".
+    // TODO: Template literal inference is not implemented; current behavior yields never.
+    let extends_template = interner.template_literal(vec![TemplateSpan::Type(infer_r)]);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_template,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let lit_foo = interner.literal_string("foo");
+    let lit_bar = interner.literal_string("bar");
+    subst.insert(t_name, interner.union(vec![lit_foo, lit_bar]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_template_literal_with_prefix_distributive() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends `foo${infer R}` ? R : never, with T = "foo1" | "bar".
+    // TODO: Template literal inference is not implemented; current behavior yields never.
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("foo")),
+        TemplateSpan::Type(infer_r),
+    ]);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_template,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let lit_foo = interner.literal_string("foo1");
+    let lit_bar = interner.literal_string("bar");
+    subst.insert(t_name, interner.union(vec![lit_foo, lit_bar]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_template_literal_with_suffix_distributive() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends `${infer R}bar` ? R : never, with T = "foobar" | "baz".
+    // TODO: Template literal inference is not implemented; current behavior yields never.
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Type(infer_r),
+        TemplateSpan::Text(interner.intern_string("bar")),
+    ]);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_template,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let lit_match = interner.literal_string("foobar");
+    let lit_other = interner.literal_string("baz");
+    subst.insert(t_name, interner.union(vec![lit_match, lit_other]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_template_literal_non_distributive_union_input() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // [T] extends [`foo${infer R}`] ? R : never, with T = "foo1" | "foo2" (no distribution).
+    // TODO: Non-distributive template literal inference is not implemented; current behavior yields never.
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("foo")),
+        TemplateSpan::Type(infer_r),
+    ]);
+    let cond = ConditionalType {
+        check_type: interner.tuple(vec![TupleElement {
+            type_id: t_param,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        extends_type: interner.tuple(vec![TupleElement {
+            type_id: extends_template,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let lit_foo1 = interner.literal_string("foo1");
+    let lit_foo2 = interner.literal_string("foo2");
+    subst.insert(t_name, interner.union(vec![lit_foo1, lit_foo2]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_template_literal_with_constrained_infer_non_distributive_union_input() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    // [T] extends [`foo${infer R extends string}`] ? R : never, with T = "foo1" | "foo2" (no distribution).
+    // TODO: Non-distributive template literal inference with constraints is not implemented; current behavior yields never.
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("foo")),
+        TemplateSpan::Type(infer_r),
+    ]);
+    let cond = ConditionalType {
+        check_type: interner.tuple(vec![TupleElement {
+            type_id: t_param,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        extends_type: interner.tuple(vec![TupleElement {
+            type_id: extends_template,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let lit_foo1 = interner.literal_string("foo1");
+    let lit_foo2 = interner.literal_string("foo2");
+    subst.insert(t_name, interner.union(vec![lit_foo1, lit_foo2]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_template_literal_with_middle_infer_non_distributive_union_input() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // [T] extends [`foo${infer R}bar`] ? R : never, with T = "foobazbar" | "foobuzbar" (no distribution).
+    // TODO: Non-distributive template literal inference is not implemented; current behavior yields never.
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("foo")),
+        TemplateSpan::Type(infer_r),
+        TemplateSpan::Text(interner.intern_string("bar")),
+    ]);
+    let cond = ConditionalType {
+        check_type: interner.tuple(vec![TupleElement {
+            type_id: t_param,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        extends_type: interner.tuple(vec![TupleElement {
+            type_id: extends_template,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let lit_left = interner.literal_string("foobazbar");
+    let lit_right = interner.literal_string("foobuzbar");
+    subst.insert(t_name, interner.union(vec![lit_left, lit_right]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_template_literal_with_middle_constrained_non_distributive_union_input() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    // [T] extends [`foo${infer R extends string}bar`] ? R : never,
+    // with T = "foobazbar" | "foobuzbar" (no distribution).
+    // TODO: Non-distributive template literal inference is not implemented; current behavior yields never.
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("foo")),
+        TemplateSpan::Type(infer_r),
+        TemplateSpan::Text(interner.intern_string("bar")),
+    ]);
+    let cond = ConditionalType {
+        check_type: interner.tuple(vec![TupleElement {
+            type_id: t_param,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        extends_type: interner.tuple(vec![TupleElement {
+            type_id: extends_template,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let lit_left = interner.literal_string("foobazbar");
+    let lit_right = interner.literal_string("foobuzbar");
+    subst.insert(t_name, interner.union(vec![lit_left, lit_right]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_template_literal_two_infers_non_distributive_union_input() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_a_name = interner.intern_string("A");
+    let infer_a = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_a_name,
+        constraint: None,
+        default: None,
+    }));
+    let infer_b_name = interner.intern_string("B");
+    let infer_b = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_b_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // [T] extends [`${infer A}-${infer B}`] ? A | B : never, with T = "foo-bar" | "baz-qux" (no distribution).
+    // TODO: Non-distributive template literal inference is not implemented; current behavior yields never.
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Type(infer_a),
+        TemplateSpan::Text(interner.intern_string("-")),
+        TemplateSpan::Type(infer_b),
+    ]);
+    let cond = ConditionalType {
+        check_type: interner.tuple(vec![TupleElement {
+            type_id: t_param,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        extends_type: interner.tuple(vec![TupleElement {
+            type_id: extends_template,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        true_type: interner.union(vec![infer_a, infer_b]),
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let lit_left = interner.literal_string("foo-bar");
+    let lit_right = interner.literal_string("baz-qux");
+    subst.insert(t_name, interner.union(vec![lit_left, lit_right]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_template_literal_with_suffix_non_distributive_union_input() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // [T] extends [`${infer R}bar`] ? R : never, with T = "foobar" | "bazbar" (no distribution).
+    // TODO: Non-distributive template literal inference is not implemented; current behavior yields never.
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Type(infer_r),
+        TemplateSpan::Text(interner.intern_string("bar")),
+    ]);
+    let cond = ConditionalType {
+        check_type: interner.tuple(vec![TupleElement {
+            type_id: t_param,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        extends_type: interner.tuple(vec![TupleElement {
+            type_id: extends_template,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let lit_left = interner.literal_string("foobar");
+    let lit_right = interner.literal_string("bazbar");
+    subst.insert(t_name, interner.union(vec![lit_left, lit_right]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_template_literal_with_suffix_non_distributive_non_matching_union_branch() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // [T] extends [`${infer R}bar`] ? R : never, with T = "foobar" | "baz" (no distribution).
+    // TODO: Non-distributive template literal inference is not implemented; current behavior yields never.
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Type(infer_r),
+        TemplateSpan::Text(interner.intern_string("bar")),
+    ]);
+    let cond = ConditionalType {
+        check_type: interner.tuple(vec![TupleElement {
+            type_id: t_param,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        extends_type: interner.tuple(vec![TupleElement {
+            type_id: extends_template,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let lit_match = interner.literal_string("foobar");
+    let lit_other = interner.literal_string("baz");
+    subst.insert(t_name, interner.union(vec![lit_match, lit_other]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_template_literal_with_suffix_constrained_non_distributive_union_input() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    // [T] extends [`${infer R extends string}bar`] ? R : never, with T = "foobar" | "bazbar" (no distribution).
+    // TODO: Non-distributive template literal inference is not implemented; current behavior yields never.
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Type(infer_r),
+        TemplateSpan::Text(interner.intern_string("bar")),
+    ]);
+    let cond = ConditionalType {
+        check_type: interner.tuple(vec![TupleElement {
+            type_id: t_param,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        extends_type: interner.tuple(vec![TupleElement {
+            type_id: extends_template,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let lit_left = interner.literal_string("foobar");
+    let lit_right = interner.literal_string("bazbar");
+    subst.insert(t_name, interner.union(vec![lit_left, lit_right]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_template_literal_with_prefix_non_distributive_union_input() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // [T] extends [`foo${infer R}`] ? R : never, with T = "foo1" | "foo2" (no distribution).
+    // TODO: Non-distributive template literal inference is not implemented; current behavior yields never.
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("foo")),
+        TemplateSpan::Type(infer_r),
+    ]);
+    let cond = ConditionalType {
+        check_type: interner.tuple(vec![TupleElement {
+            type_id: t_param,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        extends_type: interner.tuple(vec![TupleElement {
+            type_id: extends_template,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let lit_left = interner.literal_string("foo1");
+    let lit_right = interner.literal_string("foo2");
+    subst.insert(t_name, interner.union(vec![lit_left, lit_right]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_template_literal_with_prefix_non_distributive_non_matching_union_branch() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // [T] extends [`foo${infer R}`] ? R : never, with T = "foo1" | "bar" (no distribution).
+    // TODO: Non-distributive template literal inference is not implemented; current behavior yields never.
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("foo")),
+        TemplateSpan::Type(infer_r),
+    ]);
+    let cond = ConditionalType {
+        check_type: interner.tuple(vec![TupleElement {
+            type_id: t_param,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        extends_type: interner.tuple(vec![TupleElement {
+            type_id: extends_template,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let lit_match = interner.literal_string("foo1");
+    let lit_other = interner.literal_string("bar");
+    subst.insert(t_name, interner.union(vec![lit_match, lit_other]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_template_literal_with_prefix_constrained_non_distributive_union_input() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    // [T] extends [`foo${infer R extends string}`] ? R : never, with T = "foo1" | "foo2" (no distribution).
+    // TODO: Non-distributive template literal inference is not implemented; current behavior yields never.
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("foo")),
+        TemplateSpan::Type(infer_r),
+    ]);
+    let cond = ConditionalType {
+        check_type: interner.tuple(vec![TupleElement {
+            type_id: t_param,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        extends_type: interner.tuple(vec![TupleElement {
+            type_id: extends_template,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let lit_left = interner.literal_string("foo1");
+    let lit_right = interner.literal_string("foo2");
+    subst.insert(t_name, interner.union(vec![lit_left, lit_right]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_template_literal_two_infers_with_constraint_non_distributive_union_input() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_a_name = interner.intern_string("A");
+    let infer_a = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_a_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+    let infer_b_name = interner.intern_string("B");
+    let infer_b = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_b_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    // [T] extends [`${infer A extends string}-${infer B extends string}`] ? A | B : never,
+    // with T = "foo-bar" | "baz-qux" (no distribution).
+    // TODO: Non-distributive template literal inference is not implemented; current behavior yields never.
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Type(infer_a),
+        TemplateSpan::Text(interner.intern_string("-")),
+        TemplateSpan::Type(infer_b),
+    ]);
+    let cond = ConditionalType {
+        check_type: interner.tuple(vec![TupleElement {
+            type_id: t_param,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        extends_type: interner.tuple(vec![TupleElement {
+            type_id: extends_template,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        true_type: interner.union(vec![infer_a, infer_b]),
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let lit_left = interner.literal_string("foo-bar");
+    let lit_right = interner.literal_string("baz-qux");
+    subst.insert(t_name, interner.union(vec![lit_left, lit_right]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_template_literal_with_middle_infer_distributive() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends `foo${infer R}bar` ? R : never, with T = "foobazbar" | "bar".
+    // TODO: Template literal inference is not implemented; current behavior yields never.
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("foo")),
+        TemplateSpan::Type(infer_r),
+        TemplateSpan::Text(interner.intern_string("bar")),
+    ]);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_template,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let lit_match = interner.literal_string("foobazbar");
+    let lit_other = interner.literal_string("bar");
+    subst.insert(t_name, interner.union(vec![lit_match, lit_other]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_template_literal_two_infers_distributive() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_a_name = interner.intern_string("A");
+    let infer_a = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_a_name,
+        constraint: None,
+        default: None,
+    }));
+    let infer_b_name = interner.intern_string("B");
+    let infer_b = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_b_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends `${infer A}-${infer B}` ? A | B : never, with T = "foo-bar" | "baz-qux".
+    // TODO: Template literal inference is not implemented; current behavior yields never.
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Type(infer_a),
+        TemplateSpan::Text(interner.intern_string("-")),
+        TemplateSpan::Type(infer_b),
+    ]);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_template,
+        true_type: interner.union(vec![infer_a, infer_b]),
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let lit_left = interner.literal_string("foo-bar");
+    let lit_right = interner.literal_string("baz-qux");
+    subst.insert(t_name, interner.union(vec![lit_left, lit_right]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_template_literal_with_constrained_infer_distributive() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    // T extends `foo${infer R extends string}` ? R : never, with T = "foo1" | "foo2".
+    // TODO: Template literal inference is not implemented; current behavior yields never.
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("foo")),
+        TemplateSpan::Type(infer_r),
+    ]);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_template,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let lit_foo1 = interner.literal_string("foo1");
+    let lit_foo2 = interner.literal_string("foo2");
+    subst.insert(t_name, interner.union(vec![lit_foo1, lit_foo2]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_nested_object_property_distributive() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends { a: { b: infer R } } ? R : never, with T = { a: { b: string } } | { a: { b: number } }.
+    let extends_inner = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: infer_r,
+        write_type: infer_r,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let extends_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: extends_inner,
+        write_type: extends_inner,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_obj,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let obj_a_string = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_a_number = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_string = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: obj_a_string,
+        write_type: obj_a_string,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_number = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: obj_a_number,
+        write_type: obj_a_number,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    subst.insert(t_name, interner.union(vec![obj_string, obj_number]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_conditional_infer_nested_object_property_non_distributive_union_input() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends { a: { b: infer R } } ? R : never, with T = { a: { b: string } } | { a: { b: number } } (no distribution).
+    // TODO: Non-distributive nested object inference over unions yields never.
+    let extends_inner = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: infer_r,
+        write_type: infer_r,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let extends_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: extends_inner,
+        write_type: extends_inner,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_obj,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let obj_a_string = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_a_number = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_string = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: obj_a_string,
+        write_type: obj_a_string,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_number = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: obj_a_number,
+        write_type: obj_a_number,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    subst.insert(t_name, interner.union(vec![obj_string, obj_number]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_nested_object_property_with_constraint() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    // T extends { a: { b: infer R extends string } } ? R : never, with T = { a: { b: string } } | { a: { b: number } }.
+    let extends_inner = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: infer_r,
+        write_type: infer_r,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let extends_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: extends_inner,
+        write_type: extends_inner,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_obj,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let obj_a_string = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_a_number = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_string = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: obj_a_string,
+        write_type: obj_a_string,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_number = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: obj_a_number,
+        write_type: obj_a_number,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    subst.insert(t_name, interner.union(vec![obj_string, obj_number]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_conditional_infer_nested_object_property_readonly() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends { readonly a: { b: infer R } } ? R : never, with T = { readonly a: { b: string } } | { a: { b: number } }.
+    let extends_inner = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: infer_r,
+        write_type: infer_r,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let extends_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: extends_inner,
+        write_type: extends_inner,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_obj,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let obj_a_string = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_a_number = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_string = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: obj_a_string,
+        write_type: obj_a_string,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+    let obj_number = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: obj_a_number,
+        write_type: obj_a_number,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    subst.insert(t_name, interner.union(vec![obj_string, obj_number]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_conditional_infer_nested_object_property_readonly_wrapper() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends { a: Readonly<{ b: infer R }> } ? R : never,
+    // with T = { a: Readonly<{ b: string }> } | { a: { b: number } }.
+    let extends_inner_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: infer_r,
+        write_type: infer_r,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let extends_inner =
+        interner.intern(TypeKey::ReadonlyType(extends_inner_obj));
+    let extends_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: extends_inner,
+        write_type: extends_inner,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_obj,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let obj_a_string_inner = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_a_string =
+        interner.intern(TypeKey::ReadonlyType(obj_a_string_inner));
+    let obj_a_number = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_string = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: obj_a_string,
+        write_type: obj_a_string,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_number = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: obj_a_number,
+        write_type: obj_a_number,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    subst.insert(t_name, interner.union(vec![obj_string, obj_number]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_conditional_infer_nested_object_property_non_matching_branch() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends { a: { b: infer R } } ? R : never, with T = { a: { b: string } } | { a: { c: number } }.
+    let extends_inner = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: infer_r,
+        write_type: infer_r,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let extends_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: extends_inner,
+        write_type: extends_inner,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_obj,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let obj_a_string = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_a_number = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("c"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_match = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: obj_a_string,
+        write_type: obj_a_string,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_non_match = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: obj_a_number,
+        write_type: obj_a_number,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    subst.insert(t_name, interner.union(vec![obj_match, obj_non_match]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_conditional_infer_nested_object_property_union_value() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends { a: { b: infer R } } ? R : never, with T = { a: { b: string | number } }.
+    let extends_inner = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: infer_r,
+        write_type: infer_r,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let extends_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: extends_inner,
+        write_type: extends_inner,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_obj,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let b_union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: b_union,
+        write_type: b_union,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: obj_a,
+        write_type: obj_a,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    subst.insert(t_name, obj);
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, b_union);
+}
+
+#[test]
+fn test_conditional_infer_object_property_non_object_union_branch() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends { a: infer R } ? R : never, with T = { a: string } | number.
+    let extends_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: infer_r,
+        write_type: infer_r,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_obj,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let obj_match = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    subst.insert(t_name, interner.union(vec![obj_match, TypeId::NUMBER]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_conditional_infer_object_property_non_distributive_non_object_union_branch() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // [T] extends [{ a: infer R }] ? R : never, with T = { a: string } | number (no distribution).
+    let extends_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: infer_r,
+        write_type: infer_r,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let cond = ConditionalType {
+        check_type: interner.tuple(vec![TupleElement {
+            type_id: t_param,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        extends_type: interner.tuple(vec![TupleElement {
+            type_id: extends_obj,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let obj_match = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    subst.insert(t_name, interner.union(vec![obj_match, TypeId::NUMBER]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_object_index_signature_distributive() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends { [key: string]: infer R } ? R : never, with T = { a: string } | { b: number }.
+    // TODO: TypeScript infers R as string | number; solver currently yields never (no index signature inference).
+    let extends_obj = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: infer_r,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_obj,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let obj_string = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_number = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    subst.insert(t_name, interner.union(vec![obj_string, obj_number]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_number_index_signature_distributive() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends { [key: number]: infer R } ? R : never, with T = { 0: string } | { 1: number }.
+    // TODO: TypeScript infers R as string | number; solver currently yields never (no index signature inference).
+    let extends_obj = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: infer_r,
+            readonly: false,
+        }),
+    });
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_obj,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let obj_string = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("0"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_number = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("1"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    subst.insert(t_name, interner.union(vec![obj_string, obj_number]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_number_index_signature_non_distributive_union_input() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends { [key: number]: infer R } ? R : never, with T = { 0: string } | { 1: number } (no distribution).
+    // TODO: Non-distributive number index signature inference yields never.
+    let extends_obj = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: infer_r,
+            readonly: false,
+        }),
+    });
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_obj,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let obj_string = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("0"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_number = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("1"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    subst.insert(t_name, interner.union(vec![obj_string, obj_number]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_object_index_signature_non_object_union_branch() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends { [key: string]: infer R } ? R : never, with T = { a: string } | number.
+    // TODO: Index signature inference is not implemented; current behavior yields never.
+    let extends_obj = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: infer_r,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_obj,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let obj_string = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    subst.insert(t_name, interner.union(vec![obj_string, TypeId::NUMBER]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_object_index_signature_non_distributive_union_input() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends { [key: string]: infer R } ? R : never, with T = { a: string } | { b: number } (no distribution).
+    // TODO: Non-distributive index signature inference yields never.
+    let extends_obj = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: infer_r,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_obj,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let obj_string = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_number = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    subst.insert(t_name, interner.union(vec![obj_string, obj_number]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_optional_property_missing_object() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends { a?: infer R } ? R : never, with T = {}.
+    // TODO: Optional property inference currently treats missing properties as non-matches.
+    let extends_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: infer_r,
+        write_type: infer_r,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_obj,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let empty_obj = interner.object(Vec::new());
+    subst.insert(t_name, empty_obj);
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_optional_property_present_distributive() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends { a?: infer R } ? R : never, with T = { a?: string } | { a?: number }.
+    // TODO: Optional property inference currently omits undefined.
+    let extends_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: infer_r,
+        write_type: infer_r,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_obj,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let obj_string = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_number = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+    subst.insert(t_name, interner.union(vec![obj_string, obj_number]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_conditional_infer_optional_property_with_constraint() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    // T extends { a?: infer R extends string } ? R : never, with T = { a?: string } | { a?: number }.
+    let extends_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: infer_r,
+        write_type: infer_r,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_obj,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let obj_string = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_number = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+    subst.insert(t_name, interner.union(vec![obj_string, obj_number]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_conditional_infer_optional_property_non_distributive_union_input() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // [T] extends [{ a?: infer R }] ? R : never, with T = { a: string } | {} (no distribution).
+    // TODO: Non-distributive optional property inference over union inputs yields never.
+    let extends_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: infer_r,
+        write_type: infer_r,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+    let cond = ConditionalType {
+        check_type: interner.tuple(vec![TupleElement {
+            type_id: t_param,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        extends_type: interner.tuple(vec![TupleElement {
+            type_id: extends_obj,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let obj_string = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let empty_obj = interner.object(Vec::new());
+    subst.insert(t_name, interner.union(vec![obj_string, empty_obj]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_object_property_intersection_check() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends { a: infer R } ? R : never, with T = { a: string } & { b: number }.
+    // TODO: Intersection object inference currently yields never; TypeScript infers string.
+    let extends_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: infer_r,
+        write_type: infer_r,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_obj,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let intersection = interner.intersection(vec![obj_a, obj_b]);
+    subst.insert(t_name, intersection);
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_function_param_distributive() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends (arg: infer R) => void ? R : never, with T = ((arg: string) => void)
+    // | ((arg: number) => void).
+    // TODO: Function parameter inference is not implemented; current behavior yields never.
+    let extends_fn = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: infer_r,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_fn,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let string_fn = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let number_fn = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    subst.insert(t_name, interner.union(vec![string_fn, number_fn]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_function_param_non_distributive_union_input() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // [T] extends [(arg: infer R) => void] ? R : never, with T = ((arg: string) => void)
+    // | ((arg: number) => void).
+    // TODO: Non-distributive function parameter inference is not implemented; current behavior yields never.
+    let extends_fn = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: infer_r,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let cond = ConditionalType {
+        check_type: interner.tuple(vec![TupleElement {
+            type_id: t_param,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        extends_type: interner.tuple(vec![TupleElement {
+            type_id: extends_fn,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let string_fn = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let number_fn = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    subst.insert(t_name, interner.union(vec![string_fn, number_fn]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_function_rest_param_distributive() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends (...args: infer R) => void ? R : never, with T = ((...args: string[]) => void)
+    // | ((...args: number[]) => void).
+    // TODO: Function rest parameter inference is not implemented; current behavior yields never.
+    let extends_fn = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: infer_r,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_fn,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let string_fn = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: interner.array(TypeId::STRING),
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let number_fn = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: interner.array(TypeId::NUMBER),
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    subst.insert(t_name, interner.union(vec![string_fn, number_fn]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_function_this_param_distributive() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends (this: infer R) => void ? R : never, with T = ((this: string) => void)
+    // | ((this: number) => void).
+    // TODO: Function this-parameter inference is not implemented; current behavior yields never.
+    let extends_fn = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: Some(infer_r),
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_fn,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let string_fn = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: Some(TypeId::STRING),
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let number_fn = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: Some(TypeId::NUMBER),
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    subst.insert(t_name, interner.union(vec![string_fn, number_fn]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_function_this_param_non_distributive_union_input() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // [T] extends [(this: infer R) => void] ? R : never, with T = ((this: string) => void)
+    // | ((this: number) => void).
+    // TODO: Non-distributive function this-parameter inference is not implemented; current behavior yields never.
+    let extends_fn = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: Some(infer_r),
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let cond = ConditionalType {
+        check_type: interner.tuple(vec![TupleElement {
+            type_id: t_param,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        extends_type: interner.tuple(vec![TupleElement {
+            type_id: extends_fn,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let string_fn = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: Some(TypeId::STRING),
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let number_fn = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: Some(TypeId::NUMBER),
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    subst.insert(t_name, interner.union(vec![string_fn, number_fn]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_function_return_distributive() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends () => infer R ? R : never, with T = (() => string) | (() => number).
+    // TODO: Function return inference is not implemented; current behavior yields never.
+    let extends_fn = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: None,
+        return_type: infer_r,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_fn,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let string_fn = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let number_fn = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::NUMBER,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    subst.insert(t_name, interner.union(vec![string_fn, number_fn]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_function_return_non_distributive_union_input() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // [T] extends [() => infer R] ? R : never, with T = (() => string) | (() => number).
+    // TODO: Non-distributive function return inference is not implemented; current behavior yields never.
+    let extends_fn = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: None,
+        return_type: infer_r,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let cond = ConditionalType {
+        check_type: interner.tuple(vec![TupleElement {
+            type_id: t_param,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        extends_type: interner.tuple(vec![TupleElement {
+            type_id: extends_fn,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let string_fn = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let number_fn = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::NUMBER,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    subst.insert(t_name, interner.union(vec![string_fn, number_fn]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_object_property_non_distributive_union_all_match() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // [T] extends [{ a: infer R }] ? R : never, with T = { a: string } | { a: number }.
+    // TODO: Non-distributive inference over union inputs is not implemented; current behavior yields never.
+    let extends_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: infer_r,
+        write_type: infer_r,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let cond = ConditionalType {
+        check_type: interner.tuple(vec![TupleElement {
+            type_id: t_param,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        extends_type: interner.tuple(vec![TupleElement {
+            type_id: extends_obj,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let obj_string = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_number = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    subst.insert(t_name, interner.union(vec![obj_string, obj_number]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_object_property_non_distributive_union_branch() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // [T] extends [{ a: infer R }] ? R : never, with T = { a: string } | number.
+    let extends_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: infer_r,
+        write_type: infer_r,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let cond = ConditionalType {
+        check_type: interner.tuple(vec![TupleElement {
+            type_id: t_param,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        extends_type: interner.tuple(vec![TupleElement {
+            type_id: extends_obj,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let obj_match = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    subst.insert(t_name, interner.union(vec![obj_match, TypeId::NUMBER]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_tuple_element_extraction() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends [infer R] ? R : never, with T = [string] | [number].
+    let extends_tuple = interner.tuple(vec![TupleElement {
+        type_id: infer_r,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_tuple,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    subst.insert(
+        t_name,
+        interner.union(vec![
+            interner.tuple(vec![TupleElement {
+                type_id: TypeId::STRING,
+                name: None,
+                optional: false,
+                rest: false,
+            }]),
+            interner.tuple(vec![TupleElement {
+                type_id: TypeId::NUMBER,
+                name: None,
+                optional: false,
+                rest: false,
+            }]),
+        ]),
+    );
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_conditional_infer_tuple_optional_element_distributive() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends [infer R?] ? R : never, with T = [string] | [].
+    let extends_tuple = interner.tuple(vec![TupleElement {
+        type_id: infer_r,
+        name: None,
+        optional: true,
+        rest: false,
+    }]);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_tuple,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let string_tuple = interner.tuple(vec![TupleElement {
+        type_id: TypeId::STRING,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
+    let empty_tuple = interner.tuple(Vec::new());
+    subst.insert(t_name, interner.union(vec![string_tuple, empty_tuple]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_conditional_infer_tuple_optional_element_non_distributive_union_input() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends [infer R?] ? R : never, with T = [string] | [] (no distribution).
+    // TODO: Non-distributive tuple inference over union inputs yields never.
+    let extends_tuple = interner.tuple(vec![TupleElement {
+        type_id: infer_r,
+        name: None,
+        optional: true,
+        rest: false,
+    }]);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_tuple,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let string_tuple = interner.tuple(vec![TupleElement {
+        type_id: TypeId::STRING,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
+    let empty_tuple = interner.tuple(Vec::new());
+    subst.insert(t_name, interner.union(vec![string_tuple, empty_tuple]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_tuple_element_non_distributive_union_input() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends [infer R] ? R : never, with T = [string] | [number] (no distribution).
+    // TODO: Non-distributive tuple inference over union inputs yields never.
+    let extends_tuple = interner.tuple(vec![TupleElement {
+        type_id: infer_r,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_tuple,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    subst.insert(
+        t_name,
+        interner.union(vec![
+            interner.tuple(vec![TupleElement {
+                type_id: TypeId::STRING,
+                name: None,
+                optional: false,
+                rest: false,
+            }]),
+            interner.tuple(vec![TupleElement {
+                type_id: TypeId::NUMBER,
+                name: None,
+                optional: false,
+                rest: false,
+            }]),
+        ]),
+    );
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_tuple_element_non_tuple_union_branch() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends [infer R] ? R : never, with T = [string] | number.
+    let extends_tuple = interner.tuple(vec![TupleElement {
+        type_id: infer_r,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_tuple,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let tuple_string = interner.tuple(vec![TupleElement {
+        type_id: TypeId::STRING,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
+    subst.insert(t_name, interner.union(vec![tuple_string, TypeId::NUMBER]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_conditional_infer_tuple_element_with_constraint() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    // T extends [infer R extends string] ? R : never, with T = [number] | [string].
+    let extends_tuple = interner.tuple(vec![TupleElement {
+        type_id: infer_r,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_tuple,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    subst.insert(
+        t_name,
+        interner.union(vec![
+            interner.tuple(vec![TupleElement {
+                type_id: TypeId::NUMBER,
+                name: None,
+                optional: false,
+                rest: false,
+            }]),
+            interner.tuple(vec![TupleElement {
+                type_id: TypeId::STRING,
+                name: None,
+                optional: false,
+                rest: false,
+            }]),
+        ]),
+    );
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_conditional_infer_optional_tuple_element_with_constraint() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    // T extends [infer R extends string] ? R : never, with T = [string?] | [number?].
+    // TODO: Optional tuple inference currently ignores optionality; current behavior yields string.
+    let extends_tuple = interner.tuple(vec![TupleElement {
+        type_id: infer_r,
+        name: None,
+        optional: true,
+        rest: false,
+    }]);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_tuple,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    subst.insert(
+        t_name,
+        interner.union(vec![
+            interner.tuple(vec![TupleElement {
+                type_id: TypeId::NUMBER,
+                name: None,
+                optional: true,
+                rest: false,
+            }]),
+            interner.tuple(vec![TupleElement {
+                type_id: TypeId::STRING,
+                name: None,
+                optional: true,
+                rest: false,
+            }]),
+        ]),
+    );
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_conditional_infer_tuple_rest_distributive() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends [string, ...infer R] ? R : never, with T = [string, number] | [string].
+    // TODO: Variadic tuple inference is not implemented; current behavior yields the infer placeholder.
+    let extends_tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: infer_r,
+            name: None,
+            optional: false,
+            rest: true,
+        },
+    ]);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_tuple,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let tuple_string_number = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+    let tuple_string = interner.tuple(vec![TupleElement {
+        type_id: TypeId::STRING,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
+    subst.insert(t_name, interner.union(vec![tuple_string_number, tuple_string]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, infer_r);
+}
+
+#[test]
+fn test_conditional_infer_union_true_branch_distributive() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends string ? R | number : never, with T = string | boolean.
+    // Infer appears only in the true branch; ensure it is preserved.
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: TypeId::STRING,
+        true_type: interner.union(vec![infer_r, TypeId::NUMBER]),
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, interner.union(vec![TypeId::STRING, TypeId::BOOLEAN]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, interner.union(vec![infer_r, TypeId::NUMBER]));
+}
+
+#[test]
+fn test_conditional_infer_union_false_branch_distributive() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends string ? never : R | number, with T = string | boolean.
+    // Infer appears only in the false branch; ensure it is preserved.
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: TypeId::STRING,
+        true_type: TypeId::NEVER,
+        false_type: interner.union(vec![infer_r, TypeId::NUMBER]),
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, interner.union(vec![TypeId::STRING, TypeId::BOOLEAN]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, interner.union(vec![infer_r, TypeId::NUMBER]));
+}
+
+#[test]
+fn test_conditional_infer_any_check_type_distributive() {
+    let interner = TypeInterner::new();
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // any extends string ? infer R : never
+    // any produces union of branches; infer should survive in true branch.
+    let cond = ConditionalType {
+        check_type: TypeId::ANY,
+        extends_type: TypeId::STRING,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, infer_r);
+}
+
+#[test]
+fn test_conditional_infer_readonly_array_element_extraction() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends readonly (infer R)[] ? R : never, with T = readonly string[] | readonly number[].
+    let extends_array =
+        interner.intern(TypeKey::ReadonlyType(interner.array(infer_r)));
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_array,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let readonly_string_array =
+        interner.intern(TypeKey::ReadonlyType(interner.array(TypeId::STRING)));
+    let readonly_number_array =
+        interner.intern(TypeKey::ReadonlyType(interner.array(TypeId::NUMBER)));
+    subst.insert(t_name, interner.union(vec![readonly_string_array, readonly_number_array]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_conditional_infer_readonly_array_element_non_distributive_union_input() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends readonly (infer R)[] ? R : never, with T = readonly string[] | readonly number[] (no distribution).
+    // TODO: Non-distributive readonly array inference over union inputs yields never.
+    let extends_array =
+        interner.intern(TypeKey::ReadonlyType(interner.array(infer_r)));
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_array,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let readonly_string_array =
+        interner.intern(TypeKey::ReadonlyType(interner.array(TypeId::STRING)));
+    let readonly_number_array =
+        interner.intern(TypeKey::ReadonlyType(interner.array(TypeId::NUMBER)));
+    subst.insert(t_name, interner.union(vec![readonly_string_array, readonly_number_array]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_readonly_array_element_non_array_union_branch() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends readonly (infer R)[] ? R : never, with T = readonly string[] | number.
+    let extends_array =
+        interner.intern(TypeKey::ReadonlyType(interner.array(infer_r)));
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_array,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let readonly_string_array =
+        interner.intern(TypeKey::ReadonlyType(interner.array(TypeId::STRING)));
+    subst.insert(t_name, interner.union(vec![readonly_string_array, TypeId::NUMBER]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_conditional_infer_readonly_tuple_element_extraction() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends readonly [infer R] ? R : never, with T = readonly [string] | readonly [number].
+    let extends_tuple = interner.intern(TypeKey::ReadonlyType(interner.tuple(vec![
+        TupleElement {
+            type_id: infer_r,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ])));
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_tuple,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let readonly_string_tuple = interner.intern(TypeKey::ReadonlyType(interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ])));
+    let readonly_number_tuple = interner.intern(TypeKey::ReadonlyType(interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ])));
+    subst.insert(t_name, interner.union(vec![readonly_string_tuple, readonly_number_tuple]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_conditional_infer_readonly_tuple_element_non_distributive_union_input() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends readonly [infer R] ? R : never, with T = readonly [string] | readonly [number] (no distribution).
+    // TODO: Non-distributive readonly tuple inference over union inputs yields never.
+    let extends_tuple = interner.intern(TypeKey::ReadonlyType(interner.tuple(vec![
+        TupleElement {
+            type_id: infer_r,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ])));
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_tuple,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let readonly_string_tuple = interner.intern(TypeKey::ReadonlyType(interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ])));
+    let readonly_number_tuple = interner.intern(TypeKey::ReadonlyType(interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ])));
+    subst.insert(t_name, interner.union(vec![readonly_string_tuple, readonly_number_tuple]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_conditional_infer_readonly_tuple_element_non_tuple_union_branch() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends readonly [infer R] ? R : never, with T = readonly [string] | number.
+    let extends_tuple = interner.intern(TypeKey::ReadonlyType(interner.tuple(vec![
+        TupleElement {
+            type_id: infer_r,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ])));
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_tuple,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let readonly_string_tuple = interner.intern(TypeKey::ReadonlyType(interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ])));
+    subst.insert(t_name, interner.union(vec![readonly_string_tuple, TypeId::NUMBER]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_conditional_infer_readonly_array_mixed_input() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends readonly (infer R)[] ? R : never, with T = readonly string[] | number[].
+    let extends_array =
+        interner.intern(TypeKey::ReadonlyType(interner.array(infer_r)));
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_array,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let readonly_string_array =
+        interner.intern(TypeKey::ReadonlyType(interner.array(TypeId::STRING)));
+    let number_array = interner.array(TypeId::NUMBER);
+    subst.insert(t_name, interner.union(vec![readonly_string_array, number_array]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    assert_eq!(result, expected);
+}
+
+#[test]
 fn test_conditional_instantiated_param_tuple_wrapper_no_distribution() {
     let interner = TypeInterner::new();
 
@@ -316,6 +5023,234 @@ fn test_conditional_deferred_type_parameter() {
 
     // Should return the same conditional (deferred)
     assert_eq!(result, cond_type);
+}
+
+#[test]
+fn test_conditional_infer_direct_match() {
+    let interner = TypeInterner::new();
+
+    let r_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: r_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // string extends infer R ? R : never -> string
+    let cond = ConditionalType {
+        check_type: TypeId::STRING,
+        extends_type: infer_r,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_conditional_infer_constraint_mismatch() {
+    let interner = TypeInterner::new();
+
+    let r_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: r_name,
+        constraint: Some(TypeId::NUMBER),
+        default: None,
+    }));
+    let no = interner.literal_string("no");
+
+    // string extends infer R extends number ? R : "no" -> "no"
+    let cond = ConditionalType {
+        check_type: TypeId::STRING,
+        extends_type: infer_r,
+        true_type: infer_r,
+        false_type: no,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, no);
+}
+
+#[test]
+fn test_conditional_distributive_infer_array_extends() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let r_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: r_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends Array<infer R> ? R : never
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: interner.array(infer_r),
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let string_array = interner.array(TypeId::STRING);
+    let number_array = interner.array(TypeId::NUMBER);
+    let union_arrays = interner.union(vec![string_array, number_array]);
+
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, union_arrays);
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_conditional_nested_distributive_infer() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let r_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: r_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let yes = interner.literal_string("yes");
+    let no = interner.literal_string("no");
+    let outer_no = interner.literal_string("outer-no");
+
+    let inner_cond = interner.conditional(ConditionalType {
+        check_type: infer_r,
+        extends_type: TypeId::STRING,
+        true_type: yes,
+        false_type: no,
+        is_distributive: false,
+    });
+
+    // T extends infer R ? (R extends string ? "yes" : "no") : "outer-no"
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: infer_r,
+        true_type: inner_cond,
+        false_type: outer_no,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, union);
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![yes, no]);
+
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_conditional_infer_object_property() {
+    let interner = TypeInterner::new();
+
+    let r_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: r_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let prop_name = interner.intern_string("a");
+    let source = interner.object(vec![PropertyInfo {
+        name: prop_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let pattern = interner.object(vec![PropertyInfo {
+        name: prop_name,
+        type_id: infer_r,
+        write_type: infer_r,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // { a: string } extends { a: infer R } ? R : never -> string
+    let cond = ConditionalType {
+        check_type: source,
+        extends_type: pattern,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_conditional_infer_object_string_index_signature() {
+    let interner = TypeInterner::new();
+
+    let r_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: r_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let source = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+    let pattern = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: infer_r,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    // { [key: string]: number } extends { [key: string]: infer R } ? R : never -> number
+    let cond = ConditionalType {
+        check_type: source,
+        extends_type: pattern,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, TypeId::NUMBER);
 }
 
 #[test]

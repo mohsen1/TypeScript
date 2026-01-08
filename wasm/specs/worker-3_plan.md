@@ -7,13 +7,76 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- Solver hardening: verify variance rules in `wasm/src/solver/subtype.rs`. Add targeted cases in `wasm/src/solver/subtype_tests.rs` for parameter contravariance and return-type covariance, then fix any inconsistencies.
+- Awaiting next manager assignment.
 
 ## Task Queue
-- [ ] If variance coverage is solid, add edge cases for optional/rest parameters and `this` parameters in assignability.
+- [ ] (none)
 
 ## Completed
-- [x] (Move finished items here with brief notes and tests run.)
+- [x] CLI: derive default typesVersions compiler version from `package.json` with fallback to 6.0.0. Tests: not run (no direct coverage).
+- [x] Solver inference: include function/callable `this` types in occurs-checks and add `test_inference_occurs_check_function_this_type`. Tests: `./wasm/test.sh test_inference_occurs_check_function_this_type`.
+- [x] Solver variance: added param contravariance and return covariance tests in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_function_variance_`.
+- [x] Solver variance: added optional/rest method/constructor edge cases in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_variance_optional_rest_`.
+- [x] Solver variance: required vs optional parameter count coverage plus required-count checks in `wasm/src/solver/subtype.rs`. Tests: `./wasm/test.sh test_function_required_count_`.
+- [x] Solver variance: method vs function `this` parameter assignability tests in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_this_parameter_`.
+- [x] Solver variance: optional/rest + `this` parameter assignability for method vs function properties in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_variance_optional_rest_`.
+- [x] Solver unsoundness: void return exception coverage in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_void_return_exception_subtype`.
+- [x] Solver unsoundness: method bivariance regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_method_bivariant_required_param`.
+- [x] Solver unsoundness: Function top assignability regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_function_top_assignability`.
+- [x] Solver unsoundness: covariant mutable arrays regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_array_covariant_mutable_unsoundness`.
+- [x] Solver unsoundness: rest parameter bivariance regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_rest_any_bivariant_subtyping_toggle`.
+- [x] Solver unsoundness: tuple-array assignment regressions in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_tuple_array_assignment_`.
+- [x] Solver unsoundness: Object vs object vs {} trifecta regressions in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_object_trifecta_`.
+- [x] Solver unsoundness: weak type detection regressions in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_weak_type_detection_`.
+- [x] Solver unsoundness: legacy null/undefined subtyping in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_legacy_null_undefined_subtyping`.
+- [x] Solver unsoundness: no-unchecked indexed access tuple subtyping in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_no_unchecked_indexed_access_tuple_subtyping`.
+- [x] Solver unsoundness: no-unchecked indexed access string index subtyping in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_no_unchecked_indexed_access_string_index_signature`.
+- [x] Solver unsoundness: no-unchecked indexed access union index subtyping in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_no_unchecked_indexed_access_union_index_signature`.
+- [x] Solver unsoundness: error poisoning regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_error_poisoning_`.
+- [x] Solver unsoundness: optional property undefined toggle in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_exact_optional_property_types_toggle`.
+- [x] Solver unsoundness: split accessor variance regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_split_accessor_variance`.
+- [x] Solver unsoundness: constructor void exception regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_constructor_void_exception_subtype`.
+- [x] Solver unsoundness: intersection reduction (disjoint intrinsics) regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_intersection_reduction_disjoint_intrinsics`.
+- [x] Solver unsoundness: recursion depth limiter provisional subtyping in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_recursion_depth_limit_provisional_subtyping`.
+- [x] Solver unsoundness: primitive boxing (`number` to `Number` interface) regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_primitive_boxing_assignability`.
+- [x] Solver unsoundness: primitive boxing (`bigint` to `BigInt` interface) regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_primitive_boxing_bigint_assignability`.
+- [x] Solver unsoundness: primitive boxing (`boolean` to `Boolean` interface) regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_primitive_boxing_boolean_assignability`.
+- [x] Solver unsoundness: primitive boxing (`string` to `String` interface) regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_primitive_boxing_string_assignability`.
+- [x] Solver unsoundness: primitive boxing (`symbol` to `Symbol` interface) regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_primitive_boxing_symbol_assignability`.
+- [x] Solver unsoundness: any top/bottom regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_any_top_bottom_subtyping`.
+- [x] Solver unsoundness: apparent string member regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_apparent_string_member_subtyping`.
+- [x] Solver unsoundness: keyof union disjoint keys regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_keyof_union_disjoint_object_keys_is_never`.
+- [x] Solver unsoundness: keyof union overlapping keys regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_keyof_union_overlapping_keys_is_common`.
+- [x] Solver unsoundness: keyof union with optional keys regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_keyof_union_optional_key_is_common`.
+- [x] Solver unsoundness: keyof union string index + literal narrowing regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_keyof_union_string_index_and_literal_narrows`.
+- [x] Solver unsoundness: keyof intersection union-of-keys regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_keyof_intersection_union_of_keys`.
+- [x] Solver unsoundness: keyof any union regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_keyof_any_subtyping_union`.
+- [x] Solver unsoundness: keyof contravariance over object subtyping in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_keyof_contravariant_object_subtyping`.
+- [x] Solver unsoundness: mapped type over primitive number keys regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_over_number_keys_subtyping`.
+- [x] Solver unsoundness: mapped type over primitive string keys regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_over_string_keys_subtyping`.
+- [x] Solver unsoundness: index signature consistency regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_object_to_indexed_property_mismatch_string_index`.
+- [x] Solver unsoundness: apparent boolean member regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_apparent_boolean_member_subtyping`.
+- [x] Solver unsoundness: apparent symbol member regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_apparent_symbol_member_subtyping`.
+- [x] Solver unsoundness: apparent bigint member regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_apparent_bigint_member_subtyping`.
+- [x] Solver unsoundness: mapped type over primitive boolean keys regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_over_boolean_keys_subtyping`.
+- [x] Solver unsoundness: apparent object member regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_apparent_object_member_subtyping`.
+- [x] Solver unsoundness: mapped type over primitive symbol keys regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_over_symbol_keys_subtyping`.
+- [x] Solver unsoundness: mapped type over primitive bigint keys regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_over_bigint_keys_subtyping`.
+- [x] Solver unsoundness: key remapping to `never` yields empty object in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_key_remap_all_never_empty_object`.
+- [x] Solver unsoundness: mapped optional modifier add yields optional properties in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_optional_modifier_add_subtyping`.
+- [x] Solver unsoundness: mapped readonly modifier add yields readonly properties in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_readonly_modifier_add_subtyping`.
+- [x] Solver unsoundness: mapped optional modifier remove yields required properties in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_optional_modifier_remove_subtyping`.
+- [x] Solver unsoundness: mapped readonly modifier remove yields mutable properties in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_readonly_modifier_remove_subtyping`.
+- [x] Solver unsoundness: mapped optional remove over optional keyof yields required properties in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_optional_remove_from_optional_keyof`.
+- [x] Solver unsoundness: mapped readonly remove over readonly keyof yields mutable properties in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_readonly_remove_from_readonly_keyof`.
+- [x] Solver unsoundness: mapped optional+readonly add yields optional readonly properties in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_optional_readonly_add_subtyping`.
+- [x] Solver unsoundness: mapped optional+readonly remove yields mutable required properties in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_optional_readonly_remove_subtyping`.
+- [x] Solver unsoundness: key remap with optional add yields optional properties in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_key_remap_optional_add_subtyping`.
+- [x] Solver unsoundness: key remap with readonly add yields readonly properties in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_key_remap_readonly_add_subtyping`.
+- [x] Solver unsoundness: key remap with readonly remove yields mutable properties in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_key_remap_readonly_remove_subtyping`.
+- [x] Solver unsoundness: key remap with optional remove retains optional properties in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_key_remap_optional_remove_subtyping`.
+- [x] Solver unsoundness: key remap with optional+readonly add yields optional readonly properties in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_key_remap_optional_readonly_add_subtyping`.
+- [x] Solver unsoundness: key remap with optional+readonly remove yields required mutable properties in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_key_remap_optional_readonly_remove_subtyping`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
