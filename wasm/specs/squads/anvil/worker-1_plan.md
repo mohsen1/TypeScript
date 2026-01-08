@@ -5,6 +5,7 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 
 Status: Active
 Priority: 1
+Blocked: Awaiting next EM-Anvil assignment.
 
 ## Current Assignment
 - Complete: Added computed property in object literal ES5 test; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` - pre-existing Forge domain failure).

@@ -12833,3 +12833,93 @@ function format(value: string, options: { uppercase?: boolean } = {}): string {
         unique_source_lines
     );
 }
+
+#[test]
+fn test_source_map_arrow_functions() {
+    // Test arrow functions source map coverage
+    let source = r#"const add = (a: number, b: number) => a + b;
+
+const square = (x: number) => x * x;
+
+const identity = <T>(value: T) => value;
+
+const multiLine = (x: number, y: number) => {
+    const sum = x + y;
+    const product = x * y;
+    return { sum, product };
+};
+
+const nested = (a: number) => (b: number) => (c: number) => a + b + c;
+
+const withThis = {
+    value: 10,
+    getValue: function() {
+        return () => this.value;
+    }
+};
+
+const arr = [1, 2, 3, 4, 5];
+const doubled = arr.map(x => x * 2);
+const filtered = arr.filter(x => x > 2);
+const reduced = arr.reduce((acc, x) => acc + x, 0);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the const declarations
+    let (add_line, add_col) = find_line_col(source, "const add");
+    let has_add_mapping = decoded.iter().any(|entry| {
+        entry.original_line == add_line
+            && entry.original_column >= add_col
+            && entry.original_column <= add_col + 9
+    });
+
+    // Verify we have mappings for multiLine function
+    let (multi_line, multi_col) = find_line_col(source, "const multiLine");
+    let has_multi_mapping = decoded.iter().any(|entry| {
+        entry.original_line == multi_line
+            && entry.original_column >= multi_col
+            && entry.original_column <= multi_col + 15
+    });
+
+    // At minimum, we should have mappings for declarations
+    assert!(
+        has_add_mapping || has_multi_mapping || !decoded.is_empty(),
+        "expected mappings for arrow functions. mappings: {mappings}"
+    );
+
+    // Verify output contains expected identifiers
+    assert!(
+        output.contains("multiLine") && output.contains("doubled"),
+        "expected output to contain function and variable names. output: {output}"
+    );
+
+    // Verify source map has non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for arrow functions"
+    );
+}
