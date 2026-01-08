@@ -11,7 +11,7 @@ Priority: 4
 
 ## Task Queue
 - [x] Add additional end-to-end tests for other lodash-style utility types (Omit, Pick, Required, Readonly). **Done:** Added Required and Pick pattern tests. Omit covered by existing `test_mapped_type_key_remap_filters_keys`. Readonly covered by existing `test_mapped_type_with_readonly_modifier`.
-- [ ] Verify mapped type + conditional type nesting works correctly.
+- [x] Verify mapped type + conditional type nesting works correctly. **Done:** Added `test_mapped_type_with_nested_conditionals`.
 
 ## Completed
 - [x] Added generic library regression + fixed declare function overload handling. Tests: `./wasm/test.sh test_generic_library_snippet_compiles_and_checks` (full suite fails on existing `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
@@ -51,6 +51,7 @@ Priority: 4
 - [x] Added solver coverage for mapped type with optional modifier and conditional (DeepPartial pattern). Tests: `./wasm/test.sh`.
 - [x] Added solver coverage for Required utility type pattern (removes optional modifier). Tests: `./wasm/test.sh`.
 - [x] Added solver coverage for Pick utility type pattern (subset key iteration). Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for mapped type with nested conditionals. Tests: `./wasm/test.sh`.
 
 ## Ready for Merge
 Yes
