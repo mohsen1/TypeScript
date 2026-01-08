@@ -40,6 +40,7 @@ Priority: 4
 - [x] Add async await detection for template expressions. Tests: `./wasm/test.sh body_contains_await_in_template_expression`
 - [x] Add async await detection for tagged templates. Tests: `./wasm/test.sh body_contains_await_in_tagged_template`
 - [x] Add async await detection for as expressions. Tests: `./wasm/test.sh body_contains_await_in_as_expression`
+- [x] Add async await detection for type assertions. Tests: `./wasm/test.sh body_contains_await_in_type_assertion`
 - [x] Add async await detection for non-null expressions. Tests: `./wasm/test.sh body_contains_await_in_non_null_expression`
 - [x] Add async await detection for new expressions. Tests: `./wasm/test.sh body_contains_await_in_new_expression`
 - [x] Add async await detection for try statements. Tests: `./wasm/test.sh body_contains_await_in_try_statement`
