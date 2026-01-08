@@ -309,13 +309,15 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                         let mut parts = Vec::new();
                         for element in elements.iter() {
                             if element.rest {
-                                let rest_type = match self.interner.lookup(element.type_id) {
-                                    Some(TypeKey::Array(rest_elem)) => rest_elem,
-                                    _ => element.type_id,
-                                };
+                                let rest_type = self.rest_element_type(element.type_id);
                                 parts.push(rest_type);
                             } else {
-                                parts.push(element.type_id);
+                                let elem_type = if element.optional {
+                                    self.interner.union2(element.type_id, TypeId::UNDEFINED)
+                                } else {
+                                    element.type_id
+                                };
+                                parts.push(elem_type);
                             }
                         }
                         if parts.is_empty() {

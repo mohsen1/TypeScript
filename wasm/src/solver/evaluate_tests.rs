@@ -577,7 +577,6 @@ fn test_conditional_infer_array_element_from_tuple_rest_tuple() {
     }));
 
     // T extends (infer R)[] ? R : never, with T = [string, ...[number, boolean]].
-    // TODO: Current inference keeps the rest tuple as a single element (string | [number, boolean]).
     let extends_array = interner.array(infer_r);
     let cond = ConditionalType {
         check_type: t_param,
@@ -621,7 +620,7 @@ fn test_conditional_infer_array_element_from_tuple_rest_tuple() {
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
-    let expected = interner.union(vec![TypeId::STRING, rest_tuple]);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::BOOLEAN]);
 
     assert_eq!(result, expected);
 }
@@ -645,7 +644,6 @@ fn test_conditional_infer_array_element_from_optional_tuple_element() {
     }));
 
     // T extends (infer R)[] ? R : never, with T = [string?].
-    // TODO: Optional tuple elements currently infer without undefined.
     let extends_array = interner.array(infer_r);
     let cond = ConditionalType {
         check_type: t_param,
@@ -667,8 +665,9 @@ fn test_conditional_infer_array_element_from_optional_tuple_element() {
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
 
-    assert_eq!(result, TypeId::STRING);
+    assert_eq!(result, expected);
 }
 
 #[test]

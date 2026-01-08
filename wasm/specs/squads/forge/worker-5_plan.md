@@ -19,6 +19,7 @@ Priority: 5
 - [x] Added non-distributive union array inference for conditional types (tests not run).
 - [x] Added non-distributive tuple wrapper array inference for conditional types (tests not run).
 - [x] Made optional property inference include missing/undefined cases (tests not run).
+- [x] Flattened tuple rest and optional elements for array element inference (tests not run).
 
 ## Ready for Merge
 Yes
