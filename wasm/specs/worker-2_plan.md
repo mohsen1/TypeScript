@@ -92,6 +92,7 @@ Priority: 2
 - [x] Added non-distributive template literal prefix infer test with non-matching union branch (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_with_prefix_non_distributive_non_matching_union_branch`.
 - [x] Added non-distributive template literal suffix infer test with non-matching union branch (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_with_suffix_non_distributive_non_matching_union_branch`.
 - [x] Added non-distributive template literal middle infer test with non-matching union branch (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_with_middle_non_distributive_non_matching_union_branch`.
+- [x] Added non-distributive template literal two-infer test with non-matching union branch (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_two_infers_non_distributive_non_matching_union_branch`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
