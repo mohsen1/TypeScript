@@ -7,12 +7,13 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] Add ES5 emitter parity tests for private class methods in `wasm/src/thin_emitter/emitter_parity_tests.rs`. Run `./wasm/test.sh emitter_parity`.
+- [ ] (awaiting next task)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 private class method parity tests (multi params, static, async, chain) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (112 tests).
 - [x] Added ES5 class static block parity tests (this ref, multiple, typed var, function call) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (108 tests).
 - [x] Added ES5 class getter/setter parity tests (getter typed, setter typed, pair, static) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (104 tests).
 - [x] Added ES5 arrow function parity tests (typed expression, block body, this capture, multi params) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (100 tests).
