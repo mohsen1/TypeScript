@@ -2635,15 +2635,18 @@ impl ThinNodeArena {
         }
     }
 
-    /// Get extended unary expression data (await/yield/non-null).
-    /// Returns None if node is not an await/yield expression or has no data.
+    /// Get extended unary expression data (await/yield/non-null/spread).
+    /// Returns None if node is not an await/yield/non-null/spread expression or has no data.
     #[inline]
     pub fn get_unary_expr_ex(&self, node: &ThinNode) -> Option<&UnaryExprDataEx> {
-        use super::syntax_kind_ext::{AWAIT_EXPRESSION, NON_NULL_EXPRESSION, YIELD_EXPRESSION};
+        use super::syntax_kind_ext::{
+            AWAIT_EXPRESSION, NON_NULL_EXPRESSION, SPREAD_ELEMENT, YIELD_EXPRESSION,
+        };
         if node.has_data()
             && (node.kind == AWAIT_EXPRESSION
                 || node.kind == YIELD_EXPRESSION
-                || node.kind == NON_NULL_EXPRESSION)
+                || node.kind == NON_NULL_EXPRESSION
+                || node.kind == SPREAD_ELEMENT)
         {
             self.unary_exprs_ex.get(node.data_index as usize)
         } else {
