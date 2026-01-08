@@ -3486,6 +3486,9 @@ impl<'a> ThinCheckerState<'a> {
         if symbol.flags & symbol_flags::ALIAS == 0 {
             return false;
         }
+        if symbol.is_type_only {
+            return true;
+        }
 
         let mut visited = Vec::new();
         let target = match self.resolve_alias_symbol(sym_id, &mut visited) {
