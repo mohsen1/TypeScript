@@ -7,10 +7,10 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] Confirm method vs function-property variance (including `this` parameters) in `wasm/src/solver/subtype.rs` matches `tsc`, add coverage if missing.
+- [ ] Add a void-return exception regression (`() => void` accepts `() => string`) if not already covered, or pick the next unsoundness case from `wasm/specs/TS_UNSOUNDNESS_CATALOG.md`.
 
 ## Task Queue
-- [ ] Add a void-return exception regression (`() => void` accepts `() => string`) if not already covered, or pick the next unsoundness case from `wasm/specs/TS_UNSOUNDNESS_CATALOG.md`.
+- [ ] Pick the next unsoundness case from `wasm/specs/TS_UNSOUNDNESS_CATALOG.md` after the void-return regression.
 
 ## Completed
 - [x] Structural property/method variance: allow bivariant checks when either side is a method; added mixed method vs function-property test. Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
@@ -20,6 +20,7 @@ Priority: 3
 - [x] Investigated FunctionId build error in `wasm/src/solver/evaluate.rs` after sync; no references found, build succeeded. Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
 - [x] Implemented covariant `this`-type handling in parameter variance with regression coverage. Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
 - [x] Added class-like subtyping regression for `this`-typed parameters (base vs derived). Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
+- [x] Added mixed method/function-property variance tests for `this` parameters. Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
 
 ## Ready for Merge
 No
