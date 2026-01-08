@@ -7,7 +7,7 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- Complete: Added source map for conditional expressions and switch statements test in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
+- Complete: Re-added TypeScript namespaces source map test in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (169 tests PASS).
 
 ## Task Queue
 - [ ] (empty)
