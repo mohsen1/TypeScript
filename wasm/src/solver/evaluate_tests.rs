@@ -9742,3 +9742,450 @@ fn test_application_ref_expansion_nested() {
 
     let _ = expected;
 }
+
+/// Test Application with default type parameters.
+///
+/// Example: `type Optional<T, D = undefined> = T | D`
+/// - `Optional<string>` should expand to `string | undefined`
+/// - `Optional<string, null>` should expand to `string | null`
+#[test]
+fn test_application_ref_expansion_with_defaults() {
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    // Define type parameters T and D (with default)
+    let t_name = interner.intern_string("T");
+    let d_name = interner.intern_string("D");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let d_param = TypeParamInfo {
+        name: d_name,
+        constraint: None,
+        default: Some(TypeId::UNDEFINED),  // D = undefined
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param));
+    let d_type = interner.intern(TypeKey::TypeParameter(d_param));
+
+    // Define: type Optional<T, D = undefined> = T | D
+    let optional_body = interner.union(vec![t_type, d_type]);
+
+    // Create Ref(1) for Optional type alias
+    let optional_ref = interner.reference(SymbolRef(1));
+
+    // Case 1: Optional<string> - only one arg, should use default for D
+    let optional_string = interner.application(optional_ref, vec![TypeId::STRING]);
+
+    // Case 2: Optional<string, null> - both args provided
+    let optional_string_null = interner.application(optional_ref, vec![TypeId::STRING, TypeId::NULL]);
+
+    // Set up resolver
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(1), optional_body);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+
+    // Evaluate Case 1
+    let result1 = evaluator.evaluate(optional_string);
+
+    // Expected for Case 1: string | undefined
+    let expected1 = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+
+    // Evaluate Case 2
+    let result2 = evaluator.evaluate(optional_string_null);
+
+    // Expected for Case 2: string | null
+    let expected2 = interner.union(vec![TypeId::STRING, TypeId::NULL]);
+
+    // TODO: When Application expansion is implemented with default handling,
+    // update assertions to: assert_eq!(result1, expected1); assert_eq!(result2, expected2);
+    assert_eq!(
+        result1, optional_string,
+        "Current behavior: Application passes through unchanged. \
+         After fix with defaults, Optional<string> should be string | undefined"
+    );
+    assert_eq!(
+        result2, optional_string_null,
+        "Current behavior: Application passes through unchanged. \
+         After fix, Optional<string, null> should be string | null"
+    );
+
+    let _ = (expected1, expected2);
+}
+
+/// Test Application with constrained type parameters.
+///
+/// Example: `type NumericBox<T extends number> = { value: T }`
+/// The constraint should be preserved/checked during expansion.
+#[test]
+fn test_application_ref_expansion_with_constraints() {
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    // Define type parameter T with constraint: T extends number
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: Some(TypeId::NUMBER),  // T extends number
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param));
+
+    // Define: type NumericBox<T extends number> = { value: T }
+    let value_name = interner.intern_string("value");
+    let numeric_box_body = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: t_type,
+        write_type: t_type,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Create Ref(1) for NumericBox type alias
+    let numeric_box_ref = interner.reference(SymbolRef(1));
+
+    // Valid case: NumericBox<42> (literal number satisfies constraint)
+    let lit_42 = interner.literal_number(42.0);
+    let numeric_box_42 = interner.application(numeric_box_ref, vec![lit_42]);
+
+    // Edge case: NumericBox<string> (violates constraint - should this error or still expand?)
+    let numeric_box_string = interner.application(numeric_box_ref, vec![TypeId::STRING]);
+
+    // Set up resolver
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(1), numeric_box_body);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+
+    // Evaluate valid case
+    let result_valid = evaluator.evaluate(numeric_box_42);
+
+    // Expected: { value: 42 }
+    let expected_valid = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: lit_42,
+        write_type: lit_42,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Evaluate constraint violation case
+    let result_invalid = evaluator.evaluate(numeric_box_string);
+
+    // TODO: When Application expansion is implemented,
+    // decide how to handle constraint violations:
+    // Option A: Still expand (constraint checking is separate)
+    // Option B: Return error type
+    // For now, document current behavior
+    assert_eq!(
+        result_valid, numeric_box_42,
+        "Current behavior: Application passes through unchanged. \
+         After fix, NumericBox<42> should be {{ value: 42 }}"
+    );
+    assert_eq!(
+        result_invalid, numeric_box_string,
+        "Current behavior: Application passes through unchanged. \
+         After fix, behavior with constraint violation TBD"
+    );
+
+    let _ = expected_valid;
+}
+
+/// Test Application with never as type argument.
+///
+/// Example: `type Box<T> = { value: T }`
+/// `Box<never>` should expand to `{ value: never }`
+#[test]
+fn test_application_ref_expansion_with_never_arg() {
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    // Define type parameter T
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param));
+
+    // Define: type Box<T> = { value: T }
+    let value_name = interner.intern_string("value");
+    let box_body = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: t_type,
+        write_type: t_type,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Create Ref(1) for Box type alias
+    let box_ref = interner.reference(SymbolRef(1));
+
+    // Create Application: Box<never>
+    let box_never = interner.application(box_ref, vec![TypeId::NEVER]);
+
+    // Set up resolver
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(1), box_body);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(box_never);
+
+    // Expected: { value: never }
+    let expected = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: TypeId::NEVER,
+        write_type: TypeId::NEVER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // TODO: When Application expansion is implemented,
+    // update assertion to: assert_eq!(result, expected);
+    assert_eq!(
+        result, box_never,
+        "Current behavior: Application passes through unchanged. \
+         After fix, Box<never> should be {{ value: never }}"
+    );
+
+    let _ = expected;
+}
+
+/// Test Application with unknown as type argument.
+///
+/// Example: `type Box<T> = { value: T }`
+/// `Box<unknown>` should expand to `{ value: unknown }`
+#[test]
+fn test_application_ref_expansion_with_unknown_arg() {
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    // Define type parameter T
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param));
+
+    // Define: type Box<T> = { value: T }
+    let value_name = interner.intern_string("value");
+    let box_body = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: t_type,
+        write_type: t_type,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Create Ref(1) for Box type alias
+    let box_ref = interner.reference(SymbolRef(1));
+
+    // Create Application: Box<unknown>
+    let box_unknown = interner.application(box_ref, vec![TypeId::UNKNOWN]);
+
+    // Set up resolver
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(1), box_body);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(box_unknown);
+
+    // Expected: { value: unknown }
+    let expected = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: TypeId::UNKNOWN,
+        write_type: TypeId::UNKNOWN,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // TODO: When Application expansion is implemented,
+    // update assertion to: assert_eq!(result, expected);
+    assert_eq!(
+        result, box_unknown,
+        "Current behavior: Application passes through unchanged. \
+         After fix, Box<unknown> should be {{ value: unknown }}"
+    );
+
+    let _ = expected;
+}
+
+/// Test Application with any as type argument.
+///
+/// Example: `type Box<T> = { value: T }`
+/// `Box<any>` should expand to `{ value: any }`
+#[test]
+fn test_application_ref_expansion_with_any_arg() {
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    // Define type parameter T
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param));
+
+    // Define: type Box<T> = { value: T }
+    let value_name = interner.intern_string("value");
+    let box_body = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: t_type,
+        write_type: t_type,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Create Ref(1) for Box type alias
+    let box_ref = interner.reference(SymbolRef(1));
+
+    // Create Application: Box<any>
+    let box_any = interner.application(box_ref, vec![TypeId::ANY]);
+
+    // Set up resolver
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(1), box_body);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(box_any);
+
+    // Expected: { value: any }
+    let expected = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: TypeId::ANY,
+        write_type: TypeId::ANY,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // TODO: When Application expansion is implemented,
+    // update assertion to: assert_eq!(result, expected);
+    assert_eq!(
+        result, box_any,
+        "Current behavior: Application passes through unchanged. \
+         After fix, Box<any> should be {{ value: any }}"
+    );
+
+    let _ = expected;
+}
+
+/// Test Application with union type argument.
+///
+/// Example: `type Box<T> = { value: T }`
+/// `Box<string | number>` should expand to `{ value: string | number }`
+#[test]
+fn test_application_ref_expansion_with_union_arg() {
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    // Define type parameter T
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param));
+
+    // Define: type Box<T> = { value: T }
+    let value_name = interner.intern_string("value");
+    let box_body = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: t_type,
+        write_type: t_type,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Create Ref(1) for Box type alias
+    let box_ref = interner.reference(SymbolRef(1));
+
+    // Create Application: Box<string | number>
+    let string_or_number = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let box_union = interner.application(box_ref, vec![string_or_number]);
+
+    // Set up resolver
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(1), box_body);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(box_union);
+
+    // Expected: { value: string | number }
+    let expected = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: string_or_number,
+        write_type: string_or_number,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // TODO: When Application expansion is implemented,
+    // update assertion to: assert_eq!(result, expected);
+    assert_eq!(
+        result, box_union,
+        "Current behavior: Application passes through unchanged. \
+         After fix, Box<string | number> should be {{ value: string | number }}"
+    );
+
+    let _ = expected;
+}
+
+/// Test Application where the base is not a Ref (should pass through).
+///
+/// If the base is already a concrete type (not a Ref), expansion
+/// should either pass through or handle appropriately.
+#[test]
+fn test_application_non_ref_base_passthrough() {
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    // Create Application with a concrete type as base (not a Ref)
+    // This is an unusual case - normally Application has Ref as base
+    let object_base = interner.object(vec![]);
+    let weird_application = interner.application(object_base, vec![TypeId::STRING]);
+
+    // Set up empty resolver
+    let env = TypeEnvironment::new();
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(weird_application);
+
+    // Non-Ref base should pass through unchanged
+    // (or potentially be an error case)
+    assert_eq!(
+        result, weird_application,
+        "Application with non-Ref base should pass through unchanged"
+    );
+}
