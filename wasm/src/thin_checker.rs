@@ -3797,13 +3797,11 @@ impl<'a> ThinCheckerState<'a> {
         // Also populate the type environment for Application expansion
         if result != TypeId::ANY && result != TypeId::ERROR {
             let type_params = self.get_type_params_for_symbol(sym_id);
-            eprintln!("[DEBUG get_type_of_symbol] sym_id={} type_params.len()={}", sym_id.0, type_params.len());
             let mut env = self.ctx.type_env.borrow_mut();
             if type_params.is_empty() {
                 env.insert(SymbolRef(sym_id.0), result);
             } else {
-                env.insert_with_params(SymbolRef(sym_id.0), result, type_params.clone());
-                eprintln!("[DEBUG get_type_of_symbol] Inserted sym_id={} with {} type_params", sym_id.0, type_params.len());
+                env.insert_with_params(SymbolRef(sym_id.0), result, type_params);
             }
         }
 
