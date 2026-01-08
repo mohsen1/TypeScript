@@ -233,6 +233,13 @@ impl<'a> AsyncES5Emitter<'a> {
             }
         }
 
+        // Check throw statements
+        if node.kind == syntax_kind_ext::THROW_STATEMENT {
+            if let Some(throw_stmt) = self.arena.get_return_statement(node) {
+                return self.contains_await_recursive(throw_stmt.expression);
+            }
+        }
+
         // Check variable statements
         if node.kind == syntax_kind_ext::VARIABLE_STATEMENT {
             if let Some(var_data) = self.arena.get_variable(node) {
