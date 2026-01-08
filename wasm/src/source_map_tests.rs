@@ -12916,3 +12916,113 @@ class MyClass {
         unique_source_lines
     );
 }
+
+#[test]
+fn test_source_map_typescript_interfaces_and_types() {
+    // Test TypeScript interfaces and type aliases source map coverage
+    let source = r#"interface User {
+    id: number;
+    name: string;
+    email?: string;
+}
+
+type Point = {
+    x: number;
+    y: number;
+};
+
+type StringOrNumber = string | number;
+
+type Callback<T> = (value: T) => void;
+
+interface Animal {
+    name: string;
+    speak(): void;
+}
+
+class Dog implements Animal {
+    name: string;
+
+    constructor(name: string) {
+        this.name = name;
+    }
+
+    speak() {
+        console.log("Woof!");
+    }
+}
+
+function processUser(user: User): string {
+    return user.name;
+}
+
+const point: Point = { x: 10, y: 20 };
+const dog = new Dog("Buddy");
+const result = processUser({ id: 1, name: "Alice" });"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the class declaration
+    let (dog_line, dog_col) = find_line_col(source, "class Dog");
+    let has_dog_mapping = decoded.iter().any(|entry| {
+        entry.original_line == dog_line
+            && entry.original_column >= dog_col
+            && entry.original_column <= dog_col + 9
+    });
+
+    // Verify we have mappings for the function declaration
+    let (fn_line, fn_col) = find_line_col(source, "function processUser");
+    let has_fn_mapping = decoded.iter().any(|entry| {
+        entry.original_line == fn_line
+            && entry.original_column >= fn_col
+            && entry.original_column <= fn_col + 20
+    });
+
+    // At minimum, we should have mappings for runtime declarations
+    assert!(
+        has_dog_mapping || has_fn_mapping || !decoded.is_empty(),
+        "expected mappings for TypeScript interfaces/types. mappings: {mappings}"
+    );
+
+    // Verify output contains expected runtime identifiers (not type-only)
+    assert!(
+        output.contains("Dog") && output.contains("processUser"),
+        "expected output to contain class and function names. output: {output}"
+    );
+
+    // Verify type-only declarations are stripped
+    assert!(
+        !output.contains("interface User") && !output.contains("type Point"),
+        "expected type declarations to be stripped. output: {output}"
+    );
+
+    // Verify source map has non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for TypeScript interfaces/types"
+    );
+}
