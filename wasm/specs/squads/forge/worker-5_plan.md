@@ -15,6 +15,7 @@ Priority: 5
 - [ ] [EM: Add queued tasks]
 
 ## Completed
+- [x] Added non-distributive union-branch regressions for readonly array/tuple infer; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
 - [x] Added non-distributive union-branch regressions for function parameter, rest parameter, and this-parameter infer; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
 - [x] Added non-distributive tuple union-branch regressions for tuple element/optional tuple inference; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
 - [x] Implemented tuple-rest conditional infer binding and updated variadic tuple tests; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
