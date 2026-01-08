@@ -4437,6 +4437,39 @@ fn test_resolve_circular_extends_with_concrete_bound() {
 }
 
 #[test]
+fn test_resolve_circular_extends_bound_order() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let u_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: u_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // Same cycle, but add concrete bound before the cyclic one.
+    ctx.add_upper_bound(var_t, TypeId::STRING);
+    ctx.add_upper_bound(var_t, u_type);
+    ctx.add_upper_bound(var_u, t_type);
+
+    let result_t = ctx.resolve_with_constraints(var_t).unwrap();
+    let result_u = ctx.resolve_with_constraints(var_u).unwrap();
+
+    assert_eq!(result_t, TypeId::STRING);
+    assert_eq!(result_u, TypeId::STRING);
+}
+
+#[test]
 fn test_resolve_usage_based_inference_from_bound_param() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);
