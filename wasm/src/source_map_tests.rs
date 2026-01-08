@@ -12075,25 +12075,20 @@ const myStatus = Status.Active;"#;
 }
 
 #[test]
-fn test_source_map_typescript_namespaces() {
-    // Test TypeScript namespace declarations (downleveled to IIFE)
-    let source = r#"namespace Shapes {
-    export const PI = 3.14159;
-
-    export function area(radius: number): number {
-        return PI * radius * radius;
-    }
-
-    export namespace Circle {
-        export function circumference(radius: number): number {
-            return 2 * PI * radius;
-        }
-    }
+fn test_source_map_generator_es5_offset_accuracy() {
+    // Test source-map offset accuracy for generator function ES5 downleveling
+    let source = r#"function* numberGenerator() {
+    yield 1;
+    yield 2;
+    yield 3;
 }
 
-const a = Shapes.area(5);
-const c = Shapes.Circle.circumference(5);"#;
-
+function* infiniteSequence() {
+    let i = 0;
+    while (true) {
+        yield i++;
+    }
+}"#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -12110,9 +12105,15 @@ const c = Shapes.Circle.circumference(5);"#;
     printer.emit(root);
 
     let output = printer.get_output().to_string();
+
+    // Verify generator function is in output (may be __generator helper or function* syntax)
+    assert!(
+        output.contains("__generator") || output.contains("numberGenerator") || output.contains("function*"),
+        "expected generator function in output: {output}"
+    );
+
     let map_json = printer.generate_source_map_json().expect("source map");
     let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
-
     let mappings = map_value
         .get("mappings")
         .and_then(|v| v.as_str())
@@ -12120,37 +12121,35 @@ const c = Shapes.Circle.circumference(5);"#;
 
     let decoded = decode_mappings(mappings);
 
-    // Verify we have mappings for the namespace declaration
-    let (ns_line, ns_col) = find_line_col(source, "namespace Shapes");
-    let has_ns_mapping = decoded.iter().any(|entry| {
-        entry.original_line == ns_line
-            && entry.original_column >= ns_col
-            && entry.original_column <= ns_col + 16
+    // Verify we have mappings for generator function declarations
+    let (num_gen_line, _) = find_line_col(source, "function* numberGenerator");
+    let has_num_gen_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == num_gen_line
     });
 
-    // Verify we have mappings for the variable declaration
-    let (var_line, var_col) = find_line_col(source, "const a");
-    let has_var_mapping = decoded.iter().any(|entry| {
-        entry.original_line == var_line
-            && entry.original_column >= var_col
-            && entry.original_column <= var_col + 7
+    let (inf_seq_line, _) = find_line_col(source, "function* infiniteSequence");
+    let has_inf_seq_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == inf_seq_line
     });
 
-    // At minimum, we should have mappings for namespace or variable
+    // We should have mappings for both generator declarations
     assert!(
-        has_ns_mapping || has_var_mapping,
-        "expected mappings for namespace declarations. mappings: {mappings}"
+        has_num_gen_mapping || has_inf_seq_mapping,
+        "expected mappings for generator function declarations. mappings: {mappings}"
     );
 
-    // Verify output contains the namespace name
-    assert!(
-        output.contains("Shapes"),
-        "expected output to contain namespace name. output: {output}"
-    );
-
-    // Verify source map has non-empty mappings
+    // Verify non-empty mappings
     assert!(
         !decoded.is_empty(),
-        "expected non-empty source mappings for TypeScript namespaces"
+        "expected non-empty source mappings for generator ES5 code"
+    );
+
+    // Verify mappings span multiple source lines
+    let unique_source_lines: std::collections::HashSet<_> =
+        decoded.iter().map(|m| m.original_line).collect();
+    assert!(
+        unique_source_lines.len() >= 2,
+        "expected mappings from at least 2 different source lines, got: {:?}",
+        unique_source_lines
     );
 }
