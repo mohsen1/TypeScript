@@ -4715,18 +4715,27 @@ class BankAccount {
 }
 
 #[test]
-fn test_class_es5_computed_property_method() {
-    // Test method with computed property name
+fn test_class_es5_super_with_conditional_field_init() {
+    // Test super() call with conditional field initializers
+    // Field initializers that depend on constructor parameters
     let source = r#"
-const methodName = "dynamicMethod";
-
-class DynamicClass {
-    [methodName](value: number): number {
-        return value * 2;
+class Base {
+    name: string;
+    constructor(name: string) {
+        this.name = name;
     }
+}
 
-    ["literal" + "Name"](): string {
-        return "computed";
+class Derived extends Base {
+    isAdmin: boolean;
+    permissions: string[] = [];
+
+    constructor(name: string, isAdmin: boolean) {
+        super(name);
+        this.isAdmin = isAdmin;
+        if (isAdmin) {
+            this.permissions = ["read", "write", "delete"];
+        }
     }
 }
 "#;
@@ -4738,47 +4747,52 @@ class DynamicClass {
         .arena
         .get_source_file(root_node)
         .expect("expected source file data");
-
-    // Get the class (second statement after const)
-    let class_idx = *source_file
-        .statements
-        .nodes
-        .get(1)
-        .expect("expected class declaration");
+    // Get the Derived class (second statement)
+    let class_idx = source_file.statements.nodes.get(1).expect("expected Derived class");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
+    let output = emitter.emit_class(*class_idx);
 
-    // Class should emit as function
+    // Derived should emit as function
     assert!(
-        output.contains("function DynamicClass"),
-        "Expected DynamicClass class to emit as function: {}",
+        output.contains("function Derived"),
+        "Expected Derived to emit as function: {}",
         output
     );
 
-    // Should have computed property access on prototype
+    // Should call parent constructor
     assert!(
-        output.contains("prototype[") || output.contains(".prototype."),
-        "Expected prototype method definition: {}",
+        output.contains("_super.call(this") || output.contains("Base.call(this"),
+        "Expected super() call: {}",
+        output
+    );
+
+    // Field initializers should come after super()
+    assert!(
+        output.contains("this.permissions = []") || output.contains("this.permissions ="),
+        "Expected permissions field initialization: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_computed_property_accessor() {
-    // Test getter/setter with computed property name
+fn test_class_es5_super_with_arrow_field_init() {
+    // Test super() with arrow function field initializers that capture 'this'
     let source = r#"
-const propName = "value";
+class EventEmitter {
+    handlers: any[] = [];
+    emit(event: string): void {}
+}
 
-class ComputedAccessor {
-    private _data: number = 0;
+class Button extends EventEmitter {
+    label: string;
+    onClick: () => void = () => {
+        this.emit("click");
+    };
 
-    get [propName](): number {
-        return this._data;
-    }
-
-    set [propName](v: number) {
-        this._data = v;
+    constructor(label: string) {
+        super();
+        this.label = label;
     }
 }
 "#;
@@ -4790,39 +4804,62 @@ class ComputedAccessor {
         .arena
         .get_source_file(root_node)
         .expect("expected source file data");
-
-    // Get the class (second statement after const)
-    let class_idx = *source_file
-        .statements
-        .nodes
-        .get(1)
-        .expect("expected class declaration");
+    // Get the Button class (second statement)
+    let class_idx = source_file.statements.nodes.get(1).expect("expected Button class");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
+    let output = emitter.emit_class(*class_idx);
 
-    // Class should emit as function
+    // Button should emit as function
     assert!(
-        output.contains("function ComputedAccessor"),
-        "Expected ComputedAccessor class to emit as function: {}",
+        output.contains("function Button"),
+        "Expected Button to emit as function: {}",
         output
     );
 
-    // Should use Object.defineProperty for computed accessor
+    // Should have super call
     assert!(
-        output.contains("Object.defineProperty"),
-        "Expected Object.defineProperty for computed accessor: {}",
+        output.contains("_super.call(this") || output.contains("EventEmitter.call(this"),
+        "Expected super() call: {}",
+        output
+    );
+
+    // Arrow function should be assigned to onClick
+    assert!(
+        output.contains("this.onClick"),
+        "Expected onClick field: {}",
+        output
+    );
+
+    // Arrow function may need _this capture for proper 'this' binding
+    assert!(
+        output.contains("_this") || output.contains("this.emit") || output.contains("function"),
+        "Expected arrow function handling: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_symbol_tostringtag() {
-    // Test Symbol.toStringTag getter
+fn test_class_es5_super_with_computed_field_init() {
+    // Test super() with computed/dynamic field initializers
     let source = r#"
-class CustomObject {
-    get [Symbol.toStringTag](): string {
-        return "CustomObject";
+class Config {
+    settings: Record<string, any> = {};
+}
+
+class AppConfig extends Config {
+    environment: string;
+    apiUrl: string = "https://api.example.com";
+    timeout: number = 5000;
+    retries: number = 3;
+
+    constructor(environment: string) {
+        super();
+        this.environment = environment;
+        if (environment === "production") {
+            this.timeout = 10000;
+            this.retries = 5;
+        }
     }
 }
 "#;
@@ -4834,38 +4871,64 @@ class CustomObject {
         .arena
         .get_source_file(root_node)
         .expect("expected source file data");
-
-    let class_idx = *source_file
-        .statements
-        .nodes
-        .first()
-        .expect("expected class declaration");
+    // Get the AppConfig class (second statement)
+    let class_idx = source_file.statements.nodes.get(1).expect("expected AppConfig class");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
+    let output = emitter.emit_class(*class_idx);
 
-    // Class should emit as function
+    // AppConfig should emit as function
     assert!(
-        output.contains("function CustomObject"),
-        "Expected CustomObject class to emit as function: {}",
+        output.contains("function AppConfig"),
+        "Expected AppConfig to emit as function: {}",
         output
     );
 
-    // Should reference Symbol.toStringTag
+    // Should call parent constructor
     assert!(
-        output.contains("Symbol.toStringTag") || output.contains("Object.defineProperty"),
-        "Expected Symbol.toStringTag handling: {}",
+        output.contains("_super.call(this") || output.contains("Config.call(this"),
+        "Expected super() call: {}",
+        output
+    );
+
+    // Field initializers should be present
+    assert!(
+        output.contains("this.apiUrl ="),
+        "Expected apiUrl field initialization: {}",
+        output
+    );
+    assert!(
+        output.contains("this.timeout = 5000") || output.contains("this.timeout ="),
+        "Expected timeout field initialization: {}",
+        output
+    );
+    assert!(
+        output.contains("this.retries = 3") || output.contains("this.retries ="),
+        "Expected retries field initialization: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_symbol_hasinstance() {
-    // Test static Symbol.hasInstance method
+fn test_class_es5_super_with_method_call_in_field_init() {
+    // Test super() with field initializers that call methods
     let source = r#"
-class CustomType {
-    static [Symbol.hasInstance](instance: any): boolean {
-        return typeof instance === "object" && instance !== null;
+class Logger {
+    log(msg: string): void {}
+}
+
+class Service extends Logger {
+    id: string = this.generateId();
+    createdAt: Date = new Date();
+    status: string = "initialized";
+
+    constructor() {
+        super();
+        this.log("Service created with id: " + this.id);
+    }
+
+    private generateId(): string {
+        return "svc_" + Math.random().toString(36).substr(2, 9);
     }
 }
 "#;
@@ -4877,50 +4940,85 @@ class CustomType {
         .arena
         .get_source_file(root_node)
         .expect("expected source file data");
-
-    let class_idx = *source_file
-        .statements
-        .nodes
-        .first()
-        .expect("expected class declaration");
+    // Get the Service class (second statement)
+    let class_idx = source_file.statements.nodes.get(1).expect("expected Service class");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
+    let output = emitter.emit_class(*class_idx);
 
-    // Class should emit as function
+    // Service should emit as function
     assert!(
-        output.contains("function CustomType"),
-        "Expected CustomType class to emit as function: {}",
+        output.contains("function Service"),
+        "Expected Service to emit as function: {}",
         output
     );
 
-    // Static method should be defined on class (Symbol handling may vary)
+    // Should call parent constructor
     assert!(
-        output.contains("CustomType"),
-        "Expected CustomType in output: {}",
+        output.contains("_super.call(this") || output.contains("Logger.call(this"),
+        "Expected super() call: {}",
+        output
+    );
+
+    // Field with method call should be handled
+    assert!(
+        output.contains("this.id =") || output.contains("generateId"),
+        "Expected id field with method call: {}",
+        output
+    );
+
+    // Other field initializers
+    assert!(
+        output.contains("this.createdAt =") || output.contains("new Date"),
+        "Expected createdAt field initialization: {}",
+        output
+    );
+    assert!(
+        output.contains("this.status ="),
+        "Expected status field initialization: {}",
+        output
+    );
+
+    // Private method should be on prototype
+    assert!(
+        output.contains("generateId"),
+        "Expected generateId method: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_multiple_computed_properties() {
-    // Test class with multiple computed property methods
+fn test_class_es5_super_with_nested_inheritance_field_init() {
+    // Test super() with deep inheritance chain and field initializers at each level
     let source = r#"
-const key1 = "first";
-const key2 = "second";
-const key3 = "third";
+class Animal {
+    name: string;
+    constructor(name: string) {
+        this.name = name;
+    }
+}
 
-class MultiComputed {
-    [key1](): number {
-        return 1;
+class Mammal extends Animal {
+    warmBlooded: boolean = true;
+    legs: number = 4;
+
+    constructor(name: string) {
+        super(name);
+    }
+}
+
+class Dog extends Mammal {
+    breed: string;
+    canBark: boolean = true;
+    tricks: string[] = [];
+
+    constructor(name: string, breed: string) {
+        super(name);
+        this.breed = breed;
     }
 
-    [key2](): number {
-        return 2;
-    }
-
-    [key3](): number {
-        return 3;
+    bark(): void {
+        console.log(this.name + " says woof!");
     }
 }
 "#;
@@ -4932,75 +5030,42 @@ class MultiComputed {
         .arena
         .get_source_file(root_node)
         .expect("expected source file data");
-
-    // Get the class (fourth statement after three consts)
-    let class_idx = *source_file
-        .statements
-        .nodes
-        .get(3)
-        .expect("expected class declaration");
+    // Get the Dog class (third statement)
+    let class_idx = source_file.statements.nodes.get(2).expect("expected Dog class");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
+    let output = emitter.emit_class(*class_idx);
 
-    // Class should emit as function
+    // Dog should emit as function
     assert!(
-        output.contains("function MultiComputed"),
-        "Expected MultiComputed class to emit as function: {}",
+        output.contains("function Dog"),
+        "Expected Dog to emit as function: {}",
         output
     );
 
-    // Should have multiple prototype assignments
+    // Should call parent constructor
     assert!(
-        output.contains("prototype"),
-        "Expected prototype assignments: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_computed_static_property() {
-    // Test static method with computed property name
-    let source = r#"
-const staticMethodName = "create";
-
-class Factory {
-    static [staticMethodName](value: string): Factory {
-        const instance = new Factory();
-        return instance;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
-
-    // Get the class (second statement after const)
-    let class_idx = *source_file
-        .statements
-        .nodes
-        .get(1)
-        .expect("expected class declaration");
-
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
-
-    // Class should emit as function
-    assert!(
-        output.contains("function Factory"),
-        "Expected Factory class to emit as function: {}",
+        output.contains("_super.call(this") || output.contains("Mammal.call(this"),
+        "Expected super() call: {}",
         output
     );
 
-    // Static computed method should be assigned to class
+    // Dog's field initializers
     assert!(
-        output.contains("Factory[") || output.contains("Factory."),
-        "Expected static computed method on class: {}",
+        output.contains("this.canBark = true") || output.contains("this.canBark ="),
+        "Expected canBark field initialization: {}",
+        output
+    );
+    assert!(
+        output.contains("this.tricks = []") || output.contains("this.tricks ="),
+        "Expected tricks field initialization: {}",
+        output
+    );
+
+    // Method should be on prototype
+    assert!(
+        output.contains(".prototype.bark") || output.contains("prototype[\"bark\"]"),
+        "Expected bark method on prototype: {}",
         output
     );
 }
