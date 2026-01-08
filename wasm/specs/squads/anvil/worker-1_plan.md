@@ -8,12 +8,13 @@ Priority: 1
 Blocked: Awaiting next EM-Anvil assignment.
 
 ## Current Assignment
-- [ ] Add ES5 class tests for this parameter types in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
+- Complete: Added ES5 tests for this parameter types (6 tests); ran `./wasm/test.sh class_es5_tests` (all 118 pass).
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 tests for this parameter types (6 tests): basic, with other params, fluent API, with generics, in derived class, static method. Ran `./wasm/test.sh class_es5_tests` (all 118 pass).
 - [x] Added ES5 tests for index signatures (6 tests): string key, number key, with properties, readonly, with inheritance, with static members. Ran `./wasm/test.sh class_es5_tests` (all 113 pass).
 - [x] Added ES5 tests for implements clause (6 tests): single interface, multiple interfaces, extends and implements, generic interface, optional members, static members. Ran `./wasm/test.sh class_es5_tests` (all 108 pass).
 - [x] Added ES5 tests for generic classes (6 tests): basic generic class, multiple type params, generic with constraint, generic extends, default type param, generic with static members. Ran `./wasm/test.sh class_es5_tests` (all 103 pass).
