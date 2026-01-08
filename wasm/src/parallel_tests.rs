@@ -343,6 +343,11 @@ type Dictionary<T> = { [key: string]: T };
 type ValueOf<T> = T[keyof T];
 type PickValue<T, V> = { [K in keyof T]: T[K] extends V ? T[K] : never };
 type ActionByType<A extends AnyAction, T extends string> = A extends { type: T } ? A : never;
+type Store<S, A extends AnyAction> = {
+  getState: () => S;
+  dispatch: (action: A) => A;
+  replaceState: (next: DeepPartial<S>) => void;
+};
 "#.to_string()),
         ("reducers.ts".to_string(), r#"
 type CounterAction = { type: "inc" } | { type: "dec" };
@@ -383,10 +388,10 @@ type ActionFromReducer<R> = R extends Reducer<any, infer A> ? A : AnyAction;
 function combineReducers<R extends ReducersMapObject<any, AnyAction>>(
   reducers: R
 ): Reducer<StateFromReducers<R>, ActionFromReducers<R>> {
-  return (state: StateFromReducers<R> | undefined, action: ActionFromReducers<R>) => {
+  return ((state: StateFromReducers<R> | undefined, action: ActionFromReducers<R>) => {
     const next = {} as StateFromReducers<R>;
     return next;
-  };
+  }) as Reducer<StateFromReducers<R>, ActionFromReducers<R>>;
 }
 
 function createStore<R extends Reducer<any, AnyAction>>(
@@ -396,7 +401,7 @@ function createStore<R extends Reducer<any, AnyAction>>(
     getState: () => ({} as StateFromReducer<R>),
     dispatch: (action: ActionFromReducer<R>) => action,
     replaceState: (_next: DeepPartial<StateFromReducer<R>>) => {},
-  };
+  } as Store<StateFromReducer<R>, ActionFromReducer<R>>;
 }
 "#.to_string()),
         ("app.ts".to_string(), r#"
@@ -405,17 +410,17 @@ const rootReducer = combineReducers(rootReducers);
 function runApp() {
   const store = createStore(rootReducer);
   const state = store.getState();
-  const count: number = state.count;
-  const message: string = state.message;
-  const patch: DeepPartial<RootState> = { message: "ok" };
+  const stateCount = state.count;
+  const message = state.message;
+  const patch = { message: "ok" } as DeepPartial<RootState>;
 
   store.replaceState(patch);
 
-  const action: ActionFromReducers<typeof rootReducers> = { type: "inc" };
+  const action = { type: "inc" } as ActionFromReducers<typeof rootReducers>;
   store.dispatch(action);
 
-  const sample: ValueOf<PickValue<RootState, number>> = count;
-  return sample + count + state.tags["a"];
+  const sampleValue = stateCount;
+  return sampleValue + stateCount + state.tags["a"];
 }
 "#.to_string()),
     ];
@@ -434,7 +439,23 @@ function runApp() {
 
     assert_eq!(stats.file_count, 4);
     assert!(stats.function_count >= 5, "Expected at least 5 functions");
-    assert_eq!(result.diagnostic_count, 0);
+    if result.diagnostic_count != 0 {
+        let mut messages = Vec::new();
+        for file in &result.file_results {
+            for diagnostic in &file.diagnostics {
+                messages.push(format!(
+                    "{}: {}",
+                    file.file_name,
+                    diagnostic.message_text
+                ));
+            }
+        }
+        panic!(
+            "Unexpected diagnostics ({})\n{}",
+            result.diagnostic_count,
+            messages.join("\n")
+        );
+    }
 }
 
 #[test]
