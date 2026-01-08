@@ -13,6 +13,7 @@ Priority: 2
 - [ ] [EM: Add queued tasks]
 
 ## Completed
+- [x] Added CommonJS coverage asserting `__esModule` for export import-equals in `thin_emitter_tests.rs`; `./wasm/test.sh test_commonjs_export_import_equals` passed.
 - [x] Added CommonJS coverage asserting `__esModule` for exported function in `thin_emitter_tests.rs`; `./wasm/test.sh test_commonjs_export_function` passed.
 - [x] Added CommonJS coverage asserting `__esModule` for destructured export in `thin_emitter_tests.rs`; `./wasm/test.sh test_commonjs_export_const_destructuring` passed.
 - [x] Added CommonJS coverage asserting `__esModule` for exported const in `thin_emitter_tests.rs`; `./wasm/test.sh test_commonjs_export_const` passed.
