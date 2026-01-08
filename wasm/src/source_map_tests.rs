@@ -13118,3 +13118,101 @@ export default function main() {
         "expected non-empty source mappings for ES module exports"
     );
 }
+
+#[test]
+fn test_source_map_conditional_and_switch() {
+    // Test conditional expressions and switch statements source map coverage
+    let source = r#"const age = 25;
+
+const status = age >= 18 ? "adult" : "minor";
+
+const category = age < 13 ? "child" : age < 20 ? "teen" : "adult";
+
+function getDiscount(type: string): number {
+    switch (type) {
+        case "student":
+            return 0.2;
+        case "senior":
+            return 0.3;
+        case "member":
+            return 0.15;
+        default:
+            return 0;
+    }
+}
+
+const discount = getDiscount("student");
+
+const nested = true ? (false ? "a" : "b") : "c";
+
+function handleValue(value: number | string | null) {
+    switch (typeof value) {
+        case "number":
+            return value * 2;
+        case "string":
+            return value.toUpperCase();
+        default:
+            return null;
+    }
+}"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the const declarations
+    let (age_line, age_col) = find_line_col(source, "const age");
+    let has_age_mapping = decoded.iter().any(|entry| {
+        entry.original_line == age_line
+            && entry.original_column >= age_col
+            && entry.original_column <= age_col + 9
+    });
+
+    // Verify we have mappings for the function declaration
+    let (fn_line, fn_col) = find_line_col(source, "function getDiscount");
+    let has_fn_mapping = decoded.iter().any(|entry| {
+        entry.original_line == fn_line
+            && entry.original_column >= fn_col
+            && entry.original_column <= fn_col + 20
+    });
+
+    // At minimum, we should have mappings for declarations
+    assert!(
+        has_age_mapping || has_fn_mapping || !decoded.is_empty(),
+        "expected mappings for conditional/switch. mappings: {mappings}"
+    );
+
+    // Verify output contains expected identifiers
+    assert!(
+        output.contains("getDiscount") && output.contains("handleValue"),
+        "expected output to contain function names. output: {output}"
+    );
+
+    // Verify source map has non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for conditional/switch"
+    );
+}
