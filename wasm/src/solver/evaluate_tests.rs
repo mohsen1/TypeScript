@@ -17193,3 +17193,657 @@ fn test_symbol_type() {
     let result = evaluate_type(&interner, TypeId::SYMBOL);
     assert!(result != TypeId::ERROR, "Symbol type should work");
 }
+
+// =============================================================================
+// Type Application Edge Cases
+// =============================================================================
+
+#[test]
+fn test_type_application_single_arg() {
+    let interner = TypeInterner::new();
+
+    // Array<string> is Application(Array, [string])
+    let array_symbol = SymbolRef(200);
+    let array_base = interner.reference(array_symbol);
+    let array_string = interner.application(array_base, vec![TypeId::STRING]);
+
+    let result = evaluate_type(&interner, array_string);
+    assert!(result != TypeId::ERROR, "Type application with single arg should work");
+}
+
+#[test]
+fn test_type_application_multiple_args() {
+    let interner = TypeInterner::new();
+
+    // Map<string, number> is Application(Map, [string, number])
+    let map_symbol = SymbolRef(201);
+    let map_base = interner.reference(map_symbol);
+    let map_string_number = interner.application(map_base, vec![TypeId::STRING, TypeId::NUMBER]);
+
+    let result = evaluate_type(&interner, map_string_number);
+    assert!(result != TypeId::ERROR, "Type application with multiple args should work");
+}
+
+#[test]
+fn test_type_application_nested() {
+    let interner = TypeInterner::new();
+
+    // Array<Array<string>> - nested application
+    let array_symbol = SymbolRef(200);
+    let array_base = interner.reference(array_symbol);
+    let inner = interner.application(array_base, vec![TypeId::STRING]);
+    let outer = interner.application(array_base, vec![inner]);
+
+    let result = evaluate_type(&interner, outer);
+    assert!(result != TypeId::ERROR, "Nested type application should work");
+}
+
+#[test]
+fn test_type_application_with_union_arg() {
+    let interner = TypeInterner::new();
+
+    // Array<string | number>
+    let array_symbol = SymbolRef(200);
+    let array_base = interner.reference(array_symbol);
+    let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let array_union = interner.application(array_base, vec![union]);
+
+    let result = evaluate_type(&interner, array_union);
+    assert!(result != TypeId::ERROR, "Type application with union arg should work");
+}
+
+// =============================================================================
+// Tuple Type Operations
+// =============================================================================
+
+#[test]
+fn test_tuple_empty() {
+    let interner = TypeInterner::new();
+
+    // [] - empty tuple
+    let tuple = interner.tuple(vec![]);
+    let result = evaluate_type(&interner, tuple);
+    assert!(result != TypeId::ERROR, "Empty tuple should work");
+}
+
+#[test]
+fn test_tuple_with_labels() {
+    let interner = TypeInterner::new();
+
+    // [first: string, second: number]
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: Some(interner.intern_string("first")),
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: Some(interner.intern_string("second")),
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    let result = evaluate_type(&interner, tuple);
+    assert!(result != TypeId::ERROR, "Labeled tuple should work");
+}
+
+#[test]
+fn test_tuple_with_optional_elements() {
+    let interner = TypeInterner::new();
+
+    // [string, number?]
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: true,
+            rest: false,
+        },
+    ]);
+
+    let result = evaluate_type(&interner, tuple);
+    assert!(result != TypeId::ERROR, "Tuple with optional elements should work");
+}
+
+#[test]
+fn test_tuple_with_rest_element() {
+    let interner = TypeInterner::new();
+
+    // [string, ...number[]]
+    let number_array = interner.array(TypeId::NUMBER);
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: number_array,
+            name: None,
+            optional: false,
+            rest: true,
+        },
+    ]);
+
+    let result = evaluate_type(&interner, tuple);
+    assert!(result != TypeId::ERROR, "Tuple with rest element should work");
+}
+
+#[test]
+fn test_tuple_with_rest_in_middle() {
+    let interner = TypeInterner::new();
+
+    // [string, ...number[], boolean]
+    let number_array = interner.array(TypeId::NUMBER);
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: number_array,
+            name: None,
+            optional: false,
+            rest: true,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    let result = evaluate_type(&interner, tuple);
+    assert!(result != TypeId::ERROR, "Tuple with rest in middle should work");
+}
+
+// =============================================================================
+// Array Type Operations
+// =============================================================================
+
+#[test]
+fn test_array_of_primitives() {
+    let interner = TypeInterner::new();
+
+    let string_array = interner.array(TypeId::STRING);
+    let number_array = interner.array(TypeId::NUMBER);
+    let boolean_array = interner.array(TypeId::BOOLEAN);
+
+    assert!(evaluate_type(&interner, string_array) != TypeId::ERROR, "string[] should work");
+    assert!(evaluate_type(&interner, number_array) != TypeId::ERROR, "number[] should work");
+    assert!(evaluate_type(&interner, boolean_array) != TypeId::ERROR, "boolean[] should work");
+}
+
+#[test]
+fn test_array_of_objects() {
+    let interner = TypeInterner::new();
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_array = interner.array(obj);
+    let result = evaluate_type(&interner, obj_array);
+    assert!(result != TypeId::ERROR, "Array of objects should work");
+}
+
+#[test]
+fn test_array_of_unions() {
+    let interner = TypeInterner::new();
+
+    // (string | number)[]
+    let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let union_array = interner.array(union);
+
+    let result = evaluate_type(&interner, union_array);
+    assert!(result != TypeId::ERROR, "Array of unions should work");
+}
+
+#[test]
+fn test_readonly_array() {
+    let interner = TypeInterner::new();
+
+    // readonly string[]
+    let string_array = interner.array(TypeId::STRING);
+    let readonly_array = interner.intern(TypeKey::ReadonlyType(string_array));
+
+    let result = evaluate_type(&interner, readonly_array);
+    assert!(result != TypeId::ERROR, "Readonly array should work");
+}
+
+// =============================================================================
+// Object Type Operations
+// =============================================================================
+
+#[test]
+fn test_object_with_call_signature() {
+    let interner = TypeInterner::new();
+
+    // { (x: string): number }
+    let call_sig = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::NUMBER,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Object with call signature is modeled as intersection or special object
+    let result = evaluate_type(&interner, call_sig);
+    assert!(result != TypeId::ERROR, "Object with call signature should work");
+}
+
+#[test]
+fn test_object_with_construct_signature() {
+    let interner = TypeInterner::new();
+
+    // { new (x: string): Foo }
+    let construct_sig = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::OBJECT,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    let result = evaluate_type(&interner, construct_sig);
+    assert!(result != TypeId::ERROR, "Object with construct signature should work");
+}
+
+#[test]
+fn test_object_with_string_index_signature() {
+    let interner = TypeInterner::new();
+
+    // { [key: string]: number }
+    let obj = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    let result = evaluate_type(&interner, obj);
+    assert!(result != TypeId::ERROR, "Object with string index signature should work");
+}
+
+#[test]
+fn test_object_with_number_index_sig() {
+    let interner = TypeInterner::new();
+
+    // { [index: number]: string }
+    let obj = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+    });
+
+    let result = evaluate_type(&interner, obj);
+    assert!(result != TypeId::ERROR, "Object with number index signature should work");
+}
+
+#[test]
+fn test_object_with_method() {
+    let interner = TypeInterner::new();
+
+    // { foo(): string }
+    let method_type = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("foo"),
+        type_id: method_type,
+        write_type: method_type,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let result = evaluate_type(&interner, obj);
+    assert!(result != TypeId::ERROR, "Object with method should work");
+}
+
+#[test]
+fn test_object_with_readonly_property() {
+    let interner = TypeInterner::new();
+
+    // { readonly x: string }
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let result = evaluate_type(&interner, obj);
+    assert!(result != TypeId::ERROR, "Object with readonly property should work");
+}
+
+// =============================================================================
+// KeyOf Edge Cases (Additional)
+// =============================================================================
+
+#[test]
+fn test_keyof_string_primitive() {
+    let interner = TypeInterner::new();
+
+    // keyof string
+    let keyof_string = interner.intern(TypeKey::KeyOf(TypeId::STRING));
+    let result = evaluate_type(&interner, keyof_string);
+    assert!(result != TypeId::ERROR, "keyof string should work");
+}
+
+#[test]
+fn test_keyof_array_type() {
+    let interner = TypeInterner::new();
+
+    // keyof string[] - includes number and array methods
+    let string_array = interner.array(TypeId::STRING);
+    let keyof_array = interner.intern(TypeKey::KeyOf(string_array));
+    let result = evaluate_type(&interner, keyof_array);
+    assert!(result != TypeId::ERROR, "keyof array should work");
+}
+
+#[test]
+fn test_keyof_tuple_type() {
+    let interner = TypeInterner::new();
+
+    // keyof [string, number] - should be "0" | "1" | array methods
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+    let keyof_tuple = interner.intern(TypeKey::KeyOf(tuple));
+    let result = evaluate_type(&interner, keyof_tuple);
+    assert!(result != TypeId::ERROR, "keyof tuple should work");
+}
+
+#[test]
+fn test_keyof_any_type() {
+    let interner = TypeInterner::new();
+
+    // keyof any = string | number | symbol
+    let keyof_any = interner.intern(TypeKey::KeyOf(TypeId::ANY));
+    let result = evaluate_type(&interner, keyof_any);
+    assert!(result != TypeId::ERROR, "keyof any should work");
+}
+
+#[test]
+fn test_keyof_unknown_type() {
+    let interner = TypeInterner::new();
+
+    // keyof unknown = never
+    let keyof_unknown = interner.intern(TypeKey::KeyOf(TypeId::UNKNOWN));
+    let result = evaluate_type(&interner, keyof_unknown);
+    assert!(result != TypeId::ERROR, "keyof unknown should work");
+}
+
+#[test]
+fn test_keyof_never_type() {
+    let interner = TypeInterner::new();
+
+    // keyof never = string | number | symbol
+    let keyof_never = interner.intern(TypeKey::KeyOf(TypeId::NEVER));
+    let result = evaluate_type(&interner, keyof_never);
+    assert!(result != TypeId::ERROR, "keyof never should work");
+}
+
+// =============================================================================
+// Infer Type Operations
+// =============================================================================
+
+#[test]
+fn test_infer_type_basic() {
+    let interner = TypeInterner::new();
+
+    // infer U (used in conditional extends)
+    let u_name = interner.intern_string("U");
+    let u_infer = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: u_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let result = evaluate_type(&interner, u_infer);
+    assert!(result != TypeId::ERROR, "Infer type should work");
+}
+
+#[test]
+fn test_infer_type_with_constraint() {
+    let interner = TypeInterner::new();
+
+    // infer U extends string
+    let u_name = interner.intern_string("U");
+    let u_infer = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: u_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    let result = evaluate_type(&interner, u_infer);
+    assert!(result != TypeId::ERROR, "Infer type with constraint should work");
+}
+
+// =============================================================================
+// Substitution and Instantiation
+// =============================================================================
+
+#[test]
+fn test_instantiate_simple_type_param() {
+    let interner = TypeInterner::new();
+
+    // T with substitution T=string should produce string
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param));
+
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, TypeId::STRING);
+
+    let result = instantiate_type(&interner, t_type, &subst);
+    assert_eq!(result, TypeId::STRING, "T should instantiate to string");
+}
+
+#[test]
+fn test_instantiate_array_of_type_param() {
+    let interner = TypeInterner::new();
+
+    // T[] with T=string should produce string[]
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param));
+    let t_array = interner.array(t_type);
+
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, TypeId::STRING);
+
+    let result = instantiate_type(&interner, t_array, &subst);
+    assert!(result != TypeId::ERROR, "T[] should instantiate correctly");
+}
+
+#[test]
+fn test_instantiate_union_with_type_param() {
+    let interner = TypeInterner::new();
+
+    // T | number with T=string should produce string | number
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param));
+    let t_or_number = interner.union(vec![t_type, TypeId::NUMBER]);
+
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, TypeId::STRING);
+
+    let result = instantiate_type(&interner, t_or_number, &subst);
+    assert!(result != TypeId::ERROR, "T | number should instantiate correctly");
+}
+
+#[test]
+fn test_instantiate_object_with_type_param() {
+    let interner = TypeInterner::new();
+
+    // { x: T } with T=string should produce { x: string }
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param));
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: t_type,
+        write_type: t_type,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, TypeId::STRING);
+
+    let result = instantiate_type(&interner, obj, &subst);
+    assert!(result != TypeId::ERROR, "Object with x: T should instantiate correctly");
+}
+
+#[test]
+fn test_instantiate_multiple_type_params() {
+    let interner = TypeInterner::new();
+
+    // { a: T; b: U } with T=string, U=number
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let u_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: u_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: t_type,
+            write_type: t_type,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: u_type,
+            write_type: u_type,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, TypeId::STRING);
+    subst.insert(u_name, TypeId::NUMBER);
+
+    let result = instantiate_type(&interner, obj, &subst);
+    assert!(result != TypeId::ERROR, "Multiple type params should instantiate correctly");
+}
+
+// =============================================================================
+// Primitive Type Edge Cases
+// =============================================================================
+
+#[test]
+fn test_void_type() {
+    let interner = TypeInterner::new();
+    let result = evaluate_type(&interner, TypeId::VOID);
+    assert!(result != TypeId::ERROR, "void type should work");
+}
+
+#[test]
+fn test_undefined_type() {
+    let interner = TypeInterner::new();
+    let result = evaluate_type(&interner, TypeId::UNDEFINED);
+    assert!(result != TypeId::ERROR, "undefined type should work");
+}
+
+#[test]
+fn test_null_type() {
+    let interner = TypeInterner::new();
+    let result = evaluate_type(&interner, TypeId::NULL);
+    assert!(result != TypeId::ERROR, "null type should work");
+}
+
+#[test]
+fn test_object_primitive_type() {
+    let interner = TypeInterner::new();
+    let result = evaluate_type(&interner, TypeId::OBJECT);
+    assert!(result != TypeId::ERROR, "object type should work");
+}
+
+#[test]
+fn test_bigint_type() {
+    let interner = TypeInterner::new();
+    let result = evaluate_type(&interner, TypeId::BIGINT);
+    assert!(result != TypeId::ERROR, "bigint type should work");
+}
