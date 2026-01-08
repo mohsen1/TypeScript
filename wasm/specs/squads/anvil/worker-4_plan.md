@@ -82,6 +82,7 @@ Priority: 4
 - [x] Add generator function ES5 source-map offset accuracy test. Tests: `./wasm/test.sh generator_es5_offset_accuracy`
 - [x] Add optional chaining source-map test. Tests: `./wasm/test.sh optional_chaining_mapping`
 - [x] Add logical assignment operators source-map test. Tests: `./wasm/test.sh logical_assignment_operators_mapping`
+- [x] Add class static block source-map test. Tests: `./wasm/test.sh class_static_block_mapping`
 
 ## Ready for Merge
 Yes
