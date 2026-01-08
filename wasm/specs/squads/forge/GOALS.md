@@ -5,7 +5,7 @@ Updated: 2026-01-08
 Priority: 1
 
 ## Current Milestone
-Phase 8 - Conformance, Convergence, and Hardening: solver correctness in the integrated pipeline, driven by conformance tests.
+Phase 8 - Conformance, Convergence, and Hardening: Type-system correctness in the integrated pipeline, driven by conformance tests.
 
 ## Project Direction Alignment
 - Strategic shift: integration and correctness across the pipeline; conformance tests drive work.
@@ -27,17 +27,17 @@ Phase 8 - Conformance, Convergence, and Hardening: solver correctness in the int
 
 2. **Conditional Type Evaluation**
    - Context: Distributive conditional types over unions must match TypeScript
-   - Success Criteria: `solver/evaluate.rs` handles distributive conditionals and template literal inference without regressions
+   - Success Criteria: `solver/evaluate.rs` handles distributive conditionals over unions and template literal inference without regressions
    - Key Files: `solver/evaluate.rs`, `solver/evaluate_tests.rs`
    - Estimated Complexity: High
 
 3. **Structural Compatibility (Variance)**
    - Context: Variance handling must be correct for all edge cases
-   - Success Criteria: Covariant returns and contravariant parameters match `tsc` across subtype edge cases
+   - Success Criteria: Covariant returns and contravariant parameters match `tsc` across subtype edge cases and conditional inference flows
    - Key Files: `solver/subtype.rs`, `solver/subtype_tests.rs`
    - Estimated Complexity: Medium
 
-4. **End-to-End Validation**
+4. **End-to-End Conformance Validation**
    - Context: Stop adding AST nodes; compile real code end-to-end
    - Success Criteria: Compile a non-trivial generic library (e.g., redux/lodash types) without panics and track conformance pass-rate deltas
    - Key Files: `checker/mod.rs`, `solver/mod.rs`, `binder/mod.rs`
@@ -45,8 +45,8 @@ Phase 8 - Conformance, Convergence, and Hardening: solver correctness in the int
 
 ## Anti-Priorities
 - New LSP features (unless they expose a Solver bug)
-- CLI argument parsing
-- Performance micro-optimizations
+- CLI argument parsing or UX changes
+- Performance micro-optimizations (unless regression)
 - New AST nodes or isolated features outside solver correctness
 
 ## Cross-Squad Dependencies
@@ -59,9 +59,10 @@ Phase 8 - Conformance, Convergence, and Hardening: solver correctness in the int
 - Use Docker for tests: `./wasm/test.sh`
 
 ## Squad Status
-- Last EM Report: 2026-01-08
+- Last EM Report: 2026-01-08 17:30
 - Workers Active: 5/5
-- Branches Pending Merge: worker/forge-1, worker/forge-4 (blocked by management-file edits)
-- Current Focus: conditional type evaluation (function + template literal inference), subtype `this` variance, end-to-end generic regressions, optional/variadic tuple inference
+- Branches Pending Merge: None (cleared blockers)
+- Current Focus: Fixing `test_check_redux_lodash_style_generics` (6 diagnostics vs 0) - mapped type + conditional infer interactions
 - Direction: Conformance-first integration; solver correctness before feature work
-- Blockers: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports` failure; worker/forge-1/forge-4 contain management-file edits
+- Blockers: Fixed `set_use_this_capture` build error in em/forge branch; `test_check_redux_lodash_style_generics` is primary regression
+- EM Notes: All workers assigned to investigate/fix redux/lodash-style generic patterns. Worker 1 investigating type predicate aliasing narrowing issue.

@@ -72,3 +72,4 @@ yek.toml
 ~*.docx
 .env.local
 .claude/settings.local.json
+.role/

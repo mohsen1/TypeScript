@@ -613,19 +613,29 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                             })
                             .or_else(|| prop_optional.then_some(TypeId::UNDEFINED))
                     }
-                    Some(TypeKey::Union(members)) if prop_optional => {
+                    Some(TypeKey::Union(members)) => {
                         let members = self.interner.type_list(members);
                         let mut inferred_members = Vec::new();
                         for &member in members.iter() {
-                            match self.interner.lookup(member) {
+                            let member_unwrapped = match self.interner.lookup(member) {
+                                Some(TypeKey::ReadonlyType(inner)) => inner,
+                                _ => member,
+                            };
+                            match self.interner.lookup(member_unwrapped) {
                                 Some(TypeKey::Object(shape_id) | TypeKey::ObjectWithIndex(shape_id)) => {
                                     let shape = self.interner.object_shape(shape_id);
                                     if let Some(prop) =
                                         shape.properties.iter().find(|prop| prop.name == prop_name)
                                     {
-                                        inferred_members.push(self.optional_property_type(prop));
-                                    } else {
+                                        inferred_members.push(if prop_optional {
+                                            self.optional_property_type(prop)
+                                        } else {
+                                            prop.type_id
+                                        });
+                                    } else if prop_optional {
                                         inferred_members.push(TypeId::UNDEFINED);
+                                    } else {
+                                        return self.evaluate(cond.false_type);
                                     }
                                 }
                                 _ => return self.evaluate(cond.false_type),
@@ -708,6 +718,50 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                                     _ => None,
                                 }
                             })
+                    }
+                    Some(TypeKey::Union(members)) => {
+                        let members = self.interner.type_list(members);
+                        let mut inferred_members = Vec::new();
+                        for &member in members.iter() {
+                            let member_unwrapped = match self.interner.lookup(member) {
+                                Some(TypeKey::ReadonlyType(inner)) => inner,
+                                _ => member,
+                            };
+                            let Some(TypeKey::Object(shape_id) | TypeKey::ObjectWithIndex(shape_id)) =
+                                self.interner.lookup(member_unwrapped)
+                            else {
+                                return self.evaluate(cond.false_type);
+                            };
+                            let shape = self.interner.object_shape(shape_id);
+                            let Some(prop) =
+                                shape.properties.iter().find(|prop| prop.name == outer_name)
+                            else {
+                                return self.evaluate(cond.false_type);
+                            };
+                            let inner_type = match self.interner.lookup(prop.type_id) {
+                                Some(TypeKey::ReadonlyType(inner)) => inner,
+                                _ => prop.type_id,
+                            };
+                            let Some(TypeKey::Object(inner_shape_id) | TypeKey::ObjectWithIndex(inner_shape_id)) =
+                                self.interner.lookup(inner_type)
+                            else {
+                                return self.evaluate(cond.false_type);
+                            };
+                            let inner_shape = self.interner.object_shape(inner_shape_id);
+                            let Some(inner_prop) =
+                                inner_shape.properties.iter().find(|prop| prop.name == inner_name)
+                            else {
+                                return self.evaluate(cond.false_type);
+                            };
+                            inferred_members.push(inner_prop.type_id);
+                        }
+                        if inferred_members.is_empty() {
+                            None
+                        } else if inferred_members.len() == 1 {
+                            Some(inferred_members[0])
+                        } else {
+                            Some(self.interner.union(inferred_members))
+                        }
                     }
                     _ => None,
                 };
@@ -2059,6 +2113,69 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         let source_len = source_elems.len();
         let pattern_len = pattern_elems.len();
 
+        let mut rest_index = None;
+        for (idx, elem) in pattern_elems.iter().enumerate() {
+            if elem.rest {
+                if rest_index.is_some() {
+                    return false;
+                }
+                rest_index = Some(idx);
+            }
+        }
+
+        if let Some(rest_index) = rest_index {
+            if rest_index + 1 != pattern_len {
+                return false;
+            }
+            if source_len < rest_index {
+                return false;
+            }
+
+            for i in 0..rest_index {
+                let source_elem = &source_elems[i];
+                let pattern_elem = &pattern_elems[i];
+                if source_elem.rest || pattern_elem.rest {
+                    return false;
+                }
+                let source_type = if source_elem.optional {
+                    self.interner.union2(source_elem.type_id, TypeId::UNDEFINED)
+                } else {
+                    source_elem.type_id
+                };
+                if !self.match_infer_pattern(
+                    source_type,
+                    pattern_elem.type_id,
+                    bindings,
+                    visited,
+                    checker,
+                ) {
+                    return false;
+                }
+            }
+
+            let mut rest_elems = Vec::new();
+            for source_elem in &source_elems[rest_index..] {
+                if source_elem.rest {
+                    return false;
+                }
+                rest_elems.push(TupleElement {
+                    type_id: source_elem.type_id,
+                    name: source_elem.name,
+                    optional: source_elem.optional,
+                    rest: false,
+                });
+            }
+
+            let rest_tuple = self.interner.tuple(rest_elems);
+            return self.match_infer_pattern(
+                rest_tuple,
+                pattern_elems[rest_index].type_id,
+                bindings,
+                visited,
+                checker,
+            );
+        }
+
         if source_len > pattern_len {
             return false;
         }
@@ -2108,6 +2225,44 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             }
         }
 
+        true
+    }
+
+    fn match_signature_params(
+        &self,
+        source_params: &[ParamInfo],
+        pattern_params: &[ParamInfo],
+        bindings: &mut FxHashMap<Atom, TypeId>,
+        visited: &mut FxHashSet<(TypeId, TypeId)>,
+        checker: &mut SubtypeChecker<'_, R>,
+    ) -> bool {
+        if source_params.len() != pattern_params.len() {
+            return false;
+        }
+        for (source_param, pattern_param) in
+            source_params.iter().zip(pattern_params.iter())
+        {
+            if source_param.optional != pattern_param.optional
+                || source_param.rest != pattern_param.rest
+            {
+                return false;
+            }
+            let source_param_type = if source_param.optional {
+                self.interner
+                    .union2(source_param.type_id, TypeId::UNDEFINED)
+            } else {
+                source_param.type_id
+            };
+            if !self.match_infer_pattern(
+                source_param_type,
+                pattern_param.type_id,
+                bindings,
+                visited,
+                checker,
+            ) {
+                return false;
+            }
+        }
         true
     }
 
@@ -2462,50 +2617,23 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     .any(|param| self.type_contains_infer(param.type_id));
                 let has_return_infer = self.type_contains_infer(pattern_sig.return_type);
                 if pattern_sig.this_type.is_none() && has_param_infer && has_return_infer {
-                    let mut match_callable_params_and_return = |source_type: TypeId,
-                                                                source_shape_id: CallableShapeId,
-                                                                bindings: &mut FxHashMap<Atom, TypeId>|
+                    let mut match_params_and_return = |source_type: TypeId,
+                                                       source_params: &[ParamInfo],
+                                                       source_return: TypeId,
+                                                       bindings: &mut FxHashMap<Atom, TypeId>|
                      -> bool {
-                        let source_shape = self.interner.callable_shape(source_shape_id);
-                        if source_shape.call_signatures.len() != 1
-                            || !source_shape.construct_signatures.is_empty()
-                            || !source_shape.properties.is_empty()
-                        {
-                            return false;
-                        }
-                        let source_sig = &source_shape.call_signatures[0];
-                        if source_sig.params.len() != pattern_sig.params.len() {
-                            return false;
-                        }
                         let mut local_visited = FxHashSet::default();
-                        for (source_param, pattern_param) in source_sig
-                            .params
-                            .iter()
-                            .zip(pattern_sig.params.iter())
-                        {
-                            if source_param.optional != pattern_param.optional
-                                || source_param.rest != pattern_param.rest
-                            {
-                                return false;
-                            }
-                            let source_param_type = if source_param.optional {
-                                self.interner
-                                    .union2(source_param.type_id, TypeId::UNDEFINED)
-                            } else {
-                                source_param.type_id
-                            };
-                            if !self.match_infer_pattern(
-                                source_param_type,
-                                pattern_param.type_id,
-                                bindings,
-                                &mut local_visited,
-                                checker,
-                            ) {
-                                return false;
-                            }
+                        if !self.match_signature_params(
+                            source_params,
+                            &pattern_sig.params,
+                            bindings,
+                            &mut local_visited,
+                            checker,
+                        ) {
+                            return false;
                         }
                         if !self.match_infer_pattern(
-                            source_sig.return_type,
+                            source_return,
                             pattern_sig.return_type,
                             bindings,
                             &mut local_visited,
@@ -2519,24 +2647,68 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
 
                     return match self.interner.lookup(source) {
                         Some(TypeKey::Callable(source_shape_id)) => {
-                            match_callable_params_and_return(source, source_shape_id, bindings)
+                            let source_shape = self.interner.callable_shape(source_shape_id);
+                            if source_shape.call_signatures.len() != 1
+                                || !source_shape.construct_signatures.is_empty()
+                                || !source_shape.properties.is_empty()
+                            {
+                                return false;
+                            }
+                            let source_sig = &source_shape.call_signatures[0];
+                            match_params_and_return(
+                                source,
+                                &source_sig.params,
+                                source_sig.return_type,
+                                bindings,
+                            )
+                        }
+                        Some(TypeKey::Function(source_fn_id)) => {
+                            let source_fn = self.interner.function_shape(source_fn_id);
+                            match_params_and_return(
+                                source,
+                                &source_fn.params,
+                                source_fn.return_type,
+                                bindings,
+                            )
                         }
                         Some(TypeKey::Union(members)) => {
                             let members = self.interner.type_list(members);
                             let mut combined = FxHashMap::default();
                             for &member in members.iter() {
-                                let Some(TypeKey::Callable(source_shape_id)) =
-                                    self.interner.lookup(member)
-                                else {
-                                    return false;
-                                };
                                 let mut member_bindings = FxHashMap::default();
-                                if !match_callable_params_and_return(
-                                    member,
-                                    source_shape_id,
-                                    &mut member_bindings,
-                                ) {
-                                    return false;
+                                match self.interner.lookup(member) {
+                                    Some(TypeKey::Callable(source_shape_id)) => {
+                                        let source_shape =
+                                            self.interner.callable_shape(source_shape_id);
+                                        if source_shape.call_signatures.len() != 1
+                                            || !source_shape.construct_signatures.is_empty()
+                                            || !source_shape.properties.is_empty()
+                                        {
+                                            return false;
+                                        }
+                                        let source_sig = &source_shape.call_signatures[0];
+                                        if !match_params_and_return(
+                                            member,
+                                            &source_sig.params,
+                                            source_sig.return_type,
+                                            &mut member_bindings,
+                                        ) {
+                                            return false;
+                                        }
+                                    }
+                                    Some(TypeKey::Function(source_fn_id)) => {
+                                        let source_fn =
+                                            self.interner.function_shape(source_fn_id);
+                                        if !match_params_and_return(
+                                            member,
+                                            &source_fn.params,
+                                            source_fn.return_type,
+                                            &mut member_bindings,
+                                        ) {
+                                            return false;
+                                        }
+                                    }
+                                    _ => return false,
                                 }
                                 for (name, ty) in member_bindings {
                                     combined
@@ -2554,47 +2726,19 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     };
                 }
                 if pattern_sig.this_type.is_none() && has_param_infer && !has_return_infer {
-                    let mut match_callable_params = |source_type: TypeId,
-                                                     source_shape_id: CallableShapeId,
-                                                     bindings: &mut FxHashMap<Atom, TypeId>|
+                    let mut match_params = |source_type: TypeId,
+                                            source_params: &[ParamInfo],
+                                            bindings: &mut FxHashMap<Atom, TypeId>|
                      -> bool {
-                        let source_shape = self.interner.callable_shape(source_shape_id);
-                        if source_shape.call_signatures.len() != 1
-                            || !source_shape.construct_signatures.is_empty()
-                            || !source_shape.properties.is_empty()
-                        {
-                            return false;
-                        }
-                        let source_sig = &source_shape.call_signatures[0];
-                        if source_sig.params.len() != pattern_sig.params.len() {
-                            return false;
-                        }
                         let mut local_visited = FxHashSet::default();
-                        for (source_param, pattern_param) in source_sig
-                            .params
-                            .iter()
-                            .zip(pattern_sig.params.iter())
-                        {
-                            if source_param.optional != pattern_param.optional
-                                || source_param.rest != pattern_param.rest
-                            {
-                                return false;
-                            }
-                            let source_param_type = if source_param.optional {
-                                self.interner
-                                    .union2(source_param.type_id, TypeId::UNDEFINED)
-                            } else {
-                                source_param.type_id
-                            };
-                            if !self.match_infer_pattern(
-                                source_param_type,
-                                pattern_param.type_id,
-                                bindings,
-                                &mut local_visited,
-                                checker,
-                            ) {
-                                return false;
-                            }
+                        if !self.match_signature_params(
+                            source_params,
+                            &pattern_sig.params,
+                            bindings,
+                            &mut local_visited,
+                            checker,
+                        ) {
+                            return false;
                         }
                         let substituted = self.substitute_infer(pattern, bindings);
                         checker.is_subtype_of(source_type, substituted)
@@ -2602,24 +2746,56 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
 
                     return match self.interner.lookup(source) {
                         Some(TypeKey::Callable(source_shape_id)) => {
-                            match_callable_params(source, source_shape_id, bindings)
+                            let source_shape = self.interner.callable_shape(source_shape_id);
+                            if source_shape.call_signatures.len() != 1
+                                || !source_shape.construct_signatures.is_empty()
+                                || !source_shape.properties.is_empty()
+                            {
+                                return false;
+                            }
+                            let source_sig = &source_shape.call_signatures[0];
+                            match_params(source, &source_sig.params, bindings)
+                        }
+                        Some(TypeKey::Function(source_fn_id)) => {
+                            let source_fn = self.interner.function_shape(source_fn_id);
+                            match_params(source, &source_fn.params, bindings)
                         }
                         Some(TypeKey::Union(members)) => {
                             let members = self.interner.type_list(members);
                             let mut combined = FxHashMap::default();
                             for &member in members.iter() {
-                                let Some(TypeKey::Callable(source_shape_id)) =
-                                    self.interner.lookup(member)
-                                else {
-                                    return false;
-                                };
                                 let mut member_bindings = FxHashMap::default();
-                                if !match_callable_params(
-                                    member,
-                                    source_shape_id,
-                                    &mut member_bindings,
-                                ) {
-                                    return false;
+                                match self.interner.lookup(member) {
+                                    Some(TypeKey::Callable(source_shape_id)) => {
+                                        let source_shape =
+                                            self.interner.callable_shape(source_shape_id);
+                                        if source_shape.call_signatures.len() != 1
+                                            || !source_shape.construct_signatures.is_empty()
+                                            || !source_shape.properties.is_empty()
+                                        {
+                                            return false;
+                                        }
+                                        let source_sig = &source_shape.call_signatures[0];
+                                        if !match_params(
+                                            member,
+                                            &source_sig.params,
+                                            &mut member_bindings,
+                                        ) {
+                                            return false;
+                                        }
+                                    }
+                                    Some(TypeKey::Function(source_fn_id)) => {
+                                        let source_fn =
+                                            self.interner.function_shape(source_fn_id);
+                                        if !match_params(
+                                            member,
+                                            &source_fn.params,
+                                            &mut member_bindings,
+                                        ) {
+                                            return false;
+                                        }
+                                    }
+                                    _ => return false,
                                 }
                                 for (name, ty) in member_bindings {
                                     combined
@@ -2638,21 +2814,13 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 }
 
                 if pattern_sig.this_type.is_none() && !has_param_infer && has_return_infer {
-                    let mut match_callable_return = |source_type: TypeId,
-                                                     source_shape_id: CallableShapeId,
-                                                     bindings: &mut FxHashMap<Atom, TypeId>|
+                    let mut match_return = |source_type: TypeId,
+                                            source_return: TypeId,
+                                            bindings: &mut FxHashMap<Atom, TypeId>|
                      -> bool {
-                        let source_shape = self.interner.callable_shape(source_shape_id);
-                        if source_shape.call_signatures.len() != 1
-                            || !source_shape.construct_signatures.is_empty()
-                            || !source_shape.properties.is_empty()
-                        {
-                            return false;
-                        }
-                        let source_sig = &source_shape.call_signatures[0];
                         let mut local_visited = FxHashSet::default();
                         if !self.match_infer_pattern(
-                            source_sig.return_type,
+                            source_return,
                             pattern_sig.return_type,
                             bindings,
                             &mut local_visited,
@@ -2666,24 +2834,56 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
 
                     return match self.interner.lookup(source) {
                         Some(TypeKey::Callable(source_shape_id)) => {
-                            match_callable_return(source, source_shape_id, bindings)
+                            let source_shape = self.interner.callable_shape(source_shape_id);
+                            if source_shape.call_signatures.len() != 1
+                                || !source_shape.construct_signatures.is_empty()
+                                || !source_shape.properties.is_empty()
+                            {
+                                return false;
+                            }
+                            let source_sig = &source_shape.call_signatures[0];
+                            match_return(source, source_sig.return_type, bindings)
+                        }
+                        Some(TypeKey::Function(source_fn_id)) => {
+                            let source_fn = self.interner.function_shape(source_fn_id);
+                            match_return(source, source_fn.return_type, bindings)
                         }
                         Some(TypeKey::Union(members)) => {
                             let members = self.interner.type_list(members);
                             let mut combined = FxHashMap::default();
                             for &member in members.iter() {
-                                let Some(TypeKey::Callable(source_shape_id)) =
-                                    self.interner.lookup(member)
-                                else {
-                                    return false;
-                                };
                                 let mut member_bindings = FxHashMap::default();
-                                if !match_callable_return(
-                                    member,
-                                    source_shape_id,
-                                    &mut member_bindings,
-                                ) {
-                                    return false;
+                                match self.interner.lookup(member) {
+                                    Some(TypeKey::Callable(source_shape_id)) => {
+                                        let source_shape =
+                                            self.interner.callable_shape(source_shape_id);
+                                        if source_shape.call_signatures.len() != 1
+                                            || !source_shape.construct_signatures.is_empty()
+                                            || !source_shape.properties.is_empty()
+                                        {
+                                            return false;
+                                        }
+                                        let source_sig = &source_shape.call_signatures[0];
+                                        if !match_return(
+                                            member,
+                                            source_sig.return_type,
+                                            &mut member_bindings,
+                                        ) {
+                                            return false;
+                                        }
+                                    }
+                                    Some(TypeKey::Function(source_fn_id)) => {
+                                        let source_fn =
+                                            self.interner.function_shape(source_fn_id);
+                                        if !match_return(
+                                            member,
+                                            source_fn.return_type,
+                                            &mut member_bindings,
+                                        ) {
+                                            return false;
+                                        }
+                                    }
+                                    _ => return false,
                                 }
                                 for (name, ty) in member_bindings {
                                     combined

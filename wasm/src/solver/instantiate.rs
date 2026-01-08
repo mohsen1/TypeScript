@@ -17,6 +17,9 @@ use rustc_hash::FxHashMap;
 #[cfg(test)]
 use crate::solver::TypeInterner;
 
+/// Maximum depth for recursive type instantiation.
+const MAX_INSTANTIATION_DEPTH: u32 = 50;
+
 /// A substitution map from type parameter names to concrete types.
 #[derive(Clone, Debug, Default)]
 pub struct TypeSubstitution {
@@ -74,6 +77,9 @@ pub struct TypeInstantiator<'a> {
     /// Type parameter names that are shadowed in the current scope.
     shadowed: Vec<Atom>,
     substitute_infer: bool,
+    depth: u32,
+    max_depth: u32,
+    depth_exceeded: bool,
 }
 
 impl<'a> TypeInstantiator<'a> {
@@ -85,6 +91,9 @@ impl<'a> TypeInstantiator<'a> {
             visiting: FxHashMap::default(),
             shadowed: Vec::new(),
             substitute_infer: false,
+            depth: 0,
+            max_depth: MAX_INSTANTIATION_DEPTH,
+            depth_exceeded: false,
         }
     }
 
@@ -99,6 +108,22 @@ impl<'a> TypeInstantiator<'a> {
             return type_id;
         }
 
+        if self.depth_exceeded {
+            return TypeId::ERROR;
+        }
+
+        if self.depth >= self.max_depth {
+            self.depth_exceeded = true;
+            return TypeId::ERROR;
+        }
+
+        self.depth += 1;
+        let result = self.instantiate_inner(type_id);
+        self.depth -= 1;
+        result
+    }
+
+    fn instantiate_inner(&mut self, type_id: TypeId) -> TypeId {
         // Check if we're already processing this type (cycle detection)
         if let Some(&cached) = self.visiting.get(&type_id) {
             return cached;
@@ -483,7 +508,12 @@ pub fn instantiate_type(
         return type_id;
     }
     let mut instantiator = TypeInstantiator::new(interner, substitution);
-    instantiator.instantiate(type_id)
+    let result = instantiator.instantiate(type_id);
+    if instantiator.depth_exceeded {
+        TypeId::ERROR
+    } else {
+        result
+    }
 }
 
 /// Convenience function for instantiating a type while substituting infer variables.
@@ -497,7 +527,12 @@ pub fn instantiate_type_with_infer(
     }
     let mut instantiator = TypeInstantiator::new(interner, substitution);
     instantiator.substitute_infer = true;
-    instantiator.instantiate(type_id)
+    let result = instantiator.instantiate(type_id);
+    if instantiator.depth_exceeded {
+        TypeId::ERROR
+    } else {
+        result
+    }
 }
 
 /// Convenience function for instantiating a generic type with type arguments.

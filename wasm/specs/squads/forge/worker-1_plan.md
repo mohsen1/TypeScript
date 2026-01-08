@@ -7,9 +7,10 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-- [ ] Add callable-parameter inference regressions (e.g., union inputs, overload shapes) in `wasm/src/solver/evaluate_tests.rs`.
+- [ ] Investigate `test_user_defined_type_predicate_alias_narrows` failure in `wasm/src/checker/control_flow_tests.rs`. The issue is type narrowing not working when a type guard is assigned to a const alias (`const guard = isString`). Fix in `wasm/src/checker/control_flow.rs` if needed.
 
 ## Task Queue
+- [ ] Add callable-parameter inference regressions (e.g., union inputs, overload shapes) in `wasm/src/solver/evaluate_tests.rs`.
 - [ ] Validate function return inference in conditional types and fix any mismatches in `wasm/src/solver/evaluate.rs`.
 
 ## Completed
@@ -31,6 +32,7 @@ No
 - Project Direction: integration and conformance-first; prioritize solver correctness (inference/conditional/subtype) before new features.
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
+- Conformance focus: tie regressions to official TypeScript conformance cases when possible.
 - Commit format: `[wasm] solver: <description>` or `[wasm] checker: <description>`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/forge-1`

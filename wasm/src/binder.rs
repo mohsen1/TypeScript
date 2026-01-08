@@ -124,6 +124,8 @@ pub struct Symbol {
     pub members: Option<Box<SymbolTable>>,
     /// Whether this symbol is exported from its container (namespace/module)
     pub is_exported: bool,
+    /// Whether this symbol is type-only (e.g., `import type`).
+    pub is_type_only: bool,
     /// File index for cross-file resolution (set during multi-file merge)
     /// This indicates which file's arena contains this symbol's declarations.
     /// Value of u32::MAX means single-file mode (use current arena).
@@ -143,6 +145,7 @@ impl Symbol {
             exports: None,
             members: None,
             is_exported: false,
+            is_type_only: false,
             decl_file_idx: u32::MAX,
         }
     }
