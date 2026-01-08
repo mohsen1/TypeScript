@@ -11,7 +11,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use crate::parser::NodeIndex;
 use crate::parser::thin_node::ThinNodeArena;
 use crate::thin_binder::ThinBinderState;
-use crate::solver::{TypeId, TypeInterner};
+use crate::solver::{TypeId, TypeInterner, TypeEnvironment};
 use crate::checker::types::diagnostics::Diagnostic;
 use crate::binder::SymbolId;
 
@@ -162,12 +162,9 @@ pub struct CheckerContext<'a> {
     /// Current enclosing class info.
     pub enclosing_class: Option<EnclosingClassInfo>,
 
-    // --- Multi-file support ---
-
-    /// All file arenas for cross-file type resolution.
-    /// When set, allows the checker to resolve declarations from other files.
-    /// Index matches file order in MergedProgram.files.
-    pub all_arenas: Option<Vec<std::sync::Arc<ThinNodeArena>>>,
+    /// Type environment for symbol resolution with type parameters.
+    /// Used by the evaluator to expand Application types.
+    pub type_env: RefCell<TypeEnvironment>,
 }
 
 impl<'a> CheckerContext<'a> {
@@ -200,7 +197,7 @@ impl<'a> CheckerContext<'a> {
             call_depth: RefCell::new(0),
             return_type_stack: Vec::new(),
             enclosing_class: None,
-            all_arenas: None,
+            type_env: RefCell::new(TypeEnvironment::new()),
         }
     }
 
@@ -235,7 +232,7 @@ impl<'a> CheckerContext<'a> {
             call_depth: RefCell::new(0),
             return_type_stack: Vec::new(),
             enclosing_class: None,
-            all_arenas: None,
+            type_env: RefCell::new(TypeEnvironment::new()),
         }
     }
 
@@ -249,27 +246,6 @@ impl<'a> CheckerContext<'a> {
             relation_cache: self.relation_cache.into_inner(),
             symbol_dependencies: self.symbol_dependencies,
         }
-    }
-
-    /// Set all file arenas for cross-file type resolution.
-    pub fn set_all_arenas(&mut self, arenas: Vec<std::sync::Arc<ThinNodeArena>>) {
-        self.all_arenas = Some(arenas);
-    }
-
-    /// Get the arena for a specific file index.
-    /// Returns the primary arena if file_idx is u32::MAX (single-file mode)
-    /// or if all_arenas is not set.
-    pub fn get_arena_for_file(&self, file_idx: u32) -> &ThinNodeArena {
-        if file_idx == u32::MAX {
-            return self.arena;
-        }
-        if let Some(ref arenas) = self.all_arenas {
-            if let Some(arena) = arenas.get(file_idx as usize) {
-                return arena.as_ref();
-            }
-        }
-        // Fallback to primary arena
-        self.arena
     }
 
     /// Add an error diagnostic.

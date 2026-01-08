@@ -16,6 +16,7 @@ use crate::solver::types::*;
 use crate::solver::{apparent_primitive_members, ApparentMemberKind, TypeDatabase};
 use crate::solver::infer::InferenceContext;
 use crate::solver::instantiate::{
+    instantiate_generic,
     instantiate_type,
     instantiate_type_with_infer,
     TypeSubstitution,
@@ -199,40 +200,50 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 self.evaluate_keyof(*operand)
             }
             TypeKey::Application(app_id) => {
-                // Expand Application types like Reducer<S, A> by:
-                // 1. Checking if base is a Ref to a type alias
-                // 2. Getting type params from the resolved type
-                // 3. Creating a substitution mapping params to args
-                // 4. Instantiating the body with the substitution
-                let app = self.interner.type_application(*app_id);
-                if let Some(TypeKey::Ref(symbol_ref)) = self.interner.lookup(app.base) {
-                    // Get type params from the resolved type
-                    if let Some(type_params) = self.resolver.get_type_params(symbol_ref, self.interner) {
-                        // Get the body type
-                        if let Some(body) = self.resolver.resolve_ref(symbol_ref, self.interner) {
-                            // Create substitution mapping param names to args
-                            let mut substitution = TypeSubstitution::new();
-                            for (param, &arg) in type_params.iter().zip(app.args.iter()) {
-                                substitution.insert(param.name, arg);
-                            }
-                            // Fill in defaults for missing args
-                            for param in type_params.iter().skip(app.args.len()) {
-                                if let Some(default) = param.default {
-                                    substitution.insert(param.name, default);
-                                }
-                            }
-                            // Instantiate the body with the substitution
-                            let instantiated = instantiate_type(self.interner, body, &substitution);
-                            // Recursively evaluate to handle nested meta-types
-                            return self.evaluate(instantiated);
-                        }
-                    }
-                }
-                type_id
+                self.evaluate_application(*app_id)
             }
             // Other types pass through unchanged
             _ => type_id,
         }
+    }
+
+    /// Evaluate a generic type application: Base<Args>
+    ///
+    /// Algorithm:
+    /// 1. Look up the base type - if it's a Ref, resolve it
+    /// 2. Get the type parameters for the base symbol
+    /// 3. If we have type params, instantiate the resolved type with args
+    /// 4. Recursively evaluate the result
+    fn evaluate_application(&self, app_id: TypeApplicationId) -> TypeId {
+        let app = self.interner.type_application(app_id);
+
+        // Look up the base type
+        let base_key = match self.interner.lookup(app.base) {
+            Some(k) => k,
+            None => return self.interner.application(app.base, app.args.clone()),
+        };
+
+        // If the base is a Ref, try to resolve and instantiate
+        if let TypeKey::Ref(symbol) = base_key {
+            // Try to get the type parameters for this symbol
+            if let Some(type_params) = self.resolver.get_type_params(symbol) {
+                // Resolve the base type to get the body
+                if let Some(resolved) = self.resolver.resolve_ref(symbol, self.interner) {
+                    // Instantiate the resolved type with the type arguments
+                    let instantiated = instantiate_generic(
+                        self.interner,
+                        resolved,
+                        &type_params,
+                        &app.args,
+                    );
+                    // Recursively evaluate the result
+                    return self.evaluate(instantiated);
+                }
+            }
+        }
+
+        // If we can't expand, return the original application
+        self.interner.application(app.base, app.args.clone())
     }
 
     /// Evaluate a conditional type: T extends U ? X : Y
