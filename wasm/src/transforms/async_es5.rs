@@ -760,7 +760,6 @@ impl<'a> AsyncES5Emitter<'a> {
         let Some(base_node) = self.arena.get(access.expression) else {
             return false;
         };
-
         base_node.kind == SyntaxKind::SuperKeyword as u16
     }
 
@@ -801,7 +800,6 @@ impl<'a> AsyncES5Emitter<'a> {
                 self.emit_expression(arg_idx);
             }
         }
-
         self.write(")");
     }
 
