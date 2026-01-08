@@ -7,7 +7,7 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-- Complete: Added template literal ES5 method test; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` - pre-existing Forge domain failure).
+- Complete: Added destructuring ES5 method test; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` - pre-existing Forge domain failure).
 
 ## Task Queue
 - [x] Inspect `wasm/src/emitter_edge_case_tests.rs` to capture the failing case and expected output.
@@ -47,6 +47,7 @@ Priority: 1
 - [x] Added for-of loop ES5 method test; verifies for-of loops are transformed to `__values()` iterator pattern with try/finally cleanup. Ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Added Symbol.iterator ES5 method test; verifies `*[Symbol.iterator]()` generator methods are emitted with computed property name on prototype. Ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Added template literal ES5 method test; verifies template literals like `` `Hello, ${name}!` `` are transformed to string concatenation. Ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
+- [x] Added destructuring ES5 method test; verifies `const { text, line } = input` is transformed to individual property accesses. Ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 
 ## Ready for Merge
 Yes
