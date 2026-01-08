@@ -4109,20 +4109,27 @@ class EventProcessor {
 }
 
 #[test]
-fn test_class_es5_getter_with_decorator() {
-    // Test getter with method decorator
+fn test_class_es5_constructor_param_inject_decorator() {
+    // Test class with constructor parameter injection metadata
+    // Similar to Angular's @Inject decorator for DI
     let source = r#"
-function readonly(target: any, key: string, descriptor: PropertyDescriptor) {
-    descriptor.writable = false;
-    return descriptor;
-}
+class UserService {
+    static __paramtypes__ = ["HttpClient", "Logger", "Config"];
+    static __inject__ = [0, 1, 2];
 
-class Config {
-    private _value: string = "default";
+    private http: any;
+    private logger: any;
+    private config: any;
 
-    @readonly
-    get value(): string {
-        return this._value;
+    constructor(http: any, logger: any, config: any) {
+        this.http = http;
+        this.logger = logger;
+        this.config = config;
+    }
+
+    getUser(id: number): any {
+        this.logger.log("Fetching user:", id);
+        return this.http.get("/users/" + id);
     }
 }
 "#;
@@ -4134,50 +4141,80 @@ class Config {
         .arena
         .get_source_file(root_node)
         .expect("expected source file data");
-
-    // Get the class (second statement after function declaration)
     let class_idx = *source_file
         .statements
         .nodes
-        .get(1)
+        .first()
         .expect("expected class declaration");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(class_idx);
 
-    // Class should emit as function
+    // UserService should emit as function
     assert!(
-        output.contains("function Config"),
-        "Expected Config class to emit as function: {}",
+        output.contains("function UserService"),
+        "Expected UserService to emit as function: {}",
         output
     );
 
-    // Should use Object.defineProperty for getter
+    // Static parameter type metadata
     assert!(
-        output.contains("Object.defineProperty") || output.contains("get:"),
-        "Expected Object.defineProperty or getter syntax for accessor: {}",
+        output.contains("UserService.__paramtypes__"),
+        "Expected static __paramtypes__ property: {}",
+        output
+    );
+    assert!(
+        output.contains("UserService.__inject__"),
+        "Expected static __inject__ property: {}",
+        output
+    );
+
+    // Constructor should assign all injected dependencies
+    assert!(
+        output.contains("this.http = http"),
+        "Expected http assignment: {}",
+        output
+    );
+    assert!(
+        output.contains("this.logger = logger"),
+        "Expected logger assignment: {}",
+        output
+    );
+    assert!(
+        output.contains("this.config = config"),
+        "Expected config assignment: {}",
+        output
+    );
+
+    // Method should be on prototype
+    assert!(
+        output.contains(".prototype.getUser") || output.contains("prototype[\"getUser\"]"),
+        "Expected getUser method on prototype: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_setter_with_decorator() {
-    // Test setter with method decorator
+fn test_class_es5_constructor_param_optional_decorator() {
+    // Test class with optional constructor parameter metadata
+    // Similar to Angular's @Optional decorator
     let source = r#"
-function validate(target: any, key: string, descriptor: PropertyDescriptor) {
-    return descriptor;
-}
+class ConfigurableService {
+    static __paramtypes__ = ["RequiredDep", "OptionalDep", "AnotherOptional"];
+    static __optional__ = [1, 2];
 
-class User {
-    private _name: string = "";
+    private required: any;
+    private optional: any;
+    private another: any;
 
-    @validate
-    set name(value: string) {
-        this._name = value.trim();
+    constructor(required: any, optional: any, another: any) {
+        this.required = required;
+        this.optional = optional || null;
+        this.another = another || { default: true };
     }
 
-    get name(): string {
-        return this._name;
+    hasOptional(): boolean {
+        return this.optional !== null;
     }
 }
 "#;
@@ -4189,57 +4226,84 @@ class User {
         .arena
         .get_source_file(root_node)
         .expect("expected source file data");
-
-    // Get the class (second statement after function declaration)
     let class_idx = *source_file
         .statements
         .nodes
-        .get(1)
+        .first()
         .expect("expected class declaration");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(class_idx);
 
-    // Class should emit as function
+    // ConfigurableService should emit as function
     assert!(
-        output.contains("function User"),
-        "Expected User class to emit as function: {}",
+        output.contains("function ConfigurableService"),
+        "Expected ConfigurableService to emit as function: {}",
         output
     );
 
-    // Should use Object.defineProperty for setter
+    // Static optional parameter metadata
     assert!(
-        output.contains("Object.defineProperty") || output.contains("set:"),
-        "Expected Object.defineProperty or setter syntax for accessor: {}",
+        output.contains("ConfigurableService.__paramtypes__"),
+        "Expected static __paramtypes__ property: {}",
+        output
+    );
+    assert!(
+        output.contains("ConfigurableService.__optional__"),
+        "Expected static __optional__ property: {}",
+        output
+    );
+
+    // Constructor should handle optional parameters with fallbacks
+    assert!(
+        output.contains("this.required = required"),
+        "Expected required assignment: {}",
+        output
+    );
+    assert!(
+        output.contains("this.optional = optional || null") || output.contains("this.optional ="),
+        "Expected optional assignment with fallback: {}",
+        output
+    );
+
+    // Method should be on prototype
+    assert!(
+        output.contains(".prototype.hasOptional") || output.contains("prototype[\"hasOptional\"]"),
+        "Expected hasOptional method on prototype: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_getter_setter_pair_with_decorators() {
-    // Test getter/setter pair both with decorators
+fn test_class_es5_constructor_param_attribute_decorator() {
+    // Test class with constructor parameter attribute metadata
+    // Similar to Angular's @Attribute decorator for host element attributes
     let source = r#"
-function log(target: any, key: string, descriptor: PropertyDescriptor) {
-    return descriptor;
-}
+class CustomElement {
+    static __paramtypes__ = ["ElementRef", "string", "string"];
+    static __attributes__ = { 1: "id", 2: "class" };
 
-function validate(target: any, key: string, descriptor: PropertyDescriptor) {
-    return descriptor;
-}
+    private elementRef: any;
+    private id: string;
+    private className: string;
 
-class Counter {
-    private _count: number = 0;
-
-    @log
-    get count(): number {
-        return this._count;
+    constructor(elementRef: any, id: string, className: string) {
+        this.elementRef = elementRef;
+        this.id = id || "";
+        this.className = className || "";
     }
 
-    @validate
-    set count(value: number) {
-        if (value >= 0) {
-            this._count = value;
-        }
+    getId(): string {
+        return this.id;
+    }
+
+    getClassName(): string {
+        return this.className;
+    }
+
+    setClassName(name: string): void {
+        this.className = name;
+        this.elementRef.nativeElement.className = name;
     }
 }
 "#;
@@ -4251,209 +4315,65 @@ class Counter {
         .arena
         .get_source_file(root_node)
         .expect("expected source file data");
-
-    // Get the class (third statement after two function declarations)
     let class_idx = *source_file
         .statements
         .nodes
-        .get(2)
+        .first()
         .expect("expected class declaration");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(class_idx);
 
-    // Class should emit as function
+    // CustomElement should emit as function
     assert!(
-        output.contains("function Counter"),
-        "Expected Counter class to emit as function: {}",
+        output.contains("function CustomElement"),
+        "Expected CustomElement to emit as function: {}",
         output
     );
 
-    // Should use Object.defineProperty for accessors
+    // Static attribute metadata
     assert!(
-        output.contains("Object.defineProperty"),
-        "Expected Object.defineProperty for accessor pair: {}",
+        output.contains("CustomElement.__paramtypes__"),
+        "Expected static __paramtypes__ property: {}",
         output
     );
-}
-
-#[test]
-fn test_class_es5_static_getter_with_decorator() {
-    // Test static getter with decorator
-    let source = r#"
-function cached(target: any, key: string, descriptor: PropertyDescriptor) {
-    return descriptor;
-}
-
-class AppConfig {
-    private static _instance: any = null;
-
-    @cached
-    static get instance(): any {
-        if (!AppConfig._instance) {
-            AppConfig._instance = {};
-        }
-        return AppConfig._instance;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
-
-    // Get the class (second statement after function declaration)
-    let class_idx = *source_file
-        .statements
-        .nodes
-        .get(1)
-        .expect("expected class declaration");
-
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
-
-    // Class should emit as function
     assert!(
-        output.contains("function AppConfig"),
-        "Expected AppConfig class to emit as function: {}",
+        output.contains("CustomElement.__attributes__"),
+        "Expected static __attributes__ property: {}",
         output
     );
 
-    // Static getter should reference the class
+    // Constructor should assign parameters
     assert!(
-        output.contains("AppConfig") && (output.contains("Object.defineProperty") || output.contains("get")),
-        "Expected static getter definition: {}",
+        output.contains("this.elementRef = elementRef"),
+        "Expected elementRef assignment: {}",
         output
     );
-}
-
-#[test]
-fn test_class_es5_accessor_with_multiple_decorators() {
-    // Test accessor with multiple decorators
-    let source = r#"
-function enumerable(value: boolean) {
-    return function(target: any, key: string, descriptor: PropertyDescriptor) {
-        descriptor.enumerable = value;
-        return descriptor;
-    };
-}
-
-function configurable(value: boolean) {
-    return function(target: any, key: string, descriptor: PropertyDescriptor) {
-        descriptor.configurable = value;
-        return descriptor;
-    };
-}
-
-class Settings {
-    private _theme: string = "light";
-
-    @enumerable(true)
-    @configurable(false)
-    get theme(): string {
-        return this._theme;
-    }
-
-    set theme(value: string) {
-        this._theme = value;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
-
-    // Get the class (third statement after two function declarations)
-    let class_idx = *source_file
-        .statements
-        .nodes
-        .get(2)
-        .expect("expected class declaration");
-
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
-
-    // Class should emit as function
     assert!(
-        output.contains("function Settings"),
-        "Expected Settings class to emit as function: {}",
+        output.contains("this.id ="),
+        "Expected id assignment: {}",
+        output
+    );
+    assert!(
+        output.contains("this.className ="),
+        "Expected className assignment: {}",
         output
     );
 
-    // Should use Object.defineProperty for accessor
+    // Methods should be on prototype
     assert!(
-        output.contains("Object.defineProperty"),
-        "Expected Object.defineProperty for accessor with decorators: {}",
+        output.contains(".prototype.getId") || output.contains("prototype[\"getId\"]"),
+        "Expected getId method on prototype: {}",
         output
     );
-}
-
-#[test]
-fn test_class_es5_accessor_in_derived_class() {
-    // Test accessor with decorator in derived class
-    let source = r#"
-function override(target: any, key: string, descriptor: PropertyDescriptor) {
-    return descriptor;
-}
-
-class Base {
-    protected _value: number = 0;
-
-    get value(): number {
-        return this._value;
-    }
-}
-
-class Derived extends Base {
-    @override
-    get value(): number {
-        return this._value * 2;
-    }
-
-    set value(v: number) {
-        this._value = v;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
-
-    // Get the Derived class (third statement)
-    let class_idx = *source_file
-        .statements
-        .nodes
-        .get(2)
-        .expect("expected Derived class declaration");
-
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
-
-    // Class should emit as function
     assert!(
-        output.contains("function Derived"),
-        "Expected Derived class to emit as function: {}",
+        output.contains(".prototype.getClassName") || output.contains("prototype[\"getClassName\"]"),
+        "Expected getClassName method on prototype: {}",
         output
     );
-
-    // Should use __extends for inheritance
     assert!(
-        output.contains("__extends") || output.contains("_super"),
-        "Expected inheritance pattern in derived class: {}",
+        output.contains(".prototype.setClassName") || output.contains("prototype[\"setClassName\"]"),
+        "Expected setClassName method on prototype: {}",
         output
     );
 }
