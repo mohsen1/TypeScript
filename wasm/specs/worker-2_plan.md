@@ -23,6 +23,7 @@ Priority: 2
 - [x] Added constrained infer extraction tests for arrays/tuples. Tests: `./wasm/test.sh test_conditional_infer_array_element_with_constraint`.
 - [x] Added non-distributive infer extraction test for array of T. Tests: `./wasm/test.sh test_conditional_infer_array_element_non_distributive`.
 - [x] Added distributive infer extraction test for object properties. Tests: `./wasm/test.sh test_conditional_infer_object_property_distributive`.
+- [x] Added constrained infer extraction test for object properties. Tests: `./wasm/test.sh test_conditional_infer_object_property_with_constraint`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
