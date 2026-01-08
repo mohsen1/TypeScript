@@ -2588,3 +2588,198 @@ class Validator {
         output
     );
 }
+
+#[test]
+fn test_class_es5_for_in_loop() {
+    // Test class method with for-in loop
+    let source = r#"
+class ObjectInspector {
+    getKeys(obj: object): string[] {
+        const keys: string[] = [];
+        for (const key in obj) {
+            if (obj.hasOwnProperty(key)) {
+                keys.push(key);
+            }
+        }
+        return keys;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function ObjectInspector"),
+        "Expected class to emit as function: {}",
+        output
+    );
+
+    // Should preserve for-in loop
+    assert!(
+        output.contains("for") && output.contains(" in "),
+        "Expected for-in loop in output: {}",
+        output
+    );
+
+    // Method should be on prototype
+    assert!(
+        output.contains(".prototype.getKeys"),
+        "Expected getKeys method on prototype: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_typeof_instanceof() {
+    // Test class method with typeof and instanceof operators
+    let source = r#"
+class TypeChecker {
+    isString(value: unknown): boolean {
+        return typeof value === "string";
+    }
+
+    isArray(value: unknown): boolean {
+        return value instanceof Array;
+    }
+
+    getType(value: unknown): string {
+        return typeof value;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function TypeChecker"),
+        "Expected class to emit as function: {}",
+        output
+    );
+
+    // Should preserve typeof operator
+    assert!(
+        output.contains("typeof"),
+        "Expected typeof operator in output: {}",
+        output
+    );
+
+    // Should preserve instanceof operator
+    assert!(
+        output.contains("instanceof"),
+        "Expected instanceof operator in output: {}",
+        output
+    );
+
+    // Methods should be on prototype
+    assert!(
+        output.contains(".prototype.isString"),
+        "Expected isString method on prototype: {}",
+        output
+    );
+    assert!(
+        output.contains(".prototype.isArray"),
+        "Expected isArray method on prototype: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_logical_operators() {
+    // Test class method with logical operators (&&, ||, !)
+    let source = r#"
+class LogicalOps {
+    checkBoth(a: boolean, b: boolean): boolean {
+        return a && b;
+    }
+
+    checkEither(a: boolean, b: boolean): boolean {
+        return a || b;
+    }
+
+    negate(value: boolean): boolean {
+        return !value;
+    }
+
+    complex(a: boolean, b: boolean, c: boolean): boolean {
+        return (a && b) || (!c && a);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function LogicalOps"),
+        "Expected class to emit as function: {}",
+        output
+    );
+
+    // Should preserve logical operators
+    assert!(
+        output.contains("&&"),
+        "Expected && operator in output: {}",
+        output
+    );
+    assert!(
+        output.contains("||"),
+        "Expected || operator in output: {}",
+        output
+    );
+
+    // Methods should be on prototype
+    assert!(
+        output.contains(".prototype.checkBoth"),
+        "Expected checkBoth method on prototype: {}",
+        output
+    );
+    assert!(
+        output.contains(".prototype.complex"),
+        "Expected complex method on prototype: {}",
+        output
+    );
+}
