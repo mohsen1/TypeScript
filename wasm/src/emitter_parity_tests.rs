@@ -3220,3 +3220,187 @@ fn test_parity_es5_array_spread_mixed() {
         output
     );
 }
+
+/// Parity test for ES5 array destructuring assignment downlevel.
+/// Array destructuring should be converted to indexed access.
+#[test]
+fn test_parity_es5_array_destructuring_assignment() {
+    let source = "const [first, second, third] = items;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify variables are defined
+    assert!(
+        output.contains("first") && output.contains("second") && output.contains("third"),
+        "ES5 output should define destructured variables: {}",
+        output
+    );
+    // Array destructuring syntax should not appear in ES5 output
+    assert!(
+        !output.contains("[first, second, third]"),
+        "ES5 output should not contain array destructuring syntax: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 object destructuring assignment downlevel.
+/// Object destructuring should be converted to property access.
+#[test]
+fn test_parity_es5_object_destructuring_assignment() {
+    let source = "const { name, age, city } = person;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify variables are defined
+    assert!(
+        output.contains("name") && output.contains("age") && output.contains("city"),
+        "ES5 output should define destructured variables: {}",
+        output
+    );
+    // Object destructuring syntax should not appear in ES5 output
+    assert!(
+        !output.contains("{ name, age, city }"),
+        "ES5 output should not contain object destructuring syntax: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 nested destructuring downlevel.
+/// Nested destructuring should be fully expanded.
+#[test]
+fn test_parity_es5_nested_destructuring() {
+    let source = "const { user: { name, address: { city } } } = data;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify extracted variables exist
+    assert!(
+        output.contains("name") && output.contains("city"),
+        "ES5 output should define nested destructured variables: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 destructuring with default values downlevel.
+/// Default values in destructuring should be preserved.
+#[test]
+fn test_parity_es5_destructuring_defaults() {
+    let source = "const { name = 'Anonymous', age = 0 } = config;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify variables are defined
+    assert!(
+        output.contains("name") && output.contains("age"),
+        "ES5 output should define destructured variables: {}",
+        output
+    );
+    // Default values should be preserved
+    assert!(
+        output.contains("Anonymous") || output.contains("0"),
+        "ES5 output should preserve default values: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 destructuring with rest element downlevel.
+/// Rest element in destructuring should be handled.
+#[test]
+fn test_parity_es5_destructuring_rest() {
+    let source = "const [first, ...remaining] = items;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify variables are defined
+    assert!(
+        output.contains("first") && output.contains("remaining"),
+        "ES5 output should define destructured variables: {}",
+        output
+    );
+    // Rest syntax should not appear in ES5 destructuring
+    assert!(
+        !output.contains("...remaining"),
+        "ES5 output should not contain rest element in destructuring: {}",
+        output
+    );
+}
