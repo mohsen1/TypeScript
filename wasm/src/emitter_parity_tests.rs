@@ -4236,3 +4236,1231 @@ fn test_parity_es5_logical_assignment_property() {
         output
     );
 }
+
+/// Parity test for ES5 exponentiation operator with type erasure.
+/// Verifies type annotations are erased alongside exponentiation usage.
+#[test]
+fn test_parity_es5_exponentiation_type_erasure() {
+    let source = "function power(base: number, exp: number): number { return base ** exp; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify function is preserved
+    assert!(
+        output.contains("function power"),
+        "ES5 output should contain function power: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+    // Parameters should be preserved
+    assert!(
+        output.contains("base") && output.contains("exp"),
+        "ES5 output should preserve parameter names: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 exponentiation with const to var.
+/// const with exponentiation should convert to var in ES5.
+#[test]
+fn test_parity_es5_exponentiation_const_to_var() {
+    let source = "const squared = 5 ** 2;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify const is converted to var
+    assert!(
+        output.contains("var squared"),
+        "ES5 output should convert const to var: {}",
+        output
+    );
+    // No const keyword in ES5
+    assert!(
+        !output.contains("const "),
+        "ES5 output should not contain const keyword: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 exponentiation with let to var.
+/// let with exponentiation should convert to var in ES5.
+#[test]
+fn test_parity_es5_exponentiation_let_to_var() {
+    let source = "let result = 2 ** 10; result = result ** 2;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify let is converted to var
+    assert!(
+        output.contains("var result"),
+        "ES5 output should convert let to var: {}",
+        output
+    );
+    // No let keyword in ES5
+    assert!(
+        !output.contains("let "),
+        "ES5 output should not contain let keyword: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 exponentiation in arrow function.
+/// Arrow function with exponentiation should downlevel correctly.
+#[test]
+fn test_parity_es5_exponentiation_arrow() {
+    let source = "const cube = (n: number) => n ** 3;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify const is converted to var
+    assert!(
+        output.contains("var cube"),
+        "ES5 output should convert const to var: {}",
+        output
+    );
+    // Type annotation should be erased
+    assert!(
+        !output.contains(": number"),
+        "ES5 output should erase type annotation: {}",
+        output
+    );
+    // Arrow function should be converted to regular function
+    assert!(
+        output.contains("function"),
+        "ES5 output should convert arrow to function: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 arrow function with typed expression body.
+/// () => expr should convert to function() { return expr; }.
+#[test]
+fn test_parity_es5_arrow_typed_expression() {
+    let source = "const double = (x: number) => x * 2;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify arrow is converted to function
+    assert!(
+        output.contains("function"),
+        "ES5 output should contain function keyword: {}",
+        output
+    );
+    // Expression body should have return added
+    assert!(
+        output.contains("return"),
+        "ES5 output should add return for expression body: {}",
+        output
+    );
+    // Type annotation should be erased
+    assert!(
+        !output.contains(": number"),
+        "ES5 output should erase type annotation: {}",
+        output
+    );
+    // No arrow syntax
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should not contain arrow syntax: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 arrow function with block body.
+/// () => { stmts } should convert to function() { stmts }.
+#[test]
+fn test_parity_es5_arrow_block_body() {
+    let source = "const greet = (name: string) => { console.log('Hello ' + name); };";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify arrow is converted to function
+    assert!(
+        output.contains("function"),
+        "ES5 output should contain function keyword: {}",
+        output
+    );
+    // Console.log should be preserved
+    assert!(
+        output.contains("console.log"),
+        "ES5 output should preserve console.log: {}",
+        output
+    );
+    // Type annotation should be erased
+    assert!(
+        !output.contains(": string"),
+        "ES5 output should erase type annotation: {}",
+        output
+    );
+    // No arrow syntax
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should not contain arrow syntax: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 arrow function with this capture.
+/// Arrow functions should capture outer this.
+#[test]
+fn test_parity_es5_arrow_this_capture() {
+    let source = r#"class Counter {
+    count = 0;
+    increment = () => { this.count++; };
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify class is converted to function
+    assert!(
+        output.contains("function Counter") || output.contains("var Counter"),
+        "ES5 output should convert class to function: {}",
+        output
+    );
+    // No arrow syntax
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should not contain arrow syntax: {}",
+        output
+    );
+    // Class declaration should be converted (class Counter {)
+    assert!(
+        !output.contains("class Counter {"),
+        "ES5 output should not contain class declaration: {}",
+        output
+    );
+    // Should capture this with _this
+    assert!(
+        output.contains("_this"),
+        "ES5 output should capture this with _this: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 arrow function with multiple parameters.
+/// (a, b, c) => expr should convert correctly.
+#[test]
+fn test_parity_es5_arrow_multi_params() {
+    let source = "const sum = (a: number, b: number, c: number) => a + b + c;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify arrow is converted to function
+    assert!(
+        output.contains("function"),
+        "ES5 output should contain function keyword: {}",
+        output
+    );
+    // Parameters should be preserved (without types)
+    assert!(
+        output.contains("a") && output.contains("b") && output.contains("c"),
+        "ES5 output should preserve parameters: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+    // No arrow syntax
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should not contain arrow syntax: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 getter-only accessor with return type.
+/// get prop(): Type should downlevel and erase type.
+#[test]
+fn test_parity_es5_getter_only_typed() {
+    let source = "class Config { get timeout(): number { return 5000; } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify Object.defineProperty is used
+    assert!(
+        output.contains("Object.defineProperty"),
+        "ES5 output should use Object.defineProperty: {}",
+        output
+    );
+    // Type annotation should be erased
+    assert!(
+        !output.contains(": number"),
+        "ES5 output should erase return type: {}",
+        output
+    );
+    // No ES6 getter syntax
+    assert!(
+        !output.contains("get timeout()"),
+        "ES5 output should not contain ES6 getter syntax: {}",
+        output
+    );
+    // Should return 5000
+    assert!(
+        output.contains("5000"),
+        "ES5 output should contain return value: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 setter-only accessor with param type.
+/// set prop(v: Type) should downlevel and erase type.
+#[test]
+fn test_parity_es5_setter_only_typed() {
+    let source = "class Counter { private _count = 0; set count(val: number) { this._count = val; } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify Object.defineProperty is used
+    assert!(
+        output.contains("Object.defineProperty"),
+        "ES5 output should use Object.defineProperty: {}",
+        output
+    );
+    // Type annotation should be erased
+    assert!(
+        !output.contains(": number"),
+        "ES5 output should erase param type: {}",
+        output
+    );
+    // No ES6 setter syntax
+    assert!(
+        !output.contains("set count("),
+        "ES5 output should not contain ES6 setter syntax: {}",
+        output
+    );
+    // Should reference _count
+    assert!(
+        output.contains("_count"),
+        "ES5 output should reference _count: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 getter/setter pair with types.
+/// Both getter return type and setter param type should be erased.
+#[test]
+fn test_parity_es5_accessor_pair_typed() {
+    let source = "class Box<T> { private _value: T; get value(): T { return this._value; } set value(v: T) { this._value = v; } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify Object.defineProperty is used
+    assert!(
+        output.contains("Object.defineProperty"),
+        "ES5 output should use Object.defineProperty: {}",
+        output
+    );
+    // Generic type param should be erased
+    assert!(
+        !output.contains("<T>"),
+        "ES5 output should erase generic type param: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": T"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+    // No ES6 getter/setter syntax
+    assert!(
+        !output.contains("get value()") && !output.contains("set value("),
+        "ES5 output should not contain ES6 accessor syntax: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 static setter.
+/// Static setters should be defined on constructor, not prototype.
+#[test]
+fn test_parity_es5_static_setter_typed() {
+    let source = "class Logger { private static _level: string = 'info'; static set level(val: string) { Logger._level = val; } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify Object.defineProperty is used
+    assert!(
+        output.contains("Object.defineProperty"),
+        "ES5 output should use Object.defineProperty: {}",
+        output
+    );
+    // Static accessors should be on constructor (Logger), not Logger.prototype
+    assert!(
+        output.contains("Object.defineProperty(Logger,") || output.contains("Object.defineProperty(Logger, "),
+        "ES5 output should define static accessor on Logger constructor: {}",
+        output
+    );
+    // Type annotation should be erased
+    assert!(
+        !output.contains(": string"),
+        "ES5 output should erase type annotation: {}",
+        output
+    );
+    // No ES6 setter syntax
+    assert!(
+        !output.contains("static set level("),
+        "ES5 output should not contain ES6 static setter syntax: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 static block with this reference.
+/// Static block using this should downlevel correctly.
+#[test]
+fn test_parity_es5_static_block_this_ref() {
+    let source = r#"class Registry {
+    static items: string[] = [];
+    static {
+        this.items.push("default");
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 class structure
+    assert!(
+        output.contains("var Registry") || output.contains("function Registry"),
+        "ES5 output should define Registry: {}",
+        output
+    );
+    // Static block syntax should not appear
+    assert!(
+        !output.contains("static {"),
+        "ES5 output should not contain static block syntax: {}",
+        output
+    );
+    // Type annotation should be erased
+    assert!(
+        !output.contains(": string[]"),
+        "ES5 output should erase type annotation: {}",
+        output
+    );
+    // Should have push call
+    assert!(
+        output.contains("push"),
+        "ES5 output should contain push call: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 multiple static blocks in same class.
+/// Multiple static blocks should all be downleveled.
+#[test]
+fn test_parity_es5_static_block_multiple() {
+    let source = r#"class App {
+    static name = "";
+    static {
+        App.name = "MyApp";
+    }
+    static version = "";
+    static {
+        App.version = "2.0";
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 class structure
+    assert!(
+        output.contains("var App") || output.contains("function App"),
+        "ES5 output should define App: {}",
+        output
+    );
+    // No static block syntax
+    assert!(
+        !output.contains("static {"),
+        "ES5 output should not contain static block syntax: {}",
+        output
+    );
+    // Both initializations should occur
+    assert!(
+        output.contains("MyApp") && output.contains("2.0"),
+        "ES5 output should contain both static initializations: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 static block with typed variable.
+/// Local typed variables in static block should have types erased.
+#[test]
+fn test_parity_es5_static_block_typed_var() {
+    let source = r#"class Calculator {
+    static result = 0;
+    static {
+        const multiplier: number = 10;
+        Calculator.result = 5 * multiplier;
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 class structure
+    assert!(
+        output.contains("var Calculator") || output.contains("function Calculator"),
+        "ES5 output should define Calculator: {}",
+        output
+    );
+    // No static block syntax
+    assert!(
+        !output.contains("static {"),
+        "ES5 output should not contain static block syntax: {}",
+        output
+    );
+    // Type annotation should be erased
+    assert!(
+        !output.contains(": number"),
+        "ES5 output should erase type annotation: {}",
+        output
+    );
+    // Const should be converted to var
+    assert!(
+        !output.contains("const multiplier"),
+        "ES5 output should convert const to var: {}",
+        output
+    );
+    // Value 10 should be preserved
+    assert!(
+        output.contains("10"),
+        "ES5 output should contain multiplier value: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 static block with function call.
+/// Function calls inside static block should be preserved.
+#[test]
+fn test_parity_es5_static_block_function_call() {
+    let source = r#"class Logger {
+    static initialized = false;
+    static {
+        console.log("Logger static init");
+        Logger.initialized = true;
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 class structure
+    assert!(
+        output.contains("var Logger") || output.contains("function Logger"),
+        "ES5 output should define Logger: {}",
+        output
+    );
+    // No static block syntax
+    assert!(
+        !output.contains("static {"),
+        "ES5 output should not contain static block syntax: {}",
+        output
+    );
+    // Console.log should be preserved
+    assert!(
+        output.contains("console.log"),
+        "ES5 output should contain console.log call: {}",
+        output
+    );
+    // String literal should be preserved
+    assert!(
+        output.contains("Logger static init"),
+        "ES5 output should contain log message: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 private method with multiple typed parameters.
+/// Private method with types should erase all type annotations.
+#[test]
+fn test_parity_es5_private_method_multi_params() {
+    let source = r#"class MathHelper {
+    #add(a: number, b: number, c: number): number {
+        return a + b + c;
+    }
+    sum(x: number, y: number, z: number) {
+        return this.#add(x, y, z);
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 class structure
+    assert!(
+        output.contains("var MathHelper") || output.contains("function MathHelper"),
+        "ES5 output should define MathHelper: {}",
+        output
+    );
+    // Private method syntax should not appear
+    assert!(
+        !output.contains("#add"),
+        "ES5 output should not contain #add: {}",
+        output
+    );
+    // All type annotations should be erased
+    assert!(
+        !output.contains(": number"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 private static method.
+/// Private static methods should be downleveled correctly.
+#[test]
+fn test_parity_es5_private_static_method() {
+    let source = r#"class IdGenerator {
+    static #nextId: number = 0;
+    static #generateId(): number {
+        return IdGenerator.#nextId++;
+    }
+    static create() {
+        return IdGenerator.#generateId();
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 class structure
+    assert!(
+        output.contains("var IdGenerator") || output.contains("function IdGenerator"),
+        "ES5 output should define IdGenerator: {}",
+        output
+    );
+    // Private static method declaration syntax should not appear in original form
+    assert!(
+        !output.contains("static #generateId():") && !output.contains("static #nextId:"),
+        "ES5 output should not contain private static declaration syntax: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 private async method.
+/// Private async methods should combine async and private downleveling.
+#[test]
+fn test_parity_es5_private_async_method() {
+    let source = r#"class DataFetcher {
+    async #fetchData(url: string): Promise<string> {
+        return url;
+    }
+    async load(endpoint: string) {
+        return this.#fetchData(endpoint);
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 class structure
+    assert!(
+        output.contains("var DataFetcher") || output.contains("function DataFetcher"),
+        "ES5 output should define DataFetcher: {}",
+        output
+    );
+    // Private method declaration syntax should not appear
+    assert!(
+        !output.contains("async #fetchData(") && !output.contains("#fetchData(url"),
+        "ES5 output should not contain private method declaration syntax: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": Promise"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 private method calling another private method.
+/// Chained private method calls should all be downleveled.
+#[test]
+fn test_parity_es5_private_method_chain() {
+    let source = r#"class Processor {
+    #step1(val: number): number {
+        return val + 1;
+    }
+    #step2(val: number): number {
+        return this.#step1(val) * 2;
+    }
+    process(input: number) {
+        return this.#step2(input);
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 class structure
+    assert!(
+        output.contains("var Processor") || output.contains("function Processor"),
+        "ES5 output should define Processor: {}",
+        output
+    );
+    // Private method syntax should not appear
+    assert!(
+        !output.contains("#step1") && !output.contains("#step2"),
+        "ES5 output should not contain private method syntax: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 multiple class decorators.
+/// Multiple decorators should all be applied.
+#[test]
+fn test_parity_es5_class_decorator_multiple() {
+    let source = r#"function sealed(ctor: Function) {}
+function logged(ctor: Function) {}
+function tracked(ctor: Function) {}
+
+@sealed
+@logged
+@tracked
+class Service {
+    name: string = "test";
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify class exists
+    assert!(
+        output.contains("Service"),
+        "Output should define Service class: {}",
+        output
+    );
+    // No decorator syntax in ES5
+    assert!(
+        !output.contains("@sealed") && !output.contains("@logged") && !output.contains("@tracked"),
+        "ES5 output should not contain decorator syntax: {}",
+        output
+    );
+    // Type annotation should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": Function"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 class decorator factory.
+/// Decorator factory with arguments should be downleveled.
+#[test]
+fn test_parity_es5_class_decorator_factory() {
+    let source = r#"function component(name: string) {
+    return function(ctor: Function) {};
+}
+
+@component("MyComponent")
+class Widget {
+    id: number = 1;
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify class exists
+    assert!(
+        output.contains("Widget"),
+        "Output should define Widget class: {}",
+        output
+    );
+    // No decorator syntax in ES5
+    assert!(
+        !output.contains("@component"),
+        "ES5 output should not contain @component decorator syntax: {}",
+        output
+    );
+    // The decorator name should still appear as a function reference
+    assert!(
+        output.contains("component"),
+        "Output should reference component function: {}",
+        output
+    );
+    // Type annotation should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": number") && !output.contains(": Function"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 class decorator with generic class.
+/// Decorator on generic class should erase type params.
+#[test]
+fn test_parity_es5_class_decorator_generic() {
+    let source = r#"function observable(ctor: Function) {}
+
+@observable
+class Store<T> {
+    data: T;
+    constructor(initial: T) {
+        this.data = initial;
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify class exists
+    assert!(
+        output.contains("Store"),
+        "Output should define Store class: {}",
+        output
+    );
+    // No decorator syntax in ES5
+    assert!(
+        !output.contains("@observable"),
+        "ES5 output should not contain @observable decorator syntax: {}",
+        output
+    );
+    // Generic type parameter should be erased
+    assert!(
+        !output.contains("<T>"),
+        "ES5 output should erase generic type parameter: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": T") && !output.contains(": Function"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 class decorator with extends.
+/// Decorator on derived class should work correctly.
+#[test]
+fn test_parity_es5_class_decorator_extends() {
+    let source = r#"function injectable(ctor: Function) {}
+
+class BaseService {
+    name: string = "base";
+}
+
+@injectable
+class DerivedService extends BaseService {
+    id: number = 1;
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify both classes exist
+    assert!(
+        output.contains("BaseService") && output.contains("DerivedService"),
+        "Output should define both classes: {}",
+        output
+    );
+    // No decorator syntax in ES5
+    assert!(
+        !output.contains("@injectable"),
+        "ES5 output should not contain @injectable decorator syntax: {}",
+        output
+    );
+    // ES5 inheritance should use __extends or prototype chain
+    assert!(
+        output.contains("__extends") || output.contains(".prototype"),
+        "ES5 output should have inheritance pattern: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": number") && !output.contains(": Function"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}

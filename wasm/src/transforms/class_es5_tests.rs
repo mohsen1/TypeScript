@@ -6160,3 +6160,2478 @@ class Container<T> {
         output
     );
 }
+
+#[test]
+fn test_class_es5_parameter_property_public() {
+    // Test public parameter property
+    let source = r#"
+class Person {
+    constructor(public name: string, public age: number) {}
+
+    greet(): string {
+        return "Hello, " + this.name;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should transform class to function
+    assert!(
+        output.contains("function Person") || output.contains("var Person"),
+        "Expected Person class transformation: {}",
+        output
+    );
+
+    // Parameter properties should be assigned to this
+    assert!(
+        output.contains("this.name") && output.contains("this.age"),
+        "Expected parameter property assignments: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("greet"),
+        "Expected greet method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_parameter_property_private() {
+    // Test private parameter property
+    let source = r#"
+class BankAccount {
+    constructor(private balance: number, private accountId: string) {}
+
+    getBalance(): number {
+        return this.balance;
+    }
+
+    deposit(amount: number): void {
+        this.balance += amount;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should transform class
+    assert!(
+        output.contains("function BankAccount") || output.contains("var BankAccount"),
+        "Expected BankAccount class transformation: {}",
+        output
+    );
+
+    // Private parameter properties should still be assigned
+    assert!(
+        output.contains("this.balance") || output.contains("balance"),
+        "Expected balance property: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("getBalance") && output.contains("deposit"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_parameter_property_protected() {
+    // Test protected parameter property with inheritance
+    let source = r#"
+class Vehicle {
+    constructor(protected speed: number, protected fuel: number) {}
+
+    accelerate(): void {
+        this.speed += 10;
+    }
+}
+
+class Car extends Vehicle {
+    constructor(speed: number, fuel: number, private brand: string) {
+        super(speed, fuel);
+    }
+
+    getInfo(): string {
+        return this.brand + " at " + this.speed + " mph";
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Both classes should be transformed
+    assert!(
+        output.contains("Vehicle") && output.contains("Car"),
+        "Expected both class transformations: {}",
+        output
+    );
+
+    // Inheritance should be present
+    assert!(
+        output.contains("__extends") || output.contains("prototype"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+
+    // Protected properties should be assigned
+    assert!(
+        output.contains("speed") && output.contains("fuel"),
+        "Expected protected properties: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_parameter_property_readonly() {
+    // Test readonly parameter property
+    let source = r#"
+class Config {
+    constructor(
+        readonly host: string,
+        readonly port: number,
+        readonly secure: boolean = false
+    ) {}
+
+    getUrl(): string {
+        const protocol = this.secure ? "https" : "http";
+        return protocol + "://" + this.host + ":" + this.port;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should transform class
+    assert!(
+        output.contains("function Config") || output.contains("var Config"),
+        "Expected Config class transformation: {}",
+        output
+    );
+
+    // Readonly properties should be assigned
+    assert!(
+        output.contains("this.host") || output.contains("host"),
+        "Expected host property: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("getUrl"),
+        "Expected getUrl method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_parameter_property_mixed() {
+    // Test mixed parameter properties and regular parameters
+    let source = r#"
+class User {
+    email: string;
+
+    constructor(
+        public id: number,
+        private password: string,
+        readonly createdAt: Date,
+        name: string
+    ) {
+        this.email = name + "@example.com";
+    }
+
+    validatePassword(input: string): boolean {
+        return this.password === input;
+    }
+
+    getId(): number {
+        return this.id;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should transform class
+    assert!(
+        output.contains("function User") || output.contains("var User"),
+        "Expected User class transformation: {}",
+        output
+    );
+
+    // Parameter properties should be assigned
+    assert!(
+        output.contains("id") && output.contains("password"),
+        "Expected parameter properties: {}",
+        output
+    );
+
+    // Regular property from constructor body should be present
+    assert!(
+        output.contains("email"),
+        "Expected email property: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("validatePassword") && output.contains("getId"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+// =============================================================================
+// Readonly Property Tests
+// =============================================================================
+
+#[test]
+fn test_class_es5_readonly_property_basic() {
+    // Test class with readonly property
+    let source = r#"
+class Config {
+    readonly version: string = "1.0.0";
+    readonly name: string;
+
+    constructor(name: string) {
+        this.name = name;
+    }
+
+    getVersion(): string {
+        return this.version;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function Config"),
+        "Expected Config to emit as function: {}",
+        output
+    );
+
+    // Properties should be assigned (readonly is erased)
+    assert!(
+        output.contains("this.version") || output.contains("version"),
+        "Expected version property: {}",
+        output
+    );
+    assert!(
+        output.contains("this.name") || output.contains("name"),
+        "Expected name property: {}",
+        output
+    );
+
+    // readonly keyword should NOT appear in output
+    assert!(
+        !output.contains("readonly"),
+        "readonly should be erased: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("getVersion"),
+        "Expected getVersion method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_readonly_parameter_property() {
+    // Test readonly parameter property in constructor
+    let source = r#"
+class Entity {
+    constructor(
+        readonly id: string,
+        readonly createdAt: Date = new Date()
+    ) {}
+
+    getId(): string {
+        return this.id;
+    }
+
+    getCreatedAt(): Date {
+        return this.createdAt;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function Entity"),
+        "Expected Entity to emit as function: {}",
+        output
+    );
+
+    // Parameter properties should be assigned
+    assert!(
+        output.contains("this.id") || output.contains("id"),
+        "Expected id property: {}",
+        output
+    );
+    assert!(
+        output.contains("this.createdAt") || output.contains("createdAt"),
+        "Expected createdAt property: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("getId"),
+        "Expected getId method: {}",
+        output
+    );
+    assert!(
+        output.contains("getCreatedAt"),
+        "Expected getCreatedAt method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_readonly_static_property() {
+    // Test readonly static property
+    let source = r#"
+class Constants {
+    static readonly PI: number = 3.14159;
+    static readonly E: number = 2.71828;
+    static readonly GOLDEN_RATIO: number = 1.61803;
+
+    static getPI(): number {
+        return Constants.PI;
+    }
+
+    static getE(): number {
+        return Constants.E;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function Constants"),
+        "Expected Constants to emit as function: {}",
+        output
+    );
+
+    // Static properties should be on constructor
+    assert!(
+        output.contains("Constants.PI") || output.contains("PI"),
+        "Expected PI static property: {}",
+        output
+    );
+    assert!(
+        output.contains("Constants.E") || output.contains("E"),
+        "Expected E static property: {}",
+        output
+    );
+    assert!(
+        output.contains("GOLDEN_RATIO"),
+        "Expected GOLDEN_RATIO static property: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("getPI"),
+        "Expected getPI static method: {}",
+        output
+    );
+    assert!(
+        output.contains("getE"),
+        "Expected getE static method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_readonly_with_inheritance() {
+    // Test readonly properties in inheritance
+    let source = r#"
+class Base {
+    readonly type: string = "base";
+}
+
+class Derived extends Base {
+    readonly subtype: string;
+
+    constructor(subtype: string) {
+        super();
+        this.subtype = subtype;
+    }
+
+    getFullType(): string {
+        return this.type + ":" + this.subtype;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    // Get Derived class (second statement)
+    let class_idx = *source_file.statements.nodes.get(1).expect("expected Derived class");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function Derived"),
+        "Expected Derived to emit as function: {}",
+        output
+    );
+
+    // Should have inheritance setup
+    assert!(
+        output.contains("_super") || output.contains("Base") || output.contains("__extends"),
+        "Expected inheritance handling: {}",
+        output
+    );
+
+    // subtype property should be assigned
+    assert!(
+        output.contains("this.subtype") || output.contains("subtype"),
+        "Expected subtype property: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("getFullType"),
+        "Expected getFullType method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_readonly_array_property() {
+    // Test readonly array property
+    let source = r#"
+class ImmutableList {
+    readonly items: readonly string[];
+    readonly length: number;
+
+    constructor(items: string[]) {
+        this.items = items;
+        this.length = items.length;
+    }
+
+    get(index: number): string | undefined {
+        return this.items[index];
+    }
+
+    contains(item: string): boolean {
+        return this.items.includes(item);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function ImmutableList"),
+        "Expected ImmutableList to emit as function: {}",
+        output
+    );
+
+    // Properties should be assigned
+    assert!(
+        output.contains("this.items") || output.contains("items"),
+        "Expected items property: {}",
+        output
+    );
+    assert!(
+        output.contains("this.length") || output.contains("length"),
+        "Expected length property: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("get"),
+        "Expected get method: {}",
+        output
+    );
+    assert!(
+        output.contains("contains"),
+        "Expected contains method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_readonly_mixed_properties() {
+    // Test class with mix of readonly and mutable properties
+    let source = r#"
+class User {
+    readonly id: string;
+    readonly createdAt: Date;
+    name: string;
+    email: string;
+    lastLogin: Date | null = null;
+
+    constructor(id: string, name: string, email: string) {
+        this.id = id;
+        this.createdAt = new Date();
+        this.name = name;
+        this.email = email;
+    }
+
+    updateName(name: string): void {
+        this.name = name;
+    }
+
+    updateEmail(email: string): void {
+        this.email = email;
+    }
+
+    recordLogin(): void {
+        this.lastLogin = new Date();
+    }
+
+    getId(): string {
+        return this.id;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function User"),
+        "Expected User to emit as function: {}",
+        output
+    );
+
+    // All properties should be assigned
+    assert!(
+        output.contains("this.id") || output.contains("id"),
+        "Expected id property: {}",
+        output
+    );
+    assert!(
+        output.contains("this.name") || output.contains("name"),
+        "Expected name property: {}",
+        output
+    );
+    assert!(
+        output.contains("this.email") || output.contains("email"),
+        "Expected email property: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("updateName"),
+        "Expected updateName method: {}",
+        output
+    );
+    assert!(
+        output.contains("updateEmail"),
+        "Expected updateEmail method: {}",
+        output
+    );
+    assert!(
+        output.contains("recordLogin"),
+        "Expected recordLogin method: {}",
+        output
+    );
+    assert!(
+        output.contains("getId"),
+        "Expected getId method: {}",
+        output
+    );
+}
+
+// =============================================================================
+// Ambient/Declare Class Tests
+// =============================================================================
+
+#[test]
+fn test_class_es5_declare_class_basic() {
+    // declare class should emit nothing - it's a type declaration only
+    let source = r#"
+declare class ExternalAPI {
+    version: string;
+    init(): void;
+    shutdown(): void;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Declare class should produce no output or empty output
+    let trimmed = output.trim();
+    assert!(
+        trimmed.is_empty() || !trimmed.contains("function ExternalAPI"),
+        "declare class should not emit a function constructor: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_declare_class_with_methods() {
+    // declare class with method signatures should emit nothing
+    let source = r#"
+declare class Database {
+    connect(url: string): Promise<void>;
+    query<T>(sql: string, params?: any[]): Promise<T[]>;
+    disconnect(): Promise<void>;
+    readonly isConnected: boolean;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Declare class with methods should produce no output
+    let trimmed = output.trim();
+    assert!(
+        trimmed.is_empty() || !trimmed.contains("function Database"),
+        "declare class should not emit a function constructor: {}",
+        output
+    );
+    assert!(
+        !trimmed.contains("prototype"),
+        "declare class should not emit prototype assignments: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_declare_class_with_static() {
+    // declare class with static members should emit nothing
+    let source = r#"
+declare class MathUtils {
+    static PI: number;
+    static E: number;
+    static sin(x: number): number;
+    static cos(x: number): number;
+    static random(): number;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Declare class with static members should produce no output
+    let trimmed = output.trim();
+    assert!(
+        trimmed.is_empty() || !trimmed.contains("function MathUtils"),
+        "declare class should not emit a function constructor: {}",
+        output
+    );
+    assert!(
+        !trimmed.contains("MathUtils.PI"),
+        "declare class should not emit static property assignments: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_declare_class_with_extends() {
+    // declare class with extends should emit nothing
+    let source = r#"
+declare class BaseEvent {
+    type: string;
+    timestamp: number;
+}
+
+declare class MouseEvent extends BaseEvent {
+    clientX: number;
+    clientY: number;
+    button: number;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Check second class (MouseEvent extends BaseEvent)
+    let class_idx = source_file.statements.nodes.get(1).expect("expected second class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Declare class with extends should produce no output
+    let trimmed = output.trim();
+    assert!(
+        trimmed.is_empty() || !trimmed.contains("function MouseEvent"),
+        "declare class should not emit a function constructor: {}",
+        output
+    );
+    assert!(
+        !trimmed.contains("__extends"),
+        "declare class should not emit __extends helper: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_declare_class_with_implements() {
+    // declare class with implements should emit nothing
+    let source = r#"
+interface Serializable {
+    serialize(): string;
+    deserialize(data: string): void;
+}
+
+declare class DataModel implements Serializable {
+    id: string;
+    serialize(): string;
+    deserialize(data: string): void;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Second statement is the declare class
+    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Declare class with implements should produce no output
+    let trimmed = output.trim();
+    assert!(
+        trimmed.is_empty() || !trimmed.contains("function DataModel"),
+        "declare class should not emit a function constructor: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_declare_class_with_constructor() {
+    // declare class with constructor signature should emit nothing
+    let source = r#"
+declare class Config {
+    readonly host: string;
+    readonly port: number;
+    readonly secure: boolean;
+
+    constructor(host: string, port: number, secure?: boolean);
+
+    getUrl(): string;
+    clone(): Config;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Declare class with constructor should produce no output
+    let trimmed = output.trim();
+    assert!(
+        trimmed.is_empty() || !trimmed.contains("function Config"),
+        "declare class should not emit a function constructor: {}",
+        output
+    );
+    assert!(
+        !trimmed.contains("this.host"),
+        "declare class should not emit property assignments: {}",
+        output
+    );
+}
+
+// =============================================================================
+// Class Field Decorator Tests
+// =============================================================================
+
+#[test]
+fn test_class_es5_field_decorator_basic() {
+    // Basic field decorator
+    let source = r#"
+function observable(target: any, key: string) {}
+
+class Model {
+    @observable
+    name: string = "";
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Second statement is the class
+    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function Model"),
+        "Expected Model class: {}",
+        output
+    );
+
+    // Field should be initialized in constructor
+    assert!(
+        output.contains("this.name") || output.contains("name"),
+        "Expected name field initialization: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_field_decorator_with_initializer() {
+    // Field decorator with initializer
+    let source = r#"
+function defaultValue(value: any) {
+    return function(target: any, key: string) {};
+}
+
+class Config {
+    @defaultValue(42)
+    count: number = 0;
+
+    @defaultValue("default")
+    label: string = "initial";
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Second statement is the class
+    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function Config") || output.contains("Config"),
+        "Expected Config class: {}",
+        output
+    );
+
+    // Field initializers should be present
+    assert!(
+        output.contains("count") && output.contains("label"),
+        "Expected field names: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_field_decorator_static() {
+    // Static field decorator
+    let source = r#"
+function logged(target: any, key: string) {}
+
+class Service {
+    @logged
+    static instance: Service | null = null;
+
+    @logged
+    static version: string = "1.0.0";
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Second statement is the class
+    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function Service") || output.contains("Service"),
+        "Expected Service class: {}",
+        output
+    );
+
+    // Static fields should be assigned on constructor
+    assert!(
+        output.contains("Service.instance") || output.contains("instance"),
+        "Expected static instance field: {}",
+        output
+    );
+    assert!(
+        output.contains("Service.version") || output.contains("version"),
+        "Expected static version field: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_field_decorator_multiple() {
+    // Multiple decorators on a single field
+    let source = r#"
+function required(target: any, key: string) {}
+function validate(target: any, key: string) {}
+function format(target: any, key: string) {}
+
+class Form {
+    @required
+    @validate
+    @format
+    email: string = "";
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Fourth statement is the class (after 3 function declarations)
+    let class_idx = source_file.statements.nodes.get(3).expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function Form") || output.contains("Form"),
+        "Expected Form class: {}",
+        output
+    );
+
+    // Email field should be present
+    assert!(
+        output.contains("email"),
+        "Expected email field: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_field_decorator_in_derived_class() {
+    // Field decorator in derived class
+    let source = r#"
+function tracked(target: any, key: string) {}
+
+class BaseEntity {
+    id: number = 0;
+}
+
+class User extends BaseEntity {
+    @tracked
+    name: string = "";
+
+    @tracked
+    lastLogin: Date | null = null;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Third statement is the User class
+    let class_idx = source_file.statements.nodes.get(2).expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Class should emit with extends
+    assert!(
+        output.contains("function User") || output.contains("User"),
+        "Expected User class: {}",
+        output
+    );
+
+    // Should have inheritance pattern
+    assert!(
+        output.contains("__extends") || output.contains("_super"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+
+    // Decorated fields should be present
+    assert!(
+        output.contains("name") && output.contains("lastLogin"),
+        "Expected decorated fields: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_field_decorator_with_accessor() {
+    // Field decorator combined with accessor decorator
+    let source = r#"
+function observable(target: any, key: string) {}
+function computed(target: any, key: string, descriptor: PropertyDescriptor) {}
+
+class ViewModel {
+    @observable
+    firstName: string = "";
+
+    @observable
+    lastName: string = "";
+
+    @computed
+    get fullName(): string {
+        return this.firstName + " " + this.lastName;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Third statement is the class
+    let class_idx = source_file.statements.nodes.get(2).expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function ViewModel") || output.contains("ViewModel"),
+        "Expected ViewModel class: {}",
+        output
+    );
+
+    // Fields should be present
+    assert!(
+        output.contains("firstName") && output.contains("lastName"),
+        "Expected name fields: {}",
+        output
+    );
+
+    // Getter should be present
+    assert!(
+        output.contains("fullName"),
+        "Expected fullName getter: {}",
+        output
+    );
+}
+
+// =============================================================================
+// Override Keyword Tests
+// =============================================================================
+
+#[test]
+fn test_class_es5_override_method_basic() {
+    // Basic override method - override keyword should be erased
+    let source = r#"
+class Animal {
+    speak(): string {
+        return "...";
+    }
+}
+
+class Dog extends Animal {
+    override speak(): string {
+        return "Woof!";
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Second statement is the Dog class
+    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Class should emit with extends
+    assert!(
+        output.contains("function Dog"),
+        "Expected Dog class: {}",
+        output
+    );
+
+    // Override keyword should be erased
+    assert!(
+        !output.contains("override"),
+        "override keyword should be erased: {}",
+        output
+    );
+
+    // Method should be on prototype
+    assert!(
+        output.contains("speak"),
+        "Expected speak method: {}",
+        output
+    );
+
+    // Should have inheritance pattern
+    assert!(
+        output.contains("__extends") || output.contains("_super"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_override_accessor() {
+    // Override getter/setter - override keyword should be erased
+    let source = r#"
+class Base {
+    protected _value: number = 0;
+
+    get value(): number {
+        return this._value;
+    }
+
+    set value(v: number) {
+        this._value = v;
+    }
+}
+
+class Derived extends Base {
+    override get value(): number {
+        return this._value * 2;
+    }
+
+    override set value(v: number) {
+        this._value = v / 2;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Second statement is the Derived class
+    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function Derived"),
+        "Expected Derived class: {}",
+        output
+    );
+
+    // Override keyword should be erased
+    assert!(
+        !output.contains("override"),
+        "override keyword should be erased: {}",
+        output
+    );
+
+    // Accessor should use Object.defineProperty
+    assert!(
+        output.contains("value") || output.contains("defineProperty"),
+        "Expected value accessor: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_override_multiple_methods() {
+    // Multiple override methods
+    let source = r#"
+class Shape {
+    getArea(): number { return 0; }
+    getPerimeter(): number { return 0; }
+    describe(): string { return "Shape"; }
+}
+
+class Rectangle extends Shape {
+    width: number;
+    height: number;
+
+    constructor(w: number, h: number) {
+        super();
+        this.width = w;
+        this.height = h;
+    }
+
+    override getArea(): number {
+        return this.width * this.height;
+    }
+
+    override getPerimeter(): number {
+        return 2 * (this.width + this.height);
+    }
+
+    override describe(): string {
+        return "Rectangle";
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Second statement is the Rectangle class
+    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function Rectangle"),
+        "Expected Rectangle class: {}",
+        output
+    );
+
+    // Override keyword should be erased
+    assert!(
+        !output.contains("override"),
+        "override keyword should be erased: {}",
+        output
+    );
+
+    // All methods should be present
+    assert!(
+        output.contains("getArea") && output.contains("getPerimeter") && output.contains("describe"),
+        "Expected all override methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_override_multilevel_inheritance() {
+    // Override in multi-level inheritance chain
+    let source = r#"
+class A {
+    foo(): string { return "A"; }
+}
+
+class B extends A {
+    override foo(): string { return "B"; }
+}
+
+class C extends B {
+    override foo(): string { return "C"; }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Third statement is class C
+    let class_idx = source_file.statements.nodes.get(2).expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function C"),
+        "Expected C class: {}",
+        output
+    );
+
+    // Override keyword should be erased
+    assert!(
+        !output.contains("override"),
+        "override keyword should be erased: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("foo"),
+        "Expected foo method: {}",
+        output
+    );
+
+    // Should have inheritance
+    assert!(
+        output.contains("__extends") || output.contains("_super"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_override_with_super_call() {
+    // Override method that calls super
+    let source = r#"
+class Logger {
+    log(message: string): void {
+        console.log(message);
+    }
+}
+
+class TimestampLogger extends Logger {
+    override log(message: string): void {
+        const timestamp = new Date().toISOString();
+        super.log("[" + timestamp + "] " + message);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Second statement is the TimestampLogger class
+    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function TimestampLogger"),
+        "Expected TimestampLogger class: {}",
+        output
+    );
+
+    // Override keyword should be erased
+    assert!(
+        !output.contains("override"),
+        "override keyword should be erased: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("log"),
+        "Expected log method: {}",
+        output
+    );
+
+    // Super call should be transformed
+    assert!(
+        output.contains("_super") || output.contains("prototype"),
+        "Expected super call pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_override_abstract_method() {
+    // Override abstract method
+    let source = r#"
+abstract class Component {
+    abstract render(): string;
+    abstract update(): void;
+}
+
+class Button extends Component {
+    override render(): string {
+        return "<button>Click me</button>";
+    }
+
+    override update(): void {
+        console.log("Button updated");
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Second statement is the Button class
+    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function Button"),
+        "Expected Button class: {}",
+        output
+    );
+
+    // Override keyword should be erased
+    assert!(
+        !output.contains("override"),
+        "override keyword should be erased: {}",
+        output
+    );
+
+    // Abstract keyword should be erased
+    assert!(
+        !output.contains("abstract"),
+        "abstract keyword should be erased: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("render") && output.contains("update"),
+        "Expected render and update methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_decorator_constructor_param_inject() {
+    // Test @Inject decorator on constructor parameter
+    let source = r#"
+function Inject(token: string) {
+    return function(target: any, propertyKey: string | undefined, parameterIndex: number) {
+        // Store injection metadata
+    };
+}
+
+class Logger {
+    log(msg: string): void {}
+}
+
+class UserService {
+    constructor(@Inject("Logger") private logger: Logger) {}
+
+    greet(name: string): void {
+        this.logger.log("Hello " + name);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be present
+    assert!(
+        output.contains("Logger") && output.contains("UserService"),
+        "Expected Logger and UserService classes: {}",
+        output
+    );
+
+    // Inject decorator function should be present
+    assert!(
+        output.contains("Inject"),
+        "Expected Inject decorator: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("greet"),
+        "Expected greet method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_decorator_constructor_param_multiple() {
+    // Test multiple decorators on constructor parameters
+    let source = r#"
+function Injectable() {
+    return function(target: any) {};
+}
+
+function Inject(token: string) {
+    return function(target: any, propertyKey: string | undefined, parameterIndex: number) {};
+}
+
+function Optional() {
+    return function(target: any, propertyKey: string | undefined, parameterIndex: number) {};
+}
+
+class Database {}
+class Cache {}
+class Logger {}
+
+@Injectable()
+class Repository {
+    constructor(
+        @Inject("Database") private db: Database,
+        @Inject("Cache") @Optional() private cache: Cache,
+        @Inject("Logger") private logger: Logger
+    ) {}
+
+    save(data: any): void {}
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // All classes should be present
+    assert!(
+        output.contains("Repository") && output.contains("Database"),
+        "Expected Repository and Database classes: {}",
+        output
+    );
+
+    // Decorator functions should be present
+    assert!(
+        output.contains("Inject") && output.contains("Optional"),
+        "Expected decorator functions: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("save"),
+        "Expected save method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_decorator_constructor_param_with_inheritance() {
+    // Test constructor param decorators with inheritance
+    let source = r#"
+function Inject(token: string) {
+    return function(target: any, propertyKey: string | undefined, parameterIndex: number) {};
+}
+
+class Config {}
+class Logger {}
+
+class BaseService {
+    constructor(@Inject("Config") protected config: Config) {}
+}
+
+class DerivedService extends BaseService {
+    constructor(
+        @Inject("Config") config: Config,
+        @Inject("Logger") private logger: Logger
+    ) {
+        super(config);
+    }
+
+    execute(): void {}
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Both service classes should be present
+    assert!(
+        output.contains("BaseService") && output.contains("DerivedService"),
+        "Expected BaseService and DerivedService classes: {}",
+        output
+    );
+
+    // Inheritance pattern should be present
+    assert!(
+        output.contains("__extends") || output.contains("prototype"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("execute"),
+        "Expected execute method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_decorator_constructor_param_metadata() {
+    // Test constructor param decorators with metadata emission
+    let source = r#"
+function Inject(token: string) {
+    return function(target: any, propertyKey: string | undefined, parameterIndex: number) {
+        const existingParams = Reflect.getMetadata("inject:params", target) || [];
+        existingParams[parameterIndex] = token;
+        Reflect.defineMetadata("inject:params", existingParams, target);
+    };
+}
+
+class HttpClient {}
+class AuthService {}
+
+class ApiClient {
+    constructor(
+        @Inject("HttpClient") private http: HttpClient,
+        @Inject("AuthService") private auth: AuthService
+    ) {}
+
+    request(url: string): Promise<any> {
+        return Promise.resolve({});
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be present
+    assert!(
+        output.contains("ApiClient") && output.contains("HttpClient"),
+        "Expected ApiClient and HttpClient classes: {}",
+        output
+    );
+
+    // Inject decorator should be present
+    assert!(
+        output.contains("Inject"),
+        "Expected Inject decorator: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("request"),
+        "Expected request method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_decorator_constructor_param_factory() {
+    // Test constructor param decorators with factory pattern
+    let source = r#"
+function InjectFactory<T>(factory: () => T) {
+    return function(target: any, propertyKey: string | undefined, parameterIndex: number) {};
+}
+
+function LazyInject(token: string) {
+    return function(target: any, propertyKey: string | undefined, parameterIndex: number) {};
+}
+
+class ExpensiveService {
+    constructor() {
+        // Heavy initialization
+    }
+}
+
+class Consumer {
+    constructor(
+        @InjectFactory(() => new ExpensiveService()) private service: ExpensiveService,
+        @LazyInject("Config") private config: any
+    ) {}
+
+    use(): void {
+        this.service.toString();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be present
+    assert!(
+        output.contains("ExpensiveService") && output.contains("Consumer"),
+        "Expected ExpensiveService and Consumer classes: {}",
+        output
+    );
+
+    // Decorator functions should be present
+    assert!(
+        output.contains("InjectFactory") || output.contains("LazyInject"),
+        "Expected decorator functions: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("use"),
+        "Expected use method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_using_declaration_basic() {
+    // Test basic using declaration with Disposable class
+    let source = r#"
+class Resource {
+    [Symbol.dispose](): void {
+        console.log("disposed");
+    }
+}
+
+function useResource() {
+    using resource = new Resource();
+    console.log("using resource");
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be present
+    assert!(
+        output.contains("Resource"),
+        "Expected Resource class: {}",
+        output
+    );
+
+    // Function should be present
+    assert!(
+        output.contains("useResource"),
+        "Expected useResource function: {}",
+        output
+    );
+
+    // Symbol.dispose should be in output
+    assert!(
+        output.contains("Symbol.dispose") || output.contains("dispose"),
+        "Expected dispose symbol or method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_using_declaration_async() {
+    // Test await using with AsyncDisposable
+    let source = r#"
+class AsyncResource {
+    async [Symbol.asyncDispose](): Promise<void> {
+        await Promise.resolve();
+        console.log("async disposed");
+    }
+}
+
+async function useAsyncResource() {
+    await using resource = new AsyncResource();
+    console.log("using async resource");
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be present
+    assert!(
+        output.contains("AsyncResource"),
+        "Expected AsyncResource class: {}",
+        output
+    );
+
+    // Function should be present
+    assert!(
+        output.contains("useAsyncResource"),
+        "Expected useAsyncResource function: {}",
+        output
+    );
+
+    // AsyncDispose should be in output
+    assert!(
+        output.contains("asyncDispose") || output.contains("Symbol.asyncDispose"),
+        "Expected asyncDispose symbol or method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_using_declaration_in_class_method() {
+    // Test using declaration inside class methods
+    let source = r#"
+class FileHandle {
+    [Symbol.dispose](): void {
+        console.log("file closed");
+    }
+}
+
+class FileProcessor {
+    process(): void {
+        using file = new FileHandle();
+        console.log("processing file");
+    }
+
+    async processAsync(): Promise<void> {
+        using file = new FileHandle();
+        await Promise.resolve();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be present
+    assert!(
+        output.contains("FileHandle") && output.contains("FileProcessor"),
+        "Expected FileHandle and FileProcessor classes: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("process") && output.contains("processAsync"),
+        "Expected process and processAsync methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_using_declaration_multiple() {
+    // Test multiple using declarations
+    let source = r#"
+class Connection {
+    [Symbol.dispose](): void {
+        console.log("connection closed");
+    }
+}
+
+class Transaction {
+    [Symbol.dispose](): void {
+        console.log("transaction completed");
+    }
+}
+
+function performTransaction() {
+    using conn = new Connection();
+    using tx = new Transaction();
+    console.log("performing transaction");
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be present
+    assert!(
+        output.contains("Connection") && output.contains("Transaction"),
+        "Expected Connection and Transaction classes: {}",
+        output
+    );
+
+    // Function should be present
+    assert!(
+        output.contains("performTransaction"),
+        "Expected performTransaction function: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_using_declaration_with_inheritance() {
+    // Test using with inherited Disposable
+    let source = r#"
+abstract class Disposable {
+    abstract [Symbol.dispose](): void;
+}
+
+class DatabaseConnection extends Disposable {
+    [Symbol.dispose](): void {
+        console.log("db connection closed");
+    }
+
+    query(sql: string): void {
+        console.log(sql);
+    }
+}
+
+function runQuery() {
+    using db = new DatabaseConnection();
+    db.query("SELECT * FROM users");
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be present
+    assert!(
+        output.contains("Disposable") && output.contains("DatabaseConnection"),
+        "Expected Disposable and DatabaseConnection classes: {}",
+        output
+    );
+
+    // Function should be present
+    assert!(
+        output.contains("runQuery"),
+        "Expected runQuery function: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("query"),
+        "Expected query method: {}",
+        output
+    );
+
+    // Should have extends helper or prototype chain
+    assert!(
+        output.contains("__extends") || output.contains("prototype"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_auto_accessor_basic() {
+    // Test basic auto-accessor (ES2022)
+    let source = r#"
+class Person {
+    accessor name: string = "default";
+    accessor age: number = 0;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be present
+    assert!(
+        output.contains("Person"),
+        "Expected Person class: {}",
+        output
+    );
+
+    // Properties should be accessible (via getter/setter or direct)
+    assert!(
+        output.contains("name") && output.contains("age"),
+        "Expected name and age properties: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_auto_accessor_static() {
+    // Test static auto-accessor
+    let source = r#"
+class Counter {
+    static accessor count: number = 0;
+    static accessor label: string = "Counter";
+
+    static increment(): void {
+        this.count++;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be present
+    assert!(
+        output.contains("Counter"),
+        "Expected Counter class: {}",
+        output
+    );
+
+    // Static method should be present
+    assert!(
+        output.contains("increment"),
+        "Expected increment method: {}",
+        output
+    );
+
+    // Static properties should be referenced
+    assert!(
+        output.contains("count") && output.contains("label"),
+        "Expected count and label properties: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_auto_accessor_with_inheritance() {
+    // Test auto-accessor in derived class
+    let source = r#"
+class Base {
+    accessor value: number = 10;
+}
+
+class Derived extends Base {
+    accessor multiplier: number = 2;
+
+    getResult(): number {
+        return this.value * this.multiplier;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be present
+    assert!(
+        output.contains("Base") && output.contains("Derived"),
+        "Expected Base and Derived classes: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("getResult"),
+        "Expected getResult method: {}",
+        output
+    );
+
+    // Should have extends helper or prototype chain
+    assert!(
+        output.contains("__extends") || output.contains("prototype"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_auto_accessor_with_decorator() {
+    // Test auto-accessor with decorator
+    let source = r#"
+function observable(target: any, context: any) {
+    return target;
+}
+
+class Store {
+    @observable
+    accessor items: string[] = [];
+
+    @observable
+    accessor count: number = 0;
+
+    addItem(item: string): void {
+        this.items.push(item);
+        this.count++;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be present
+    assert!(
+        output.contains("Store"),
+        "Expected Store class: {}",
+        output
+    );
+
+    // Decorator function should be present
+    assert!(
+        output.contains("observable"),
+        "Expected observable decorator: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("addItem"),
+        "Expected addItem method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_auto_accessor_private() {
+    // Test private auto-accessor
+    let source = r#"
+class BankAccount {
+    accessor #balance: number = 0;
+
+    deposit(amount: number): void {
+        this.#balance += amount;
+    }
+
+    withdraw(amount: number): boolean {
+        if (this.#balance >= amount) {
+            this.#balance -= amount;
+            return true;
+        }
+        return false;
+    }
+
+    getBalance(): number {
+        return this.#balance;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be present
+    assert!(
+        output.contains("BankAccount"),
+        "Expected BankAccount class: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("deposit") && output.contains("withdraw") && output.contains("getBalance"),
+        "Expected deposit, withdraw, and getBalance methods: {}",
+        output
+    );
+}
