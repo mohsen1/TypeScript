@@ -2783,3 +2783,252 @@ class LogicalOps {
         output
     );
 }
+
+#[test]
+fn test_class_es5_bitwise_operators() {
+    // Test class method with bitwise operators
+    let source = r#"
+class BitwiseOps {
+    and(a: number, b: number): number {
+        return a & b;
+    }
+
+    or(a: number, b: number): number {
+        return a | b;
+    }
+
+    xor(a: number, b: number): number {
+        return a ^ b;
+    }
+
+    not(a: number): number {
+        return ~a;
+    }
+
+    leftShift(a: number, b: number): number {
+        return a << b;
+    }
+
+    rightShift(a: number, b: number): number {
+        return a >> b;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function BitwiseOps"),
+        "Expected class to emit as function: {}",
+        output
+    );
+
+    // Should preserve bitwise operators
+    assert!(
+        output.contains("&") || output.contains("&amp;"),
+        "Expected & operator in output: {}",
+        output
+    );
+    assert!(
+        output.contains("|"),
+        "Expected | operator in output: {}",
+        output
+    );
+    assert!(
+        output.contains("^"),
+        "Expected ^ operator in output: {}",
+        output
+    );
+    assert!(
+        output.contains("<<"),
+        "Expected << operator in output: {}",
+        output
+    );
+    assert!(
+        output.contains(">>"),
+        "Expected >> operator in output: {}",
+        output
+    );
+
+    // Methods should be on prototype
+    assert!(
+        output.contains(".prototype.and"),
+        "Expected and method on prototype: {}",
+        output
+    );
+    assert!(
+        output.contains(".prototype.leftShift"),
+        "Expected leftShift method on prototype: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_assignment_operators() {
+    // Test class method with compound assignment operators
+    let source = r#"
+class Calculator {
+    accumulate(values: number[]): number {
+        let total = 0;
+        for (let i = 0; i < values.length; i++) {
+            total += values[i];
+        }
+        return total;
+    }
+
+    decrement(start: number, step: number): number {
+        let value = start;
+        value -= step;
+        return value;
+    }
+
+    multiply(base: number, factor: number): number {
+        let result = base;
+        result *= factor;
+        return result;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function Calculator"),
+        "Expected class to emit as function: {}",
+        output
+    );
+
+    // Should preserve compound assignment operators
+    assert!(
+        output.contains("+="),
+        "Expected += operator in output: {}",
+        output
+    );
+    assert!(
+        output.contains("-="),
+        "Expected -= operator in output: {}",
+        output
+    );
+    assert!(
+        output.contains("*="),
+        "Expected *= operator in output: {}",
+        output
+    );
+
+    // Methods should be on prototype
+    assert!(
+        output.contains(".prototype.accumulate"),
+        "Expected accumulate method on prototype: {}",
+        output
+    );
+    assert!(
+        output.contains(".prototype.multiply"),
+        "Expected multiply method on prototype: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_prefix_postfix_operators() {
+    // Test class method with prefix and postfix increment/decrement
+    let source = r#"
+class Counter {
+    incrementPost(value: number): number {
+        let x = value;
+        return x++;
+    }
+
+    incrementPre(value: number): number {
+        let x = value;
+        return ++x;
+    }
+
+    decrementPost(value: number): number {
+        let x = value;
+        return x--;
+    }
+
+    decrementPre(value: number): number {
+        let x = value;
+        return --x;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function Counter"),
+        "Expected class to emit as function: {}",
+        output
+    );
+
+    // Should preserve increment/decrement operators
+    assert!(
+        output.contains("++"),
+        "Expected ++ operator in output: {}",
+        output
+    );
+    assert!(
+        output.contains("--"),
+        "Expected -- operator in output: {}",
+        output
+    );
+
+    // Methods should be on prototype
+    assert!(
+        output.contains(".prototype.incrementPost"),
+        "Expected incrementPost method on prototype: {}",
+        output
+    );
+    assert!(
+        output.contains(".prototype.decrementPre"),
+        "Expected decrementPre method on prototype: {}",
+        output
+    );
+}
