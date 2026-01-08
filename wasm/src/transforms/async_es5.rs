@@ -297,6 +297,37 @@ impl<'a> AsyncES5Emitter<'a> {
             }
         }
 
+        // Check template expressions
+        if node.kind == syntax_kind_ext::TEMPLATE_EXPRESSION {
+            if let Some(template) = self.arena.get_template_expr(node) {
+                for &span_idx in &template.template_spans.nodes {
+                    if span_idx.is_none() {
+                        continue;
+                    }
+                    let Some(span_node) = self.arena.get(span_idx) else {
+                        continue;
+                    };
+                    if let Some(span) = self.arena.get_template_span(span_node) {
+                        if self.contains_await_recursive(span.expression) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Check tagged template expressions
+        if node.kind == syntax_kind_ext::TAGGED_TEMPLATE_EXPRESSION {
+            if let Some(tagged) = self.arena.get_tagged_template(node) {
+                if self.contains_await_recursive(tagged.tag) {
+                    return true;
+                }
+                if self.contains_await_recursive(tagged.template) {
+                    return true;
+                }
+            }
+        }
+
         // Check object/array literal expressions
         if node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION
             || node.kind == syntax_kind_ext::ARRAY_LITERAL_EXPRESSION
