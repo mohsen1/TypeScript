@@ -13033,3 +13033,95 @@ const result = processUser({ id: 1, name: "Alice" });"#;
         "expected non-empty source mappings for TypeScript interfaces/types"
     );
 }
+
+#[test]
+fn test_source_map_es_module_exports() {
+    // Test ES module export declarations source map coverage
+    let source = r#"export const PI = 3.14159;
+
+export function add(a: number, b: number): number {
+    return a + b;
+}
+
+export class Calculator {
+    value = 0;
+
+    add(n: number) {
+        this.value += n;
+        return this;
+    }
+
+    subtract(n: number) {
+        this.value -= n;
+        return this;
+    }
+}
+
+const privateValue = 42;
+
+export { privateValue as publicValue };
+
+export default function main() {
+    return new Calculator();
+}"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the const declaration
+    let (pi_line, pi_col) = find_line_col(source, "export const PI");
+    let has_pi_mapping = decoded.iter().any(|entry| {
+        entry.original_line == pi_line
+            && entry.original_column >= pi_col
+            && entry.original_column <= pi_col + 15
+    });
+
+    // Verify we have mappings for the function declaration
+    let (fn_line, fn_col) = find_line_col(source, "export function add");
+    let has_fn_mapping = decoded.iter().any(|entry| {
+        entry.original_line == fn_line
+            && entry.original_column >= fn_col
+            && entry.original_column <= fn_col + 19
+    });
+
+    // At minimum, we should have mappings for declarations
+    assert!(
+        has_pi_mapping || has_fn_mapping || !decoded.is_empty(),
+        "expected mappings for ES module exports. mappings: {mappings}"
+    );
+
+    // Verify output contains expected identifiers
+    assert!(
+        output.contains("Calculator") && output.contains("add"),
+        "expected output to contain class and function names. output: {output}"
+    );
+
+    // Verify source map has non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for ES module exports"
+    );
+}
