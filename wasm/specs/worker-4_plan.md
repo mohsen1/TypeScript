@@ -13,6 +13,7 @@ Priority: 4
 - [ ] Stand by for next emitter fidelity task.
 
 ## Completed
+- [x] ES5 async derived method super call + arrow this capture; test `./wasm/test.sh async_super_this_capture`.
 - [x] ES5 class derived ctor nested arrow this capture after super; test `./wasm/test.sh super_nested_arrow_this_capture`.
 - [x] ES5 class derived ctor arrow this capture after super; test `./wasm/test.sh super_arrow_this_capture`.
 - [x] ES5 class super method regression with arguments; test `./wasm/test.sh super_method_arguments`.
