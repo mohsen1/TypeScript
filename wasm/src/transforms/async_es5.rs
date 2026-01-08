@@ -101,6 +101,7 @@ pub struct AsyncES5Emitter<'a> {
     output: String,
     indent_level: u32,
     state: AsyncTransformState,
+    this_capture_depth: u32,
 }
 
 impl<'a> AsyncES5Emitter<'a> {
@@ -110,6 +111,7 @@ impl<'a> AsyncES5Emitter<'a> {
             output: String::with_capacity(1024),
             indent_level: 0,
             state: AsyncTransformState::new(),
+            this_capture_depth: 0,
         }
     }
 
@@ -651,7 +653,11 @@ impl<'a> AsyncES5Emitter<'a> {
                 self.write("undefined");
             }
             k if k == SyntaxKind::ThisKeyword as u16 => {
-                self.write("this");
+                if self.this_capture_depth > 0 {
+                    self.write("_this");
+                } else {
+                    self.write("this");
+                }
             }
             k if k == syntax_kind_ext::CALL_EXPRESSION => {
                 if let Some(call) = self.arena.get_call_expr(node) {
@@ -724,19 +730,23 @@ impl<'a> AsyncES5Emitter<'a> {
                 }
             }
             k if k == syntax_kind_ext::ARROW_FUNCTION => {
-                let captures_this = contains_this_reference(self.arena, idx);
-                let mut transforms = TransformContext::new();
-                transforms.insert(
-                    idx,
-                    TransformDirective::ES5ArrowFunction {
-                        arrow_node: idx,
-                        captures_this,
-                    },
-                );
-                let mut printer = ThinPrinter::with_transforms(self.arena, transforms);
-                printer.set_target_es5(true);
-                printer.emit(idx);
-                self.write(printer.get_output());
+                if self.contains_super_reference(idx) {
+                    self.emit_arrow_function_with_super(idx);
+                } else {
+                    let captures_this = contains_this_reference(self.arena, idx);
+                    let mut transforms = TransformContext::new();
+                    transforms.insert(
+                        idx,
+                        TransformDirective::ES5ArrowFunction {
+                            arrow_node: idx,
+                            captures_this,
+                        },
+                    );
+                    let mut printer = ThinPrinter::with_transforms(self.arena, transforms);
+                    printer.set_target_es5(true);
+                    printer.emit(idx);
+                    self.write(printer.get_output());
+                }
             }
             _ => {
                 // Fallback for unhandled expressions
@@ -782,6 +792,122 @@ impl<'a> AsyncES5Emitter<'a> {
         base_node.kind == SyntaxKind::SuperKeyword as u16
     }
 
+    fn contains_super_reference(&self, idx: NodeIndex) -> bool {
+        let Some(node) = self.arena.get(idx) else {
+            return false;
+        };
+
+        if node.kind == SyntaxKind::SuperKeyword as u16 {
+            return true;
+        }
+
+        match node.kind {
+            k if k == syntax_kind_ext::BLOCK => {
+                if let Some(block) = self.arena.get_block(node) {
+                    for &stmt_idx in &block.statements.nodes {
+                        if self.contains_super_reference(stmt_idx) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::EXPRESSION_STATEMENT => {
+                if let Some(expr_stmt) = self.arena.get_expression_statement(node) {
+                    return self.contains_super_reference(expr_stmt.expression);
+                }
+            }
+            k if k == syntax_kind_ext::RETURN_STATEMENT => {
+                if let Some(ret) = self.arena.get_return_statement(node) {
+                    if !ret.expression.is_none() {
+                        return self.contains_super_reference(ret.expression);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::VARIABLE_STATEMENT => {
+                if let Some(var_data) = self.arena.get_variable(node) {
+                    for &decl_idx in &var_data.declarations.nodes {
+                        if let Some(decl_node) = self.arena.get(decl_idx) {
+                            if let Some(decl) = self.arena.get_variable_declaration(decl_node) {
+                                if !decl.initializer.is_none()
+                                    && self.contains_super_reference(decl.initializer)
+                                {
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::CALL_EXPRESSION => {
+                if let Some(call) = self.arena.get_call_expr(node) {
+                    if self.contains_super_reference(call.expression) {
+                        return true;
+                    }
+                    if let Some(args) = &call.arguments {
+                        for &arg_idx in &args.nodes {
+                            if self.contains_super_reference(arg_idx) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION
+                || k == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION =>
+            {
+                if let Some(access) = self.arena.get_access_expr(node) {
+                    if self.contains_super_reference(access.expression) {
+                        return true;
+                    }
+                    if self.contains_super_reference(access.name_or_argument) {
+                        return true;
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::CONDITIONAL_EXPRESSION => {
+                if let Some(cond) = self.arena.get_conditional_expr(node) {
+                    if self.contains_super_reference(cond.condition)
+                        || self.contains_super_reference(cond.when_true)
+                        || self.contains_super_reference(cond.when_false)
+                    {
+                        return true;
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::BINARY_EXPRESSION => {
+                if let Some(bin) = self.arena.get_binary_expr(node) {
+                    if self.contains_super_reference(bin.left)
+                        || self.contains_super_reference(bin.right)
+                    {
+                        return true;
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::PREFIX_UNARY_EXPRESSION
+                || k == syntax_kind_ext::POSTFIX_UNARY_EXPRESSION =>
+            {
+                if let Some(unary) = self.arena.get_unary_expr(node) {
+                    return self.contains_super_reference(unary.operand);
+                }
+            }
+            k if k == syntax_kind_ext::PARENTHESIZED_EXPRESSION => {
+                if let Some(paren) = self.arena.get_parenthesized(node) {
+                    return self.contains_super_reference(paren.expression);
+                }
+            }
+            k if k == syntax_kind_ext::ARROW_FUNCTION => {
+                if let Some(func) = self.arena.get_function(node) {
+                    if !func.body.is_none() && self.contains_super_reference(func.body) {
+                        return true;
+                    }
+                }
+            }
+            _ => {}
+        }
+
+        false
+    }
+
     fn emit_super_method_call(&mut self, callee_idx: NodeIndex, args: &Option<NodeList>) {
         let Some(callee_node) = self.arena.get(callee_idx) else {
             return;
@@ -792,7 +918,12 @@ impl<'a> AsyncES5Emitter<'a> {
 
         self.write("_super.prototype.");
         self.emit_expression(access.name_or_argument);
-        self.write(".call(this");
+        self.write(".call(");
+        if self.this_capture_depth > 0 {
+            self.write("_this");
+        } else {
+            self.write("this");
+        }
 
         if let Some(arg_list) = args {
             for &arg_idx in &arg_list.nodes {
@@ -813,7 +944,12 @@ impl<'a> AsyncES5Emitter<'a> {
 
         self.write("_super.prototype[");
         self.emit_expression(access.name_or_argument);
-        self.write("].call(this");
+        self.write("].call(");
+        if self.this_capture_depth > 0 {
+            self.write("_this");
+        } else {
+            self.write("this");
+        }
 
         if let Some(arg_list) = args {
             for &arg_idx in &arg_list.nodes {
@@ -823,6 +959,128 @@ impl<'a> AsyncES5Emitter<'a> {
         }
 
         self.write(")");
+    }
+
+    fn emit_arrow_function_with_super(&mut self, arrow_idx: NodeIndex) {
+        let Some(arrow_node) = self.arena.get(arrow_idx) else {
+            return;
+        };
+        let Some(func) = self.arena.get_function(arrow_node) else {
+            return;
+        };
+
+        let captures_this = contains_this_reference(self.arena, arrow_idx);
+        let parent_this_expr = if self.this_capture_depth > 0 {
+            "_this"
+        } else {
+            "this"
+        };
+
+        if captures_this {
+            self.write("(function (_this) { return ");
+            self.this_capture_depth += 1;
+        }
+
+        self.write("function (");
+        self.emit_arrow_parameters_simple(&func.parameters);
+        self.write(") ");
+
+        let body_node = self.arena.get(func.body);
+        let is_block = body_node
+            .map(|node| node.kind == syntax_kind_ext::BLOCK)
+            .unwrap_or(false);
+
+        if is_block {
+            self.emit_arrow_block(func.body);
+        } else {
+            self.write("{ return ");
+            self.emit_expression(func.body);
+            self.write("; }");
+        }
+
+        if captures_this {
+            self.this_capture_depth -= 1;
+            self.write("; })(");
+            self.write(parent_this_expr);
+            self.write(")");
+        }
+    }
+
+    fn emit_arrow_parameters_simple(&mut self, params: &NodeList) {
+        let mut first = true;
+        for &param_idx in &params.nodes {
+            let Some(param_node) = self.arena.get(param_idx) else {
+                continue;
+            };
+            let Some(param) = self.arena.get_parameter(param_node) else {
+                continue;
+            };
+            if !first {
+                self.write(", ");
+            }
+            first = false;
+            if param.dot_dot_dot_token {
+                self.write("...");
+            }
+            if !param.name.is_none() {
+                self.emit_expression(param.name);
+            }
+        }
+    }
+
+    fn emit_arrow_block(&mut self, block_idx: NodeIndex) {
+        let Some(block_node) = self.arena.get(block_idx) else {
+            self.write("{ }");
+            return;
+        };
+        let Some(block) = self.arena.get_block(block_node) else {
+            self.write("{ }");
+            return;
+        };
+
+        self.write("{");
+        self.write_line();
+        self.increase_indent();
+        for &stmt_idx in &block.statements.nodes {
+            self.emit_arrow_statement(stmt_idx);
+        }
+        self.decrease_indent();
+        self.write_indent();
+        self.write("}");
+    }
+
+    fn emit_arrow_statement(&mut self, stmt_idx: NodeIndex) {
+        let Some(stmt_node) = self.arena.get(stmt_idx) else {
+            return;
+        };
+
+        match stmt_node.kind {
+            k if k == syntax_kind_ext::EXPRESSION_STATEMENT => {
+                if let Some(expr_stmt) = self.arena.get_expression_statement(stmt_node) {
+                    self.write_indent();
+                    self.emit_expression(expr_stmt.expression);
+                    self.write(";");
+                    self.write_line();
+                }
+            }
+            k if k == syntax_kind_ext::RETURN_STATEMENT => {
+                if let Some(ret) = self.arena.get_return_statement(stmt_node) {
+                    self.write_indent();
+                    self.write("return");
+                    if !ret.expression.is_none() {
+                        self.write(" ");
+                        self.emit_expression(ret.expression);
+                    }
+                    self.write(";");
+                    self.write_line();
+                }
+            }
+            _ => {
+                self.write_indent();
+                self.write("/* statement */;");
+                self.write_line();
+            }
+        }
     }
 
     fn emit_operator(&mut self, op: u16) {

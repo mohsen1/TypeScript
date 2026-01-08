@@ -854,6 +854,11 @@ class Derived extends Base {
         output
     );
     assert!(
+        !output.contains("super[\"m\"]"),
+        "ES5 output should not contain super element access: {}",
+        output
+    );
+    assert!(
         output.contains("arguments[0]"),
         "ES5 output should preserve arguments usage in returned arrow: {}",
         output
@@ -909,6 +914,11 @@ class Derived extends Base {
         output
     );
     assert!(
+        !output.contains("super[\"m\"]"),
+        "ES5 output should not contain super element access: {}",
+        output
+    );
+    assert!(
         !output.contains("=>"),
         "ES5 output should downlevel returned arrow: {}",
         output
@@ -961,7 +971,7 @@ class Derived extends Base {
     );
     assert!(
         !output.contains("super[key]"),
-        "ES5 output should not contain computed super element access: {}",
+        "ES5 output should not contain super element access: {}",
         output
     );
     assert!(
@@ -1012,7 +1022,7 @@ class Derived extends Base {
     );
     assert!(
         !output.contains("super[key]"),
-        "ES5 output should not contain computed super element access: {}",
+        "ES5 output should not contain super element access: {}",
         output
     );
     assert!(
@@ -1113,7 +1123,7 @@ class Derived extends Base {
     );
     assert!(
         !output.contains("super[key]"),
-        "ES5 output should not contain computed super element access: {}",
+        "ES5 output should not contain super element access: {}",
         output
     );
     assert!(
@@ -1248,13 +1258,13 @@ class Derived extends Base {
         output
     );
     assert!(
-        output.contains("_super.prototype[key].call(_this"),
+        output.contains("_super.prototype[key].call(_this)"),
         "ES5 output should lower computed super element access in returned arrow: {}",
         output
     );
     assert!(
         !output.contains("super[key]"),
-        "ES5 output should not contain computed super element access: {}",
+        "ES5 output should not contain super element access: {}",
         output
     );
     assert!(
@@ -1437,8 +1447,13 @@ class Derived extends Base {
         output
     );
     assert!(
-        output.contains("_super.prototype[\"m\"].call(_this"),
+        output.contains("_super.prototype[\"m\"].call(_this)"),
         "ES5 output should lower computed super element access in arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("super[\"m\"]"),
+        "ES5 output should not contain super element access: {}",
         output
     );
     assert!(
@@ -1489,6 +1504,11 @@ class Derived extends Base {
         output
     );
     assert!(
+        !output.contains("super[key]"),
+        "ES5 output should not contain super element access: {}",
+        output
+    );
+    assert!(
         !output.contains("=>"),
         "ES5 output should downlevel arrow: {}",
         output
@@ -1533,6 +1553,11 @@ class Derived extends Base {
     assert!(
         output.contains("_super.prototype[key].call(_this"),
         "ES5 output should lower computed super element access in arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("super[key]"),
+        "ES5 output should not contain super element access: {}",
         output
     );
     assert!(
@@ -1878,6 +1903,11 @@ class Derived extends Base {
         output
     );
     assert!(
+        !output.contains("super[\"m\"]"),
+        "ES5 output should not contain super element access: {}",
+        output
+    );
+    assert!(
         !output.contains("=>"),
         "ES5 output should downlevel nested arrow: {}",
         output
@@ -1921,6 +1951,11 @@ class Derived extends Base {
     assert!(
         output.contains("_super.prototype[\"m\"].call(_this"),
         "ES5 output should lower computed super element access in nested arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("super[\"m\"]"),
+        "ES5 output should not contain super element access: {}",
         output
     );
     assert!(
@@ -1972,6 +2007,11 @@ class Derived extends Base {
     assert!(
         output.contains("_super.prototype[\"m\"].call(_this"),
         "ES5 output should lower computed super element access in nested arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("super[\"m\"]"),
+        "ES5 output should not contain super element access: {}",
         output
     );
     assert!(
@@ -2027,6 +2067,11 @@ class Derived extends Base {
         output
     );
     assert!(
+        !output.contains("super[key]"),
+        "ES5 output should not contain super element access: {}",
+        output
+    );
+    assert!(
         !output.contains("=>"),
         "ES5 output should downlevel nested arrow: {}",
         output
@@ -2069,8 +2114,13 @@ class Derived extends Base {
         output
     );
     assert!(
-        output.contains("_super.prototype[key].call(_this"),
+        output.contains("_super.prototype[key].call(_this, arguments[0])"),
         "ES5 output should lower computed super element access in nested arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("super[key]"),
+        "ES5 output should not contain super element access: {}",
         output
     );
     assert!(
@@ -2110,8 +2160,13 @@ class Derived extends Base {
         output
     );
     assert!(
-        output.contains("_super.prototype[\"m\"].call(_this"),
+        output.contains("_super.prototype[\"m\"].call(_this, arguments[0])"),
         "ES5 output should lower computed super element access in nested arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("super[\"m\"]"),
+        "ES5 output should not contain super element access: {}",
         output
     );
     assert!(
