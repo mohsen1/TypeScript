@@ -8,6 +8,7 @@ Priority: 4
 
 ## Current Assignment
 - [x] Investigate `DeepPartial<T>` and `PickValue<T, V>` mapped type patterns from `test_check_redux_lodash_style_generics`. Test these patterns in isolation in `wasm/src/solver/evaluate_tests.rs` to identify if they contribute to the 6 diagnostics. **Result:** The 6 diagnostics issue is now fixed (test passes with 0 diagnostics). Added solver tests for both patterns.
+- [x] Add solver tests for Exclude, Extract, NonNullable, and ReturnType utility types. **Done:** Added 6 new tests covering these patterns.
 
 ## Task Queue
 - [x] Add additional end-to-end tests for other lodash-style utility types (Omit, Pick, Required, Readonly). **Done:** Added Required and Pick pattern tests. Omit covered by existing `test_mapped_type_key_remap_filters_keys`. Readonly covered by existing `test_mapped_type_with_readonly_modifier`.
@@ -52,6 +53,10 @@ Priority: 4
 - [x] Added solver coverage for Required utility type pattern (removes optional modifier). Tests: `./wasm/test.sh`.
 - [x] Added solver coverage for Pick utility type pattern (subset key iteration). Tests: `./wasm/test.sh`.
 - [x] Added solver coverage for mapped type with nested conditionals. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for Exclude utility type pattern. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for Extract utility type pattern. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for NonNullable utility type pattern. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for ReturnType utility type pattern. Tests: `./wasm/test.sh`.
 
 ## Ready for Merge
 Yes
