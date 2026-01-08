@@ -410,6 +410,72 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             }
         }
 
+        if let Some(extends_shape_id) = match self.interner.lookup(extends_unwrapped) {
+            Some(TypeKey::Object(shape_id) | TypeKey::ObjectWithIndex(shape_id)) => Some(shape_id),
+            _ => None,
+        } {
+            let extends_shape = self.interner.object_shape(extends_shape_id);
+            let mut infer_prop = None;
+
+            for prop in extends_shape.properties.iter() {
+                if let Some(TypeKey::Infer(info)) = self.interner.lookup(prop.type_id) {
+                    if infer_prop.is_some() {
+                        infer_prop = None;
+                        break;
+                    }
+                    infer_prop = Some((prop.name, info));
+                }
+            }
+
+            if let Some((prop_name, info)) = infer_prop {
+                if matches!(
+                    self.interner.lookup(check_unwrapped),
+                    Some(TypeKey::TypeParameter(_)) | Some(TypeKey::Infer(_))
+                ) {
+                    return self.interner.conditional(cond.clone());
+                }
+
+                let inferred = match self.interner.lookup(check_unwrapped) {
+                    Some(TypeKey::Object(shape_id) | TypeKey::ObjectWithIndex(shape_id)) => {
+                        let shape = self.interner.object_shape(shape_id);
+                        shape
+                            .properties
+                            .iter()
+                            .find(|prop| prop.name == prop_name)
+                            .map(|prop| prop.type_id)
+                    }
+                    _ => None,
+                };
+
+                let Some(inferred) = inferred else {
+                    return self.evaluate(cond.false_type);
+                };
+
+                let mut subst = TypeSubstitution::new();
+                subst.insert(info.name, inferred);
+
+                if let Some(constraint) = info.constraint {
+                    let mut checker =
+                        SubtypeChecker::with_resolver(self.interner, self.resolver);
+                    if !checker.is_subtype_of(inferred, constraint) {
+                        let false_inst = instantiate_type_with_infer(
+                            self.interner,
+                            cond.false_type,
+                            &subst,
+                        );
+                        return self.evaluate(false_inst);
+                    }
+                }
+
+                let true_inst = instantiate_type_with_infer(
+                    self.interner,
+                    cond.true_type,
+                    &subst,
+                );
+                return self.evaluate(true_inst);
+            }
+        }
+
         // Step 2: Check for naked type parameter (defer)
         if let Some(TypeKey::TypeParameter(_)) = self.interner.lookup(check_type) {
             // Type parameter hasn't been substituted - defer evaluation
