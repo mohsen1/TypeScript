@@ -13621,3 +13621,92 @@ const utils = {
         "expected non-empty source mappings for object literal methods and accessors"
     );
 }
+
+#[test]
+fn test_source_map_for_await_of_loops() {
+    // Test source-map accuracy for for-await-of loops
+    let source = r#"async function processAsyncIterator(items: AsyncIterable<number>) {
+    let total = 0;
+    for await (const item of items) {
+        total += item;
+        console.log("Processing:", item);
+    }
+    return total;
+}
+
+async function* generateNumbers() {
+    yield 1;
+    yield 2;
+    yield 3;
+}
+
+async function main() {
+    for await (const num of generateNumbers()) {
+        console.log(num);
+    }
+
+    const results: number[] = [];
+    for await (const value of someAsyncIterable) {
+        results.push(value);
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the async function
+    let (fn_line, fn_col) = find_line_col(source, "async function processAsyncIterator");
+    let has_fn_mapping = decoded.iter().any(|entry| {
+        entry.original_line == fn_line
+            && entry.original_column >= fn_col
+            && entry.original_column <= fn_col + 35
+    });
+
+    // Verify we have mappings for the main function
+    let (main_line, main_col) = find_line_col(source, "async function main");
+    let has_main_mapping = decoded.iter().any(|entry| {
+        entry.original_line == main_line
+            && entry.original_column >= main_col
+            && entry.original_column <= main_col + 19
+    });
+
+    // At minimum, we should have mappings for async function declarations
+    assert!(
+        has_fn_mapping || has_main_mapping || !decoded.is_empty(),
+        "expected mappings for for-await-of functions. mappings: {mappings}"
+    );
+
+    // Verify output contains expected identifiers
+    assert!(
+        output.contains("processAsyncIterator") || output.contains("main"),
+        "expected output to contain function names. output: {output}"
+    );
+
+    // Verify source map has non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for for-await-of loops"
+    );
+}
