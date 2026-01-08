@@ -14,6 +14,24 @@ Priority: 5
 - [ ] Add coverage for `ActionFromReducers<R>` that uses indexed access `[keyof R]` on a mapped type.
 
 ## Completed
+- [x] Added non-distributive template literal union-branch tests (middle/suffix/prefix); ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
+- [x] Added non-distributive template literal two-infer union-branch tests; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
+- [x] Added non-distributive template literal constrained union-branch tests (middle/suffix/prefix); ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
+- [x] Added non-distributive template literal union-branch tests (basic + constrained); ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
+- [x] Added non-distributive optional-property union-branch inference test; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
+- [x] Added non-distributive readonly wrapper object-property inference tests; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
+- [x] Added non-distributive readonly object-property inference tests (union input/branch); ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
+- [x] Added non-distributive readonly nested union-branch inference test; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
+- [x] Added non-distributive readonly nested object inference test; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
+- [x] Added union handling for non-distributive object/nested-object infer in conditional evaluation; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
+- [x] Added non-distributive union-branch regression for nested object infer; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
+- [x] Added non-distributive union-branch regressions for string/number index signature infer; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
+- [x] Added non-distributive union-branch regressions for readonly array/tuple infer; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
+- [x] Added non-distributive union-branch regressions for function parameter, rest parameter, and this-parameter infer; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
+- [x] Added non-distributive tuple union-branch regressions for tuple element/optional tuple inference; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
+- [x] Implemented tuple-rest conditional infer binding and updated variadic tuple tests; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
+- [x] Added non-distributive union branch regression for conditional object call signatures; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
+- [x] Added non-distributive union branch regression for function return conditional inference; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
 - [x] Added non-distributive union branch regression test for array-element conditional inference; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Updated conditional infer array element tests to expect `string` for non-array union branches; ran `./wasm/test.sh test_conditional_infer_array_element_non_array_union_branch` and `./wasm/test.sh test_conditional_instantiated_param_distributes_branch_substitution`.
 - [x] Implemented function/callable parameter inference for conditional `infer` patterns (including optional/rest params); updated expectations; `./wasm/test.sh` failed: `emitter_edge_case_tests::test_parse_error_tolerance`.
