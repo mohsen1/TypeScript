@@ -5685,3 +5685,399 @@ abstract class Entity {
         output
     );
 }
+
+// =============================================================================
+// Mixin Pattern Tests
+// =============================================================================
+
+#[test]
+fn test_class_es5_mixin_base_class() {
+    // Test base class used in mixin patterns
+    let source = r#"
+class Disposable {
+    isDisposed: boolean = false;
+
+    dispose(): void {
+        this.isDisposed = true;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function Disposable"),
+        "Expected Disposable to emit as function: {}",
+        output
+    );
+
+    // Instance field should be initialized
+    assert!(
+        output.contains("this.isDisposed = false") || output.contains("this.isDisposed"),
+        "Expected isDisposed field: {}",
+        output
+    );
+
+    // Method should be on prototype
+    assert!(
+        output.contains(".prototype.dispose") || output.contains("dispose"),
+        "Expected dispose method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_mixin_with_extends() {
+    // Test class extending another class (common in mixin results)
+    let source = r#"
+class Base {
+    name: string = "base";
+}
+
+class Extended extends Base {
+    value: number = 42;
+
+    getValue(): number {
+        return this.value;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    // Get Extended class (second statement)
+    let class_idx = *source_file.statements.nodes.get(1).expect("expected Extended class");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function Extended"),
+        "Expected Extended to emit as function: {}",
+        output
+    );
+
+    // Should have inheritance setup
+    assert!(
+        output.contains("_super") || output.contains("Base") || output.contains("__extends"),
+        "Expected inheritance handling: {}",
+        output
+    );
+
+    // Instance field should be initialized
+    assert!(
+        output.contains("this.value") || output.contains("value"),
+        "Expected value field: {}",
+        output
+    );
+
+    // Method should be on prototype
+    assert!(
+        output.contains(".prototype.getValue") || output.contains("getValue"),
+        "Expected getValue method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_mixin_multiple_methods() {
+    // Test class with multiple methods (like a mixin would provide)
+    let source = r#"
+class Activatable {
+    isActive: boolean = false;
+
+    activate(): void {
+        this.isActive = true;
+    }
+
+    deactivate(): void {
+        this.isActive = false;
+    }
+
+    toggle(): void {
+        this.isActive = !this.isActive;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function Activatable"),
+        "Expected Activatable to emit as function: {}",
+        output
+    );
+
+    // All methods should be on prototype
+    assert!(
+        output.contains("activate"),
+        "Expected activate method: {}",
+        output
+    );
+    assert!(
+        output.contains("deactivate"),
+        "Expected deactivate method: {}",
+        output
+    );
+    assert!(
+        output.contains("toggle"),
+        "Expected toggle method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_mixin_with_static_members() {
+    // Test mixin-like class with static members
+    let source = r#"
+class Tagged {
+    static tagCounter: number = 0;
+    tag: string;
+
+    constructor() {
+        this.tag = "tag-" + Tagged.tagCounter++;
+    }
+
+    static resetCounter(): void {
+        Tagged.tagCounter = 0;
+    }
+
+    getTag(): string {
+        return this.tag;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function Tagged"),
+        "Expected Tagged to emit as function: {}",
+        output
+    );
+
+    // Static field should be on constructor
+    assert!(
+        output.contains("Tagged.tagCounter") || output.contains("tagCounter"),
+        "Expected tagCounter static field: {}",
+        output
+    );
+
+    // Static method should be on constructor
+    assert!(
+        output.contains("Tagged.resetCounter") || output.contains("resetCounter"),
+        "Expected resetCounter static method: {}",
+        output
+    );
+
+    // Instance method should be on prototype
+    assert!(
+        output.contains(".prototype.getTag") || output.contains("getTag"),
+        "Expected getTag method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_mixin_with_generic_constraint() {
+    // Test class that could be used with generic mixin pattern
+    let source = r#"
+class Timestamped {
+    createdAt: Date;
+    updatedAt: Date;
+
+    constructor() {
+        this.createdAt = new Date();
+        this.updatedAt = new Date();
+    }
+
+    touch(): void {
+        this.updatedAt = new Date();
+    }
+
+    getAge(): number {
+        return Date.now() - this.createdAt.getTime();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function Timestamped"),
+        "Expected Timestamped to emit as function: {}",
+        output
+    );
+
+    // Constructor should initialize dates
+    assert!(
+        output.contains("this.createdAt") || output.contains("new Date"),
+        "Expected createdAt initialization: {}",
+        output
+    );
+    assert!(
+        output.contains("this.updatedAt"),
+        "Expected updatedAt initialization: {}",
+        output
+    );
+
+    // Methods should be on prototype
+    assert!(
+        output.contains("touch"),
+        "Expected touch method: {}",
+        output
+    );
+    assert!(
+        output.contains("getAge"),
+        "Expected getAge method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_mixin_composed_class() {
+    // Test a class that looks like it's composed from mixins
+    let source = r#"
+class ComposedEntity {
+    id: string;
+    isDisposed: boolean = false;
+    isActive: boolean = false;
+    createdAt: Date;
+
+    constructor(id: string) {
+        this.id = id;
+        this.createdAt = new Date();
+    }
+
+    dispose(): void {
+        this.isDisposed = true;
+        this.isActive = false;
+    }
+
+    activate(): void {
+        if (!this.isDisposed) {
+            this.isActive = true;
+        }
+    }
+
+    deactivate(): void {
+        this.isActive = false;
+    }
+
+    getId(): string {
+        return this.id;
+    }
+
+    getStatus(): string {
+        if (this.isDisposed) return "disposed";
+        if (this.isActive) return "active";
+        return "inactive";
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function ComposedEntity"),
+        "Expected ComposedEntity to emit as function: {}",
+        output
+    );
+
+    // Constructor should take id parameter
+    assert!(
+        output.contains("this.id = id") || output.contains("this.id"),
+        "Expected id assignment: {}",
+        output
+    );
+
+    // Instance fields should be initialized
+    assert!(
+        output.contains("this.isDisposed") || output.contains("isDisposed"),
+        "Expected isDisposed field: {}",
+        output
+    );
+    assert!(
+        output.contains("this.isActive") || output.contains("isActive"),
+        "Expected isActive field: {}",
+        output
+    );
+
+    // All methods should be present
+    assert!(
+        output.contains("dispose"),
+        "Expected dispose method: {}",
+        output
+    );
+    assert!(
+        output.contains("activate"),
+        "Expected activate method: {}",
+        output
+    );
+    assert!(
+        output.contains("getStatus"),
+        "Expected getStatus method: {}",
+        output
+    );
+}
