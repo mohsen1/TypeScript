@@ -7,12 +7,13 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] Add BigInt literal source map tests in `wasm/src/source_map_tests.rs`. Run `./wasm/test.sh source_map`.
+- [ ] (awaiting assignment)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added BigInt literal source map tests (basic, with variables, arithmetic, comparison, constructor, in function, large numbers, negative, in array/object, combined); `./wasm/test.sh source_map` passes.
 - [x] Added ES5 exponentiation operator source map tests (basic, with variables, assignment, chained, negative exponent, in expression, precedence, in function, with method call, combined); `./wasm/test.sh source_map` passes.
 - [x] Added logical assignment transform source map tests (&&= basic, ||= basic, &&=/||= object property, &&=/||= element access, chained, in function, with method call, combined); `./wasm/test.sh source_map` passes.
 - [x] Added nullish coalescing transform source map tests (basic, with null, with undefined, chained, with function call, assignment, in conditional, with objects, in function, combined); `./wasm/test.sh source_map` passes.
