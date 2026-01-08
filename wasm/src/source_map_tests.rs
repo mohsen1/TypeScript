@@ -11608,12 +11608,14 @@ c ??= "fallback";"#;
 }
 
 #[test]
-fn test_source_map_es5_transform_numeric_separators_mapping() {
-    // Test source maps with numeric separators in the source code
-    // Numeric separators are a lexer feature - the value 1_000_000 equals 1000000
-    let source = r#"const million = 1_000_000;
-const binary = 0b1010_0101;
-const hex = 0xFF_FF_FF;"#;
+fn test_source_map_bigint_literals() {
+    // Test BigInt literals with n suffix
+    let source = r#"const small = 123n;
+const large = 9007199254740991n;
+const hex = 0xFFFFFFFFFFFFFFFFn;
+const binary = 0b1010n;
+const sum = small + large;"#;
+
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -11630,56 +11632,46 @@ const hex = 0xFF_FF_FF;"#;
     printer.emit(root);
 
     let output = printer.get_output().to_string();
-
-    // Verify the variable declarations are in the output
-    assert!(
-        output.contains("million") && output.contains("binary") && output.contains("hex"),
-        "expected variable names in output: {output}"
-    );
-
     let map_json = printer.generate_source_map_json().expect("source map");
     let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
     let mappings = map_value
         .get("mappings")
-        .and_then(|value| value.as_str())
+        .and_then(|v| v.as_str())
         .unwrap_or("");
 
     let decoded = decode_mappings(mappings);
 
     // Verify we have mappings for the variable declarations
-    let (million_line, million_col) = find_line_col(source, "million");
-    let has_million_mapping = decoded.iter().any(|m| {
-        m.source_index == 0
-            && m.original_line == million_line
-            && m.original_column >= million_col
-            && m.original_column <= million_col + 10
+    let (small_line, small_col) = find_line_col(source, "const small");
+    let has_small_mapping = decoded.iter().any(|entry| {
+        entry.original_line == small_line
+            && entry.original_column >= small_col
+            && entry.original_column <= small_col + 11
     });
 
-    let (binary_line, binary_col) = find_line_col(source, "binary");
-    let has_binary_mapping = decoded.iter().any(|m| {
-        m.source_index == 0
-            && m.original_line == binary_line
-            && m.original_column >= binary_col
-            && m.original_column <= binary_col + 10
+    let (large_line, large_col) = find_line_col(source, "const large");
+    let has_large_mapping = decoded.iter().any(|entry| {
+        entry.original_line == large_line
+            && entry.original_column >= large_col
+            && entry.original_column <= large_col + 11
     });
 
-    let (hex_line, hex_col) = find_line_col(source, "hex");
-    let has_hex_mapping = decoded.iter().any(|m| {
-        m.source_index == 0
-            && m.original_line == hex_line
-            && m.original_column >= hex_col
-            && m.original_column <= hex_col + 10
-    });
-
-    // We should have mappings for the numeric literal declarations
+    // At minimum, we should have mappings for one of the declarations
     assert!(
-        has_million_mapping || has_binary_mapping || has_hex_mapping,
-        "expected mappings for numeric separator declarations. mappings: {mappings}"
+        has_small_mapping || has_large_mapping,
+        "expected mappings for BigInt declarations. mappings: {mappings}"
     );
 
-    // Verify non-empty mappings
+    // Verify output contains the variable names
+    assert!(
+        output.contains("small") && output.contains("large"),
+        "expected output to contain variable names. output: {output}"
+    );
+
+    // Verify source map has non-empty mappings
     assert!(
         !decoded.is_empty(),
-        "expected non-empty source mappings for numeric separators code"
+        "expected non-empty source mappings for BigInt code"
     );
 }
