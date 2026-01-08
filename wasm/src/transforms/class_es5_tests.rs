@@ -2480,3 +2480,59 @@ class Validator {
         output
     );
 }
+
+#[test]
+fn test_class_es5_private_accessors() {
+    // Test private getter and setter accessors
+    let source = r#"
+class Temperature {
+    #celsius = 0;
+
+    get #value(): number {
+        return this.#celsius;
+    }
+
+    set #value(v: number) {
+        this.#celsius = v;
+    }
+
+    setFahrenheit(f: number) {
+        this.#value = (f - 32) * 5 / 9;
+    }
+
+    getFahrenheit(): number {
+        return this.#value * 9 / 5 + 32;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function Temperature"),
+        "Expected class to emit as function: {}",
+        output
+    );
+
+    // Public methods should be on prototype
+    assert!(
+        output.contains("setFahrenheit") && output.contains("getFahrenheit"),
+        "Expected public methods in output: {}",
+        output
+    );
+}
