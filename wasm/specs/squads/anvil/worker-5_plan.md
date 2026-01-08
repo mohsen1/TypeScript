@@ -7,13 +7,14 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- Complete: Adjusted async ES5 source-map coverage for loop/try constructs in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
+- Complete: Added a decode-mappings round-trip test in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
 - [x] Added async loop/try source-map tests and loosened mapping assertions to fall back to function-level mappings when transforms omit statements; ran `./wasm/test.sh source_map` (PASS).
+- [x] Added decode-mappings round-trip test in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 
 ## Ready for Merge
 Yes
