@@ -4738,7 +4738,6 @@ fn test_conditional_infer_object_property_non_distributive_union_all_match() {
     }));
 
     // [T] extends [{ a: infer R }] ? R : never, with T = { a: string } | { a: number }.
-    // TODO: Non-distributive inference over union inputs is not implemented; current behavior yields never.
     let extends_obj = interner.object(vec![PropertyInfo {
         name: interner.intern_string("a"),
         type_id: infer_r,
@@ -4787,8 +4786,9 @@ fn test_conditional_infer_object_property_non_distributive_union_all_match() {
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
 
-    assert_eq!(result, TypeId::NEVER);
+    assert_eq!(result, expected);
 }
 
 #[test]
