@@ -10,7 +10,10 @@ Priority: 5
 - Await next manager assignment.
 
 ## Task Queue
-- [ ] (empty)
+- [ ] Reapply stash `wip async ternary` and land consequent-await ternary mapping once test.sh is fixed.
+- [ ] Add async unary plus await mapping regression.
+- [ ] Add async sequence expression mapping with mixed await/non-await (e.g., `foo(), await bar()`).
+- [ ] Add async compound assignment mapping with a different operator (e.g., `*=`).
 
 ## Completed
 - [x] Added ES5 for-of source map mapping test in `wasm/src/source_map_tests.rs`; no fixes needed in source map writer/generator.
@@ -212,3 +215,4 @@ Priority: 5
 - Re-ran `./wasm/test.sh test_source_map_es5_transform_async_await_conditional_mapping`.
 - Re-ran `./wasm/test.sh test_source_map_es5_transform_async_arrow_captures_this_mapping`.
 - Re-ran `./wasm/test.sh test_source_map_es5_transform_async_binary_modulo_mapping`.
+- Docker builds currently blocked by cli/driver.rs E0515 after test.sh fix; awaiting resolution before resuming tests.
