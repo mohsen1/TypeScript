@@ -597,9 +597,12 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
             // Target is Application, source is structural - try to expand and compare
             (_, TypeKey::Application(_)) => {
+                eprintln!("[DEBUG] check_subtype: target is Application {:?}", target);
                 if let Some(expanded) = self.try_expand_application(target) {
+                    eprintln!("[DEBUG] check_subtype: expanded target to {:?}", expanded);
                     self.check_subtype(source, expanded)
                 } else {
+                    eprintln!("[DEBUG] check_subtype: failed to expand target Application");
                     // Can't expand - assume not a subtype
                     SubtypeResult::False
                 }
@@ -870,20 +873,27 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         // Check if base is a Ref
         let base_key = self.interner.lookup(app.base)?;
         let TypeKey::Ref(sym_ref) = base_key else {
+            eprintln!("[DEBUG] try_expand_application: base is not Ref, it's {:?}", base_key);
             // Base is not a Ref, can't expand
             return None;
         };
 
+        eprintln!("[DEBUG] try_expand_application: base is Ref({}) with {} args", sym_ref.0, app.args.len());
+
         // Resolve the Ref to get the underlying type
-        let resolved = self.resolver.resolve_ref(sym_ref, self.interner)?;
+        let resolved = self.resolver.resolve_ref(sym_ref, self.interner);
+        eprintln!("[DEBUG] try_expand_application: resolve_ref returned {:?}", resolved);
+        let resolved = resolved?;
 
         // First, try to get type parameters from the resolver (if implemented)
         if let Some(type_params) = self.resolver.get_type_params(sym_ref) {
             if !type_params.is_empty() && type_params.len() == app.args.len() {
                 // Build substitution: map type param names to type arguments
+                // Pre-expand args that are TypeQuery or Application types
                 let mut substitution = TypeSubstitution::new();
                 for (param, &arg) in type_params.iter().zip(app.args.iter()) {
-                    substitution.insert(param.name, arg);
+                    let expanded_arg = self.try_expand_type_arg(arg).unwrap_or(arg);
+                    substitution.insert(param.name, expanded_arg);
                 }
                 return Some(instantiate_type(self.interner, resolved, &substitution));
             }
@@ -898,13 +908,32 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         }
 
         // Build substitution: map type param names to type arguments
+        // Pre-expand args that are TypeQuery or Application types
         let mut substitution = TypeSubstitution::new();
         for (param_name, &arg) in type_params.iter().zip(app.args.iter()) {
-            substitution.insert(*param_name, arg);
+            let expanded_arg = self.try_expand_type_arg(arg).unwrap_or(arg);
+            substitution.insert(*param_name, expanded_arg);
         }
 
         // Instantiate the resolved type with the substitution
         Some(instantiate_type(self.interner, resolved, &substitution))
+    }
+
+    /// Try to expand a type argument that is a TypeQuery or Application.
+    /// Returns the expanded type or None if no expansion needed/possible.
+    fn try_expand_type_arg(&mut self, arg: TypeId) -> Option<TypeId> {
+        let key = self.interner.lookup(arg)?;
+        match key {
+            TypeKey::TypeQuery(sym_ref) => {
+                // Resolve typeof expression to its actual type
+                self.resolver.resolve_ref(sym_ref, self.interner)
+            }
+            TypeKey::Application(_) => {
+                // Recursively expand nested Application
+                self.try_expand_application(arg)
+            }
+            _ => None,
+        }
     }
 
     /// Extract type parameter names from a type in first-occurrence order.
