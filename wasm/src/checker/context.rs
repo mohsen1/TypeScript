@@ -11,7 +11,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use crate::parser::NodeIndex;
 use crate::parser::thin_node::ThinNodeArena;
 use crate::thin_binder::ThinBinderState;
-use crate::solver::{TypeId, TypeInterner};
+use crate::solver::{TypeId, TypeInterner, TypeEnvironment};
 use crate::checker::types::diagnostics::Diagnostic;
 use crate::binder::SymbolId;
 
@@ -161,6 +161,10 @@ pub struct CheckerContext<'a> {
 
     /// Current enclosing class info.
     pub enclosing_class: Option<EnclosingClassInfo>,
+
+    /// Type environment for symbol resolution with type parameters.
+    /// Used by the evaluator to expand Application types.
+    pub type_env: RefCell<TypeEnvironment>,
 }
 
 impl<'a> CheckerContext<'a> {
@@ -193,6 +197,7 @@ impl<'a> CheckerContext<'a> {
             call_depth: RefCell::new(0),
             return_type_stack: Vec::new(),
             enclosing_class: None,
+            type_env: RefCell::new(TypeEnvironment::new()),
         }
     }
 
@@ -227,6 +232,7 @@ impl<'a> CheckerContext<'a> {
             call_depth: RefCell::new(0),
             return_type_stack: Vec::new(),
             enclosing_class: None,
+            type_env: RefCell::new(TypeEnvironment::new()),
         }
     }
 

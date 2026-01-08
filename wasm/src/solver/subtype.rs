@@ -46,6 +46,13 @@ pub trait TypeResolver {
     /// Resolve a symbol reference to its structural type.
     /// Returns None if the symbol cannot be resolved.
     fn resolve_ref(&self, symbol: SymbolRef, interner: &dyn TypeDatabase) -> Option<TypeId>;
+
+    /// Get type parameters for a symbol (for generic type aliases/interfaces).
+    /// Returns None by default; implementations can override to support
+    /// Application type expansion.
+    fn get_type_params(&self, _symbol: SymbolRef) -> Option<Vec<TypeParamInfo>> {
+        None
+    }
 }
 
 /// A no-op resolver that doesn't resolve any references.
@@ -64,12 +71,15 @@ impl TypeResolver for NoopResolver {
 pub struct TypeEnvironment {
     /// Maps symbol references to their resolved structural types.
     types: std::collections::HashMap<u32, TypeId>,
+    /// Maps symbol references to their type parameters (for generic types).
+    type_params: std::collections::HashMap<u32, Vec<TypeParamInfo>>,
 }
 
 impl TypeEnvironment {
     pub fn new() -> Self {
         TypeEnvironment {
             types: std::collections::HashMap::new(),
+            type_params: std::collections::HashMap::new(),
         }
     }
 
@@ -78,9 +88,22 @@ impl TypeEnvironment {
         self.types.insert(symbol.0, type_id);
     }
 
+    /// Register a symbol's resolved type with type parameters.
+    pub fn insert_with_params(&mut self, symbol: SymbolRef, type_id: TypeId, params: Vec<TypeParamInfo>) {
+        self.types.insert(symbol.0, type_id);
+        if !params.is_empty() {
+            self.type_params.insert(symbol.0, params);
+        }
+    }
+
     /// Get a symbol's resolved type.
     pub fn get(&self, symbol: SymbolRef) -> Option<TypeId> {
         self.types.get(&symbol.0).copied()
+    }
+
+    /// Get a symbol's type parameters.
+    pub fn get_params(&self, symbol: SymbolRef) -> Option<&Vec<TypeParamInfo>> {
+        self.type_params.get(&symbol.0)
     }
 
     /// Check if the environment contains a symbol.
@@ -102,6 +125,10 @@ impl TypeEnvironment {
 impl TypeResolver for TypeEnvironment {
     fn resolve_ref(&self, symbol: SymbolRef, _interner: &dyn TypeDatabase) -> Option<TypeId> {
         self.get(symbol)
+    }
+
+    fn get_type_params(&self, symbol: SymbolRef) -> Option<Vec<TypeParamInfo>> {
+        self.get_params(symbol).cloned()
     }
 }
 

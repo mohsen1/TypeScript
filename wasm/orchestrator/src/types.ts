@@ -6,7 +6,17 @@ export type AgentType = 'claude' | 'codex';
 
 export type AgentRole = 'director' | 'em' | 'worker';
 
-export type SquadName = 'forge' | 'anvil';
+// Squad name is now a string to support dynamic squad configuration
+export type SquadName = string;
+
+/**
+ * Squad configuration - defines a team of workers
+ */
+export interface SquadConfig {
+  readonly name: string;
+  readonly workerCount: number;
+  readonly focusAreas: string[];
+}
 
 export interface PaneId {
   readonly session: string;
@@ -72,6 +82,7 @@ export interface OrchestratorConfig {
   readonly rootDir: string;
   readonly worktreeBase: string;
   readonly stateFile: string;
+  readonly squads: readonly SquadConfig[];
 }
 
 export interface PaneState {
@@ -102,4 +113,23 @@ export interface WorktreeInfo {
   readonly exists: boolean;
 }
 
-export type OperationMode = 'start' | 'kill' | 'resume' | 'fresh';
+export type OperationMode = 'start' | 'kill' | 'resume' | 'fresh' | 'graceful-exit';
+
+/**
+ * Utility type to make all properties mutable (remove readonly)
+ */
+export type Mutable<T> = { -readonly [P in keyof T]: T[P] };
+
+/**
+ * Deep partial type for nested objects
+ */
+export type DeepPartial<T> = {
+  [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
+};
+
+/**
+ * Mutable deep partial for config building
+ */
+export type MutablePartial<T> = {
+  -readonly [P in keyof T]?: T[P] extends object ? MutablePartial<T[P]> : T[P];
+};

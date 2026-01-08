@@ -18,10 +18,10 @@ import type {
 export interface AgentStartOptions {
   pane: PaneId;
   role: AgentRole;
-  squad?: SquadName;
-  workerNum?: number;
+  squad?: SquadName | undefined;
+  workerNum?: number | undefined;
   cwd: string;
-  resumePrompt?: string;
+  resumePrompt?: string | undefined;
 }
 
 export class AgentManager {
