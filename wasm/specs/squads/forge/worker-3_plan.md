@@ -76,6 +76,7 @@ Priority: 3
 - [x] Freshness/Excess Property (TS unsoundness #4): added 5 tests with proper labeling. Tests cover object literal excess property check, variable no-check (width subtyping), function argument check, return statement check, and spread behavior (expected failure until spread implemented). Tests: `./wasm/test.sh -- test_freshness`.
 - [x] Covariant this Types (TS unsoundness #19): added 4 tests for this type covariance. Tests cover basic subtyping (expected failure until class extends implemented), fluent API pattern (expected failure until class extends implemented), interface with this pattern (passes), and unsound call scenario (expected failure until class extends implemented). Tests: `./wasm/test.sh -- test_covariant_this`.
 - [x] Legacy Null/Undefined (TS unsoundness #9): added 4 tests for strictNullChecks behavior. Tests cover valid code with null/undefined types (passes), null-to-string rejection (passes), undefined-to-number rejection (passes), and union types with null/undefined (passes). Tests: `./wasm/test.sh -- test_strict_null_checks\|test_null_undefined_union`.
+- [x] Correlated Unions (TS unsoundness #38): added 4 tests for cross-product limitation. Tests cover basic union property access (passes), discriminant narrowing (passes), index access with union key (passes), and common property access on union (passes). Tests: `./wasm/test.sh -- test_correlated_unions`.
 
 ## Ready for Merge
 Yes
