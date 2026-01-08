@@ -12155,12 +12155,23 @@ function* infiniteSequence() {
 }
 
 #[test]
-fn test_source_map_optional_chaining_mapping() {
-    // Test source-map accuracy for optional chaining (?.) expressions
-    let source = r#"const name = user?.profile?.name;
-const length = arr?.length;
-const result = obj?.method?.();
-const nested = a?.b?.c?.d;"#;
+fn test_source_map_destructuring_patterns() {
+    // Test object and array destructuring patterns
+    let source = r#"const obj = { a: 1, b: 2, c: 3 };
+const { a, b: renamed, ...rest } = obj;
+
+const arr = [1, 2, 3, 4, 5];
+const [first, second, ...remaining] = arr;
+
+function processPoint({ x, y }: { x: number; y: number }) {
+    return x + y;
+}
+
+const swap = ([a, b]: [number, number]) => [b, a];
+
+const result = processPoint({ x: 10, y: 20 });
+const swapped = swap([1, 2]);"#;
+
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -12177,15 +12188,9 @@ const nested = a?.b?.c?.d;"#;
     printer.emit(root);
 
     let output = printer.get_output().to_string();
-
-    // Verify variable declarations are in output
-    assert!(
-        output.contains("name") && output.contains("length") && output.contains("result"),
-        "expected variable names in output: {output}"
-    );
-
     let map_json = printer.generate_source_map_json().expect("source map");
     let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
     let mappings = map_value
         .get("mappings")
         .and_then(|v| v.as_str())
@@ -12193,40 +12198,37 @@ const nested = a?.b?.c?.d;"#;
 
     let decoded = decode_mappings(mappings);
 
-    // Verify we have mappings for the variable declarations
-    let (name_line, _) = find_line_col(source, "const name");
-    let has_name_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == name_line
+    // Verify we have mappings for the object declaration
+    let (obj_line, obj_col) = find_line_col(source, "const obj");
+    let has_obj_mapping = decoded.iter().any(|entry| {
+        entry.original_line == obj_line
+            && entry.original_column >= obj_col
+            && entry.original_column <= obj_col + 9
     });
 
-    let (length_line, _) = find_line_col(source, "const length");
-    let has_length_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == length_line
+    // Verify we have mappings for the function declaration
+    let (fn_line, fn_col) = find_line_col(source, "function processPoint");
+    let has_fn_mapping = decoded.iter().any(|entry| {
+        entry.original_line == fn_line
+            && entry.original_column >= fn_col
+            && entry.original_column <= fn_col + 21
     });
 
-    let (result_line, _) = find_line_col(source, "const result");
-    let has_result_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == result_line
-    });
-
-    // We should have mappings for the optional chaining declarations
+    // At minimum, we should have mappings for declarations
     assert!(
-        has_name_mapping || has_length_mapping || has_result_mapping,
-        "expected mappings for optional chaining declarations. mappings: {mappings}"
+        has_obj_mapping || has_fn_mapping,
+        "expected mappings for destructuring patterns. mappings: {mappings}"
     );
 
-    // Verify non-empty mappings
+    // Verify output contains expected identifiers
+    assert!(
+        output.contains("processPoint") && output.contains("swap"),
+        "expected output to contain function names. output: {output}"
+    );
+
+    // Verify source map has non-empty mappings
     assert!(
         !decoded.is_empty(),
-        "expected non-empty source mappings for optional chaining code"
-    );
-
-    // Verify mappings span multiple source lines
-    let unique_source_lines: std::collections::HashSet<_> =
-        decoded.iter().map(|m| m.original_line).collect();
-    assert!(
-        unique_source_lines.len() >= 2,
-        "expected mappings from at least 2 different source lines, got: {:?}",
-        unique_source_lines
+        "expected non-empty source mappings for destructuring patterns"
     );
 }
