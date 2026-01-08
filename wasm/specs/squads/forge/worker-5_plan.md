@@ -7,13 +7,13 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- [ ] Follow up with any missing `infer` placeholder vs `never` behavior from recent TODOs in solver tests.
+- [ ] [EM: Assign next task]
 
 ## Task Queue
-- [ ] Follow up with any missing `infer` placeholder vs `never` behavior from recent TODOs in solver tests.
-- [ ] Follow up with any missing `infer` placeholder vs `never` behavior from recent TODOs in solver tests.
+- [ ] [EM: Add queued tasks]
 
 ## Completed
+- [x] Updated infer TODO expectations in `wasm/src/solver/evaluate_tests.rs` (tuple rest inference note + this-parameter TODO cleanup); `./wasm/test.sh` failed: missing `FunctionId` in `wasm/src/solver/evaluate.rs`.
 - [x] Implemented this-parameter bounds checking + conditional inference; added non-distributive optional tuple/property inference; updated tests (tests not run).
 - [x] Added `this`-parameter inference tests in `wasm/src/solver/infer_tests.rs` (tests not run).
 - [x] Added non-distributive union array inference for conditional types (tests not run).

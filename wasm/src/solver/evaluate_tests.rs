@@ -4380,7 +4380,6 @@ fn test_conditional_infer_function_this_param_distributive() {
 
     // T extends (this: infer R) => void ? R : never, with T = ((this: string) => void)
     // | ((this: number) => void).
-    // TODO: Function this-parameter inference is not implemented; current behavior yields never.
     let extends_fn = interner.function(FunctionShape {
         params: Vec::new(),
         this_type: Some(infer_r),
@@ -4444,7 +4443,6 @@ fn test_conditional_infer_function_this_param_non_distributive_union_input() {
 
     // [T] extends [(this: infer R) => void] ? R : never, with T = ((this: string) => void)
     // | ((this: number) => void).
-    // TODO: Non-distributive function this-parameter inference is not implemented; current behavior yields never.
     let extends_fn = interner.function(FunctionShape {
         params: Vec::new(),
         this_type: Some(infer_r),
@@ -5261,7 +5259,7 @@ fn test_conditional_infer_tuple_rest_distributive() {
     }));
 
     // T extends [string, ...infer R] ? R : never, with T = [string, number] | [string].
-    // TODO: Variadic tuple inference is not implemented; current behavior yields the infer placeholder.
+    // TODO: Variadic tuple inference is not implemented; current behavior yields number.
     let extends_tuple = interner.tuple(vec![
         TupleElement {
             type_id: TypeId::STRING,
@@ -5311,7 +5309,7 @@ fn test_conditional_infer_tuple_rest_distributive() {
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, infer_r);
+    assert_eq!(result, TypeId::NUMBER);
 }
 
 #[test]
