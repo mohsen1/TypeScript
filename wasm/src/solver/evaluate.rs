@@ -284,16 +284,25 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             return self.evaluate(true_inst);
         }
 
-        if let Some(TypeKey::Array(ext_elem)) = self.interner.lookup(extends_type) {
+        let extends_unwrapped = match self.interner.lookup(extends_type) {
+            Some(TypeKey::ReadonlyType(inner)) => inner,
+            _ => extends_type,
+        };
+        let check_unwrapped = match self.interner.lookup(check_type) {
+            Some(TypeKey::ReadonlyType(inner)) => inner,
+            _ => check_type,
+        };
+
+        if let Some(TypeKey::Array(ext_elem)) = self.interner.lookup(extends_unwrapped) {
             if let Some(TypeKey::Infer(info)) = self.interner.lookup(ext_elem) {
                 if matches!(
-                    self.interner.lookup(check_type),
+                    self.interner.lookup(check_unwrapped),
                     Some(TypeKey::TypeParameter(_)) | Some(TypeKey::Infer(_))
                 ) {
                     return self.interner.conditional(cond.clone());
                 }
 
-                let inferred = match self.interner.lookup(check_type) {
+                let inferred = match self.interner.lookup(check_unwrapped) {
                     Some(TypeKey::Array(elem)) => Some(elem),
                     Some(TypeKey::Tuple(elements)) => {
                         let elements = self.interner.tuple_list(elements);
@@ -346,20 +355,20 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             }
         }
 
-        if let Some(TypeKey::Tuple(extends_elements)) = self.interner.lookup(extends_type) {
+        if let Some(TypeKey::Tuple(extends_elements)) = self.interner.lookup(extends_unwrapped) {
             let extends_elements = self.interner.tuple_list(extends_elements);
             if extends_elements.len() == 1 && !extends_elements[0].rest {
                 if let Some(TypeKey::Infer(info)) =
                     self.interner.lookup(extends_elements[0].type_id)
                 {
                     if matches!(
-                        self.interner.lookup(check_type),
+                        self.interner.lookup(check_unwrapped),
                         Some(TypeKey::TypeParameter(_)) | Some(TypeKey::Infer(_))
                     ) {
                         return self.interner.conditional(cond.clone());
                     }
 
-                    let inferred = match self.interner.lookup(check_type) {
+                    let inferred = match self.interner.lookup(check_unwrapped) {
                         Some(TypeKey::Tuple(check_elements)) => {
                             let check_elements = self.interner.tuple_list(check_elements);
                             if check_elements.len() == 1 && !check_elements[0].rest {
