@@ -109,6 +109,72 @@ fn test_two_phase_emission_es5_class_expression() {
 }
 
 #[test]
+fn test_es5_derived_field_initializer_order_and_nested_arrow_async_this_capture() {
+    let source = r#"
+class Base { m() { return 1; } }
+class Derived extends Base {
+    field = () => async () => super["m"]();
+    constructor() { prep(); super(); post(); }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.target_es5 = true;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    let prep_pos = output.find("prep()").expect("expected prep() call");
+    let super_pos = output
+        .find("_super.call(this")
+        .expect("expected super call assignment");
+    let init_pos = output
+        .find("_this.field =")
+        .expect("expected field initializer assignment");
+    let post_pos = output.find("post()").expect("expected post() call");
+
+    assert!(
+        prep_pos < super_pos,
+        "Expected prep() before super call: {}",
+        output
+    );
+    assert!(
+        super_pos < init_pos,
+        "Expected field initializer after super call: {}",
+        output
+    );
+    assert!(
+        init_pos < post_pos,
+        "Expected post() after field initializer: {}",
+        output
+    );
+    assert!(
+        output.contains("__awaiter(_this"),
+        "Expected async arrow to capture this in field initializer: {}",
+        output
+    );
+    assert!(
+        output.contains("_super.prototype[\"m\"].call(_this"),
+        "Expected computed super call to lower with lexical this: {}",
+        output
+    );
+    assert!(
+        !output.contains("super[\"m\"]"),
+        "Expected computed super access to be downleveled: {}",
+        output
+    );
+}
+
+#[test]
 fn test_lowering_pass_sets_es5_helpers() {
     let source = r#"
 async function foo() { await bar(); }

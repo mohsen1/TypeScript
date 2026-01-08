@@ -658,6 +658,8 @@ impl<'a> ClassES5Emitter<'a> {
             }
         }
 
+        self.emit_param_destructuring_prologue(param_transforms);
+
         if let Some(super_idx) = super_stmt_idx {
             // Emit statements before super() unchanged.
             for &stmt_idx in &block.statements.nodes {
@@ -670,8 +672,6 @@ impl<'a> ClassES5Emitter<'a> {
             }
             self.emit_super_call_as_this_assignment(super_idx);
         }
-
-        self.emit_param_destructuring_prologue(param_transforms);
 
         // Emit parameter properties using _this
         for &param_idx in &params.nodes {
@@ -714,17 +714,8 @@ impl<'a> ClassES5Emitter<'a> {
             self.write_identifier_text(prop_data.name);
             self.write(" = ");
 
-            // Check if this initializer contains `this` that needs capture
-            let init_node = self.arena.get(prop_data.initializer);
-            let needs_capture = if let Some(node) = init_node {
-                if node.kind == syntax_kind_ext::ARROW_FUNCTION {
-                    contains_this_reference(self.arena, prop_data.initializer)
-                } else {
-                    false
-                }
-            } else {
-                false
-            };
+            // Check if this initializer contains `this` or `super` that needs capture.
+            let needs_capture = contains_this_reference(self.arena, prop_data.initializer);
 
             // Emit the initializer, with _this capture if needed
             let prev = self.use_this_capture;
