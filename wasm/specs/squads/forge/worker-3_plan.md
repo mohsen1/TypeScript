@@ -7,7 +7,7 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] Pick another unsoundness case from `wasm/specs/TS_UNSOUNDNESS_CATALOG.md` and add coverage if missing.
+- [ ] Pick the next unsoundness case from `wasm/specs/TS_UNSOUNDNESS_CATALOG.md` and add coverage if missing.
 
 ## Task Queue
 - [ ] Coordinate with manager if unsure which unsoundness case to prioritize next.
@@ -23,6 +23,7 @@ Priority: 3
 - [x] Added mixed method/function-property variance tests for `this` parameters. Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
 - [x] Added void-return exception coverage for method properties. Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
 - [x] Reset flow at function boundaries to avoid narrowing in closures; added CFA invalidation test. Tests: `./wasm/test.sh` (fails: `wasm/src/transforms/async_es5.rs:749` unexpected closing delimiter after sync).
+- [x] Added best common type array literal regression coverage. Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_parse_error_tolerance`).
 
 ## Ready for Merge
 No
