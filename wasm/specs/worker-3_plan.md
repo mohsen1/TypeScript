@@ -7,10 +7,10 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- Emitter fidelity: run `emitter_parity_tests::test_parity_async_es5` in your worktree with `--nocapture` if possible and report the actual output/diff versus expected (no code edits yet).
+- Solver hardening: verify variance rules in `wasm/src/solver/subtype.rs`. Add targeted cases in `wasm/src/solver/subtype_tests.rs` for parameter contravariance and return-type covariance, then fix any inconsistencies.
 
 ## Task Queue
-- [ ] If the diff is noisy, trim to the smallest failing snippet and highlight the first semantic mismatch.
+- [ ] If variance coverage is solid, add edge cases for optional/rest parameters and `this` parameters in assignability.
 
 ## Completed
 - [x] (Move finished items here with brief notes and tests run.)

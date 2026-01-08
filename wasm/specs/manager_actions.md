@@ -11,3 +11,7 @@ Date: 2026-01-08
 
 ## Notes
 - This log records only actions taken in `wasm/specs` during this management session.
+
+## Rebalance (2026-01-08)
+- Reassigned worker plans to reduce overlap and align with Project Direction.
+- Worker focus now split across solver hardening (workers 1-3) and emitter fidelity/source maps (workers 4-5).
