@@ -45,3 +45,11 @@ fn test_emit_import_star_helpers() {
     assert!(output.contains("__setModuleDefault"));
     assert!(output.contains("__importStar"));
 }
+
+#[test]
+fn test_emit_create_binding_helper() {
+    let mut helpers = HelpersNeeded::default();
+    helpers.create_binding = true;
+    let output = emit_helpers(&helpers);
+    assert!(output.contains("__createBinding"));
+}

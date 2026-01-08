@@ -13,6 +13,7 @@ Priority: 2
 - [ ] [EM: Add queued tasks]
 
 ## Completed
+- [x] Added coverage for `__createBinding` helper emission in `helpers_tests.rs`; `./wasm/test.sh` failed at `solver::evaluate::tests::test_conditional_infer_array_element_non_array_union_branch` (unrelated).
 - [x] Restored `AsyncES5Emitter::set_use_this_capture` wrapper after merge to fix build; `./wasm/test.sh` failed at `solver::evaluate::tests::test_conditional_infer_array_element_non_array_union_branch` (unrelated).
 - [x] Added coverage for import-star helper emission in `helpers_tests.rs`; `./wasm/test.sh` failed at `solver::evaluate::tests::test_conditional_infer_array_element_non_array_union_branch` (unrelated).
 - [x] Added coverage that empty helper requests emit no output in `helpers_tests.rs`; `./wasm/test.sh` failed at `solver::evaluate::tests::test_conditional_infer_array_element_non_array_union_branch` (unrelated).
