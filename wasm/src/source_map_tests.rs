@@ -11897,3 +11897,87 @@ sum(1, 2, 3, 4, 5);"#;
         "expected non-empty source mappings for rest/default parameters"
     );
 }
+
+#[test]
+fn test_source_map_class_accessors() {
+    // Test class getter and setter accessors
+    let source = r#"class Rectangle {
+    private _width = 0;
+    private _height = 0;
+
+    get width() {
+        return this._width;
+    }
+
+    set width(value: number) {
+        this._width = value;
+    }
+
+    get area() {
+        return this._width * this._height;
+    }
+}
+
+const rect = new Rectangle();
+rect.width = 10;"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the class declaration
+    let (class_line, class_col) = find_line_col(source, "class Rectangle");
+    let has_class_mapping = decoded.iter().any(|entry| {
+        entry.original_line == class_line
+            && entry.original_column >= class_col
+            && entry.original_column <= class_col + 15
+    });
+
+    // Verify we have mappings for the getter
+    let (get_line, get_col) = find_line_col(source, "get width()");
+    let has_getter_mapping = decoded.iter().any(|entry| {
+        entry.original_line == get_line
+            && entry.original_column >= get_col
+            && entry.original_column <= get_col + 11
+    });
+
+    // At minimum, we should have mappings for class or getter
+    assert!(
+        has_class_mapping || has_getter_mapping,
+        "expected mappings for class with accessors. mappings: {mappings}"
+    );
+
+    // Verify output contains the class name
+    assert!(
+        output.contains("Rectangle"),
+        "expected output to contain class name. output: {output}"
+    );
+
+    // Verify source map has non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for class accessors"
+    );
+}
