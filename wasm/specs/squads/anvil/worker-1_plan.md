@@ -7,7 +7,7 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-- Complete: Added for-of loop ES5 method test; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` - pre-existing Forge domain failure).
+- Complete: Added Symbol.iterator ES5 method test; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` - pre-existing Forge domain failure).
 
 ## Task Queue
 - [x] Inspect `wasm/src/emitter_edge_case_tests.rs` to capture the failing case and expected output.
@@ -45,6 +45,7 @@ Priority: 1
 - [x] Added spread element in array literal ES5 support; arrays with spread like `[...a, 1, ...b]` now emit as `[].concat(a, [1], b)`; added `emit_array_with_spread_es5` helper. Ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Added object spread in ES5 method test; verifies `{...obj}` is transformed to `Object.assign` for ES5 output. Ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Added for-of loop ES5 method test; verifies for-of loops are transformed to `__values()` iterator pattern with try/finally cleanup. Ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
+- [x] Added Symbol.iterator ES5 method test; verifies `*[Symbol.iterator]()` generator methods are emitted with computed property name on prototype. Ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 
 ## Ready for Merge
 Yes
