@@ -1692,3 +1692,53 @@ fn test_parity_es5_namespace() {
         output
     );
 }
+
+/// Parity test for ES5 enum downlevel.
+/// TypeScript enums should be downleveled to IIFE with bidirectional mapping.
+#[test]
+fn test_parity_es5_enum() {
+    let source = "enum Color { Red, Green, Blue }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 enum downlevel
+    assert!(
+        output.contains("var Color") || output.contains("Color = {}"),
+        "ES5 output should define Color enum: {}",
+        output
+    );
+    // Enum members should be assigned
+    assert!(
+        output.contains("Red") && output.contains("Green") && output.contains("Blue"),
+        "ES5 output should contain all enum members: {}",
+        output
+    );
+    // Should have numeric values (0, 1, 2)
+    assert!(
+        output.contains("0") && output.contains("1") && output.contains("2"),
+        "ES5 output should have numeric enum values: {}",
+        output
+    );
+    // No enum keyword
+    assert!(
+        !output.contains("enum Color"),
+        "ES5 output should not contain enum keyword: {}",
+        output
+    );
+}
