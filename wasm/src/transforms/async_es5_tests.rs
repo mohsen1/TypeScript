@@ -1196,3 +1196,244 @@ fn test_async_closure_capturing_variable() {
         }
     }
 }
+
+// ============================================================================
+// Promise combinator tests
+// ============================================================================
+
+#[test]
+fn test_async_promise_all_basic() {
+    let output = parse_and_emit_async(
+        "async function fetchAll() { const results = await Promise.all([fetch1(), fetch2()]); return results; }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Should have generator wrapper for Promise.all: {}",
+        output
+    );
+    assert!(
+        output.contains("[4 /*yield*/"),
+        "Should have yield for await Promise.all: {}",
+        output
+    );
+    assert!(
+        output.contains("Promise.all"),
+        "Should preserve Promise.all call: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_promise_all_with_map() {
+    let output = parse_and_emit_async(
+        "async function processAll() { const results = await Promise.all(items.map(async (x) => await process(x))); return results; }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Should have generator wrapper: {}",
+        output
+    );
+    assert!(
+        output.contains("Promise.all"),
+        "Should preserve Promise.all: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_promise_all_destructuring() {
+    let output = parse_and_emit_async(
+        "async function fetchPair() { const [a, b] = await Promise.all([fetchA(), fetchB()]); return a + b; }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Should have generator wrapper for destructured Promise.all: {}",
+        output
+    );
+    assert!(
+        output.contains("[4 /*yield*/"),
+        "Should have yield for Promise.all: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_promise_race_basic() {
+    let output = parse_and_emit_async(
+        "async function raceRequests() { const first = await Promise.race([fast(), slow()]); return first; }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Should have generator wrapper for Promise.race: {}",
+        output
+    );
+    assert!(
+        output.contains("[4 /*yield*/"),
+        "Should have yield for await Promise.race: {}",
+        output
+    );
+    assert!(
+        output.contains("Promise.race"),
+        "Should preserve Promise.race call: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_promise_race_with_timeout() {
+    let output = parse_and_emit_async(
+        "async function withTimeout() { const result = await Promise.race([fetchData(), timeout(5000)]); return result; }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Should have generator wrapper: {}",
+        output
+    );
+    assert!(
+        output.contains("Promise.race"),
+        "Should preserve Promise.race: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_promise_allsettled_basic() {
+    let output = parse_and_emit_async(
+        "async function settleAll() { const outcomes = await Promise.allSettled([try1(), try2(), try3()]); return outcomes; }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Should have generator wrapper for Promise.allSettled: {}",
+        output
+    );
+    assert!(
+        output.contains("[4 /*yield*/"),
+        "Should have yield for await Promise.allSettled: {}",
+        output
+    );
+    assert!(
+        output.contains("Promise.allSettled"),
+        "Should preserve Promise.allSettled call: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_promise_any_basic() {
+    let output = parse_and_emit_async(
+        "async function anySuccess() { const first = await Promise.any([attempt1(), attempt2()]); return first; }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Should have generator wrapper for Promise.any: {}",
+        output
+    );
+    assert!(
+        output.contains("[4 /*yield*/"),
+        "Should have yield for await Promise.any: {}",
+        output
+    );
+    assert!(
+        output.contains("Promise.any"),
+        "Should preserve Promise.any call: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_promise_resolve_basic() {
+    let output = parse_and_emit_async(
+        "async function resolveValue() { const value = await Promise.resolve(42); return value; }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Should have generator wrapper for Promise.resolve: {}",
+        output
+    );
+    assert!(
+        output.contains("[4 /*yield*/"),
+        "Should have yield for await Promise.resolve: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_chained_promise_combinators() {
+    let output = parse_and_emit_async(
+        "async function chainedCombinators() { const a = await Promise.all([p1(), p2()]); const b = await Promise.race([fast(), slow()]); return { a, b }; }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Should have generator wrapper: {}",
+        output
+    );
+    // Should have multiple yields for sequential awaits
+    let yield_count = output.matches("[4 /*yield*/").count();
+    assert!(
+        yield_count >= 2,
+        "Should have at least 2 yields for chained combinators, got {}: {}",
+        yield_count,
+        output
+    );
+}
+
+#[test]
+fn test_async_nested_promise_all() {
+    let output = parse_and_emit_async(
+        "async function nestedAll() { const result = await Promise.all([Promise.all([a(), b()]), Promise.all([c(), d()])]); return result; }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Should have generator wrapper for nested Promise.all: {}",
+        output
+    );
+    assert!(
+        output.contains("Promise.all"),
+        "Should preserve Promise.all calls: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_promise_all_in_try_catch() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "async function safeAll() { try { return await Promise.all([p1(), p2()]); } catch (e) { return []; } }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&func_idx) = source_file.statements.nodes.first() {
+                if let Some(func_node) = parser.arena.get(func_idx) {
+                    if let Some(func) = parser.arena.get_function(func_node) {
+                        let emitter = AsyncES5Emitter::new(&parser.arena);
+                        assert!(
+                            emitter.body_contains_await(func.body),
+                            "Should detect await Promise.all in try block"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn test_async_promise_race_in_loop() {
+    // Test that Promise.race works in loop context via body_contains_await detection
+    // Note: The emit path for while loops is not fully implemented yet
+    let output = parse_and_emit_async(
+        "async function pollUntilDone() { while (true) { await Promise.race([check(), timeout()]); } }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Should have generator wrapper for await in loop: {}",
+        output
+    );
+    assert!(
+        output.contains("switch (_a.label)"),
+        "Should have switch for await detection: {}",
+        output
+    );
+}
