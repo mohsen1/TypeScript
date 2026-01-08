@@ -2974,3 +2974,244 @@ fn compile_declaration_with_declaration_dir() {
         "Declaration file should NOT be in dist/ when declarationDir is set"
     );
 }
+
+#[test]
+fn compile_outdir_places_output_in_directory() {
+    // Test that outDir places compiled files in the specified directory
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "build"
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+    write_file(&base.join("src/index.ts"), "export const value = 42;");
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty());
+
+    // Output should be in build/ directory
+    assert!(
+        base.join("build/src/index.js").is_file(),
+        "JS output should be in build/src/"
+    );
+
+    // Output should NOT be alongside source
+    assert!(
+        !base.join("src/index.js").is_file(),
+        "JS output should NOT be alongside source when outDir is set"
+    );
+}
+
+#[test]
+fn compile_outdir_absent_outputs_alongside_source() {
+    // Test that missing outDir places compiled files alongside source files
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {},
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+    write_file(&base.join("src/index.ts"), "export const value = 42;");
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty());
+
+    // Output should be alongside source file
+    assert!(
+        base.join("src/index.js").is_file(),
+        "JS output should be alongside source when outDir is not set"
+    );
+}
+
+#[test]
+fn compile_outdir_with_rootdir_flattens_paths() {
+    // Test that rootDir + outDir flattens the output path
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "rootDir": "src"
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+    write_file(&base.join("src/index.ts"), "export const value = 42;");
+    write_file(&base.join("src/utils/helpers.ts"), "export const helper = 1;");
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty());
+
+    // With rootDir=src, output should NOT include src/ in path
+    assert!(
+        base.join("dist/index.js").is_file(),
+        "JS output should be at dist/index.js (flattened)"
+    );
+    assert!(
+        base.join("dist/utils/helpers.js").is_file(),
+        "Nested JS output should be at dist/utils/helpers.js"
+    );
+
+    // Should NOT be at dist/src/...
+    assert!(
+        !base.join("dist/src/index.js").is_file(),
+        "Output should NOT include src/ when rootDir is set to src"
+    );
+}
+
+#[test]
+fn compile_outdir_nested_structure() {
+    // Test that outDir preserves nested directory structure
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+    write_file(&base.join("src/index.ts"), "export const main = 1;");
+    write_file(&base.join("src/models/user.ts"), "export const user = 2;");
+    write_file(&base.join("src/utils/helpers.ts"), "export const helper = 3;");
+    write_file(&base.join("src/services/api/client.ts"), "export const client = 4;");
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty());
+
+    // All nested directories should be preserved
+    assert!(base.join("dist/src/index.js").is_file());
+    assert!(base.join("dist/src/models/user.js").is_file());
+    assert!(base.join("dist/src/utils/helpers.js").is_file());
+    assert!(base.join("dist/src/services/api/client.js").is_file());
+}
+
+#[test]
+fn compile_outdir_deep_nested_path() {
+    // Test that outDir can be a deeply nested path
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "build/output/js"
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+    write_file(&base.join("src/index.ts"), "export const value = 42;");
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty());
+
+    // Output should be in deeply nested outDir
+    assert!(
+        base.join("build/output/js/src/index.js").is_file(),
+        "JS output should be in build/output/js/src/"
+    );
+}
+
+#[test]
+fn compile_outdir_with_declaration_and_sourcemap() {
+    // Test that outDir works correctly with declaration and sourceMap
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "rootDir": "src",
+            "declaration": true,
+            "sourceMap": true
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+    write_file(&base.join("src/index.ts"), "export const value = 42;");
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty());
+
+    // All output files should be in outDir
+    assert!(
+        base.join("dist/index.js").is_file(),
+        "JS should be in outDir"
+    );
+    assert!(
+        base.join("dist/index.d.ts").is_file(),
+        "Declaration should be in outDir"
+    );
+    assert!(
+        base.join("dist/index.js.map").is_file(),
+        "Source map should be in outDir"
+    );
+
+    // Verify source map references correct file
+    let map_contents = std::fs::read_to_string(base.join("dist/index.js.map")).expect("read map");
+    let map_json: Value = serde_json::from_str(&map_contents).expect("parse map");
+    let file_field = map_json.get("file").and_then(|v| v.as_str()).unwrap_or("");
+    assert_eq!(file_field, "index.js", "Source map file field should be index.js");
+}
+
+#[test]
+fn compile_outdir_multiple_entry_points() {
+    // Test outDir with multiple entry point files
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "rootDir": "src"
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+    write_file(&base.join("src/main.ts"), "export const main = 1;");
+    write_file(&base.join("src/worker.ts"), "export const worker = 2;");
+    write_file(&base.join("src/cli.ts"), "export const cli = 3;");
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty());
+
+    // All entry points should be compiled to outDir
+    assert!(base.join("dist/main.js").is_file());
+    assert!(base.join("dist/worker.js").is_file());
+    assert!(base.join("dist/cli.js").is_file());
+}
