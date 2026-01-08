@@ -865,3 +865,57 @@ fn test_parity_es5_computed_property() {
         output
     );
 }
+
+/// Parity test for ES5 shorthand property syntax.
+/// Shorthand properties { x, y } should be expanded to { x: x, y: y }.
+#[test]
+fn test_parity_es5_shorthand_property() {
+    let source = "const x = 1; const y = 2; const obj = { x, y };";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 shorthand property expansion
+    assert!(
+        output.contains("var x"),
+        "ES5 output should define x variable: {}",
+        output
+    );
+    assert!(
+        output.contains("var y"),
+        "ES5 output should define y variable: {}",
+        output
+    );
+    assert!(
+        output.contains("var obj"),
+        "ES5 output should define obj variable: {}",
+        output
+    );
+    // Shorthand should be expanded to x: x, y: y
+    // tsc outputs { x: x, y: y }
+    assert!(
+        output.contains("x: x") || output.contains("x:x"),
+        "ES5 output should expand shorthand x to x: x: {}",
+        output
+    );
+    assert!(
+        output.contains("y: y") || output.contains("y:y"),
+        "ES5 output should expand shorthand y to y: y: {}",
+        output
+    );
+}
