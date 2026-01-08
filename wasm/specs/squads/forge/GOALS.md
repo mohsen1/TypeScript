@@ -59,9 +59,10 @@ Phase 8 - Conformance, Convergence, and Hardening: solver correctness in the int
 - Use Docker for tests: `./wasm/test.sh`
 
 ## Squad Status
-- Last EM Report: 2026-01-08
+- Last EM Report: 2026-01-08 17:30
 - Workers Active: 5/5
-- Branches Pending Merge: worker/forge-1, worker/forge-4 (blocked by management-file edits)
-- Current Focus: conditional type evaluation (function + template literal inference), subtype `this` variance, end-to-end generic regressions, optional/variadic tuple inference
+- Branches Pending Merge: None (cleared blockers)
+- Current Focus: Fixing `test_check_redux_lodash_style_generics` (6 diagnostics vs 0) - mapped type + conditional infer interactions
 - Direction: Conformance-first integration; solver correctness before feature work
-- Blockers: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports` failure; worker/forge-1/forge-4 contain management-file edits
+- Blockers: Fixed `set_use_this_capture` build error in em/forge branch; `test_check_redux_lodash_style_generics` is primary regression
+- EM Notes: All workers assigned to investigate/fix redux/lodash-style generic patterns. Worker 1 investigating type predicate aliasing narrowing issue.
