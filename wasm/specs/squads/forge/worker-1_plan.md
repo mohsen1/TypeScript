@@ -13,6 +13,7 @@ Priority: 1
 - [ ] [EM: Add queued tasks]
 
 ## Completed
+- [x] Restored `AsyncES5Emitter::set_use_this_capture` in `wasm/src/transforms/async_es5.rs` to unblock builds; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Validated conditional return inference for call signatures vs function sources; added regressions and updated matching in `wasm/src/solver/evaluate.rs` + `wasm/src/solver/evaluate_tests.rs`. Ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `src/transforms/async_es5.rs`).
 - [x] Added callable-parameter inference regressions for non-callable union branches (distributive + non-distributive) in `wasm/src/solver/evaluate_tests.rs`. Ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `src/transforms/async_es5.rs`).
 - [x] Added callable-parameter inference regressions for optional/rest parameters (distributive + non-distributive) in `wasm/src/solver/evaluate_tests.rs`. Ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `src/transforms/async_es5.rs`).
