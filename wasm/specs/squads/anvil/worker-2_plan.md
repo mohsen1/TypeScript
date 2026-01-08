@@ -13,6 +13,8 @@ Priority: 2
 - [ ] [EM: Add queued tasks]
 
 ## Completed
+- [x] Added parity test for class constructor super call ES5 downlevel in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (25 tests).
+- [x] Added parity test for arrow expression body ES5 downlevel in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (24 tests).
 - [x] Added parity test for object destructuring params ES5 downlevel in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (23 tests).
 - [x] Added parity test for array destructuring params ES5 downlevel in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (22 tests).
 - [x] Added parity test for for...of loop ES5 downlevel in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (21 tests).
