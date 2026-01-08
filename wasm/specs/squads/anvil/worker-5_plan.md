@@ -7,7 +7,7 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- Complete: Added 12 more async ES5 tests (multiple sequential awaits, binary expressions, conditional, if/else, loops, switch, catch/finally) and extended `body_contains_await` to handle loops and switch in `wasm/src/transforms/async_es5.rs`; ran `./wasm/test.sh async_es5_tests` (38 tests PASS).
+- [ ] Add ES5 async tests for nested async functions and closures in `wasm/src/transforms/async_es5_tests.rs`. Run `./wasm/test.sh async_es5_tests`.
 
 ## Task Queue
 - [ ] (empty)
