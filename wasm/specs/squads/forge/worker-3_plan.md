@@ -7,10 +7,11 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [x] Pick the next unsoundness case from `wasm/specs/TS_UNSOUNDNESS_CATALOG.md` and add coverage if missing.
+- [ ] Support Worker 2 on `test_check_redux_lodash_style_generics` by isolating which specific generic patterns in `wasm/src/parallel_tests.rs:321-438` produce the 6 diagnostics. Create minimal repro tests in `wasm/src/thin_checker_tests.rs` for each failing pattern.
 
 ## Task Queue
-- [ ] Coordinate with manager if unsure which unsoundness case to prioritize next.
+- [ ] Once Worker 2 fixes the core issue, verify all minimal repros pass.
+- [ ] Pick the next unsoundness case from `wasm/specs/TS_UNSOUNDNESS_CATALOG.md` and add coverage if missing.
 
 ## Completed
 - [x] Freshness/excess property check: allow assigning non-fresh object (variable) to target type. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).

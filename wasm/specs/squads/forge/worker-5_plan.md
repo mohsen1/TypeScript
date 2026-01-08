@@ -7,12 +7,11 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- [ ] [EM: Add queued tasks]
+- [ ] Investigate `ExtractState<R>` and `ExtractAction<R>` conditional infer patterns from `test_check_redux_lodash_style_generics`. These use `infer S` inside mapped type values. Test in isolation in `wasm/src/solver/evaluate_tests.rs`.
 
 ## Task Queue
-- [x] Add tests for function `this`-parameter inference (contextual typing + call-site inference) in `wasm/src/solver/infer_tests.rs`.
-- [x] Convert TODOs in `wasm/src/solver/evaluate_tests.rs` for optional property inference (missing vs `undefined`) and optional tuple element inference (undefined inclusion).
-- [ ] [EM: Add queued tasks]
+- [ ] Add coverage for `StateFromReducers<R>` mapped type that uses `ExtractState` on each property.
+- [ ] Add coverage for `ActionFromReducers<R>` that uses indexed access `[keyof R]` on a mapped type.
 
 ## Completed
 - [x] Added non-distributive union branch regression test for array-element conditional inference; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).

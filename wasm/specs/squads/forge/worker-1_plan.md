@@ -7,9 +7,10 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-- [ ] Add callable-parameter inference regressions (e.g., union inputs, overload shapes) in `wasm/src/solver/evaluate_tests.rs`.
+- [ ] Investigate `test_user_defined_type_predicate_alias_narrows` failure in `wasm/src/checker/control_flow_tests.rs`. The issue is type narrowing not working when a type guard is assigned to a const alias (`const guard = isString`). Fix in `wasm/src/checker/control_flow.rs` if needed.
 
 ## Task Queue
+- [ ] Add callable-parameter inference regressions (e.g., union inputs, overload shapes) in `wasm/src/solver/evaluate_tests.rs`.
 - [ ] Validate function return inference in conditional types and fix any mismatches in `wasm/src/solver/evaluate.rs`.
 
 ## Completed
