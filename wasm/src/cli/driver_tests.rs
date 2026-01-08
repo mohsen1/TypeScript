@@ -3850,3 +3850,454 @@ export class Result<T, E> {
     assert!(dts.contains("Queue<T>"), "Generic class should be in declaration");
     assert!(dts.contains("Result<T, E>") || dts.contains("Result<T,E>"), "Generic class should be in declaration");
 }
+
+// =============================================================================
+// E2E: Module Re-exports
+// =============================================================================
+
+#[test]
+fn compile_module_named_reexports() {
+    // Test named re-exports: export { foo, bar } from "./module"
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "declaration": true
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/utils.ts"),
+        r#"
+export function add(a: number, b: number): number {
+    return a + b;
+}
+
+export function multiply(a: number, b: number): number {
+    return a * b;
+}
+
+export const PI = 3.14159;
+"#,
+    );
+
+    write_file(
+        &base.join("src/index.ts"),
+        r#"
+export { add, multiply, PI } from "./utils";
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors");
+    assert!(base.join("dist/src/utils.js").is_file());
+    assert!(base.join("dist/src/index.js").is_file());
+    assert!(base.join("dist/src/index.d.ts").is_file());
+
+    // Verify index re-exports
+    let index_dts = std::fs::read_to_string(base.join("dist/src/index.d.ts")).expect("read dts");
+    assert!(index_dts.contains("add"), "add should be re-exported");
+    assert!(index_dts.contains("multiply"), "multiply should be re-exported");
+    assert!(index_dts.contains("PI"), "PI should be re-exported");
+}
+
+#[test]
+fn compile_module_renamed_reexports() {
+    // Test renamed re-exports: export { foo as bar } from "./module"
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "declaration": true
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/internal.ts"),
+        r#"
+export function internalHelper(): string {
+    return "helper";
+}
+
+export const internalValue = 42;
+"#,
+    );
+
+    write_file(
+        &base.join("src/index.ts"),
+        r#"
+export { internalHelper as helper, internalValue as value } from "./internal";
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors");
+
+    let index_dts = std::fs::read_to_string(base.join("dist/src/index.d.ts")).expect("read dts");
+    assert!(index_dts.contains("helper"), "helper should be re-exported");
+    assert!(index_dts.contains("value"), "value should be re-exported");
+}
+
+#[test]
+fn compile_module_star_reexports() {
+    // Test star re-exports: export * from "./module"
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "declaration": true
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/math.ts"),
+        r#"
+export function sum(arr: number[]): number {
+    let total = 0;
+    for (const n of arr) {
+        total += n;
+    }
+    return total;
+}
+
+export function average(arr: number[]): number {
+    return sum(arr) / arr.length;
+}
+"#,
+    );
+
+    write_file(
+        &base.join("src/index.ts"),
+        r#"
+export * from "./math";
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors");
+
+    let index_dts = std::fs::read_to_string(base.join("dist/src/index.d.ts")).expect("read dts");
+    assert!(index_dts.contains("sum") || index_dts.contains("*"), "sum should be re-exported or star export present");
+}
+
+#[test]
+fn compile_module_chained_reexports() {
+    // Test chained re-exports: A re-exports from B which re-exports from C
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "declaration": true
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    // Level 3: core module
+    write_file(
+        &base.join("src/core.ts"),
+        r#"
+export function coreFunction(): string {
+    return "core";
+}
+
+export const CORE_VERSION = "1.0.0";
+"#,
+    );
+
+    // Level 2: intermediate module
+    write_file(
+        &base.join("src/intermediate.ts"),
+        r#"
+export { coreFunction, CORE_VERSION } from "./core";
+
+export function intermediateFunction(): string {
+    return "intermediate";
+}
+"#,
+    );
+
+    // Level 1: public module
+    write_file(
+        &base.join("src/index.ts"),
+        r#"
+export { coreFunction, CORE_VERSION, intermediateFunction } from "./intermediate";
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors");
+
+    // All files should be compiled
+    assert!(base.join("dist/src/core.js").is_file());
+    assert!(base.join("dist/src/intermediate.js").is_file());
+    assert!(base.join("dist/src/index.js").is_file());
+
+    let index_dts = std::fs::read_to_string(base.join("dist/src/index.d.ts")).expect("read dts");
+    assert!(index_dts.contains("coreFunction"), "coreFunction should be re-exported");
+    assert!(index_dts.contains("intermediateFunction"), "intermediateFunction should be re-exported");
+}
+
+#[test]
+fn compile_module_mixed_exports_and_reexports() {
+    // Test mixing local exports with re-exports
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "declaration": true
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/helpers.ts"),
+        r#"
+export function helperA(): string {
+    return "A";
+}
+
+export function helperB(): string {
+    return "B";
+}
+"#,
+    );
+
+    write_file(
+        &base.join("src/index.ts"),
+        r#"
+// Re-exports
+export { helperA, helperB } from "./helpers";
+
+// Local exports
+export function localFunction(): number {
+    return 42;
+}
+
+export const LOCAL_CONSTANT = "local";
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors");
+
+    let index_js = std::fs::read_to_string(base.join("dist/src/index.js")).expect("read js");
+    assert!(index_js.contains("localFunction"), "Local function should be in output");
+
+    let index_dts = std::fs::read_to_string(base.join("dist/src/index.d.ts")).expect("read dts");
+    assert!(index_dts.contains("helperA"), "helperA should be re-exported");
+    assert!(index_dts.contains("localFunction"), "localFunction should be exported");
+    assert!(index_dts.contains("LOCAL_CONSTANT"), "LOCAL_CONSTANT should be exported");
+}
+
+#[test]
+fn compile_module_type_only_reexports() {
+    // Test type-only re-exports
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "declaration": true
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/types.ts"),
+        r#"
+export type UserId = number;
+
+export type UserName = string;
+
+export function createId(n: number): UserId {
+    return n;
+}
+"#,
+    );
+
+    write_file(
+        &base.join("src/index.ts"),
+        r#"
+// Type-only re-exports (should be erased from JS)
+export type { UserId, UserName } from "./types";
+
+// Value re-export
+export { createId } from "./types";
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors");
+
+    let index_js = std::fs::read_to_string(base.join("dist/src/index.js")).expect("read js");
+    // Type-only exports should not appear in runtime output, but createId should
+    assert!(index_js.contains("createId"), "createId should be in output");
+
+    let index_dts = std::fs::read_to_string(base.join("dist/src/index.d.ts")).expect("read dts");
+    assert!(index_dts.contains("UserId"), "UserId type should be in declaration");
+    assert!(index_dts.contains("createId"), "createId should be in declaration");
+}
+
+#[test]
+fn compile_module_default_reexport() {
+    // Test default re-export
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "declaration": true
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/component.ts"),
+        r#"
+export default function Component(): string {
+    return "Component";
+}
+
+export const version = "1.0";
+"#,
+    );
+
+    write_file(
+        &base.join("src/index.ts"),
+        r#"
+export { default, version } from "./component";
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors");
+
+    let index_dts = std::fs::read_to_string(base.join("dist/src/index.d.ts")).expect("read dts");
+    assert!(index_dts.contains("default") || index_dts.contains("Component"), "default export should be re-exported");
+    assert!(index_dts.contains("version"), "version should be re-exported");
+}
+
+#[test]
+fn compile_module_barrel_file() {
+    // Test barrel file pattern (common in libraries)
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "declaration": true
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    // Feature modules
+    write_file(
+        &base.join("src/features/auth.ts"),
+        r#"
+export function login(user: string): boolean {
+    return user.length > 0;
+}
+
+export function logout(): void {}
+"#,
+    );
+
+    write_file(
+        &base.join("src/features/data.ts"),
+        r#"
+export function fetchData(): string[] {
+    return [];
+}
+
+export function saveData(data: string[]): boolean {
+    return data.length > 0;
+}
+"#,
+    );
+
+    // Barrel file
+    write_file(
+        &base.join("src/features/index.ts"),
+        r#"
+export { login, logout } from "./auth";
+export { fetchData, saveData } from "./data";
+"#,
+    );
+
+    // Main entry
+    write_file(
+        &base.join("src/index.ts"),
+        r#"
+export { login, logout, fetchData, saveData } from "./features";
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors");
+
+    // All files should be compiled
+    assert!(base.join("dist/src/features/auth.js").is_file());
+    assert!(base.join("dist/src/features/data.js").is_file());
+    assert!(base.join("dist/src/features/index.js").is_file());
+    assert!(base.join("dist/src/index.js").is_file());
+
+    let index_dts = std::fs::read_to_string(base.join("dist/src/index.d.ts")).expect("read dts");
+    assert!(index_dts.contains("login"), "login should be re-exported");
+    assert!(index_dts.contains("fetchData"), "fetchData should be re-exported");
+}
