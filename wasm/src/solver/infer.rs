@@ -872,8 +872,10 @@ impl<'a> InferenceContext<'a> {
                 return self.function_like_subtype_of_with_variance(
                     &s_fn.params,
                     s_fn.return_type,
+                    s_fn.this_type,
                     &t_fn.params,
                     t_fn.return_type,
+                    t_fn.this_type,
                     true,
                 );
             }
@@ -1080,6 +1082,20 @@ impl<'a> InferenceContext<'a> {
         }
     }
 
+    fn are_this_parameters_compatible(
+        &self,
+        source: Option<TypeId>,
+        target: Option<TypeId>,
+        bivariant: bool,
+    ) -> bool {
+        if source.is_none() && target.is_none() {
+            return true;
+        }
+        let source = source.unwrap_or(TypeId::ANY);
+        let target = target.unwrap_or(TypeId::ANY);
+        self.are_parameters_compatible(source, target, bivariant)
+    }
+
     fn is_numeric_property_name(&self, name: Atom) -> bool {
         let prop_name = self.interner.resolve_atom_ref(name);
         Self::is_numeric_literal_name(prop_name.as_ref())
@@ -1146,14 +1162,18 @@ impl<'a> InferenceContext<'a> {
         &self,
         source_params: &[ParamInfo],
         source_return: TypeId,
+        source_this: Option<TypeId>,
         target_params: &[ParamInfo],
         target_return: TypeId,
+        target_this: Option<TypeId>,
     ) -> bool {
         self.function_like_subtype_of_with_variance(
             source_params,
             source_return,
+            source_this,
             target_params,
             target_return,
+            target_this,
             false,
         )
     }
@@ -1162,11 +1182,17 @@ impl<'a> InferenceContext<'a> {
         &self,
         source_params: &[ParamInfo],
         source_return: TypeId,
+        source_this: Option<TypeId>,
         target_params: &[ParamInfo],
         target_return: TypeId,
+        target_this: Option<TypeId>,
         bivariant: bool,
     ) -> bool {
         if !self.is_subtype(source_return, target_return) {
+            return false;
+        }
+
+        if !self.are_this_parameters_compatible(source_this, target_this, bivariant) {
             return false;
         }
 
@@ -1227,8 +1253,10 @@ impl<'a> InferenceContext<'a> {
         self.function_like_subtype_of(
             &source.params,
             source.return_type,
+            source.this_type,
             &target.params,
             target.return_type,
+            target.this_type,
         )
     }
 
@@ -1241,8 +1269,10 @@ impl<'a> InferenceContext<'a> {
         self.function_like_subtype_of_with_variance(
             &source.params,
             source.return_type,
+            source.this_type,
             &target.params,
             target.return_type,
+            target.this_type,
             bivariant,
         )
     }
@@ -1300,8 +1330,10 @@ impl<'a> InferenceContext<'a> {
             if !self.function_like_subtype_of_with_variance(
                 &source.params,
                 source.return_type,
+                source.this_type,
                 &t_sig.params,
                 t_sig.return_type,
+                t_sig.this_type,
                 bivariant,
             ) {
                 return false;
@@ -1324,8 +1356,10 @@ impl<'a> InferenceContext<'a> {
             if self.function_like_subtype_of_with_variance(
                 &s_sig.params,
                 s_sig.return_type,
+                s_sig.this_type,
                 &target.params,
                 target.return_type,
+                target.this_type,
                 bivariant,
             ) {
                 return true;

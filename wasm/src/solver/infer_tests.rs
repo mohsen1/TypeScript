@@ -1091,6 +1091,44 @@ fn test_resolve_bounds_function_subtype() {
 }
 
 #[test]
+fn test_resolve_bounds_function_this_type_mismatch() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+
+    let lower = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: Vec::new(),
+        this_type: Some(TypeId::STRING),
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let upper = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: Vec::new(),
+        this_type: Some(TypeId::NUMBER),
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    ctx.add_lower_bound(var, lower);
+    ctx.add_upper_bound(var, upper);
+
+    let result = ctx.resolve_with_constraints(var);
+    assert!(matches!(
+        result,
+        Err(InferenceError::BoundsViolation {
+            lower: actual_lower,
+            upper: actual_upper,
+            ..
+        }) if actual_lower == lower && actual_upper == upper
+    ));
+}
+
+#[test]
 fn test_resolve_bounds_callable_subtype() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);
