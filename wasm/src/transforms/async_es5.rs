@@ -140,6 +140,10 @@ impl<'a> AsyncES5Emitter<'a> {
         self.this_capture_depth = if capture { 1 } else { 0 };
     }
 
+    pub fn set_use_this_capture(&mut self, capture: bool) {
+        self.set_lexical_this(capture);
+    }
+
     pub fn set_source_map_context(&mut self, source_text: &'a str, source_index: u32) {
         self.source_text = Some(source_text);
         self.source_index = source_index;
