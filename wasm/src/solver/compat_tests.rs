@@ -167,6 +167,25 @@ fn test_error_poisoning_union_normalization() {
 }
 
 #[test]
+fn test_recursion_depth_limit_assignable() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    fn nest_array(interner: &TypeInterner, base: TypeId, depth: usize) -> TypeId {
+        let mut ty = base;
+        for _ in 0..depth {
+            ty = interner.array(ty);
+        }
+        ty
+    }
+
+    let deep_string = nest_array(&interner, TypeId::STRING, 120);
+    let deep_number = nest_array(&interner, TypeId::NUMBER, 120);
+
+    assert!(checker.is_assignable(deep_string, deep_number));
+}
+
+#[test]
 fn test_base_constraint_assignability_compat() {
     let interner = TypeInterner::new();
     let mut checker = CompatChecker::new(&interner);

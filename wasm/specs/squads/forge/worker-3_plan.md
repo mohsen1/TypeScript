@@ -13,6 +13,7 @@ Priority: 3
 - [ ] Coordinate with manager if unsure which unsoundness case to prioritize next.
 
 ## Completed
+- [x] Recursion depth circuit breaker (TS unsoundness #35): treat deep array instantiation as assignable to avoid runaway recursion. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
 - [x] Error poisoning union suppression (TS unsoundness #11): union with `error` collapses to `error`. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
 - [x] Intersection reduction for disjoint primitives (TS unsoundness #21): ensure `string & number` reduces to `never`. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
 - [x] Homomorphic mapped types over string primitives (TS unsoundness #27): added string key mapping coverage. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
