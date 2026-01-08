@@ -3696,3 +3696,173 @@ fn test_parity_es5_nullish_property() {
         output
     );
 }
+
+/// Parity test for ES5 template literal with multiple expressions.
+/// Multiple expressions should all be concatenated.
+#[test]
+fn test_parity_es5_template_multi_expr() {
+    let source = r#"const msg = `Hello ${first} ${middle} ${last}!`;"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify variable declaration
+    assert!(
+        output.contains("msg"),
+        "ES5 output should define msg: {}",
+        output
+    );
+    // All identifiers should be preserved
+    assert!(
+        output.contains("first") && output.contains("middle") && output.contains("last"),
+        "ES5 output should preserve all identifiers: {}",
+        output
+    );
+    // Template literal syntax should not appear
+    assert!(
+        !output.contains("`"),
+        "ES5 output should not contain backticks: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 tagged template literal.
+/// Tagged templates should be converted to function calls.
+#[test]
+fn test_parity_es5_tagged_template() {
+    let source = r#"const result = tag`Hello ${name}!`;"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify variable declaration
+    assert!(
+        output.contains("result"),
+        "ES5 output should define result: {}",
+        output
+    );
+    // Tag function should be preserved
+    assert!(
+        output.contains("tag"),
+        "ES5 output should preserve tag function: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 template literal with function call expression.
+/// Function calls in template expressions should be preserved.
+#[test]
+fn test_parity_es5_template_with_call() {
+    let source = r#"const msg = `Result: ${compute(x, y)}`;"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify variable declaration
+    assert!(
+        output.contains("msg"),
+        "ES5 output should define msg: {}",
+        output
+    );
+    // Function call should be preserved
+    assert!(
+        output.contains("compute"),
+        "ES5 output should preserve function call: {}",
+        output
+    );
+    // Template literal syntax should not appear
+    assert!(
+        !output.contains("`"),
+        "ES5 output should not contain backticks: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 nested template literals.
+/// Nested templates should all be converted.
+#[test]
+fn test_parity_es5_template_nested() {
+    let source = r#"const msg = `outer ${`inner ${value}`}`;"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify variable declaration
+    assert!(
+        output.contains("msg"),
+        "ES5 output should define msg: {}",
+        output
+    );
+    // Value should be preserved
+    assert!(
+        output.contains("value"),
+        "ES5 output should preserve value: {}",
+        output
+    );
+    // Template literal syntax should not appear
+    assert!(
+        !output.contains("`"),
+        "ES5 output should not contain backticks: {}",
+        output
+    );
+}
