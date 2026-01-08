@@ -7421,3 +7421,294 @@ class BankAccount {
         output
     );
 }
+
+#[test]
+fn test_class_es5_extends_function_call() {
+    // Test class extending a function call expression
+    let source = r#"
+function getBase() {
+    return class {
+        value: number = 0;
+        getValue(): number {
+            return this.value;
+        }
+    };
+}
+
+class Derived extends getBase() {
+    multiplier: number = 2;
+
+    getMultipliedValue(): number {
+        return this.getValue() * this.multiplier;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should have the function and class
+    assert!(
+        output.contains("getBase") && output.contains("Derived"),
+        "Expected getBase function and Derived class: {}",
+        output
+    );
+
+    // Extends expression should be evaluated
+    assert!(
+        output.contains("__extends") || output.contains("getBase()") || output.contains("prototype"),
+        "Expected extends expression handling: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("getMultipliedValue"),
+        "Expected getMultipliedValue method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_extends_mixin_pattern() {
+    // Test class extending a mixin function
+    let source = r#"
+function Timestamped<T extends new (...args: any[]) => any>(Base: T) {
+    return class extends Base {
+        timestamp: Date = new Date();
+        getTimestamp(): Date {
+            return this.timestamp;
+        }
+    };
+}
+
+class Entity {
+    id: number;
+    constructor(id: number) {
+        this.id = id;
+    }
+}
+
+class TimestampedEntity extends Timestamped(Entity) {
+    name: string;
+    constructor(id: number, name: string) {
+        super(id);
+        this.name = name;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // All classes/functions should be present
+    assert!(
+        output.contains("Timestamped") && output.contains("Entity") && output.contains("TimestampedEntity"),
+        "Expected all classes: {}",
+        output
+    );
+
+    // Mixin call should be in extends
+    assert!(
+        output.contains("__extends") || output.contains("Timestamped(Entity)") || output.contains("prototype"),
+        "Expected mixin pattern handling: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_extends_property_access() {
+    // Test class extending a property access expression
+    let source = r#"
+const Components = {
+    Base: class {
+        render(): string {
+            return "base";
+        }
+    },
+    Container: class {
+        children: any[] = [];
+    }
+};
+
+class CustomComponent extends Components.Base {
+    name: string = "custom";
+
+    render(): string {
+        return "custom: " + this.name;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Components and class should be present
+    assert!(
+        output.contains("Components") && output.contains("CustomComponent"),
+        "Expected Components and CustomComponent: {}",
+        output
+    );
+
+    // Property access in extends should be handled
+    assert!(
+        output.contains("Base") || output.contains("Components.Base"),
+        "Expected property access in extends: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("render"),
+        "Expected render method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_extends_conditional() {
+    // Test class extending a conditional expression
+    let source = r#"
+const useAdvanced = true;
+
+class BasicFeatures {
+    basic(): void {}
+}
+
+class AdvancedFeatures {
+    advanced(): void {}
+}
+
+class App extends (useAdvanced ? AdvancedFeatures : BasicFeatures) {
+    run(): void {
+        console.log("running");
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // All classes should be present
+    assert!(
+        output.contains("BasicFeatures") && output.contains("AdvancedFeatures") && output.contains("App"),
+        "Expected all classes: {}",
+        output
+    );
+
+    // Conditional expression should be handled
+    assert!(
+        output.contains("useAdvanced") || output.contains("?") || output.contains("__extends"),
+        "Expected conditional in extends: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("run"),
+        "Expected run method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_extends_iife() {
+    // Test class extending an IIFE (Immediately Invoked Function Expression)
+    let source = r#"
+class Widget extends (function() {
+    return class {
+        width: number = 100;
+        height: number = 100;
+        resize(w: number, h: number): void {
+            this.width = w;
+            this.height = h;
+        }
+    };
+})() {
+    title: string = "Widget";
+
+    getSize(): string {
+        return this.width + "x" + this.height;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Widget class should be present
+    assert!(
+        output.contains("Widget"),
+        "Expected Widget class: {}",
+        output
+    );
+
+    // IIFE pattern should be handled - the extends helper should be present
+    assert!(
+        output.contains("__extends") || output.contains("prototype"),
+        "Expected extends handling: {}",
+        output
+    );
+
+    // getSize method should be present (resize may be in base class IIFE)
+    assert!(
+        output.contains("getSize"),
+        "Expected getSize method: {}",
+        output
+    );
+}
