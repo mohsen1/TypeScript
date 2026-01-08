@@ -692,6 +692,9 @@ impl<'a> ClassES5Emitter<'a> {
             }
         }
 
+        // Emit private field initializations using _this (after super)
+        self.emit_private_field_initializations(true);
+
         // Emit instance property initializers using _this
         for &prop_idx in instance_props {
             let Some(prop_node) = self.arena.get(prop_idx) else { continue };
@@ -1336,7 +1339,13 @@ impl<'a> ClassES5Emitter<'a> {
         };
 
         self.write_indent();
-        self.write("return __awaiter(this, void 0, void 0, function () {");
+        self.write("return __awaiter(");
+        if self.use_this_capture {
+            self.write("_this");
+        } else {
+            self.write("this");
+        }
+        self.write(", void 0, void 0, function () {");
         self.write_line();
         self.increase_indent();
         self.write(&generator_body);
