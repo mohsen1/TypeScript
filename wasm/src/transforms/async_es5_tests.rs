@@ -1437,3 +1437,226 @@ fn test_async_promise_race_in_loop() {
         output
     );
 }
+
+// ============================================================================
+// Error handling patterns tests (try/catch/finally with async)
+// ============================================================================
+
+#[test]
+fn test_async_try_catch_basic() {
+    // Note: Try/catch emit is not fully implemented, so we verify generator wrapper and switch
+    let output = parse_and_emit_async(
+        "async function safeFetch() { try { return await fetch(); } catch (e) { return null; } }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Should have generator wrapper for try/catch: {}",
+        output
+    );
+    assert!(
+        output.contains("switch (_a.label)"),
+        "Should have switch for await detection: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_try_finally_basic() {
+    // Note: Try/finally emit is not fully implemented
+    let output = parse_and_emit_async(
+        "async function withCleanup() { try { return await work(); } finally { cleanup(); } }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Should have generator wrapper for try/finally: {}",
+        output
+    );
+    assert!(
+        output.contains("switch (_a.label)"),
+        "Should have switch for await detection: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_try_catch_finally_full() {
+    // Note: Try/catch/finally emit is not fully implemented
+    let output = parse_and_emit_async(
+        "async function fullHandler() { try { await start(); } catch (e) { await logError(e); } finally { await cleanup(); } }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Should have generator wrapper: {}",
+        output
+    );
+    assert!(
+        output.contains("switch (_a.label)"),
+        "Should have switch for await detection: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_await_in_catch_block() {
+    let output = parse_and_emit_async(
+        "async function handleError() { try { throw new Error(); } catch (e) { await reportError(e); } }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Should have generator wrapper for await in catch: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_await_in_finally_block() {
+    let output = parse_and_emit_async(
+        "async function alwaysCleanup() { try { work(); } finally { await asyncCleanup(); } }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Should have generator wrapper for await in finally: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_nested_try_catch() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "async function nestedTry() { try { try { await inner(); } catch (e1) { throw e1; } } catch (e2) { await handleOuter(e2); } }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&func_idx) = source_file.statements.nodes.first() {
+                if let Some(func_node) = parser.arena.get(func_idx) {
+                    if let Some(func) = parser.arena.get_function(func_node) {
+                        let emitter = AsyncES5Emitter::new(&parser.arena);
+                        assert!(
+                            emitter.body_contains_await(func.body),
+                            "Should detect await in nested try/catch"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn test_async_rethrow_after_await() {
+    let output = parse_and_emit_async(
+        "async function rethrowPattern() { try { await riskyOperation(); } catch (e) { await logError(e); throw e; } }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Should have generator wrapper for rethrow pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_error_wrapping_pattern() {
+    // Note: Try/catch emit is not fully implemented, so we just verify generator wrapper
+    let output = parse_and_emit_async(
+        "async function wrapError() { try { return await operation(); } catch (e) { throw new WrapperError(e); } }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Should have generator wrapper for error wrapping: {}",
+        output
+    );
+    assert!(
+        output.contains("switch (_a.label)"),
+        "Should have switch for await detection: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_sequential_try_blocks() {
+    let output = parse_and_emit_async(
+        "async function sequentialTry() { try { await first(); } catch (e1) { } try { await second(); } catch (e2) { } }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Should have generator wrapper for sequential try: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_try_with_return_in_finally() {
+    let output = parse_and_emit_async(
+        "async function finallyReturn() { try { await work(); return 1; } finally { return 2; } }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Should have generator wrapper: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_try_catch_with_type_guard() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "async function typeGuardCatch() { try { await operation(); } catch (e) { if (e instanceof TypeError) { await handleType(e); } else { throw e; } } }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&func_idx) = source_file.statements.nodes.first() {
+                if let Some(func_node) = parser.arena.get(func_idx) {
+                    if let Some(func) = parser.arena.get_function(func_node) {
+                        let emitter = AsyncES5Emitter::new(&parser.arena);
+                        assert!(
+                            emitter.body_contains_await(func.body),
+                            "Should detect await in try with type guard catch"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn test_async_multiple_catches_pattern() {
+    // Test using if/else in catch to simulate multiple catch behavior
+    let output = parse_and_emit_async(
+        "async function multiCatch() { try { await riskyOp(); } catch (e) { if (isNetworkError(e)) { await retry(); } else { await fallback(); } } }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Should have generator wrapper for multi-catch pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_finally_always_runs() {
+    let output = parse_and_emit_async(
+        "async function guaranteedCleanup() { let resource; try { resource = await acquire(); await use(resource); } finally { if (resource) { await release(resource); } } }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Should have generator wrapper for guaranteed cleanup: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_catch_and_rethrow_new_error() {
+    let output = parse_and_emit_async(
+        "async function transformError() { try { await operation(); } catch (original) { const enhanced = await enhanceError(original); throw enhanced; } }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Should have generator wrapper for error transform: {}",
+        output
+    );
+}

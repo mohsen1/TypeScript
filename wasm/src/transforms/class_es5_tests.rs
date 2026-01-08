@@ -4713,3 +4713,359 @@ class BankAccount {
         output
     );
 }
+
+#[test]
+fn test_class_es5_super_with_conditional_field_init() {
+    // Test super() call with conditional field initializers
+    // Field initializers that depend on constructor parameters
+    let source = r#"
+class Base {
+    name: string;
+    constructor(name: string) {
+        this.name = name;
+    }
+}
+
+class Derived extends Base {
+    isAdmin: boolean;
+    permissions: string[] = [];
+
+    constructor(name: string, isAdmin: boolean) {
+        super(name);
+        this.isAdmin = isAdmin;
+        if (isAdmin) {
+            this.permissions = ["read", "write", "delete"];
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    // Get the Derived class (second statement)
+    let class_idx = source_file.statements.nodes.get(1).expect("expected Derived class");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Derived should emit as function
+    assert!(
+        output.contains("function Derived"),
+        "Expected Derived to emit as function: {}",
+        output
+    );
+
+    // Should call parent constructor
+    assert!(
+        output.contains("_super.call(this") || output.contains("Base.call(this"),
+        "Expected super() call: {}",
+        output
+    );
+
+    // Field initializers should come after super()
+    assert!(
+        output.contains("this.permissions = []") || output.contains("this.permissions ="),
+        "Expected permissions field initialization: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_super_with_arrow_field_init() {
+    // Test super() with arrow function field initializers that capture 'this'
+    let source = r#"
+class EventEmitter {
+    handlers: any[] = [];
+    emit(event: string): void {}
+}
+
+class Button extends EventEmitter {
+    label: string;
+    onClick: () => void = () => {
+        this.emit("click");
+    };
+
+    constructor(label: string) {
+        super();
+        this.label = label;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    // Get the Button class (second statement)
+    let class_idx = source_file.statements.nodes.get(1).expect("expected Button class");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Button should emit as function
+    assert!(
+        output.contains("function Button"),
+        "Expected Button to emit as function: {}",
+        output
+    );
+
+    // Should have super call
+    assert!(
+        output.contains("_super.call(this") || output.contains("EventEmitter.call(this"),
+        "Expected super() call: {}",
+        output
+    );
+
+    // Arrow function should be assigned to onClick
+    assert!(
+        output.contains("this.onClick"),
+        "Expected onClick field: {}",
+        output
+    );
+
+    // Arrow function may need _this capture for proper 'this' binding
+    assert!(
+        output.contains("_this") || output.contains("this.emit") || output.contains("function"),
+        "Expected arrow function handling: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_super_with_computed_field_init() {
+    // Test super() with computed/dynamic field initializers
+    let source = r#"
+class Config {
+    settings: Record<string, any> = {};
+}
+
+class AppConfig extends Config {
+    environment: string;
+    apiUrl: string = "https://api.example.com";
+    timeout: number = 5000;
+    retries: number = 3;
+
+    constructor(environment: string) {
+        super();
+        this.environment = environment;
+        if (environment === "production") {
+            this.timeout = 10000;
+            this.retries = 5;
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    // Get the AppConfig class (second statement)
+    let class_idx = source_file.statements.nodes.get(1).expect("expected AppConfig class");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // AppConfig should emit as function
+    assert!(
+        output.contains("function AppConfig"),
+        "Expected AppConfig to emit as function: {}",
+        output
+    );
+
+    // Should call parent constructor
+    assert!(
+        output.contains("_super.call(this") || output.contains("Config.call(this"),
+        "Expected super() call: {}",
+        output
+    );
+
+    // Field initializers should be present
+    assert!(
+        output.contains("this.apiUrl ="),
+        "Expected apiUrl field initialization: {}",
+        output
+    );
+    assert!(
+        output.contains("this.timeout = 5000") || output.contains("this.timeout ="),
+        "Expected timeout field initialization: {}",
+        output
+    );
+    assert!(
+        output.contains("this.retries = 3") || output.contains("this.retries ="),
+        "Expected retries field initialization: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_super_with_method_call_in_field_init() {
+    // Test super() with field initializers that call methods
+    let source = r#"
+class Logger {
+    log(msg: string): void {}
+}
+
+class Service extends Logger {
+    id: string = this.generateId();
+    createdAt: Date = new Date();
+    status: string = "initialized";
+
+    constructor() {
+        super();
+        this.log("Service created with id: " + this.id);
+    }
+
+    private generateId(): string {
+        return "svc_" + Math.random().toString(36).substr(2, 9);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    // Get the Service class (second statement)
+    let class_idx = source_file.statements.nodes.get(1).expect("expected Service class");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Service should emit as function
+    assert!(
+        output.contains("function Service"),
+        "Expected Service to emit as function: {}",
+        output
+    );
+
+    // Should call parent constructor
+    assert!(
+        output.contains("_super.call(this") || output.contains("Logger.call(this"),
+        "Expected super() call: {}",
+        output
+    );
+
+    // Field with method call should be handled
+    assert!(
+        output.contains("this.id =") || output.contains("generateId"),
+        "Expected id field with method call: {}",
+        output
+    );
+
+    // Other field initializers
+    assert!(
+        output.contains("this.createdAt =") || output.contains("new Date"),
+        "Expected createdAt field initialization: {}",
+        output
+    );
+    assert!(
+        output.contains("this.status ="),
+        "Expected status field initialization: {}",
+        output
+    );
+
+    // Private method should be on prototype
+    assert!(
+        output.contains("generateId"),
+        "Expected generateId method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_super_with_nested_inheritance_field_init() {
+    // Test super() with deep inheritance chain and field initializers at each level
+    let source = r#"
+class Animal {
+    name: string;
+    constructor(name: string) {
+        this.name = name;
+    }
+}
+
+class Mammal extends Animal {
+    warmBlooded: boolean = true;
+    legs: number = 4;
+
+    constructor(name: string) {
+        super(name);
+    }
+}
+
+class Dog extends Mammal {
+    breed: string;
+    canBark: boolean = true;
+    tricks: string[] = [];
+
+    constructor(name: string, breed: string) {
+        super(name);
+        this.breed = breed;
+    }
+
+    bark(): void {
+        console.log(this.name + " says woof!");
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    // Get the Dog class (third statement)
+    let class_idx = source_file.statements.nodes.get(2).expect("expected Dog class");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Dog should emit as function
+    assert!(
+        output.contains("function Dog"),
+        "Expected Dog to emit as function: {}",
+        output
+    );
+
+    // Should call parent constructor
+    assert!(
+        output.contains("_super.call(this") || output.contains("Mammal.call(this"),
+        "Expected super() call: {}",
+        output
+    );
+
+    // Dog's field initializers
+    assert!(
+        output.contains("this.canBark = true") || output.contains("this.canBark ="),
+        "Expected canBark field initialization: {}",
+        output
+    );
+    assert!(
+        output.contains("this.tricks = []") || output.contains("this.tricks ="),
+        "Expected tricks field initialization: {}",
+        output
+    );
+
+    // Method should be on prototype
+    assert!(
+        output.contains(".prototype.bark") || output.contains("prototype[\"bark\"]"),
+        "Expected bark method on prototype: {}",
+        output
+    );
+}

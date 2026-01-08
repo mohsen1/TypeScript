@@ -7,12 +7,13 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] Add ES5 emitter parity tests for decorators in `wasm/src/emitter_parity_tests.rs`. Run `./wasm/test.sh emitter_parity`.
+- [ ] Add ES5 emitter parity tests for spread operators in `wasm/src/emitter_parity_tests.rs`. Run `./wasm/test.sh emitter_parity`.
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 decorator parity tests (class, method, property, parameter) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (63 tests).
 - [x] Added ES5 async generator parity tests (type erasure, method, await+yield) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (59 tests).
 - [x] Added ES5 generator function parity tests (type erasure, method, yield type erasure) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (56 tests).
 - [x] Added ES5 private class field parity tests (instance field, static access, method, getter, setter) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (51 tests).
