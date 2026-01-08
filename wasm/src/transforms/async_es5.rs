@@ -1295,6 +1295,26 @@ mod tests {
     }
 
     #[test]
+    fn test_async_var_await_initializer_emits_assignment() {
+        let output = parse_and_emit_async("async function foo() { var x = await bar(); return x; }");
+        assert!(
+            output.contains("return [4 /*yield*/, bar()]"),
+            "Should yield awaited initializer: {}",
+            output
+        );
+        assert!(
+            output.contains("x = _a.sent()"),
+            "Should assign awaited initializer: {}",
+            output
+        );
+        assert!(
+            output.contains("return [2 /*return*/, x]"),
+            "Should return variable after await: {}",
+            output
+        );
+    }
+
+    #[test]
     fn test_body_contains_await_detection() {
         let mut parser =
             ThinParserState::new("test.ts".to_string(), "async function foo() { await x; }".to_string());

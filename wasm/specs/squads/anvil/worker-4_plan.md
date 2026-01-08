@@ -18,6 +18,7 @@ Priority: 4
 - [x] Add async await detection test for nested functions. Tests: `./wasm/test.sh body_contains_await`
 - [x] Add ES5 derived default constructor ordering test. Tests: `./wasm/test.sh default_derived_constructor`
 - [x] Add ES5 derived constructor ordering test (super/field/body). Tests: `./wasm/test.sh` (fails in `parallel::tests::test_check_redux_lodash_style_generics`)
+- [x] Add async await initializer assignment coverage. Tests: `./wasm/test.sh async_es5`
 
 ## Ready for Merge
 Yes - branch `worker/anvil-4` is ready for merge.
