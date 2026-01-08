@@ -11750,3 +11750,75 @@ fn test_source_map_class_static_blocks() {
         "expected non-empty source mappings for class static blocks"
     );
 }
+
+#[test]
+fn test_source_map_dynamic_import() {
+    // Test dynamic import() expressions
+    let source = r#"async function loadModule() {
+    const mod = await import("./module");
+    return mod.default;
+}
+
+const lazy = import("./lazy");
+const conditional = true ? import("./a") : import("./b");"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the async function
+    let (func_line, func_col) = find_line_col(source, "async function loadModule");
+    let has_func_mapping = decoded.iter().any(|entry| {
+        entry.original_line == func_line
+            && entry.original_column >= func_col
+            && entry.original_column <= func_col + 25
+    });
+
+    // Verify we have mappings for the lazy variable
+    let (lazy_line, lazy_col) = find_line_col(source, "const lazy");
+    let has_lazy_mapping = decoded.iter().any(|entry| {
+        entry.original_line == lazy_line
+            && entry.original_column >= lazy_col
+            && entry.original_column <= lazy_col + 10
+    });
+
+    // At minimum, we should have mappings for function or variable
+    assert!(
+        has_func_mapping || has_lazy_mapping,
+        "expected mappings for dynamic import code. mappings: {mappings}"
+    );
+
+    // Verify output contains expected identifiers
+    assert!(
+        output.contains("loadModule") || output.contains("lazy"),
+        "expected output to contain function or variable names. output: {output}"
+    );
+
+    // Verify source map has non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for dynamic import"
+    );
+}
