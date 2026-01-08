@@ -1375,3 +1375,46 @@ fn test_parity_es5_async_arrow() {
         output
     );
 }
+
+/// Parity test for ES5 let in for loop.
+/// let/const should be converted to var.
+#[test]
+fn test_parity_es5_let_in_for_loop() {
+    let source = "for (let i = 0; i < 10; i++) { console.log(i); }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 let->var conversion
+    assert!(
+        output.contains("for (var i") || output.contains("for(var i"),
+        "ES5 output should use var in for loop: {}",
+        output
+    );
+    assert!(
+        output.contains("console.log"),
+        "ES5 output should contain console.log: {}",
+        output
+    );
+    // No let keyword
+    assert!(
+        !output.contains("let i") && !output.contains("let  i"),
+        "ES5 output should not contain let keyword: {}",
+        output
+    );
+}
