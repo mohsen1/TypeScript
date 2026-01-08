@@ -101,3 +101,14 @@ fn test_emit_class_private_helpers_ordering() {
     assert!(get_pos < set_pos, "__classPrivateFieldGet should precede __classPrivateFieldSet");
     assert!(set_pos < in_pos, "__classPrivateFieldSet should precede __classPrivateFieldIn");
 }
+
+#[test]
+fn test_emit_values_before_read_helpers() {
+    let mut helpers = HelpersNeeded::default();
+    helpers.values = true;
+    helpers.read = true;
+    let output = emit_helpers(&helpers);
+    let values_pos = output.find("__values").expect("Expected __values helper");
+    let read_pos = output.find("__read").expect("Expected __read helper");
+    assert!(values_pos < read_pos, "__values should precede __read");
+}
