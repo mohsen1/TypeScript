@@ -6,6 +6,7 @@ fn test_sanitize_module_name() {
     assert_eq!(sanitize_module_name("./foo/bar"), "foo_bar");
     assert_eq!(sanitize_module_name("../utils"), "utils");
     assert_eq!(sanitize_module_name("@scope/pkg"), "_scope_pkg");
+    assert_eq!(sanitize_module_name("./foo-bar/baz.qux"), "foo_bar_baz_qux");
 }
 
 #[test]
@@ -24,6 +25,13 @@ fn test_emit_exports_init() {
 }
 
 #[test]
+fn test_emit_exports_init_empty() {
+    let mut output = String::new();
+    emit_exports_init(&mut output, &[]).unwrap();
+    assert!(output.is_empty(), "Expected no output for empty exports");
+}
+
+#[test]
 fn test_emit_export_assignment() {
     assert_eq!(emit_export_assignment("foo"), "exports.foo = foo;");
 }
@@ -32,8 +40,16 @@ fn test_emit_export_assignment() {
 fn test_emit_reexport_property() {
     let result = emit_reexport_property("foo", "module_1", "foo");
     assert!(result.contains("Object.defineProperty"));
+    assert!(result.contains("enumerable: true"));
     assert!(result.contains("\"foo\""));
     assert!(result.contains("module_1.foo"));
+}
+
+#[test]
+fn test_emit_reexport_property_alias() {
+    let result = emit_reexport_property("foo", "module_1", "bar");
+    assert!(result.contains("\"foo\""));
+    assert!(result.contains("module_1.bar"));
 }
 
 #[test]
@@ -140,6 +156,27 @@ fn test_collect_export_names_with_default_export() {
 }
 
 #[test]
+fn test_collect_export_names_with_default_class_export() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = "export default class Foo {}";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let Some(source_file) = parser.arena.get_source_file(parser.arena.get(root).unwrap()) else {
+        panic!("Failed to get source file");
+    };
+
+    let export_names = collect_export_names(&parser.arena, &source_file.statements.nodes);
+
+    assert_eq!(
+        export_names,
+        vec!["default"],
+        "Expected default export name for class"
+    );
+}
+
+#[test]
 fn test_collect_export_names_with_named_exports() {
     use crate::thin_parser::ThinParserState;
 
@@ -178,6 +215,26 @@ fn test_collect_export_names_ignores_type_only_specifiers() {
         export_names,
         vec!["foo"],
         "Expected type-only specifiers to be ignored"
+    );
+}
+
+#[test]
+fn test_collect_export_names_ignores_type_only_named_exports() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = "type Foo = number; export type { Foo };";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let Some(source_file) = parser.arena.get_source_file(parser.arena.get(root).unwrap()) else {
+        panic!("Failed to get source file");
+    };
+
+    let export_names = collect_export_names(&parser.arena, &source_file.statements.nodes);
+
+    assert!(
+        export_names.is_empty(),
+        "Expected type-only named exports to be ignored"
     );
 }
 
@@ -280,6 +337,26 @@ fn test_collect_export_names_ignores_reexports() {
     assert!(
         export_names.is_empty(),
         "Expected no runtime exports for re-exports"
+    );
+}
+
+#[test]
+fn test_collect_export_names_ignores_default_reexport() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = "export { default } from \"./foo\";";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let Some(source_file) = parser.arena.get_source_file(parser.arena.get(root).unwrap()) else {
+        panic!("Failed to get source file");
+    };
+
+    let export_names = collect_export_names(&parser.arena, &source_file.statements.nodes);
+
+    assert!(
+        export_names.is_empty(),
+        "Expected no runtime exports for default re-export"
     );
 }
 
