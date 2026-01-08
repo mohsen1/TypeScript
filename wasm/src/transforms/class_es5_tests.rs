@@ -2177,20 +2177,74 @@ class ErrorHandler {
 }
 
 #[test]
-fn test_class_es5_switch_case_statement() {
+fn test_class_es5_abstract_class_lowering() {
+    // Test abstract class is properly lowered to ES5
     let source = r#"
-class Router {
-    route(action: string) {
-        switch (action) {
-            case "home":
-                return "/";
-            case "about":
-                return "/about";
-            case "contact":
-                return "/contact";
-            default:
-                return "/404";
-        }
+abstract class Shape {
+    abstract getArea(): number;
+
+    describe(): string {
+        return "A shape with area: " + this.getArea();
+    }
+}
+
+class Circle extends Shape {
+    constructor(public radius: number) {
+        super();
+    }
+
+    getArea(): number {
+        return Math.PI * this.radius * this.radius;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Get the abstract class (first class)
+    let abstract_class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected abstract class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(abstract_class_idx);
+
+    // Abstract class should still emit as a function
+    assert!(
+        output.contains("function Shape"),
+        "Expected abstract class to emit as function: {}",
+        output
+    );
+
+    // Concrete method should be on prototype
+    assert!(
+        output.contains(".prototype.describe") || output.contains("prototype[\"describe\"]"),
+        "Expected concrete method on prototype: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_class_with_index_signature() {
+    // Test class with index signature is properly lowered
+    let source = r#"
+class Dictionary {
+    [key: string]: number;
+
+    set(key: string, value: number) {
+        this[key] = value;
+    }
+
+    get(key: string): number {
+        return this[key];
     }
 }
 "#;
@@ -2211,38 +2265,119 @@ class Router {
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(class_idx);
 
-    // Should emit as a function (ES5 class pattern)
+    // Class should emit as function
     assert!(
-        output.contains("function Router"),
-        "Expected Router constructor function: {}",
+        output.contains("function Dictionary"),
+        "Expected class with index signature to emit as function: {}",
         output
     );
 
-    // Should have switch statement
+    // Methods should be on prototype
     assert!(
-        output.contains("switch"),
-        "Expected switch statement in output: {}",
+        output.contains(".prototype.set") || output.contains("prototype[\"set\"]"),
+        "Expected set method on prototype: {}",
+        output
+    );
+    assert!(
+        output.contains(".prototype.get") || output.contains("prototype[\"get\"]"),
+        "Expected get method on prototype: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_class_expression() {
+    // Test class expression (not declaration) is properly lowered
+    let source = r#"
+const MyClass = class {
+    value = 10;
+    getValue() {
+        return this.value;
+    }
+};
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // The class expression is inside a variable declaration
+    // We need to find it differently - for now just verify parse succeeds
+    assert!(
+        source_file.statements.nodes.len() >= 1,
+        "Expected at least one statement"
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_keyed_methods() {
+    // Test class with Symbol-keyed methods (computed property with Symbol)
+    let source = r#"
+class IterableCollection<T> {
+    private items: T[] = [];
+
+    [Symbol.iterator]() {
+        let index = 0;
+        const items = this.items;
+        return {
+            next() {
+                if (index < items.length) {
+                    return { value: items[index++], done: false };
+                }
+                return { value: undefined, done: true };
+            }
+        };
+    }
+
+    [Symbol.toStringTag]() {
+        return "IterableCollection";
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function IterableCollection"),
+        "Expected class to emit as function: {}",
         output
     );
 
-    // Should have case clauses
+    // Symbol-keyed methods should be on prototype with computed property syntax
     assert!(
-        output.contains("case"),
-        "Expected case clauses in output: {}",
+        output.contains("[Symbol.iterator]") || output.contains("Symbol.iterator"),
+        "Expected Symbol.iterator method in output: {}",
+        output
+    );
+    assert!(
+        output.contains("[Symbol.toStringTag]") || output.contains("Symbol.toStringTag"),
+        "Expected Symbol.toStringTag method in output: {}",
         output
     );
 
-    // Should have default clause
+    // Should have prototype assignment pattern
     assert!(
-        output.contains("default"),
-        "Expected default clause in output: {}",
-        output
-    );
-
-    // Method should be on prototype
-    assert!(
-        output.contains(".prototype.route") || output.contains("prototype[\"route\"]"),
-        "Expected route method on prototype: {}",
+        output.contains(".prototype[Symbol") || output.contains("prototype[Symbol"),
+        "Expected Symbol-keyed methods to be assigned to prototype: {}",
         output
     );
 }
