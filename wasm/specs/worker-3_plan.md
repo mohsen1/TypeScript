@@ -27,6 +27,7 @@ Priority: 3
 - [x] Solver unsoundness: Object vs object vs {} trifecta regressions in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_object_trifecta_`.
 - [x] Solver unsoundness: weak type detection regressions in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_weak_type_detection_`.
 - [x] Solver unsoundness: legacy null/undefined subtyping in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_legacy_null_undefined_subtyping`.
+- [x] Solver unsoundness: error poisoning regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_error_poisoning_`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.

@@ -47,6 +47,22 @@ fn test_error_poisoning_subtyping() {
 }
 
 #[test]
+fn test_error_poisoning_top_bottom() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let tuple = interner.tuple(vec![TupleElement {
+        type_id: TypeId::NUMBER,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
+
+    assert!(checker.is_subtype_of(TypeId::ERROR, TypeId::OBJECT));
+    assert!(checker.is_subtype_of(tuple, TypeId::ERROR));
+}
+
+#[test]
 fn test_literal_subtyping() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
