@@ -4,6 +4,7 @@
 Execute the highest-impact tasks assigned by the manager across all areas (solver, checker, emitter, CLI, LSP).
 
 Status: Active
+Ready for merge
 Priority: 1
 
 ## Current Assignment
