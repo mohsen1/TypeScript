@@ -4829,3 +4829,126 @@ export class Counter {
     assert!(js.contains("Counter"), "Class should be present");
     assert!(!js.is_empty(), "JS output should not be empty");
 }
+
+// =============================================================================
+// E2E: Spread Operator Compilation
+// =============================================================================
+
+#[test]
+fn compile_array_spread() {
+    // Test array spread operator compilation
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/arrays.ts"),
+        r#"
+export function concat(a: number[], b: number[]): number[] {
+    return [...a, ...b];
+}
+
+export function copy(a: number[]): number[] {
+    return [...a];
+}
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+
+    let js = std::fs::read_to_string(base.join("dist/src/arrays.js")).expect("read js");
+    assert!(!js.is_empty(), "JS output should not be empty");
+}
+
+#[test]
+fn compile_object_spread() {
+    // Test object spread operator compilation
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/objects.ts"),
+        r#"
+interface Person {
+    name: string;
+    age: number;
+}
+
+export function clone(obj: Person): Person {
+    return { ...obj };
+}
+
+export function update(obj: Person, updates: Person): Person {
+    return { ...obj, ...updates };
+}
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+
+    let js = std::fs::read_to_string(base.join("dist/src/objects.js")).expect("read js");
+    assert!(!js.is_empty(), "JS output should not be empty");
+}
+
+#[test]
+fn compile_function_call_spread() {
+    // Test spread in function calls
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/calls.ts"),
+        r#"
+export function apply(fn: (...args: number[]) => number, args: number[]): number {
+    return fn(...args);
+}
+
+export function log(...items: string[]): void {
+    console.log(...items);
+}
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+
+    let js = std::fs::read_to_string(base.join("dist/src/calls.js")).expect("read js");
+    assert!(!js.is_empty(), "JS output should not be empty");
+}
