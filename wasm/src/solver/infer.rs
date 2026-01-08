@@ -313,6 +313,55 @@ impl<'a> InferenceContext<'a> {
         false
     }
 
+    fn expand_cyclic_upper_bound(
+        &mut self,
+        root: InferenceVar,
+        bound: TypeId,
+        target_names: &[Atom],
+        lower_bounds: &mut Vec<TypeId>,
+        upper_bounds: &mut Vec<TypeId>,
+    ) {
+        let name = match self.interner.lookup(bound) {
+            Some(TypeKey::TypeParameter(info)) | Some(TypeKey::Infer(info)) => info.name,
+            _ => return,
+        };
+
+        let Some(var) = self.find_type_param(name) else {
+            return;
+        };
+
+        if let Some(resolved) = self.probe(var) {
+            if !upper_bounds.contains(&resolved) {
+                upper_bounds.push(resolved);
+            }
+            return;
+        }
+
+        let bound_root = self.table.find(var);
+        let constraints = self.constraints[bound_root.0 as usize].clone();
+
+        for ty in constraints.lower_bounds {
+            if self.occurs_in(root, ty) {
+                continue;
+            }
+            if !lower_bounds.contains(&ty) {
+                lower_bounds.push(ty);
+            }
+        }
+
+        for ty in constraints.upper_bounds {
+            if self.occurs_in(root, ty) {
+                continue;
+            }
+            if !target_names.is_empty() && self.upper_bound_cycles_param(ty, target_names) {
+                continue;
+            }
+            if !upper_bounds.contains(&ty) {
+                upper_bounds.push(ty);
+            }
+        }
+    }
+
     fn collect_type_params(
         &self,
         ty: TypeId,
@@ -764,15 +813,25 @@ impl<'a> InferenceContext<'a> {
         let constraints = self.constraints[root.0 as usize].clone();
         let target_names = self.type_param_names_for_root(root);
         let mut upper_bounds = Vec::new();
+        let mut lower_bounds = constraints.lower_bounds;
         for bound in constraints.upper_bounds {
-            if !self.occurs_in(root, bound) {
-                if !target_names.is_empty() && self.upper_bound_cycles_param(bound, &target_names) {
-                    continue;
-                }
+            if self.occurs_in(root, bound) {
+                continue;
+            }
+            if !target_names.is_empty() && self.upper_bound_cycles_param(bound, &target_names) {
+                self.expand_cyclic_upper_bound(
+                    root,
+                    bound,
+                    &target_names,
+                    &mut lower_bounds,
+                    &mut upper_bounds,
+                );
+                continue;
+            }
+            if !upper_bounds.contains(&bound) {
                 upper_bounds.push(bound);
             }
         }
-        let mut lower_bounds = constraints.lower_bounds;
 
         if !upper_bounds.is_empty() {
             lower_bounds.retain(|ty| !matches!(*ty, TypeId::ANY | TypeId::UNKNOWN | TypeId::ERROR));
