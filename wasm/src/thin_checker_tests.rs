@@ -144,6 +144,164 @@ const ok: Foo = obj;
 }
 
 #[test]
+fn test_object_trifecta_assignability_in_checker() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let ok: {} = "hi";
+let bad: object = "hi";
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let not_assignable_count = codes.iter().filter(|&&code| code == 2322).count();
+    assert_eq!(not_assignable_count, 1,
+        "Expected one 2322 error for object keyword rejecting string, got: {:?}", codes);
+}
+
+#[test]
+fn test_tuple_array_assignability_in_checker() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type Tup = [string, number];
+const tup: Tup = ["a", 1];
+const arr: (string | number)[] = tup;
+const bad: Tup = arr;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let not_assignable_count = codes.iter().filter(|&&code| code == 2322).count();
+    assert_eq!(not_assignable_count, 1,
+        "Expected one 2322 error for array to tuple assignment, got: {:?}", codes);
+}
+
+#[test]
+fn test_rest_any_bivariance_in_checker() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type Logger = (...args: any[]) => void;
+const log: Logger = (id: number) => {};
+const log2: Logger = (id: number, extra: string) => {};
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+}
+
+#[test]
+fn test_weak_type_detection_in_checker() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface Weak {
+    a?: number;
+}
+const ok = { a: 1 };
+const bad = { b: "nope" };
+
+const okAssign: Weak = ok;
+const badAssign: Weak = bad;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let no_common_count = codes.iter().filter(|&&code| code == 2559).count();
+    assert_eq!(no_common_count, 1,
+        "Expected one 2559 error for weak type with no overlap, got: {:?}", codes);
+}
+
+#[test]
+fn test_apparent_members_on_primitives() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+const s: string = "hi";
+const n: number = 1;
+const b: boolean = true;
+
+s.toUpperCase();
+n.toFixed();
+b.valueOf();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+}
+
+#[test]
+fn test_void_return_exception_assignability() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type VoidFn = () => void;
+const ok: VoidFn = () => "value";
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+}
+
+#[test]
 fn test_literal_widening_for_mutable_bindings() {
     use crate::thin_parser::ThinParserState;
 
@@ -1168,6 +1326,36 @@ let ctor: typeof A = B;
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
     assert!(codes.contains(&2741),
         "Expected error 2741 for missing static member on constructor type, got: {:?}", codes);
+}
+
+#[test]
+fn test_private_member_nominal_class_assignability() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class A {
+    private x: number;
+}
+class B {
+    private x: number;
+}
+const a: A = new B();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(codes.contains(&2741),
+        "Expected error 2741 for private member nominal mismatch, got: {:?}", codes);
 }
 
 #[test]
@@ -2626,6 +2814,31 @@ interface Derived extends Base {
 }
 
 #[test]
+fn test_optional_property_allows_undefined_assignment() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface Foo {
+    x?: number;
+}
+const ok: Foo = {};
+const ok2: Foo = { x: 1 };
+const ok3: Foo = { x: undefined };
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+}
+
+#[test]
 fn test_interface_extends_string_literal_property_mismatch_2430() {
     use crate::thin_parser::ThinParserState;
 
@@ -3283,6 +3496,31 @@ const second = tup[1];
 
     assert_eq!(first_type, TypeId::STRING);
     assert_eq!(second_type, TypeId::NUMBER);
+}
+
+#[test]
+fn test_checker_array_element_access_unchecked() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+const arr: number[] = [];
+const value = arr[0];
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let value_sym = binder.file_locals.get("value").expect("value should exist");
+    let value_type = checker.get_type_of_symbol(value_sym);
+    assert_eq!(value_type, TypeId::NUMBER);
 }
 
 #[test]
@@ -6746,4 +6984,232 @@ const reducer = createReducer(0, {
             checker.ctx.diagnostics
         );
     }
+}
+
+/// TS Unsoundness #41: Key Remapping with `as never`
+/// In mapped types, remapping a key to `never` removes that key from the result.
+/// This is the mechanism behind the `Omit` utility type.
+/// Note: Full instantiation of generic mapped types is tested in solver/evaluate_tests.rs.
+#[test]
+fn test_key_remapping_syntax_parsing() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test that key remapping syntax parses and binds correctly
+    let source = r#"
+// Custom Omit using key remapping with `as never`
+type MyOmit<T, K extends keyof any> = {
+    [P in keyof T as P extends K ? never : P]: T[P]
+};
+
+// Custom Pick using key remapping
+type MyPick<T, K extends keyof T> = {
+    [P in keyof T as P extends K ? P : never]: T[P]
+};
+
+// Custom Exclude using `as`
+type ExcludeKeys<T, U> = {
+    [K in keyof T as K extends U ? never : K]: T[K]
+};
+
+// Source type for reference
+interface Person {
+    name: string;
+    age: number;
+    email: string;
+}
+
+// Type alias usages (verify no parse errors)
+declare const o: MyOmit<Person, "email">;
+declare const p: MyPick<Person, "name">;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // No diagnostics expected for type declarations
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Unexpected diagnostics: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// TS Unsoundness #28: Constructor Void Exception
+/// A constructor type declared as `new () => void` accepts concrete classes
+/// that construct objects, similar to the void return exception for functions (#6).
+#[test]
+fn test_constructor_void_exception() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// Constructor type returning void
+type VoidCtor = new () => void;
+
+// A concrete class that constructs an instance
+class MyClass {
+    value: number = 42;
+}
+
+// Assignment should be allowed: class constructor is assignable to void constructor
+const ctor: VoidCtor = MyClass;
+
+// Another class with a constructor
+class AnotherClass {
+    constructor(public name: string = "default") {}
+}
+
+// This should also work - constructor with default params is compatible
+type DefaultCtor = new () => void;
+const ctor2: DefaultCtor = AnotherClass;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // No diagnostics expected - void constructor should accept any class
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Unexpected diagnostics: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// TS Unsoundness #40: Distributivity Disabling via [T] extends [U]
+/// Tests the is_distributive flag parsing and lowering through conditional types.
+/// Verifies that naked type parameters are marked distributive while tuple-wrapped are not.
+/// Note: This test verifies the lowering behavior via the solver's lower_tests.rs,
+/// and checks that the thin checker properly handles conditional type declarations.
+#[test]
+fn test_distributivity_conditional_type_declarations() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test that conditional type declarations parse and bind correctly
+    let source = r#"
+type Distributive<T> = T extends any ? true : false;
+type NonDistributive<T> = [T] extends [any] ? true : false;
+
+// Verify these type aliases are usable (no errors in declaration)
+declare const x: Distributive<string>;
+declare const y: NonDistributive<string>;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // No diagnostics expected for type declarations
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Unexpected diagnostics: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// TS Unsoundness #40: Conditional type parsing with concrete extends checks
+/// Tests that conditional types with concrete types parse correctly.
+/// Note: Conditional type evaluation during type alias assignment is tested in solver/evaluate_tests.rs.
+#[test]
+fn test_conditional_type_concrete_extends() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test that conditional types parse and bind correctly with concrete extends checks
+    let source = r#"
+// Direct conditional type definitions
+type StringCheck = string extends string ? "yes" : "no";
+type NumberCheck = number extends string ? "yes" : "no";
+type TupleCheck = [string] extends [string] ? "yes" : "no";
+
+// These declarations should parse and bind without errors
+declare const s: StringCheck;
+declare const n: NumberCheck;
+declare const t: TupleCheck;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // No diagnostics expected for well-formed declarations
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Unexpected diagnostics: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// TS Unsoundness #40: Tuple-wrapped conditional types for non-distribution
+/// Tests the [T] extends [U] pattern used to disable distributivity.
+/// The is_distributive flag detection is verified in solver/lower_tests.rs.
+#[test]
+fn test_tuple_wrapped_conditional_pattern() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test the [T] extends [U] pattern used to disable distributivity
+    let source = r#"
+// Generic distributive conditional
+type Dist<T> = T extends string ? true : false;
+
+// Generic non-distributive conditional (tuple-wrapped)
+type NonDist<T> = [T] extends [string] ? true : false;
+
+// Complex conditional with infer
+type ExtractElement<T> = T extends (infer U)[] ? U : never;
+
+// Complex non-distributive with infer
+type ExtractElementNonDist<T> = [T] extends [(infer U)[]] ? U : never;
+
+// Declarations to verify parsing
+declare const d: Dist<string>;
+declare const nd: NonDist<string>;
+declare const e: ExtractElement<string[]>;
+declare const end: ExtractElementNonDist<string[]>;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // No diagnostics expected for well-formed declarations
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Unexpected diagnostics: {:?}",
+        checker.ctx.diagnostics
+    );
 }

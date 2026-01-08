@@ -2261,6 +2261,7 @@ impl<'a> ThinCheckerState<'a> {
         let mut properties: FxHashMap<Atom, PropertyInfo> = FxHashMap::default();
         let mut methods: FxHashMap<Atom, MethodAggregate> = FxHashMap::default();
         let mut accessors: FxHashMap<Atom, AccessorAggregate> = FxHashMap::default();
+        let mut has_nominal_members = false;
 
         for &member_idx in &class.members.nodes {
             let Some(member_node) = self.ctx.arena.get(member_idx) else {
@@ -2274,6 +2275,9 @@ impl<'a> ThinCheckerState<'a> {
                     };
                     if self.has_static_modifier(&prop.modifiers) {
                         continue;
+                    }
+                    if self.member_requires_nominal(&prop.modifiers, prop.name) {
+                        has_nominal_members = true;
                     }
                     let Some(name) = self.get_property_name(prop.name) else {
                         continue;
@@ -2303,6 +2307,9 @@ impl<'a> ThinCheckerState<'a> {
                     if self.has_static_modifier(&method.modifiers) {
                         continue;
                     }
+                    if self.member_requires_nominal(&method.modifiers, method.name) {
+                        has_nominal_members = true;
+                    }
                     let Some(name) = self.get_property_name(method.name) else {
                         continue;
                     };
@@ -2328,6 +2335,9 @@ impl<'a> ThinCheckerState<'a> {
                     };
                     if self.has_static_modifier(&accessor.modifiers) {
                         continue;
+                    }
+                    if self.member_requires_nominal(&accessor.modifiers, accessor.name) {
+                        has_nominal_members = true;
                     }
                     let Some(name) = self.get_property_name(accessor.name) else {
                         continue;
@@ -2376,6 +2386,11 @@ impl<'a> ThinCheckerState<'a> {
                         };
                         if !self.has_parameter_property_modifier(&param.modifiers) {
                             continue;
+                        }
+                        if self.has_private_modifier(&param.modifiers)
+                            || self.has_protected_modifier(&param.modifiers)
+                        {
+                            has_nominal_members = true;
                         }
                         let Some(name) = self.get_property_name(param.name) else {
                             continue;
@@ -2443,6 +2458,23 @@ impl<'a> ThinCheckerState<'a> {
                 optional,
                 readonly: false,
                 is_method: true,
+            });
+        }
+
+        if has_nominal_members {
+            let brand_name = if let Some(sym_id) = current_sym {
+                format!("__private_brand_{}", sym_id.0)
+            } else {
+                format!("__private_brand_node_{}", class_idx.0)
+            };
+            let brand_atom = self.ctx.types.intern_string(&brand_name);
+            properties.entry(brand_atom).or_insert(PropertyInfo {
+                name: brand_atom,
+                type_id: TypeId::ANY,
+                write_type: TypeId::ANY,
+                optional: false,
+                readonly: true,
+                is_method: false,
             });
         }
 
@@ -6601,6 +6633,54 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
         false
+    }
+
+    /// Check if modifiers include the 'private' keyword.
+    fn has_private_modifier(&self, modifiers: &Option<crate::parser::NodeList>) -> bool {
+        use crate::scanner::SyntaxKind;
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(mod_node) = self.ctx.arena.get(mod_idx) {
+                    if mod_node.kind == SyntaxKind::PrivateKeyword as u16 {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Check if modifiers include the 'protected' keyword.
+    fn has_protected_modifier(&self, modifiers: &Option<crate::parser::NodeList>) -> bool {
+        use crate::scanner::SyntaxKind;
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(mod_node) = self.ctx.arena.get(mod_idx) {
+                    if mod_node.kind == SyntaxKind::ProtectedKeyword as u16 {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    fn is_private_identifier_name(&self, name_idx: NodeIndex) -> bool {
+        use crate::scanner::SyntaxKind;
+        let Some(node) = self.ctx.arena.get(name_idx) else {
+            return false;
+        };
+        node.kind == SyntaxKind::PrivateIdentifier as u16
+    }
+
+    fn member_requires_nominal(
+        &self,
+        modifiers: &Option<crate::parser::NodeList>,
+        name_idx: NodeIndex,
+    ) -> bool {
+        self.has_private_modifier(modifiers)
+            || self.has_protected_modifier(modifiers)
+            || self.is_private_identifier_name(name_idx)
     }
 
     /// Get the const modifier node from a list of modifiers, if present.
