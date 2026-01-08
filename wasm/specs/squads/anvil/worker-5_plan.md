@@ -7,7 +7,7 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- Complete: Added 12 nested async functions and closures tests in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (50 tests PASS).
+- [ ] Add ES5 async tests for Promise combinators (Promise.all, Promise.race, Promise.allSettled) in `wasm/src/transforms/async_es5_tests.rs`. Run `./wasm/test.sh async_es5_tests`.
 
 ## Task Queue
 - [ ] (empty)
