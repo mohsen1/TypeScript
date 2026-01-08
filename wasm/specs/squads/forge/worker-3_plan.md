@@ -50,6 +50,7 @@ Priority: 3
 - [x] Rest parameter bivariance (TS unsoundness #16): added thin checker coverage for `(...args: any[]) => void` accepting specific params. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
 - [x] Weak type detection (TS unsoundness #13): added thin checker coverage for optional-only target rejecting no-overlap source. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
 - [x] Optionality vs undefined (TS unsoundness #14): added thin checker coverage for optional properties accepting `undefined` by default. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
+- [x] Unchecked indexed access (TS unsoundness #8): added thin checker coverage for array element access returning element type without `undefined`. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
 
 ## Ready for Merge
 Yes
