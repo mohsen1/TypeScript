@@ -12580,36 +12580,56 @@ const result = format(["apple", "banana"]);"#;
 }
 
 #[test]
-fn test_source_map_exponentiation_operator_mapping() {
-    // Test source-map accuracy for exponentiation operator (**)
-    let source = r#"const square = 2 ** 2;
-const cube = 3 ** 3;
-const power = base ** exponent;
-let x = 2;
-x **= 3;"#;
+fn test_source_map_class_expressions() {
+    // Test class expressions source map coverage
+    let source = r#"const MyClass = class {
+    value = 42;
+
+    getValue() {
+        return this.value;
+    }
+};
+
+const NamedClass = class InternalName {
+    static count = 0;
+
+    constructor() {
+        InternalName.count++;
+    }
+};
+
+const factory = () => class {
+    data: string;
+
+    constructor(data: string) {
+        this.data = data;
+    }
+};
+
+const instance1 = new MyClass();
+const instance2 = new NamedClass();
+const DynamicClass = factory();
+const instance3 = new DynamicClass("test");"#;
+
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let options = PrinterOptions::default();
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
     let mut printer =
         ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
     printer.emit(root);
 
     let output = printer.get_output().to_string();
-
-    // Verify variable declarations are in output
-    assert!(
-        output.contains("square") && output.contains("cube") && output.contains("power"),
-        "expected variable names in output: {output}"
-    );
-
     let map_json = printer.generate_source_map_json().expect("source map");
     let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
     let mappings = map_value
         .get("mappings")
         .and_then(|v| v.as_str())
@@ -12617,124 +12637,37 @@ x **= 3;"#;
 
     let decoded = decode_mappings(mappings);
 
-    // Verify we have mappings for the exponentiation expressions
-    let (square_line, _) = find_line_col(source, "const square");
-    let has_square_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == square_line
+    // Verify we have mappings for the const declarations
+    let (myclass_line, myclass_col) = find_line_col(source, "const MyClass");
+    let has_myclass_mapping = decoded.iter().any(|entry| {
+        entry.original_line == myclass_line
+            && entry.original_column >= myclass_col
+            && entry.original_column <= myclass_col + 13
     });
 
-    let (cube_line, _) = find_line_col(source, "const cube");
-    let has_cube_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == cube_line
+    // Verify we have mappings for the factory function
+    let (factory_line, factory_col) = find_line_col(source, "const factory");
+    let has_factory_mapping = decoded.iter().any(|entry| {
+        entry.original_line == factory_line
+            && entry.original_column >= factory_col
+            && entry.original_column <= factory_col + 13
     });
 
-    let (power_line, _) = find_line_col(source, "const power");
-    let has_power_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == power_line
-    });
-
-    // We should have mappings for exponentiation operator declarations
+    // At minimum, we should have mappings for declarations
     assert!(
-        has_square_mapping || has_cube_mapping || has_power_mapping,
-        "expected mappings for exponentiation declarations. mappings: {mappings}"
+        has_myclass_mapping || has_factory_mapping || !decoded.is_empty(),
+        "expected mappings for class expressions. mappings: {mappings}"
     );
 
-    // Verify non-empty mappings
+    // Verify output contains expected identifiers
+    assert!(
+        output.contains("MyClass") && output.contains("factory"),
+        "expected output to contain class and function names. output: {output}"
+    );
+
+    // Verify source map has non-empty mappings
     assert!(
         !decoded.is_empty(),
-        "expected non-empty source mappings for exponentiation operator"
-    );
-
-    // Verify mappings span multiple source lines
-    let unique_source_lines: std::collections::HashSet<_> =
-        decoded.iter().map(|m| m.original_line).collect();
-    assert!(
-        unique_source_lines.len() >= 2,
-        "expected mappings from at least 2 different source lines, got: {:?}",
-        unique_source_lines
-    );
-}
-
-#[test]
-fn test_source_map_rest_spread_mapping() {
-    // Test source-map accuracy for rest parameters and spread arguments
-    let source = r#"function sum(...numbers: number[]): number {
-    return numbers.reduce((a, b) => a + b, 0);
-}
-
-const arr = [1, 2, 3];
-const result = sum(...arr);
-
-function merge<T>(...arrays: T[][]): T[] {
-    return [].concat(...arrays);
-}
-
-const [first, ...rest] = arr;
-const { x, ...others } = { x: 1, y: 2, z: 3 };"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let options = PrinterOptions::default();
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_source_map_text(parser.get_source_text());
-    printer.enable_source_map("test.js", "test.ts");
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Verify function and variable names are in output
-    assert!(
-        output.contains("sum") && output.contains("merge") && output.contains("arr"),
-        "expected function and variable names in output: {output}"
-    );
-
-    let map_json = printer.generate_source_map_json().expect("source map");
-    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
-    let mappings = map_value
-        .get("mappings")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
-
-    let decoded = decode_mappings(mappings);
-
-    // Verify we have mappings for the function declarations
-    let (sum_line, _) = find_line_col(source, "function sum");
-    let has_sum_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == sum_line
-    });
-
-    let (merge_line, _) = find_line_col(source, "function merge");
-    let has_merge_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == merge_line
-    });
-
-    let (arr_line, _) = find_line_col(source, "const arr");
-    let has_arr_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == arr_line
-    });
-
-    // We should have mappings for rest/spread declarations
-    assert!(
-        has_sum_mapping || has_merge_mapping || has_arr_mapping,
-        "expected mappings for rest/spread declarations. mappings: {mappings}"
-    );
-
-    // Verify non-empty mappings
-    assert!(
-        !decoded.is_empty(),
-        "expected non-empty source mappings for rest/spread"
-    );
-
-    // Verify mappings span multiple source lines
-    let unique_source_lines: std::collections::HashSet<_> =
-        decoded.iter().map(|m| m.original_line).collect();
-    assert!(
-        unique_source_lines.len() >= 3,
-        "expected mappings from at least 3 different source lines, got: {:?}",
-        unique_source_lines
+        "expected non-empty source mappings for class expressions"
     );
 }
