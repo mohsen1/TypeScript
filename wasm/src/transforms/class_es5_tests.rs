@@ -7786,3 +7786,322 @@ class Button extends Component {
         output
     );
 }
+
+#[test]
+fn test_class_es5_decorator_constructor_param_inject() {
+    // Test @Inject decorator on constructor parameter
+    let source = r#"
+function Inject(token: string) {
+    return function(target: any, propertyKey: string | undefined, parameterIndex: number) {
+        // Store injection metadata
+    };
+}
+
+class Logger {
+    log(msg: string): void {}
+}
+
+class UserService {
+    constructor(@Inject("Logger") private logger: Logger) {}
+
+    greet(name: string): void {
+        this.logger.log("Hello " + name);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be present
+    assert!(
+        output.contains("Logger") && output.contains("UserService"),
+        "Expected Logger and UserService classes: {}",
+        output
+    );
+
+    // Inject decorator function should be present
+    assert!(
+        output.contains("Inject"),
+        "Expected Inject decorator: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("greet"),
+        "Expected greet method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_decorator_constructor_param_multiple() {
+    // Test multiple decorators on constructor parameters
+    let source = r#"
+function Injectable() {
+    return function(target: any) {};
+}
+
+function Inject(token: string) {
+    return function(target: any, propertyKey: string | undefined, parameterIndex: number) {};
+}
+
+function Optional() {
+    return function(target: any, propertyKey: string | undefined, parameterIndex: number) {};
+}
+
+class Database {}
+class Cache {}
+class Logger {}
+
+@Injectable()
+class Repository {
+    constructor(
+        @Inject("Database") private db: Database,
+        @Inject("Cache") @Optional() private cache: Cache,
+        @Inject("Logger") private logger: Logger
+    ) {}
+
+    save(data: any): void {}
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // All classes should be present
+    assert!(
+        output.contains("Repository") && output.contains("Database"),
+        "Expected Repository and Database classes: {}",
+        output
+    );
+
+    // Decorator functions should be present
+    assert!(
+        output.contains("Inject") && output.contains("Optional"),
+        "Expected decorator functions: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("save"),
+        "Expected save method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_decorator_constructor_param_with_inheritance() {
+    // Test constructor param decorators with inheritance
+    let source = r#"
+function Inject(token: string) {
+    return function(target: any, propertyKey: string | undefined, parameterIndex: number) {};
+}
+
+class Config {}
+class Logger {}
+
+class BaseService {
+    constructor(@Inject("Config") protected config: Config) {}
+}
+
+class DerivedService extends BaseService {
+    constructor(
+        @Inject("Config") config: Config,
+        @Inject("Logger") private logger: Logger
+    ) {
+        super(config);
+    }
+
+    execute(): void {}
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Both service classes should be present
+    assert!(
+        output.contains("BaseService") && output.contains("DerivedService"),
+        "Expected BaseService and DerivedService classes: {}",
+        output
+    );
+
+    // Inheritance pattern should be present
+    assert!(
+        output.contains("__extends") || output.contains("prototype"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("execute"),
+        "Expected execute method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_decorator_constructor_param_metadata() {
+    // Test constructor param decorators with metadata emission
+    let source = r#"
+function Inject(token: string) {
+    return function(target: any, propertyKey: string | undefined, parameterIndex: number) {
+        const existingParams = Reflect.getMetadata("inject:params", target) || [];
+        existingParams[parameterIndex] = token;
+        Reflect.defineMetadata("inject:params", existingParams, target);
+    };
+}
+
+class HttpClient {}
+class AuthService {}
+
+class ApiClient {
+    constructor(
+        @Inject("HttpClient") private http: HttpClient,
+        @Inject("AuthService") private auth: AuthService
+    ) {}
+
+    request(url: string): Promise<any> {
+        return Promise.resolve({});
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be present
+    assert!(
+        output.contains("ApiClient") && output.contains("HttpClient"),
+        "Expected ApiClient and HttpClient classes: {}",
+        output
+    );
+
+    // Inject decorator should be present
+    assert!(
+        output.contains("Inject"),
+        "Expected Inject decorator: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("request"),
+        "Expected request method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_decorator_constructor_param_factory() {
+    // Test constructor param decorators with factory pattern
+    let source = r#"
+function InjectFactory<T>(factory: () => T) {
+    return function(target: any, propertyKey: string | undefined, parameterIndex: number) {};
+}
+
+function LazyInject(token: string) {
+    return function(target: any, propertyKey: string | undefined, parameterIndex: number) {};
+}
+
+class ExpensiveService {
+    constructor() {
+        // Heavy initialization
+    }
+}
+
+class Consumer {
+    constructor(
+        @InjectFactory(() => new ExpensiveService()) private service: ExpensiveService,
+        @LazyInject("Config") private config: any
+    ) {}
+
+    use(): void {
+        this.service.toString();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be present
+    assert!(
+        output.contains("ExpensiveService") && output.contains("Consumer"),
+        "Expected ExpensiveService and Consumer classes: {}",
+        output
+    );
+
+    // Decorator functions should be present
+    assert!(
+        output.contains("InjectFactory") || output.contains("LazyInject"),
+        "Expected decorator functions: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("use"),
+        "Expected use method: {}",
+        output
+    );
+}
