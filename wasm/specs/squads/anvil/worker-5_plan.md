@@ -7,12 +7,13 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- Complete: Added 6 more for-await-of destructuring tests (renamed properties, mixed nested, await in body, let binding, skipped elements, deep nesting) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (26 tests PASS).
+- Complete: Added 12 more async ES5 tests (multiple sequential awaits, binary expressions, conditional, if/else, loops, switch, catch/finally) and extended `body_contains_await` to handle loops and switch in `wasm/src/transforms/async_es5.rs`; ran `./wasm/test.sh async_es5_tests` (38 tests PASS).
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added 12 more async ES5 tests (multiple sequential awaits, binary expressions, conditional, if/else, loops, switch, catch/finally) and extended `body_contains_await` to handle loops and switch in `wasm/src/transforms/async_es5.rs`; ran `./wasm/test.sh async_es5_tests` (38 tests PASS).
 - [x] Added 6 more for-await-of destructuring tests (renamed properties, mixed nested, await in body, let binding, skipped elements, deep nesting) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (26 tests PASS).
 - [x] Added 6 for-await-of destructuring pattern tests (array, object, nested, defaults, rest element, computed property) in `wasm/src/transforms/async_es5_tests.rs`; also added try/catch/finally await detection in `wasm/src/transforms/async_es5.rs`; ran `./wasm/test.sh async_es5_tests` (20 tests PASS).
 - [x] Added 3 private class feature tests (private method in async, static private method, private accessors) in `wasm/src/transforms/class_es5_tests.rs`; ran `./wasm/test.sh class_es5_tests` (54 tests PASS).
