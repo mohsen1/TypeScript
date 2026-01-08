@@ -2631,6 +2631,98 @@ class Foo {
 }
 
 #[test]
+fn test_two_phase_emission_es5_class_static_async_arrow_field() {
+    let source = r#"
+class Foo {
+    static handler = async () => {
+        await fetch();
+        return this.value;
+    };
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("__awaiter"),
+        "ES5 output should use __awaiter for static async arrow: {}",
+        output
+    );
+    assert!(
+        output.contains("Foo.handler"),
+        "ES5 output should emit static field initializer: {}",
+        output
+    );
+    assert!(
+        output.contains("this.value"),
+        "ES5 output should preserve this for static async arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("var _this = this"),
+        "ES5 output should not capture this for static field: {}",
+        output
+    );
+    assert!(
+        !output.contains("async"),
+        "ES5 output should downlevel async: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_static_async_arrow_nested_arrow() {
+    let source = r#"
+class Foo {
+    static handler = async () => {
+        const inner = () => this.value;
+        await fetch();
+        return inner();
+    };
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("__awaiter"),
+        "ES5 output should use __awaiter for static async arrow: {}",
+        output
+    );
+    // Static field should NOT capture _this at class level
+    assert!(
+        !output.contains("var _this = Foo"),
+        "ES5 output should not capture Foo to _this: {}",
+        output
+    );
+    assert!(
+        !output.contains("async"),
+        "ES5 output should downlevel async: {}",
+        output
+    );
+}
+
+#[test]
 fn test_two_phase_emission_es5_class_derived_field_arrow_super_call() {
     let source = r#"
 class Base { m() { return this.x; } }

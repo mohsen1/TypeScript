@@ -523,3 +523,38 @@ class Derived extends Base {
         output
     );
 }
+
+#[test]
+fn test_class_es5_static_field_async_arrow() {
+    let source = "class Foo { static handler = async () => { await fetch(); return this.value; }; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Should emit __awaiter for async
+    assert!(
+        output.contains("__awaiter"),
+        "Expected static async arrow to use __awaiter: {}",
+        output
+    );
+
+    // Should preserve `this` (not capture to _this) for static field
+    assert!(
+        output.contains("this.value"),
+        "Expected static async arrow to preserve `this`: {}",
+        output
+    );
+}
