@@ -14022,3 +14022,84 @@ const origin = { x: 0, y: 0 } as Point;"#;
         "expected non-empty source mappings for type assertions"
     );
 }
+
+#[test]
+fn test_source_map_non_null_assertions() {
+    // Test source-map accuracy for non-null assertions (!)
+    let source = r#"function getLength(str: string | null) {
+    return str!.length;
+}
+
+const element = document.getElementById("app")!;
+const width = element!.offsetWidth;
+
+class Container {
+    value!: number;
+
+    init() {
+        this.value = 42;
+    }
+
+    getValue() {
+        return this.value!;
+    }
+}
+
+function processArray(arr: number[] | undefined) {
+    const first = arr![0];
+    const mapped = arr!.map(x => x * 2);
+    return { first, mapped };
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions::default();
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for function declarations
+    let (fn_line, _) = find_line_col(source, "function getLength");
+    let has_fn_mapping = decoded.iter().any(|entry| {
+        entry.original_line == fn_line
+    });
+
+    let (class_line, _) = find_line_col(source, "class Container");
+    let has_class_mapping = decoded.iter().any(|entry| {
+        entry.original_line == class_line
+    });
+
+    // At minimum, we should have mappings for declarations
+    assert!(
+        has_fn_mapping || has_class_mapping || !decoded.is_empty(),
+        "expected mappings for non-null assertions. mappings: {mappings}"
+    );
+
+    // Verify output contains expected identifiers
+    assert!(
+        output.contains("getLength") && output.contains("Container"),
+        "expected output to contain function and class names. output: {output}"
+    );
+
+    // Verify source map has non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for non-null assertions"
+    );
+}

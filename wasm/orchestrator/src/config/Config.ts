@@ -56,7 +56,7 @@ const DEFAULT_IDLE_THRESHOLDS: IdleThresholds = {
 const DEFAULT_POKE_MESSAGES: PokeMessages = {
   director:
     'Run `git fetch origin` and check for new commits on squad branches. Merge any squad branches that have new commits into rust. No need to coordinate with EMs or workers.',
-  em: 'Run `git fetch origin` and check for new commits on worker branches (origin/worker/$SQUAD_NAME-*). Merge any that have new commits into your squad branch, then push.',
+  em: 'Check worker status: 1) Run `git fetch origin` and merge any new commits from worker branches (origin/worker/$SQUAD_NAME-*) into your squad branch. 2) Check tmux panes for idle workers waiting for tasks. 3) If any worker is idle, assign them a task from the backlog in wasm/specs/squads/$SQUAD_NAME/. Update their worker plan file.',
   worker:
     'How is your task going? If stuck, describe the issue.',
 };
