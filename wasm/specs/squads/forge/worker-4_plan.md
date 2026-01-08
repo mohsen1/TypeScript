@@ -7,10 +7,12 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [EM: Assign initial task]
+- [ ] End-to-end validation: add a compile-and-check regression for a non-trivial generic library snippet in `wasm/src/parallel_tests.rs` (or `wasm/src/thin_checker_tests.rs`) and fix the first panic or mismatch in `wasm/src/checker/mod.rs` or `wasm/src/solver/mod.rs`; run `./wasm/test.sh`.
 
 ## Task Queue
-- [ ] [EM: Add queued tasks]
+- [ ] Add a multi-file generic library test case (redux/lodash-style types) and assert no panics + expected diagnostics.
+- [ ] If a panic arises, minimize to a focused solver/checker regression test.
+- [ ] Validate the new test still passes with `./wasm/test.sh`.
 
 ## Completed
 - [x] (Move finished items here with brief notes and tests run)

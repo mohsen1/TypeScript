@@ -7,10 +7,12 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [EM: Assign initial task]
+- [ ] Structural compatibility/variance: fix covariance/contravariance edge cases in `wasm/src/solver/subtype.rs`; add tests in `wasm/src/solver/subtype_tests.rs`; run `./wasm/test.sh`.
 
 ## Task Queue
-- [ ] [EM: Add queued tasks]
+- [ ] Add regressions for function parameter variance across unions/intersections in `wasm/src/solver/subtype_tests.rs`.
+- [ ] Confirm method vs function-property variance in `wasm/src/solver/subtype.rs` matches `tsc`, add coverage if missing.
+- [ ] Pull next unsoundness case from `wasm/specs/TS_UNSOUNDNESS_CATALOG.md` and add a subtype regression test.
 
 ## Completed
 - [x] (Move finished items here with brief notes and tests run)

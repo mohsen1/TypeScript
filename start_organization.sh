@@ -27,14 +27,13 @@ EM_POKE="${EM_POKE:-continue}"
 WORKER_IDLE_SECONDS="${WORKER_IDLE_SECONDS:-180}"
 WORKER_POKE="${WORKER_POKE:-continue with your plan.}"
 
-# Startup - longer delays to ensure codex is fully loaded
-# Note: Prompts are sent to codex, not shell - they appear after codex loads
+# Startup timing (codex boots in ~5s)
 WORKER_START_PROMPT="${WORKER_START_PROMPT:-Read your plan file and start working on your current assignment.}"
 EM_START_PROMPT="${EM_START_PROMPT:-Read your squad GOALS.md and assign tasks to your workers.}"
 DIRECTOR_START_PROMPT="${DIRECTOR_START_PROMPT:-Read the Project Direction and update squad goals.}"
-START_PAUSE="${START_PAUSE:-45}"
-SEND_ENTER_PAUSE="${SEND_ENTER_PAUSE:-3}"
-STAGGER_PAUSE="${STAGGER_PAUSE:-5}"
+START_PAUSE="${START_PAUSE:-10}"
+SEND_ENTER_PAUSE="${SEND_ENTER_PAUSE:-1}"
+STAGGER_PAUSE="${STAGGER_PAUSE:-2}"
 
 AUTO_MONITOR="${AUTO_MONITOR:-0}"
 AUTO_ATTACH="${AUTO_ATTACH:-1}"
@@ -330,36 +329,46 @@ setup_squad_window() {
   # Create window for squad
   tmux new-window -t "$SESSION" -n "$window" -c "$ROOT_DIR"
 
-  # Pane 0: EM
+  # Pane 0: EM - start codex with squad identity
   tmux send-keys -t "$SESSION:$window.0" "export SQUAD_NAME=$squad && bash -lc '$em_cmd'" C-m
   tmux select-pane -t "$SESSION:$window.0" -T "em-$squad" 2>/dev/null || true
 
-  # Create 5 worker panes, rebalancing after each split to ensure space
+  # Create 5 worker panes - just start the shell, codex will be started after layout is set
   local worker_dir
   for n in 1 2 3 4 5; do
     worker_dir="$(get_worktree_dir "$squad" "$n")"
     [ -z "$worker_dir" ] && worker_dir="$ROOT_DIR"
 
-    # Split from pane 0 and immediately rebalance
-    tmux split-window -t "$SESSION:$window.0" -c "$worker_dir"
+    # Split pane (starts with shell, not codex yet)
+    tmux split-window -t "$SESSION:$window" -c "$worker_dir"
     tmux select-layout -t "$SESSION:$window" tiled
-    # Export SQUAD_NAME and WORKER_NUM so worker knows its identity
-    tmux send-keys -t "$SESSION:$window.$n" "export SQUAD_NAME=$squad WORKER_NUM=$n && bash -lc '$worker_cmd'" C-m
+  done
+
+  # Rename panes for clarity (pane 0 is EM, panes 1-5 are workers)
+  tmux select-pane -t "$SESSION:$window.0" -T "em-$squad" 2>/dev/null || true
+  for n in 1 2 3 4 5; do
     tmux select-pane -t "$SESSION:$window.$n" -T "${squad}-${n}" 2>/dev/null || true
   done
 
   # Final layout balance
   tmux select-layout -t "$SESSION:$window" tiled
 
-  # Send start prompts to EM and workers
+  # Now start codex in each worker pane (staggered so they don't all boot at once)
+  for n in 1 2 3 4 5; do
+    tmux send-keys -t "$SESSION:$window.$n" "export SQUAD_NAME=$squad WORKER_NUM=$n && bash -lc '$worker_cmd'" C-m
+    sleep 2  # Small delay between starting each codex
+  done
+
+  # Wait for all codex instances to boot
+  echo "  Waiting ${START_PAUSE}s for codex to boot in $squad squad..."
   sleep "$START_PAUSE"
 
-  # EM start
+  # Send start prompts to EM
   tmux send-keys -t "$SESSION:$window.0" "$EM_START_PROMPT"
   sleep "$SEND_ENTER_PAUSE"
   tmux send-keys -t "$SESSION:$window.0" C-m
 
-  # Worker starts (staggered to allow each codex to fully load)
+  # Send start prompts to workers (staggered)
   for pane in 1 2 3 4 5; do
     sleep "$STAGGER_PAUSE"
     tmux send-keys -t "$SESSION:$window.$pane" "$WORKER_START_PROMPT"

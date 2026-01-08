@@ -7,10 +7,12 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-- [EM: Assign initial task]
+- Implement ES5 derived `super()` + field initializer ordering and nested arrow/async `this` capture in `wasm/src/transforms/class_es5.rs`; add regression in `wasm/src/emitter_transform_integration_tests.rs`; run `./wasm/test.sh`.
 
 ## Task Queue
-- [ ] [EM: Add queued tasks]
+- [ ] Audit computed `super[...]` lowering paths in `wasm/src/transforms/class_es5.rs` for nested arrows.
+- [ ] Add a focused unit test in `wasm/src/transforms/class_es5_tests.rs` for pre-`super()` statement ordering.
+- [ ] Confirm ES5 output removes `super[` for computed super calls in class fields.
 
 ## Completed
 - [x] (Move finished items here with brief notes and tests run)

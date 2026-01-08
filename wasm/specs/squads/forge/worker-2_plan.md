@@ -7,10 +7,12 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [EM: Assign initial task]
+- [ ] Conditional type evaluation: implement distributive conditional handling and template-literal inference in `wasm/src/solver/evaluate.rs`; add regressions in `wasm/src/solver/evaluate_tests.rs`; run `./wasm/test.sh`.
 
 ## Task Queue
-- [ ] [EM: Add queued tasks]
+- [ ] Add non-distributive conditional template-literal infer cases (prefix/suffix/middle/two-infer) in `wasm/src/solver/evaluate_tests.rs`.
+- [ ] Cover constrained template-literal inference (`infer T extends ...`) and confirm behavior matches `tsc`.
+- [ ] Validate distributive vs wrapped conditional behavior with unions and `never`/`any` in `wasm/src/solver/evaluate_tests.rs`.
 
 ## Completed
 - [x] (Move finished items here with brief notes and tests run)

@@ -5,7 +5,7 @@ Updated: 2026-01-08
 Priority: 2
 
 ## Current Milestone
-Output Fidelity - Make JavaScript output semantically identical to TypeScript.
+Phase 8 - Conformance, Convergence, and Hardening: Output fidelity across the integrated pipeline.
 
 ## Focus Areas (Director can reassign)
 - `wasm/src/thin_emitter/` - JavaScript emission
@@ -16,26 +16,20 @@ Output Fidelity - Make JavaScript output semantically identical to TypeScript.
 ## Objectives (Ranked)
 
 1. **ES5 Downleveling Correctness**
-   - Context: ES5 transforms must produce semantically identical JavaScript to `tsc`
-   - Success Criteria: All ES5 transform tests pass; `super()` and `this` capture work
+   - Context: Emitter fidelity is the utility bottleneck per Project Direction
+   - Success Criteria: Match `tsc` for `super()` in derived classes with field initializers, nested arrow/async `this` capture, and computed `super[...]` cases
    - Key Files: `transforms/class_es5.rs`, `transforms/async_es5.rs`
    - Estimated Complexity: High
 
 2. **Source Map Validation**
    - Context: Source maps must be valid and usable by debuggers
-   - Success Criteria: Generated source maps pass validation
+   - Success Criteria: Generated source maps validate and attach correctly in debuggers
    - Key Files: `thin_emitter/source_writer.rs`, `thin_emitter/source_map.rs`
    - Estimated Complexity: Medium
 
-3. **Async ES5 Edge Cases**
-   - Context: Async ES5 transforms have known issues with computed super
-   - Success Criteria: All async ES5 tests pass
-   - Key Files: `transforms/async_es5.rs`, `transforms/async_es5_tests.rs`
-   - Estimated Complexity: High
-
-4. **End-to-End Compilation**
-   - Context: Compile real code without panicking
-   - Success Criteria: Successfully compile redux types
+3. **End-to-End Compilation**
+   - Context: Stop adding AST nodes; compile real code end-to-end
+   - Success Criteria: Compile a non-trivial generic library (e.g., redux/lodash types) without panics
    - Key Files: `cli/driver.rs`, `thin_emitter/mod.rs`
    - Estimated Complexity: Medium
 
@@ -43,6 +37,7 @@ Output Fidelity - Make JavaScript output semantically identical to TypeScript.
 - New LSP features (Semantic Tokens, Code Actions)
 - CLI argument parsing or fancy terminal output
 - Performance micro-optimizations
+- New AST nodes or isolated features outside emitter correctness
 
 ## Cross-Squad Dependencies
 - Forge squad owns type checking; emitter may expose Forge bugs
