@@ -5029,3 +5029,211 @@ fn test_parity_es5_static_block_function_call() {
         output
     );
 }
+
+/// Parity test for ES5 private method with multiple typed parameters.
+/// Private method with types should erase all type annotations.
+#[test]
+fn test_parity_es5_private_method_multi_params() {
+    let source = r#"class MathHelper {
+    #add(a: number, b: number, c: number): number {
+        return a + b + c;
+    }
+    sum(x: number, y: number, z: number) {
+        return this.#add(x, y, z);
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 class structure
+    assert!(
+        output.contains("var MathHelper") || output.contains("function MathHelper"),
+        "ES5 output should define MathHelper: {}",
+        output
+    );
+    // Private method syntax should not appear
+    assert!(
+        !output.contains("#add"),
+        "ES5 output should not contain #add: {}",
+        output
+    );
+    // All type annotations should be erased
+    assert!(
+        !output.contains(": number"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 private static method.
+/// Private static methods should be downleveled correctly.
+#[test]
+fn test_parity_es5_private_static_method() {
+    let source = r#"class IdGenerator {
+    static #nextId: number = 0;
+    static #generateId(): number {
+        return IdGenerator.#nextId++;
+    }
+    static create() {
+        return IdGenerator.#generateId();
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 class structure
+    assert!(
+        output.contains("var IdGenerator") || output.contains("function IdGenerator"),
+        "ES5 output should define IdGenerator: {}",
+        output
+    );
+    // Private static method declaration syntax should not appear in original form
+    assert!(
+        !output.contains("static #generateId():") && !output.contains("static #nextId:"),
+        "ES5 output should not contain private static declaration syntax: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 private async method.
+/// Private async methods should combine async and private downleveling.
+#[test]
+fn test_parity_es5_private_async_method() {
+    let source = r#"class DataFetcher {
+    async #fetchData(url: string): Promise<string> {
+        return url;
+    }
+    async load(endpoint: string) {
+        return this.#fetchData(endpoint);
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 class structure
+    assert!(
+        output.contains("var DataFetcher") || output.contains("function DataFetcher"),
+        "ES5 output should define DataFetcher: {}",
+        output
+    );
+    // Private method declaration syntax should not appear
+    assert!(
+        !output.contains("async #fetchData(") && !output.contains("#fetchData(url"),
+        "ES5 output should not contain private method declaration syntax: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": Promise"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 private method calling another private method.
+/// Chained private method calls should all be downleveled.
+#[test]
+fn test_parity_es5_private_method_chain() {
+    let source = r#"class Processor {
+    #step1(val: number): number {
+        return val + 1;
+    }
+    #step2(val: number): number {
+        return this.#step1(val) * 2;
+    }
+    process(input: number) {
+        return this.#step2(input);
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 class structure
+    assert!(
+        output.contains("var Processor") || output.contains("function Processor"),
+        "ES5 output should define Processor: {}",
+        output
+    );
+    // Private method syntax should not appear
+    assert!(
+        !output.contains("#step1") && !output.contains("#step2"),
+        "ES5 output should not contain private method syntax: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+}
