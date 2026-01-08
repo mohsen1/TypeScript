@@ -7,12 +7,14 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- Stand by for next emitter fidelity task.
+- Investigate ES5 derived field arrow computed super call (failing regression).
 
 ## Task Queue
+- [ ] Fix ES5 derived field arrow computed super call; test `./wasm/test.sh derived_field_arrow_super_computed`.
 - [ ] Stand by for next emitter fidelity task.
 
 ## Completed
+- [x] ES5 derived field arrow computed super call regression added (failing); test `./wasm/test.sh derived_field_arrow_super_computed`.
 - [x] ES5 derived field arrow handles super + this; test `./wasm/test.sh derived_field_arrow_super_and_this`.
 - [x] ES5 ctor arrow lowers super call with lexical this; test `./wasm/test.sh ctor_arrow_super_call`.
 - [x] ES5 derived field arrow lowers super call with lexical this; test `./wasm/test.sh derived_field_arrow_super_call`.
