@@ -6257,3 +6257,70 @@ function f(x: number) { return x; }
     let param_type = checker.get_type_of_node(return_data.expression);
     assert_eq!(param_type, TypeId::NUMBER);
 }
+
+#[test]
+fn test_generic_library_snippet_compiles_and_checks() {
+    use crate::binder::SymbolTable;
+    use crate::parallel;
+
+    let source = r#"
+type Dictionary<T> = { [key: string]: T };
+type ReadonlyDict<T> = { readonly [K in keyof T]: T[K] };
+type OptionalDict<T> = { [K in keyof T]?: T[K] };
+
+type Action<T extends string = string> = { type: T };
+type PayloadAction<T extends string, P> = { type: T; payload: P };
+
+type Reducer<S, A extends Action = Action> = (state: S, action: A) => S;
+type CaseReducer<S, A extends Action> = (state: S, action: A) => S;
+
+type CaseReducers<S, A extends Action = Action> = {
+  [T in A["type"]]?: CaseReducer<S, A>;
+};
+
+declare function createReducer<S, A extends Action>(
+  initial: S,
+  reducers: CaseReducers<S, A>
+): Reducer<S, A>;
+
+type CounterAction =
+  | PayloadAction<"inc", number>
+  | PayloadAction<"set", number>;
+
+const reducer = createReducer(0, {
+  inc: (state, action) => state + action.payload,
+  set: (state, action) => action.payload,
+});
+"#;
+
+    let program = parallel::compile_files(vec![("lib.ts".to_string(), source.to_string())]);
+    let file = &program.files[0];
+
+    let mut file_locals = SymbolTable::new();
+    for (name, &sym_id) in program.file_locals[0].iter() {
+        file_locals.set(name.clone(), sym_id);
+    }
+    for (name, &sym_id) in program.globals.iter() {
+        if !file_locals.has(name) {
+            file_locals.set(name.clone(), sym_id);
+        }
+    }
+
+    let binder = ThinBinderState::from_bound_state_with_scopes(
+        program.symbols.clone(),
+        file_locals,
+        file.node_symbols.clone(),
+        file.scopes.clone(),
+        file.node_scope_ids.clone(),
+    );
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(&file.arena, &binder, &types, "lib.ts".to_string());
+    checker.check_source_file(file.source_file);
+
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Unexpected diagnostics: {:?}",
+        checker.ctx.diagnostics
+    );
+}
