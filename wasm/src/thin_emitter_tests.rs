@@ -1925,6 +1925,7 @@ fn test_commonjs_import_named() {
 
     let output = printer.get_output();
     assert!(output.contains("require(\"./module\")"), "Expected require() in CommonJS output: {}", output);
+    assert!(output.contains("__esModule"), "Expected __esModule marker in CommonJS output: {}", output);
     assert!(output.contains("var foo = module_1.foo;"), "Expected foo binding in output: {}", output);
     assert!(output.contains("var bar = module_1.bar;"), "Expected bar binding in output: {}", output);
 }
