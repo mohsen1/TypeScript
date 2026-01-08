@@ -10,7 +10,11 @@ Priority: 1
 - [ ] Redux test (`test_check_redux_lodash_style_generics`) has 3 remaining diagnostics:
   - store.ts:716 - Object literal not assignable to Store<StateFromReducer<R>, ActionFromReducer<R>> where conditional types contain type param R
   - app.ts:375 (x2) - Action type inference with nested mapped/conditional types
-  - Root cause: Conditional types with type parameters can't be fully evaluated until instantiation. TypeScript defers evaluation. Need similar handling in SubtypeChecker.
+  - Root cause investigation complete:
+    1. Conditional types with type params ARE being deferred correctly (lines 386-392 in evaluate.rs)
+    2. The issue is in TYPE EQUIVALENCE checking: when comparing `R extends Reducer<infer S, AnyAction> ? S : never` (inline) vs `StateFromReducer<R>` (Ref to alias with same body), they should be equivalent but aren't
+    3. `types_equivalent` in subtype.rs uses bidirectional subtyping, but Ref types may not resolve to their alias bodies before comparison
+  - Potential fix: In subtype checker, when comparing Conditional vs Ref, resolve the Ref first and then compare
 
 ## Task Queue
 - [ ] Add callable-parameter inference regressions (e.g., union inputs, overload shapes) in `wasm/src/solver/evaluate_tests.rs`.
