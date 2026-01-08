@@ -15,6 +15,8 @@ Priority: 3
 - [ ] Once setter type checking is implemented, update `test_split_accessors_write_error` to expect 1 error.
 - [ ] Once typeof class types work, update `test_abstract_constructor_assignability` to expect 0 errors.
 - [ ] Once class inheritance type checking works, update `test_concrete_extends_abstract` and `test_best_common_type_class_hierarchy` to expect 0 errors.
+- [ ] Once namespace-interface value merging works, update `test_namespace_interface_merging` to expect 0 errors.
+- [ ] Once enum member access works, update `test_enum_namespace_merging` to expect 0 errors.
 - [ ] Pick the next unsoundness case from `wasm/specs/TS_UNSOUNDNESS_CATALOG.md` and add coverage if missing.
 
 ## Completed
@@ -67,6 +69,7 @@ Priority: 3
 - [x] Abstract class instantiation (TS unsoundness #43): added 3 tests for abstract class behavior. Tests cover instantiation error, constructor type assignability (4 expected errors until typeof class works), and concrete-to-abstract assignment (3 expected errors until class inheritance works). Tests: `./wasm/test.sh -- test_abstract_class_instantiation\|test_abstract_constructor\|test_concrete_extends`.
 - [x] Global Function type (TS unsoundness #29): added 3 tests for untyped callable supertype. Tests cover callable-to-Function assignability, Function-to-specific assignability (with any), and function type hierarchy. Tests: `./wasm/test.sh -- test_global_function_type\|test_function_not_assignable\|test_function_type_hierarchy`.
 - [x] Best Common Type inference (TS unsoundness #32): added 3 tests for array literal type inference. Tests cover mixed array literals, class hierarchy (1 expected error until class inheritance works), and literal widening. Tests: `./wasm/test.sh -- test_best_common_type`.
+- [x] Module Augmentation Merging (TS unsoundness #44): added 6 tests for declaration merging. Tests cover interface merging, method overloads, extend+merge, namespace-interface merging (2 expected errors), class-namespace merging, and enum-namespace merging (4 expected errors). Tests: `./wasm/test.sh -- test_interface_merging\|test_namespace_interface\|test_class_namespace\|test_enum_namespace`.
 
 ## Ready for Merge
 Yes
