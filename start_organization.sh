@@ -23,14 +23,14 @@ CODEX_UPDATE_CMD="${CODEX_UPDATE_CMD:-npm install -g @openai/codex}"
 DIRECTOR_IDLE_SECONDS="${DIRECTOR_IDLE_SECONDS:-600}"
 DIRECTOR_POKE="${DIRECTOR_POKE:-Check if any intervention is needed. If EMs are working, do nothing.}"
 EM_IDLE_SECONDS="${EM_IDLE_SECONDS:-90}"
-EM_POKE="${EM_POKE:-continue}"
+EM_POKE="${EM_POKE:-Check worker panes. If any worker is stuck or asking questions, unblock them with a clear directive.}"
 WORKER_IDLE_SECONDS="${WORKER_IDLE_SECONDS:-180}"
-WORKER_POKE="${WORKER_POKE:-continue with your plan.}"
+WORKER_POKE="${WORKER_POKE:-You are not blocked. Do not ask questions. Stash dirty files if needed. Write code. Commit. Push.}"
 
 # Startup timing (codex boots in ~5s)
-WORKER_START_PROMPT="${WORKER_START_PROMPT:-Read your plan file and start working on your current assignment.}"
-EM_START_PROMPT="${EM_START_PROMPT:-Read your squad GOALS.md and assign tasks to your workers.}"
-DIRECTOR_START_PROMPT="${DIRECTOR_START_PROMPT:-Read the Project Direction and update squad goals.}"
+WORKER_START_PROMPT="${WORKER_START_PROMPT:-You are worker \$WORKER_NUM in squad \$SQUAD_NAME. Read AGENTS.md then your plan at wasm/specs/squads/\$SQUAD_NAME/worker-\${WORKER_NUM}_plan.md. Do NOT ask questions. Stash dirty files, switch to branch worker/\$SQUAD_NAME-\$WORKER_NUM, write code, commit, push. Go.}"
+EM_START_PROMPT="${EM_START_PROMPT:-Read SQUAD_LEAD_AGENT.md. Check worker panes for idle workers. Ensure workers are committing code, not just exploring.}"
+DIRECTOR_START_PROMPT="${DIRECTOR_START_PROMPT:-Read DIRECTOR_AGENT.md. Be hands-off. Only intervene if EMs need help.}"
 START_PAUSE="${START_PAUSE:-10}"
 SEND_ENTER_PAUSE="${SEND_ENTER_PAUSE:-1}"
 STAGGER_PAUSE="${STAGGER_PAUSE:-2}"
@@ -49,6 +49,15 @@ if [ "${1:-}" = "--kill" ]; then
     echo "No tmux session found: $SESSION"
   fi
   exit 0
+fi
+
+# =============================================================================
+# Fresh mode - reset all branches to origin/rust
+# =============================================================================
+FRESH_MODE=0
+if [ "${1:-}" = "--fresh" ]; then
+  FRESH_MODE=1
+  echo "Fresh mode: will reset all branches to origin/rust"
 fi
 
 # =============================================================================
@@ -107,7 +116,7 @@ fi
 # Ensure rust branch exists
 # =============================================================================
 if [ "$AUTO_FETCH" = "1" ]; then
-  git -C "$ROOT_DIR" fetch --prune origin rust >/dev/null 2>&1 || true
+  git -C "$ROOT_DIR" fetch --prune origin >/dev/null 2>&1 || true
 fi
 
 if ! git -C "$ROOT_DIR" show-ref --verify --quiet refs/heads/rust; then
@@ -116,6 +125,37 @@ if ! git -C "$ROOT_DIR" show-ref --verify --quiet refs/heads/rust; then
   else
     git -C "$ROOT_DIR" branch rust >/dev/null 2>&1 || true
   fi
+fi
+
+# =============================================================================
+# Fresh mode: Reset all branches to origin/rust
+# =============================================================================
+if [ "$FRESH_MODE" = "1" ]; then
+  echo "Resetting all branches to origin/rust..."
+
+  # Reset squad branches
+  for squad in forge anvil; do
+    branch="squad/$squad"
+    if git -C "$ROOT_DIR" show-ref --verify --quiet "refs/heads/$branch"; then
+      git -C "$ROOT_DIR" branch -D "$branch" >/dev/null 2>&1 || true
+    fi
+    git -C "$ROOT_DIR" branch "$branch" origin/rust >/dev/null 2>&1 || true
+    echo "  Reset $branch -> origin/rust"
+  done
+
+  # Reset worker branches
+  for squad in forge anvil; do
+    for n in 1 2 3 4 5; do
+      branch="worker/${squad}-${n}"
+      if git -C "$ROOT_DIR" show-ref --verify --quiet "refs/heads/$branch"; then
+        git -C "$ROOT_DIR" branch -D "$branch" >/dev/null 2>&1 || true
+      fi
+      git -C "$ROOT_DIR" branch "$branch" origin/rust >/dev/null 2>&1 || true
+      echo "  Reset $branch -> origin/rust"
+    done
+  done
+
+  echo "All branches reset to origin/rust"
 fi
 
 # =============================================================================
@@ -234,11 +274,20 @@ is_worktree() {
 ensure_worktree() {
   local name="$1"
   local dir="$WORKTREE_BASE/TypeScript-${name}-track"
+  local branch="worker/$name"
 
   if [ -d "$dir" ]; then
     if ! is_worktree "$dir"; then
       echo "warning: $dir exists but is not a git worktree; skipping" >&2
       return 1
+    fi
+    # Fresh mode: reset worktree to origin/rust
+    if [ "$FRESH_MODE" = "1" ]; then
+      git -C "$dir" fetch origin >/dev/null 2>&1 || true
+      git -C "$dir" reset --hard origin/rust >/dev/null 2>&1 || true
+      git -C "$dir" clean -fd >/dev/null 2>&1 || true
+      git -C "$dir" checkout -B "$branch" origin/rust >/dev/null 2>&1 || true
+      echo "  Reset worktree $name -> origin/rust" >&2
     fi
   else
     git -C "$ROOT_DIR" worktree add --force "$dir" rust >/dev/null 2>&1 || {
@@ -590,6 +639,7 @@ echo "  tmux select-window -t $SESSION:anvil"
 echo ""
 echo "Attach: tmux attach -t $SESSION"
 echo "Kill:   $0 --kill"
+echo "Fresh:  $0 --fresh  (reset all branches to origin/rust)"
 echo "=============================================="
 
 # =============================================================================

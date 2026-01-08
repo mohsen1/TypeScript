@@ -93,6 +93,13 @@ Keep all 5 workers active at all times. If a worker finishes or stalls:
 1. Immediately assign the next task from the queue
 2. If queue is empty, break down the next GOALS.md objective into tasks
 
+## Unblock Workers Policy
+If a worker is stuck or asking questions instead of writing code:
+1. Send them a clear directive to continue.
+2. Remind them: "You are not blocked. Stash dirty files if needed. Pick the next task. Write code."
+
+Workers should not be asking permission or waiting for answers - they should act.
+
 ## EM Management Loop
 
 **Priority: Workers First, Merges Second.** Never leave a worker idle while doing merges.
