@@ -1114,3 +1114,48 @@ fn test_parity_es5_array_destructuring_param() {
         output
     );
 }
+
+/// Parity test for ES5 object destructuring in function parameters.
+/// Object destructuring params should be downleveled to property access.
+#[test]
+fn test_parity_es5_object_destructuring_param() {
+    let source = "function greet({ name, age }) { return name + ' is ' + age; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 object destructuring param downlevel
+    assert!(
+        output.contains("function greet"),
+        "ES5 output should define greet function: {}",
+        output
+    );
+    // Destructuring should be converted to property access
+    // tsc outputs: function greet(_a) { var name = _a.name, age = _a.age; ... }
+    assert!(
+        output.contains(".name") || output.contains(".age") || output.contains("_a"),
+        "ES5 output should use property access or temp variables: {}",
+        output
+    );
+    // No destructuring in parameter list
+    assert!(
+        !output.contains("({ name") && !output.contains("({name"),
+        "ES5 output should not contain object destructuring in params: {}",
+        output
+    );
+}
