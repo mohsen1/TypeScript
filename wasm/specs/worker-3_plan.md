@@ -36,6 +36,7 @@ Priority: 3
 - [x] Solver unsoundness: primitive boxing (`bigint` to `BigInt` interface) regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_primitive_boxing_bigint_assignability`.
 - [x] Solver unsoundness: primitive boxing (`boolean` to `Boolean` interface) regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_primitive_boxing_boolean_assignability`.
 - [x] Solver unsoundness: primitive boxing (`string` to `String` interface) regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_primitive_boxing_string_assignability`.
+- [x] Solver unsoundness: primitive boxing (`symbol` to `Symbol` interface) regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_primitive_boxing_symbol_assignability`.
 - [x] Solver unsoundness: any top/bottom regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_any_top_bottom_subtyping`.
 - [x] Solver unsoundness: apparent string member regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_apparent_string_member_subtyping`.
 - [x] Solver unsoundness: keyof union disjoint keys regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_keyof_union_disjoint_object_keys_is_never`.

@@ -519,6 +519,31 @@ fn test_primitive_boxing_string_assignability() {
 }
 
 #[test]
+fn test_primitive_boxing_symbol_assignability() {
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let description = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+    let symbol_interface = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("description"),
+        type_id: description,
+        write_type: description,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let sym = SymbolRef(6);
+    env.insert(sym, symbol_interface);
+    let symbol_ref = interner.reference(sym);
+
+    let mut checker = SubtypeChecker::with_resolver(&interner, &env);
+
+    assert!(checker.is_subtype_of(TypeId::SYMBOL, symbol_ref));
+    assert!(!checker.is_subtype_of(symbol_ref, TypeId::SYMBOL));
+}
+
+#[test]
 fn test_weak_type_detection_requires_overlap() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
