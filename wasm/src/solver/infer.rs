@@ -561,7 +561,7 @@ impl<'a> InferenceContext<'a> {
 
         if !lower_bounds.is_empty() && !upper_bounds.is_empty() {
             let has_informative = lower_bounds.iter().any(|ty| {
-                !matches!(*ty, TypeId::ANY | TypeId::UNKNOWN)
+                !matches!(*ty, TypeId::ANY | TypeId::UNKNOWN | TypeId::ERROR)
             });
             if !has_informative {
                 lower_bounds.clear();
