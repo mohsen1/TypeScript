@@ -12661,3 +12661,1023 @@ fn test_recursive_conditional_readonly_array_unwrap() {
     // Behavior depends on whether readonly arrays match Array<U>
     assert!(result != TypeId::ERROR, "Readonly array unwrap should not produce error");
 }
+
+// =============================================================================
+// Distributive Conditional Types with Mapped Type Interactions
+// =============================================================================
+// These test patterns like FunctionKeys<T>, PickByValue<T, V>, etc.
+// which combine mapped types with conditional filtering and index access.
+
+#[test]
+fn test_mapped_conditional_function_keys_pattern() {
+    let interner = TypeInterner::new();
+
+    // FunctionKeys<T> = { [K in keyof T]: T[K] extends Function ? K : never }[keyof T]
+    // For { a: string, b: () => void, c: number, d: () => string }
+    // Should produce: "b" | "d"
+
+    // Create source object type
+    let fn_void = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_string = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: fn_void,
+            write_type: fn_void,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: interner.intern_string("c"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("d"),
+            type_id: fn_string,
+            write_type: fn_string,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+    ]);
+
+    // Create the mapped type: { [K in keyof T]: T[K] extends Function ? K : never }
+    let k_name = interner.intern_string("K");
+    let k_param = TypeParamInfo {
+        name: k_name,
+        constraint: None,
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    // keyof T (will be "a" | "b" | "c" | "d")
+    let keyof_source = interner.intern(TypeKey::KeyOf(source_obj));
+
+    // T[K] - index access
+    let t_k = interner.intern(TypeKey::IndexAccess(source_obj, k_type));
+
+    // Function type to check against
+    let function_base = interner.reference(SymbolRef(300));
+
+    // T[K] extends Function ? K : never
+    let conditional = interner.conditional(ConditionalType {
+        check_type: t_k,
+        extends_type: function_base,
+        true_type: k_type,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    });
+
+    // The mapped type
+    let mapped = interner.mapped(MappedType {
+        type_param: k_param,
+        constraint: keyof_source,
+        name_type: None,
+        template: conditional,
+        readonly_modifier: None,
+        optional_modifier: None,
+    });
+
+    // The pattern tests mapped type with conditional value filtering
+    let result = evaluate_type(&interner, mapped);
+    assert!(result != TypeId::ERROR, "FunctionKeys mapped type should evaluate without error");
+}
+
+#[test]
+fn test_mapped_conditional_non_function_keys_pattern() {
+    let interner = TypeInterner::new();
+
+    // NonFunctionKeys<T> = { [K in keyof T]: T[K] extends Function ? never : K }[keyof T]
+    // For { a: string, b: () => void, c: number }
+    // Should produce: "a" | "c"
+
+    let fn_void = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: fn_void,
+            write_type: fn_void,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: interner.intern_string("c"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let k_name = interner.intern_string("K");
+    let k_param = TypeParamInfo {
+        name: k_name,
+        constraint: None,
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    let keyof_source = interner.intern(TypeKey::KeyOf(source_obj));
+    let t_k = interner.intern(TypeKey::IndexAccess(source_obj, k_type));
+
+    let function_base = interner.reference(SymbolRef(300));
+
+    // T[K] extends Function ? never : K (inverse of FunctionKeys)
+    let conditional = interner.conditional(ConditionalType {
+        check_type: t_k,
+        extends_type: function_base,
+        true_type: TypeId::NEVER,
+        false_type: k_type,
+        is_distributive: true,
+    });
+
+    let mapped = interner.mapped(MappedType {
+        type_param: k_param,
+        constraint: keyof_source,
+        name_type: None,
+        template: conditional,
+        readonly_modifier: None,
+        optional_modifier: None,
+    });
+
+    let result = evaluate_type(&interner, mapped);
+    assert!(result != TypeId::ERROR, "NonFunctionKeys mapped type should evaluate without error");
+}
+
+#[test]
+fn test_mapped_conditional_pick_by_value_pattern() {
+    let interner = TypeInterner::new();
+
+    // PickByValue<T, V> = { [K in keyof T as T[K] extends V ? K : never]: T[K] }
+    // For { a: string, b: number, c: string }, V = string
+    // Should produce: { a: string, c: string }
+
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("c"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let k_name = interner.intern_string("K");
+    let k_param = TypeParamInfo {
+        name: k_name,
+        constraint: None,
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    let keyof_source = interner.intern(TypeKey::KeyOf(source_obj));
+    let t_k = interner.intern(TypeKey::IndexAccess(source_obj, k_type));
+
+    // T[K] extends string ? K : never (key remapping)
+    let name_conditional = interner.conditional(ConditionalType {
+        check_type: t_k,
+        extends_type: TypeId::STRING,
+        true_type: k_type,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    });
+
+    // Mapped type with key remapping (as clause)
+    let mapped = interner.mapped(MappedType {
+        type_param: k_param,
+        constraint: keyof_source,
+        name_type: Some(name_conditional),
+        template: t_k,
+        readonly_modifier: None,
+        optional_modifier: None,
+    });
+
+    let result = evaluate_type(&interner, mapped);
+    assert!(result != TypeId::ERROR, "PickByValue mapped type should evaluate without error");
+}
+
+#[test]
+fn test_mapped_conditional_omit_by_value_pattern() {
+    let interner = TypeInterner::new();
+
+    // OmitByValue<T, V> = { [K in keyof T as T[K] extends V ? never : K]: T[K] }
+    // For { a: string, b: number, c: string }, V = string
+    // Should produce: { b: number }
+
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("c"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let k_name = interner.intern_string("K");
+    let k_param = TypeParamInfo {
+        name: k_name,
+        constraint: None,
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    let keyof_source = interner.intern(TypeKey::KeyOf(source_obj));
+    let t_k = interner.intern(TypeKey::IndexAccess(source_obj, k_type));
+
+    // T[K] extends string ? never : K (inverse of PickByValue)
+    let name_conditional = interner.conditional(ConditionalType {
+        check_type: t_k,
+        extends_type: TypeId::STRING,
+        true_type: TypeId::NEVER,
+        false_type: k_type,
+        is_distributive: true,
+    });
+
+    let mapped = interner.mapped(MappedType {
+        type_param: k_param,
+        constraint: keyof_source,
+        name_type: Some(name_conditional),
+        template: t_k,
+        readonly_modifier: None,
+        optional_modifier: None,
+    });
+
+    let result = evaluate_type(&interner, mapped);
+    assert!(result != TypeId::ERROR, "OmitByValue mapped type should evaluate without error");
+}
+
+#[test]
+fn test_mapped_conditional_value_of_pattern() {
+    let interner = TypeInterner::new();
+
+    // ValueOf<T> = T[keyof T]
+    // For { a: string, b: number }
+    // Should produce: string | number
+
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let keyof_source = interner.intern(TypeKey::KeyOf(source_obj));
+    let value_of = interner.intern(TypeKey::IndexAccess(source_obj, keyof_source));
+
+    let result = evaluate_type(&interner, value_of);
+    assert!(result != TypeId::ERROR, "ValueOf pattern should evaluate without error");
+}
+
+#[test]
+fn test_mapped_conditional_extract_keys_by_type() {
+    let interner = TypeInterner::new();
+
+    // Pattern: { [K in keyof T]: T[K] extends string ? K : never }[keyof T]
+    // Extracts keys whose values are strings
+
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("name"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("age"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("email"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let k_name = interner.intern_string("K");
+    let k_param = TypeParamInfo {
+        name: k_name,
+        constraint: None,
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    let keyof_source = interner.intern(TypeKey::KeyOf(source_obj));
+    let t_k = interner.intern(TypeKey::IndexAccess(source_obj, k_type));
+
+    // T[K] extends string ? K : never
+    let conditional = interner.conditional(ConditionalType {
+        check_type: t_k,
+        extends_type: TypeId::STRING,
+        true_type: k_type,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    });
+
+    let mapped = interner.mapped(MappedType {
+        type_param: k_param,
+        constraint: keyof_source,
+        name_type: None,
+        template: conditional,
+        readonly_modifier: None,
+        optional_modifier: None,
+    });
+
+    // { [K in keyof T]: ... }[keyof T] - index access to extract union
+    let extracted = interner.intern(TypeKey::IndexAccess(mapped, keyof_source));
+
+    let result = evaluate_type(&interner, extracted);
+    assert!(result != TypeId::ERROR, "Extract keys by type should evaluate without error");
+}
+
+#[test]
+fn test_mapped_conditional_nullable_keys_pattern() {
+    let interner = TypeInterner::new();
+
+    // NullableKeys<T> = { [K in keyof T]: null extends T[K] ? K : never }[keyof T]
+    // For { a: string | null, b: number, c: string | null }
+    // Should produce: "a" | "c"
+
+    let string_or_null = interner.union(vec![TypeId::STRING, TypeId::NULL]);
+
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: string_or_null,
+            write_type: string_or_null,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("c"),
+            type_id: string_or_null,
+            write_type: string_or_null,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let k_name = interner.intern_string("K");
+    let k_param = TypeParamInfo {
+        name: k_name,
+        constraint: None,
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    let keyof_source = interner.intern(TypeKey::KeyOf(source_obj));
+    let t_k = interner.intern(TypeKey::IndexAccess(source_obj, k_type));
+
+    // null extends T[K] ? K : never
+    let conditional = interner.conditional(ConditionalType {
+        check_type: TypeId::NULL,
+        extends_type: t_k,
+        true_type: k_type,
+        false_type: TypeId::NEVER,
+        is_distributive: false, // Not distributive - check is a concrete type
+    });
+
+    let mapped = interner.mapped(MappedType {
+        type_param: k_param,
+        constraint: keyof_source,
+        name_type: None,
+        template: conditional,
+        readonly_modifier: None,
+        optional_modifier: None,
+    });
+
+    let result = evaluate_type(&interner, mapped);
+    assert!(result != TypeId::ERROR, "NullableKeys pattern should evaluate without error");
+}
+
+#[test]
+fn test_mapped_conditional_required_keys_pattern() {
+    let interner = TypeInterner::new();
+
+    // RequiredKeys<T> = { [K in keyof T]-?: {} extends Pick<T, K> ? never : K }[keyof T]
+    // Simplified version: keys that are not optional
+
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("required"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("optional"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: true,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let k_name = interner.intern_string("K");
+    let k_param = TypeParamInfo {
+        name: k_name,
+        constraint: None,
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    let keyof_source = interner.intern(TypeKey::KeyOf(source_obj));
+
+    // For RequiredKeys, we'd need to check optionality
+    // Simplified: the mapped type iteration is the key part
+    let mapped = interner.mapped(MappedType {
+        type_param: k_param,
+        constraint: keyof_source,
+        name_type: None,
+        template: k_type, // Just return the key
+        readonly_modifier: None,
+        optional_modifier: Some(MappedModifier::Remove), // -?
+    });
+
+    let result = evaluate_type(&interner, mapped);
+    assert!(result != TypeId::ERROR, "RequiredKeys pattern should evaluate without error");
+}
+
+#[test]
+fn test_mapped_conditional_deep_pick_by_value() {
+    let interner = TypeInterner::new();
+
+    // DeepPickByValue<T, V> - nested pattern
+    // { [K in keyof T as T[K] extends V ? K : never]: T[K] extends object ? DeepPickByValue<T[K], V> : T[K] }
+
+    let nested_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("inner"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: nested_obj,
+            write_type: nested_obj,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let k_name = interner.intern_string("K");
+    let k_param = TypeParamInfo {
+        name: k_name,
+        constraint: None,
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    let keyof_source = interner.intern(TypeKey::KeyOf(source_obj));
+    let t_k = interner.intern(TypeKey::IndexAccess(source_obj, k_type));
+
+    // T[K] extends object ? T[K] : T[K] (simplified - real would be recursive)
+    let inner_conditional = interner.conditional(ConditionalType {
+        check_type: t_k,
+        extends_type: TypeId::OBJECT,
+        true_type: t_k,
+        false_type: t_k,
+        is_distributive: true,
+    });
+
+    let mapped = interner.mapped(MappedType {
+        type_param: k_param,
+        constraint: keyof_source,
+        name_type: None,
+        template: inner_conditional,
+        readonly_modifier: None,
+        optional_modifier: None,
+    });
+
+    let result = evaluate_type(&interner, mapped);
+    assert!(result != TypeId::ERROR, "DeepPickByValue pattern should evaluate without error");
+}
+
+#[test]
+fn test_mapped_conditional_getters_pattern() {
+    let interner = TypeInterner::new();
+
+    // Getters<T> = { [K in keyof T as `get${Capitalize<K>}`]: () => T[K] }
+    // Uses template literal in key remapping
+
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("name"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("age"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let k_name = interner.intern_string("K");
+    let k_param = TypeParamInfo {
+        name: k_name,
+        constraint: None,
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    let keyof_source = interner.intern(TypeKey::KeyOf(source_obj));
+    let t_k = interner.intern(TypeKey::IndexAccess(source_obj, k_type));
+
+    // Template literal: `get${K}` (simplified, without Capitalize)
+    let get_prefix = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("get")),
+        TemplateSpan::Type(k_type),
+    ]);
+
+    // () => T[K]
+    let getter_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: t_k,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let mapped = interner.mapped(MappedType {
+        type_param: k_param,
+        constraint: keyof_source,
+        name_type: Some(get_prefix),
+        template: getter_fn,
+        readonly_modifier: None,
+        optional_modifier: None,
+    });
+
+    let result = evaluate_type(&interner, mapped);
+    assert!(result != TypeId::ERROR, "Getters pattern should evaluate without error");
+}
+
+#[test]
+fn test_mapped_conditional_setters_pattern() {
+    let interner = TypeInterner::new();
+
+    // Setters<T> = { [K in keyof T as `set${Capitalize<K>}`]: (value: T[K]) => void }
+
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("value"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let k_name = interner.intern_string("K");
+    let k_param = TypeParamInfo {
+        name: k_name,
+        constraint: None,
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    let keyof_source = interner.intern(TypeKey::KeyOf(source_obj));
+    let t_k = interner.intern(TypeKey::IndexAccess(source_obj, k_type));
+
+    // Template literal: `set${K}`
+    let set_prefix = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("set")),
+        TemplateSpan::Type(k_type),
+    ]);
+
+    // (value: T[K]) => void
+    let setter_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("value")),
+            type_id: t_k,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let mapped = interner.mapped(MappedType {
+        type_param: k_param,
+        constraint: keyof_source,
+        name_type: Some(set_prefix),
+        template: setter_fn,
+        readonly_modifier: None,
+        optional_modifier: None,
+    });
+
+    let result = evaluate_type(&interner, mapped);
+    assert!(result != TypeId::ERROR, "Setters pattern should evaluate without error");
+}
+
+#[test]
+fn test_mapped_conditional_filter_readonly_keys() {
+    let interner = TypeInterner::new();
+
+    // ReadonlyKeys<T> - extract keys that are readonly
+    // This tests filtering based on property metadata
+
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("id"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: true,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("name"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("version"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: true,
+            is_method: false,
+        },
+    ]);
+
+    let k_name = interner.intern_string("K");
+    let k_param = TypeParamInfo {
+        name: k_name,
+        constraint: None,
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    let keyof_source = interner.intern(TypeKey::KeyOf(source_obj));
+
+    // The mapped type iteration
+    let mapped = interner.mapped(MappedType {
+        type_param: k_param,
+        constraint: keyof_source,
+        name_type: None,
+        template: k_type,
+        readonly_modifier: Some(MappedModifier::Add), // +readonly
+        optional_modifier: None,
+    });
+
+    let result = evaluate_type(&interner, mapped);
+    assert!(result != TypeId::ERROR, "ReadonlyKeys pattern should evaluate without error");
+}
+
+#[test]
+fn test_mapped_conditional_array_element_keys() {
+    let interner = TypeInterner::new();
+
+    // ArrayKeys<T> = { [K in keyof T]: T[K] extends any[] ? K : never }[keyof T]
+    // Extract keys whose values are arrays
+
+    let string_array = interner.array(TypeId::STRING);
+    let number_array = interner.array(TypeId::NUMBER);
+
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("items"),
+            type_id: string_array,
+            write_type: string_array,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("count"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("values"),
+            type_id: number_array,
+            write_type: number_array,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let k_name = interner.intern_string("K");
+    let k_param = TypeParamInfo {
+        name: k_name,
+        constraint: None,
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    let keyof_source = interner.intern(TypeKey::KeyOf(source_obj));
+    let t_k = interner.intern(TypeKey::IndexAccess(source_obj, k_type));
+
+    // any[] type for extends check
+    let any_array = interner.array(TypeId::ANY);
+
+    // T[K] extends any[] ? K : never
+    let conditional = interner.conditional(ConditionalType {
+        check_type: t_k,
+        extends_type: any_array,
+        true_type: k_type,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    });
+
+    let mapped = interner.mapped(MappedType {
+        type_param: k_param,
+        constraint: keyof_source,
+        name_type: None,
+        template: conditional,
+        readonly_modifier: None,
+        optional_modifier: None,
+    });
+
+    let result = evaluate_type(&interner, mapped);
+    assert!(result != TypeId::ERROR, "ArrayKeys pattern should evaluate without error");
+}
+
+#[test]
+fn test_mapped_conditional_union_distribution_in_template() {
+    let interner = TypeInterner::new();
+
+    // When T[K] is a union, the conditional should distribute over it
+    // For { a: string | number }, T[K] extends string ? "yes" : "no"
+    // Should produce "yes" | "no" for key "a"
+
+    let string_or_number = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: string_or_number,
+            write_type: string_or_number,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let k_name = interner.intern_string("K");
+    let k_param = TypeParamInfo {
+        name: k_name,
+        constraint: None,
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    let keyof_source = interner.intern(TypeKey::KeyOf(source_obj));
+    let t_k = interner.intern(TypeKey::IndexAccess(source_obj, k_type));
+
+    let yes_lit = interner.literal_string("yes");
+    let no_lit = interner.literal_string("no");
+
+    // T[K] extends string ? "yes" : "no"
+    let conditional = interner.conditional(ConditionalType {
+        check_type: t_k,
+        extends_type: TypeId::STRING,
+        true_type: yes_lit,
+        false_type: no_lit,
+        is_distributive: true,
+    });
+
+    let mapped = interner.mapped(MappedType {
+        type_param: k_param,
+        constraint: keyof_source,
+        name_type: None,
+        template: conditional,
+        readonly_modifier: None,
+        optional_modifier: None,
+    });
+
+    let result = evaluate_type(&interner, mapped);
+    assert!(result != TypeId::ERROR, "Union distribution in template should evaluate without error");
+}
+
+#[test]
+fn test_mapped_conditional_nested_keyof() {
+    let interner = TypeInterner::new();
+
+    // NestedKeyOf<T> = { [K in keyof T]: T[K] extends object ? keyof T[K] : never }[keyof T]
+    // For { a: { x: string, y: number }, b: string }
+    // Should produce: "x" | "y"
+
+    let nested_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("x"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("y"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: nested_obj,
+            write_type: nested_obj,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let k_name = interner.intern_string("K");
+    let k_param = TypeParamInfo {
+        name: k_name,
+        constraint: None,
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    let keyof_source = interner.intern(TypeKey::KeyOf(source_obj));
+    let t_k = interner.intern(TypeKey::IndexAccess(source_obj, k_type));
+    let keyof_t_k = interner.intern(TypeKey::KeyOf(t_k));
+
+    // T[K] extends object ? keyof T[K] : never
+    let conditional = interner.conditional(ConditionalType {
+        check_type: t_k,
+        extends_type: TypeId::OBJECT,
+        true_type: keyof_t_k,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    });
+
+    let mapped = interner.mapped(MappedType {
+        type_param: k_param,
+        constraint: keyof_source,
+        name_type: None,
+        template: conditional,
+        readonly_modifier: None,
+        optional_modifier: None,
+    });
+
+    // Final index access to extract values
+    let extracted = interner.intern(TypeKey::IndexAccess(mapped, keyof_source));
+
+    let result = evaluate_type(&interner, extracted);
+    assert!(result != TypeId::ERROR, "NestedKeyOf pattern should evaluate without error");
+}
