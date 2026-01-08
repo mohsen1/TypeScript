@@ -20,6 +20,7 @@ Priority: 1
 - [x] Drop mutual circular upper bounds across type params; added `test_resolve_mutual_circular_upper_bounds_unknown`. Tests: `./wasm/test.sh test_resolve_mutual_circular_upper_bounds_unknown`.
 - [x] Guard self-recursive object bounds on multiple params; added `test_resolve_self_recursive_object_bounds_two_params_unknown`. Tests: `./wasm/test.sh test_resolve_self_recursive_object_bounds_two_params_unknown`.
 - [x] Guard mutual recursive object bounds; added `test_resolve_mutual_recursive_object_bounds_unknown`. Tests: `./wasm/test.sh test_resolve_mutual_recursive_object_bounds_unknown`.
+- [x] Contextual literal selection over `any`; added `test_apply_contextual_any_uses_literal_context`. Tests: `./wasm/test.sh test_apply_contextual_any_uses_literal_context`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.

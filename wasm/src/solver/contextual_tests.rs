@@ -365,6 +365,16 @@ fn test_apply_contextual_any_uses_context() {
 }
 
 #[test]
+fn test_apply_contextual_any_uses_literal_context() {
+    let interner = TypeInterner::new();
+    let literal = interner.literal_string("ready");
+
+    // Expression type is any - use contextual literal type
+    let result = apply_contextual_type(&interner, TypeId::ANY, Some(literal));
+    assert_eq!(result, literal);
+}
+
+#[test]
 fn test_apply_contextual_unknown_uses_context() {
     let interner = TypeInterner::new();
 
