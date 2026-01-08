@@ -82,8 +82,10 @@ Priority: 3
 - [x] Solver unsoundness: mapped type over number keys with optional+readonly add in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_over_number_keys_optional_readonly_add_subtyping`.
 - [x] Test runner: mount repo root and copy `package.json` for Docker tests in `wasm/test.sh`. Tests: `./wasm/test.sh test_template_literal_subtyping_to_string`.
 - [x] CLI: avoid `package.json` version borrow in `wasm/src/cli/driver.rs`. Tests: `./wasm/test.sh test_template_literal_subtyping_to_string`.
+- [x] Solver unsoundness: object trifecta null/undefined rejection in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_object_trifecta_nullish_rejection`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
 - Use Docker for Rust tests (`./wasm/test.sh`), never `cargo test` directly.
 - Update this plan after each task and keep it accurate.
+- Ready for merge.
