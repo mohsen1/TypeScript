@@ -270,3 +270,62 @@ fn test_parity_es5_class_static_getter() {
         output
     );
 }
+
+/// Parity test for ES5 class with static async method that captures `this`.
+/// In static methods, `this` refers to the class constructor.
+/// The async static method should be wrapped in __awaiter and properly capture `this`.
+#[test]
+fn test_parity_es5_class_static_async_this_capture() {
+    let source = "class Foo { static value = 42; static async getValue() { return this.value; } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 static async method downlevel with this capture
+    assert!(
+        output.contains("__awaiter"),
+        "ES5 output should include __awaiter helper for static async method: {}",
+        output
+    );
+    assert!(
+        output.contains("__generator"),
+        "ES5 output should include __generator helper for static async method: {}",
+        output
+    );
+    assert!(
+        output.contains("Foo.getValue = function"),
+        "ES5 output should emit static method on class constructor: {}",
+        output
+    );
+    // In static methods, this refers to the class itself, so this.value should work
+    assert!(
+        output.contains("this.value") || output.contains("_this.value"),
+        "ES5 output should reference this.value or _this.value in static async method: {}",
+        output
+    );
+    assert!(
+        !output.contains("async"),
+        "ES5 output should not contain async keyword: {}",
+        output
+    );
+    assert!(
+        !output.contains("static async"),
+        "ES5 output should not contain static async syntax: {}",
+        output
+    );
+}

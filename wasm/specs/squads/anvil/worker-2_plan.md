@@ -13,6 +13,7 @@ Priority: 2
 - [ ] [EM: Add queued tasks]
 
 ## Completed
+- [x] Added parity test for static async method with this capture in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (8 tests).
 - [x] Added parity tests for getter/setter ES5 downleveling in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (7 tests).
 - [x] Added parity test for ES5 class async method with super.method() call in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (5 tests).
 - [x] Added coverage for triple-nested arrow functions with async this/arguments capture in `emitter_transform_integration_tests.rs`; `./wasm/test.sh triple_nested` passed (3 tests).
