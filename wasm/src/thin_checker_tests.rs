@@ -8817,3 +8817,332 @@ const vertical: boolean = Direction.isVertical(Direction.Up);
         checker.ctx.diagnostics
     );
 }
+
+/// TS Unsoundness #2: Function Bivariance - Methods are bivariant
+///
+/// Methods defined using method shorthand syntax are always bivariant,
+/// meaning they accept both narrower AND wider argument types.
+/// This allows common patterns like event handlers to work.
+///
+/// EXPECTED FAILURE: Method bivariance is not yet implemented. Methods are
+/// currently checked with strictFunctionTypes semantics. Once method bivariance
+/// is implemented, change to expect 0 errors.
+#[test]
+fn test_method_bivariance_wider_argument() {
+    use crate::thin_parser::ThinParserState;
+
+    // Animal is wider than Dog
+    // A method handler(dog: Dog) should be assignable to handler(animal: Animal)
+    // because methods are bivariant
+    let source = r#"
+interface Animal { name: string }
+interface Dog extends Animal { breed: string }
+
+interface HandlerWithAnimal {
+    handle(animal: Animal): void;
+}
+
+interface HandlerWithDog {
+    handle(dog: Dog): void;
+}
+
+// Method bivariance: handler with narrower param type can be assigned to wider
+// This is unsound but intentionally allowed
+declare const dogHandler: HandlerWithDog;
+const animalHandler: HandlerWithAnimal = dogHandler;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let error_count = checker.ctx.diagnostics.len();
+
+    // Currently expects 1 error: method bivariance not implemented
+    // Once method bivariance works, change to expect 0 errors
+    if error_count != 1 {
+        eprintln!("=== Method Bivariance Wider Arg Diagnostics ===");
+        eprintln!("Expected 1 error (method bivariance not implemented), got {}", error_count);
+        for diag in &checker.ctx.diagnostics {
+            eprintln!("[{}] {}", diag.start, diag.message_text);
+        }
+    }
+
+    assert_eq!(
+        error_count, 1,
+        "Expected 1 error for method bivariance (not yet implemented): {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// TS Unsoundness #2: Function Bivariance - Methods accept narrower too
+///
+/// Due to method bivariance, a method with WIDER argument type
+/// is also assignable to one with NARROWER argument type.
+#[test]
+fn test_method_bivariance_narrower_argument() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface Animal { name: string }
+interface Dog extends Animal { breed: string }
+
+interface HandlerWithAnimal {
+    handle(animal: Animal): void;
+}
+
+interface HandlerWithDog {
+    handle(dog: Dog): void;
+}
+
+// Method bivariance: handler with wider param type also assignable to narrower
+// This is the truly unsound direction
+declare const animalHandler: HandlerWithAnimal;
+const dogHandler: HandlerWithDog = animalHandler;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    if !checker.ctx.diagnostics.is_empty() {
+        eprintln!("=== Method Bivariance Narrower Arg Diagnostics ===");
+        for diag in &checker.ctx.diagnostics {
+            eprintln!("[{}] {}", diag.start, diag.message_text);
+        }
+    }
+
+    // Method bivariance should allow this unsound assignment (0 errors)
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Method bivariance should allow wider->narrower param assignment: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// TS Unsoundness #2: Function Bivariance - Function properties are contravariant
+///
+/// Unlike methods, function properties (arrow function syntax) are checked
+/// contravariantly under strictFunctionTypes. A function with wider parameter
+/// can be assigned to one with narrower parameter, but NOT vice versa.
+#[test]
+fn test_function_property_contravariance() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface Animal { name: string }
+interface Dog extends Animal { breed: string }
+
+interface HandlerWithAnimalProp {
+    handle: (animal: Animal) => void;
+}
+
+interface HandlerWithDogProp {
+    handle: (dog: Dog) => void;
+}
+
+// Function property: wider param -> narrower is allowed (contravariance)
+declare const animalHandler: HandlerWithAnimalProp;
+const dogHandler: HandlerWithDogProp = animalHandler;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    if !checker.ctx.diagnostics.is_empty() {
+        eprintln!("=== Function Property Contravariance Diagnostics ===");
+        for diag in &checker.ctx.diagnostics {
+            eprintln!("[{}] {}", diag.start, diag.message_text);
+        }
+    }
+
+    // Contravariant direction should be allowed (0 errors)
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Function property should allow contravariant assignment (wider->narrower): {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// TS Unsoundness #2: Function Bivariance - Function property rejects unsound direction
+///
+/// With strictFunctionTypes, function properties reject the unsound
+/// covariant direction (narrower param -> wider param).
+#[test]
+fn test_function_property_rejects_covariant() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface Animal { name: string }
+interface Dog extends Animal { breed: string }
+
+interface HandlerWithAnimalProp {
+    handle: (animal: Animal) => void;
+}
+
+interface HandlerWithDogProp {
+    handle: (dog: Dog) => void;
+}
+
+// Function property: narrower param -> wider should be REJECTED
+// This would be unsound and strictFunctionTypes catches it
+declare const dogHandler: HandlerWithDogProp;
+const animalHandler: HandlerWithAnimalProp = dogHandler;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let error_count = checker.ctx.diagnostics.len();
+
+    if error_count != 1 {
+        eprintln!("=== Function Property Covariant Rejection Diagnostics ===");
+        eprintln!("Expected 1 error, got {}", error_count);
+        for diag in &checker.ctx.diagnostics {
+            eprintln!("[{}] {}", diag.start, diag.message_text);
+        }
+    }
+
+    // strictFunctionTypes should reject the unsound direction (1 error)
+    assert_eq!(
+        error_count, 1,
+        "Function property should reject narrower->wider param assignment: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// TS Unsoundness #2: Function Bivariance - Event handler pattern
+///
+/// The classic use case: event handlers with specific event types
+/// must be assignable to generic event handlers.
+#[test]
+fn test_method_bivariance_event_handler_pattern() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface Event { type: string }
+interface MouseEvent extends Event { x: number; y: number }
+
+interface Element {
+    addEventListener(handler: (e: Event) => void): void;
+}
+
+// Should be able to pass a MouseEvent handler to addEventListener
+// This relies on method bivariance
+function handleMouse(e: MouseEvent): void {
+    console.log(e.x, e.y);
+}
+
+declare const elem: Element;
+elem.addEventListener(handleMouse);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    if !checker.ctx.diagnostics.is_empty() {
+        eprintln!("=== Event Handler Pattern Diagnostics ===");
+        for diag in &checker.ctx.diagnostics {
+            eprintln!("[{}] {}", diag.start, diag.message_text);
+        }
+    }
+
+    // Event handler pattern should work due to method bivariance
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Event handler pattern should work with method bivariance: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// TS Unsoundness #2: Function Bivariance - Callback in method parameter
+///
+/// When a callback is passed as a method parameter, the callback itself
+/// benefits from method bivariance rules.
+#[test]
+fn test_callback_method_parameter_bivariance() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface Animal { name: string }
+interface Dog extends Animal { breed: string }
+
+interface Processor {
+    process(items: Animal[], callback: (item: Animal) => void): void;
+}
+
+function handleDog(dog: Dog): void {
+    console.log(dog.breed);
+}
+
+declare const processor: Processor;
+declare const dogs: Dog[];
+
+// Passing a Dog[] to Animal[] is covariant (allowed by #3)
+// Passing handleDog to callback is bivariant (should be allowed)
+processor.process(dogs, handleDog);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    if !checker.ctx.diagnostics.is_empty() {
+        eprintln!("=== Callback Method Parameter Diagnostics ===");
+        for diag in &checker.ctx.diagnostics {
+            eprintln!("[{}] {}", diag.start, diag.message_text);
+        }
+    }
+
+    // Callback parameter should benefit from method bivariance
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Callback in method parameter should allow bivariant assignment: {:?}",
+        checker.ctx.diagnostics
+    );
+}
