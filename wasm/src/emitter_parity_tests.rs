@@ -149,3 +149,124 @@ fn test_parity_es5_class_async_super_method() {
         output
     );
 }
+
+/// Parity test for ES5 class with getter and setter.
+/// In ES5, class accessors should be downleveled to Object.defineProperty calls.
+/// tsc emits: Object.defineProperty(Foo.prototype, "value", { get: function() {...}, set: function(v) {...}, ... });
+#[test]
+fn test_parity_es5_class_getter_setter() {
+    let source = "class Foo { private _value: number = 0; get value() { return this._value; } set value(v) { this._value = v; } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 class accessor downlevel produces correct output matching tsc behavior
+    assert!(
+        output.contains("Object.defineProperty"),
+        "ES5 output should use Object.defineProperty for accessors: {}",
+        output
+    );
+    assert!(
+        output.contains("Foo.prototype"),
+        "ES5 output should define accessors on prototype: {}",
+        output
+    );
+    assert!(
+        output.contains("\"value\""),
+        "ES5 output should define property named 'value': {}",
+        output
+    );
+    assert!(
+        output.contains("get:") || output.contains("get :"),
+        "ES5 output should have getter in property descriptor: {}",
+        output
+    );
+    assert!(
+        output.contains("set:") || output.contains("set :"),
+        "ES5 output should have setter in property descriptor: {}",
+        output
+    );
+    assert!(
+        output.contains("this._value"),
+        "ES5 output should reference this._value in accessor bodies: {}",
+        output
+    );
+    assert!(
+        !output.contains("get value()"),
+        "ES5 output should not contain ES6 getter syntax: {}",
+        output
+    );
+    assert!(
+        !output.contains("set value("),
+        "ES5 output should not contain ES6 setter syntax: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 class with static getter.
+/// Static accessors should be defined on the class constructor, not the prototype.
+#[test]
+fn test_parity_es5_class_static_getter() {
+    let source = "class Foo { private static _instance: Foo; static get instance() { return Foo._instance; } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 static accessor downlevel
+    assert!(
+        output.contains("Object.defineProperty"),
+        "ES5 output should use Object.defineProperty for static accessor: {}",
+        output
+    );
+    // Static accessors are defined on the constructor function itself, not prototype
+    assert!(
+        output.contains("Foo, \"instance\"") || output.contains("Foo,\"instance\""),
+        "ES5 output should define static accessor on Foo (constructor): {}",
+        output
+    );
+    assert!(
+        output.contains("get:") || output.contains("get :"),
+        "ES5 output should have getter in property descriptor: {}",
+        output
+    );
+    assert!(
+        output.contains("Foo._instance"),
+        "ES5 output should reference Foo._instance in getter body: {}",
+        output
+    );
+    assert!(
+        !output.contains("static get instance"),
+        "ES5 output should not contain ES6 static getter syntax: {}",
+        output
+    );
+}

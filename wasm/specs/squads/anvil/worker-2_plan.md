@@ -13,6 +13,7 @@ Priority: 2
 - [ ] [EM: Add queued tasks]
 
 ## Completed
+- [x] Added parity tests for getter/setter ES5 downleveling in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (7 tests).
 - [x] Added parity test for ES5 class async method with super.method() call in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (5 tests).
 - [x] Added coverage for triple-nested arrow functions with async this/arguments capture in `emitter_transform_integration_tests.rs`; `./wasm/test.sh triple_nested` passed (3 tests).
 - [x] Added CommonJS coverage asserting `__esModule` for exported class in `thin_emitter_tests.rs`; `./wasm/test.sh test_commonjs_export_class` passed.
