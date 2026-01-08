@@ -297,6 +297,23 @@ impl<'a> AsyncES5Emitter<'a> {
             }
         }
 
+        // Check type assertions (as/satisfies/type assertion)
+        if node.kind == syntax_kind_ext::AS_EXPRESSION
+            || node.kind == syntax_kind_ext::TYPE_ASSERTION
+            || node.kind == syntax_kind_ext::SATISFIES_EXPRESSION
+        {
+            if let Some(assertion) = self.arena.get_type_assertion(node) {
+                return self.contains_await_recursive(assertion.expression);
+            }
+        }
+
+        // Check non-null expressions
+        if node.kind == syntax_kind_ext::NON_NULL_EXPRESSION {
+            if let Some(unary) = self.arena.get_unary_expr_ex(node) {
+                return self.contains_await_recursive(unary.expression);
+            }
+        }
+
         // Check template expressions
         if node.kind == syntax_kind_ext::TEMPLATE_EXPRESSION {
             if let Some(template) = self.arena.get_template_expr(node) {
