@@ -3605,7 +3605,12 @@ impl<'a> ClassES5Emitter<'a> {
         // Emit _super.prototype.method.call(this, args)
         self.write("_super.prototype.");
         self.write_identifier_text(access.name_or_argument);
-        self.write(".call(this");
+        self.write(".call(");
+        if self.use_this_capture {
+            self.write("_this");
+        } else {
+            self.write("this");
+        }
 
         if let Some(arg_list) = args {
             for &arg_idx in &arg_list.nodes {
