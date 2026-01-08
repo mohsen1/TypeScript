@@ -551,7 +551,12 @@ impl<'a> InferenceContext<'a> {
     fn compute_constraint_result(&mut self, var: InferenceVar) -> (InferenceVar, TypeId, Vec<TypeId>) {
         let root = self.table.find(var);
         let constraints = self.constraints[root.0 as usize].clone();
-        let upper_bounds = constraints.upper_bounds.clone();
+        let mut upper_bounds = Vec::new();
+        for bound in constraints.upper_bounds {
+            if !self.occurs_in(root, bound) {
+                upper_bounds.push(bound);
+            }
+        }
         let mut lower_bounds = constraints.lower_bounds;
 
         if !lower_bounds.is_empty() && !upper_bounds.is_empty() {

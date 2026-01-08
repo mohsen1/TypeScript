@@ -250,6 +250,34 @@ fn test_resolve_any_lower_prefers_upper_bound() {
 }
 
 #[test]
+fn test_resolve_circular_upper_bound_defaults_unknown() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var = ctx.fresh_type_param(t_name);
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let name_next = interner.intern_string("next");
+    let upper = interner.object(vec![PropertyInfo {
+        name: name_next,
+        type_id: t_type,
+        write_type: t_type,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    ctx.add_upper_bound(var, upper);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, TypeId::UNKNOWN);
+}
+
+#[test]
 fn test_resolve_multiple_upper_bounds_intersection() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);
