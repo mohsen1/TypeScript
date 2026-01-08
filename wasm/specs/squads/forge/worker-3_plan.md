@@ -13,6 +13,7 @@ Priority: 3
 - [ ] Coordinate with manager if unsure which unsoundness case to prioritize next.
 
 ## Completed
+- [x] Nominal classes (TS unsoundness #5): add private/protected brand property and coverage. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
 - [x] Instantiation depth limit (TS unsoundness #17): guard deep instantiation in solver and add coverage. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
 - [x] Class static side rules (TS unsoundness #18): include static members in constructor type and add coverage. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
 - [x] Numeric/string enum nominalness (TS unsoundness #7/#24/#34): added enum assignability handling and coverage. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).

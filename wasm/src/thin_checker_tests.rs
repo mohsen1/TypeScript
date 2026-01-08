@@ -1171,6 +1171,36 @@ let ctor: typeof A = B;
 }
 
 #[test]
+fn test_private_member_nominal_class_assignability() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class A {
+    private x: number;
+}
+class B {
+    private x: number;
+}
+const a: A = new B();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(codes.contains(&2741),
+        "Expected error 2741 for private member nominal mismatch, got: {:?}", codes);
+}
+
+#[test]
 fn test_abstract_property_in_constructor_2715() {
     // Error 2715: Abstract property 'prop' in class 'AbstractClass' cannot be accessed in the constructor.
     use crate::thin_parser::ThinParserState;
