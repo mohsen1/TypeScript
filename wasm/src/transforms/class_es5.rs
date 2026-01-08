@@ -398,13 +398,20 @@ impl<'a> ClassES5Emitter<'a> {
                         continue;
                     }
                     self.write_indent();
-                    self.write("_this.");
-                    self.write_identifier_text(prop_data.name);
-                    self.write(" = ");
-                    self.emit_expression(prop_data.initializer);
-                    self.write(";");
-                    self.write_line();
+                self.write("_this.");
+                self.write_identifier_text(prop_data.name);
+                self.write(" = ");
+                let needs_capture =
+                    contains_this_reference(self.arena, prop_data.initializer);
+                let prev = self.use_this_capture;
+                if needs_capture {
+                    self.use_this_capture = true;
                 }
+                self.emit_expression(prop_data.initializer);
+                self.use_this_capture = prev;
+                self.write(";");
+                self.write_line();
+            }
 
                 // Return _this
                 self.write_indent();
@@ -516,7 +523,14 @@ impl<'a> ClassES5Emitter<'a> {
                 self.write(", ");
                 self.write(&field.weakmap_name);
                 self.write(", ");
+                let needs_capture =
+                    use_this && contains_this_reference(self.arena, field.initializer);
+                let prev = self.use_this_capture;
+                if needs_capture {
+                    self.use_this_capture = true;
+                }
                 self.emit_expression(field.initializer);
+                self.use_this_capture = prev;
                 self.write(", \"f\");");
                 self.write_line();
             }

@@ -171,3 +171,73 @@ class Derived extends Base {
         output
     );
 }
+
+#[test]
+fn test_class_es5_synthesized_ctor_captures_this_in_field_initializers() {
+    let source = r#"
+class Base { m() { return 1; } }
+class Derived extends Base {
+    field = this.value;
+    fromSuper = super.m();
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected derived class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    assert!(
+        output.contains("_this.field = _this.value"),
+        "Expected synthesized ctor to use _this in initializer: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.fromSuper = _super.prototype.m.call(_this"),
+        "Expected super call to use _this in initializer: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_private_field_initializer_uses_this_capture() {
+    let source = r#"
+class Base {}
+class Derived extends Base {
+    #count = this.value;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected derived class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    assert!(
+        output.contains("__classPrivateFieldSet(_this, _Derived_count, _this.value"),
+        "Expected private field initializer to use _this in derived class: {}",
+        output
+    );
+}
