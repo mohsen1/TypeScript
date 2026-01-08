@@ -174,6 +174,46 @@ fn test_object_trifecta_object_interface_accepts_primitives() {
 }
 
 #[test]
+fn test_weak_type_detection_requires_overlap() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+    checker.enforce_weak_types = true;
+
+    let a = interner.intern_string("a");
+    let b = interner.intern_string("b");
+
+    let weak_target = interner.object(vec![PropertyInfo {
+        name: a,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let no_overlap = interner.object(vec![PropertyInfo {
+        name: b,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let overlap = interner.object(vec![PropertyInfo {
+        name: a,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(!checker.is_subtype_of(no_overlap, weak_target));
+    assert!(checker.is_subtype_of(overlap, weak_target));
+}
+
+#[test]
 fn test_unique_symbol_subtyping() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);

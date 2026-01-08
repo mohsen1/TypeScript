@@ -136,6 +136,8 @@ pub struct SubtypeChecker<'a, R: TypeResolver = NoopResolver> {
     /// Whether indexed access includes `undefined`.
     /// Default: false (legacy TS behavior).
     pub no_unchecked_indexed_access: bool,
+    /// Whether to enforce weak type detection (optional-only targets require overlap).
+    pub enforce_weak_types: bool,
 }
 
 impl<'a> SubtypeChecker<'a, NoopResolver> {
@@ -153,6 +155,7 @@ impl<'a> SubtypeChecker<'a, NoopResolver> {
             exact_optional_property_types: false,
             strict_null_checks: true,
             no_unchecked_indexed_access: false,
+            enforce_weak_types: false,
         }
     }
 }
@@ -171,6 +174,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             exact_optional_property_types: false,
             strict_null_checks: true,
             no_unchecked_indexed_access: false,
+            enforce_weak_types: false,
         }
     }
 
@@ -288,6 +292,10 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             Some(k) => k,
             None => return SubtypeResult::False,
         };
+
+        if self.enforce_weak_types && self.violates_weak_type(source, target) {
+            return SubtypeResult::False;
+        }
 
         if let Some(shape) = self.apparent_primitive_shape_for_key(&source_key) {
             match &target_key {
@@ -1019,6 +1027,81 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         }
 
         true
+    }
+
+    fn violates_weak_type(&self, source: TypeId, target: TypeId) -> bool {
+        let target_key = match self.interner.lookup(target) {
+            Some(key) => key,
+            None => return false,
+        };
+
+        let target_shape = match &target_key {
+            TypeKey::Object(shape_id) => self.interner.object_shape(*shape_id),
+            TypeKey::ObjectWithIndex(shape_id) => {
+                let shape = self.interner.object_shape(*shape_id);
+                if shape.string_index.is_some() || shape.number_index.is_some() {
+                    return false;
+                }
+                shape
+            }
+            _ => return false,
+        };
+
+        let target_props = target_shape.properties.as_slice();
+        if target_props.is_empty() || target_props.iter().any(|prop| !prop.optional) {
+            return false;
+        }
+
+        self.violates_weak_type_with_target_props(source, target_props)
+    }
+
+    fn violates_weak_type_with_target_props(
+        &self,
+        source: TypeId,
+        target_props: &[PropertyInfo],
+    ) -> bool {
+        let source_key = match self.interner.lookup(source) {
+            Some(key) => key,
+            None => return false,
+        };
+
+        match &source_key {
+            TypeKey::Object(shape_id) => {
+                let shape = self.interner.object_shape(*shape_id);
+                !self.has_common_property(shape.properties.as_slice(), target_props)
+            }
+            TypeKey::ObjectWithIndex(shape_id) => {
+                let shape = self.interner.object_shape(*shape_id);
+                !self.has_common_property(shape.properties.as_slice(), target_props)
+            }
+            TypeKey::Union(members) => {
+                let members = self.interner.type_list(*members);
+                members
+                    .iter()
+                    .any(|member| self.violates_weak_type_with_target_props(*member, target_props))
+            }
+            _ => false,
+        }
+    }
+
+    fn has_common_property(&self, source_props: &[PropertyInfo], target_props: &[PropertyInfo]) -> bool {
+        let mut source_idx = 0;
+        let mut target_idx = 0;
+
+        while source_idx < source_props.len() && target_idx < target_props.len() {
+            let source_name = source_props[source_idx].name;
+            let target_name = target_props[target_idx].name;
+            if source_name == target_name {
+                return true;
+            }
+            if source_name < target_name {
+                source_idx += 1;
+            } else {
+                target_idx += 1;
+            }
+        }
+
+        false
     }
 
     fn lookup_property<'props>(
@@ -1935,6 +2018,13 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         // Look up the type keys
         let source_key = self.interner.lookup(source)?;
         let target_key = self.interner.lookup(target)?;
+
+        if self.enforce_weak_types && self.violates_weak_type(source, target) {
+            return Some(SubtypeFailureReason::NoCommonProperties {
+                source_type: source,
+                target_type: target,
+            });
+        }
 
         self.explain_failure_inner(source, target, &source_key, &target_key)
     }
