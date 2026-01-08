@@ -7,12 +7,13 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] Add source map tests for destructuring transforms in `wasm/src/source_map_tests.rs`. Run `./wasm/test.sh source_map`.
+- [ ] (awaiting)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added destructuring transform source map tests (object basic, array basic, object with rename, array with skip, nested object, nested array, object with defaults, array with defaults, function parameters, mixed); `./wasm/test.sh source_map` passes.
 - [x] Added template literal transform source map tests (simple, with expression, multiple expressions, nested, tagged, in function, with method calls, conditional, multiline, in class); `./wasm/test.sh source_map` passes.
 - [x] Added spread and rest parameter transform source map tests (rest param function/arrow, spread function call/array/object literal, rest array/object destructuring, class method, new expression, combined); `./wasm/test.sh source_map` passes.
 - [x] Added namespace transform source map tests (functions, class, enum, nested dot notation, merging, variables, exported, nested declaration, interface-only, mixed content); `./wasm/test.sh source_map` passes.
