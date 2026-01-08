@@ -39,6 +39,16 @@ Priority: 5
 - [ ] Add coverage for `ActionFromReducers<R>` that uses indexed access `[keyof R]` on a mapped type.
 
 ## Completed
+- [x] Added never-input readonly array infer regression; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
+- [x] Added never-input multi-template infer regression; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
+- [x] Added never-input tuple infer regression; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
+- [x] Added never-input function infer regression; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
+- [x] Added never-input array infer regression; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
+- [x] Added never-input object infer regression; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
+- [x] Ensured infer patterns bind `never` across templates; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
+- [x] Added conditional infer regression for never input; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
+- [x] Added infer union target placeholder + never regression test; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
+- [x] Added non-distributive template literal union input with template member; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
 - [x] Added non-distributive template literal union-branch tests (middle/suffix/prefix); ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
 - [x] Added non-distributive template literal two-infer union-branch tests; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
 - [x] Added non-distributive template literal constrained union-branch tests (middle/suffix/prefix); ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
