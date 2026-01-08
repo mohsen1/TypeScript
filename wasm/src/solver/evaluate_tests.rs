@@ -463,6 +463,46 @@ fn test_conditional_infer_array_element_with_constraint() {
 }
 
 #[test]
+fn test_conditional_infer_array_element_non_distributive() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // (T[]) extends (infer R)[] ? R : never, with T = string | number (no distribution).
+    let check_array = interner.array(t_param);
+    let extends_array = interner.array(infer_r);
+    let cond = ConditionalType {
+        check_type: check_array,
+        extends_type: extends_array,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, interner.union(vec![TypeId::STRING, TypeId::NUMBER]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    assert_eq!(result, expected);
+}
+
+#[test]
 fn test_conditional_infer_tuple_element_extraction() {
     let interner = TypeInterner::new();
 

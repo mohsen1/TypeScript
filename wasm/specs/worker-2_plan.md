@@ -21,6 +21,7 @@ Priority: 2
 - [x] Added readonly array/tuple infer extraction tests and unwrapped readonly in evaluation. Tests: `./wasm/test.sh test_conditional_infer_readonly_`.
 - [x] Added mixed readonly/mutable array infer extraction test. Tests: `./wasm/test.sh test_conditional_infer_readonly_array_mixed_input`.
 - [x] Added constrained infer extraction tests for arrays/tuples. Tests: `./wasm/test.sh test_conditional_infer_array_element_with_constraint`.
+- [x] Added non-distributive infer extraction test for array of T. Tests: `./wasm/test.sh test_conditional_infer_array_element_non_distributive`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
