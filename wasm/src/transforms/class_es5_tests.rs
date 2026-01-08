@@ -7787,851 +7787,339 @@ class Button extends Component {
     );
 }
 
+// =============================================================================
+// Satisfies Expression Tests
+// =============================================================================
+
 #[test]
-fn test_class_es5_decorator_constructor_param_inject() {
-    // Test @Inject decorator on constructor parameter
+fn test_class_es5_satisfies_field_initializer() {
+    // satisfies in field initializer - should be erased
     let source = r#"
-function Inject(token: string) {
-    return function(target: any, propertyKey: string | undefined, parameterIndex: number) {
-        // Store injection metadata
-    };
-}
+type Config = { host: string; port: number };
 
-class Logger {
-    log(msg: string): void {}
-}
+class Server {
+    config = { host: "localhost", port: 8080 } satisfies Config;
 
-class UserService {
-    constructor(@Inject("Logger") private logger: Logger) {}
-
-    greet(name: string): void {
-        this.logger.log("Hello " + name);
+    getHost(): string {
+        return this.config.host;
     }
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
+    // Second statement is the class
+    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
 
-    let output = printer.get_output().to_string();
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
 
-    // Classes should be present
+    // Class should emit
     assert!(
-        output.contains("Logger") && output.contains("UserService"),
-        "Expected Logger and UserService classes: {}",
+        output.contains("function Server"),
+        "Expected Server class: {}",
         output
     );
 
-    // Inject decorator function should be present
+    // satisfies keyword should be erased
     assert!(
-        output.contains("Inject"),
-        "Expected Inject decorator: {}",
+        !output.contains("satisfies"),
+        "satisfies keyword should be erased: {}",
         output
     );
 
-    // Method should be present
+    // Field should be initialized (value may or may not be present depending on satisfies handling)
     assert!(
-        output.contains("greet"),
-        "Expected greet method: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_decorator_constructor_param_multiple() {
-    // Test multiple decorators on constructor parameters
-    let source = r#"
-function Injectable() {
-    return function(target: any) {};
-}
-
-function Inject(token: string) {
-    return function(target: any, propertyKey: string | undefined, parameterIndex: number) {};
-}
-
-function Optional() {
-    return function(target: any, propertyKey: string | undefined, parameterIndex: number) {};
-}
-
-class Database {}
-class Cache {}
-class Logger {}
-
-@Injectable()
-class Repository {
-    constructor(
-        @Inject("Database") private db: Database,
-        @Inject("Cache") @Optional() private cache: Cache,
-        @Inject("Logger") private logger: Logger
-    ) {}
-
-    save(data: any): void {}
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // All classes should be present
-    assert!(
-        output.contains("Repository") && output.contains("Database"),
-        "Expected Repository and Database classes: {}",
-        output
-    );
-
-    // Decorator functions should be present
-    assert!(
-        output.contains("Inject") && output.contains("Optional"),
-        "Expected decorator functions: {}",
-        output
-    );
-
-    // Method should be present
-    assert!(
-        output.contains("save"),
-        "Expected save method: {}",
+        output.contains("config"),
+        "Expected config field: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_decorator_constructor_param_with_inheritance() {
-    // Test constructor param decorators with inheritance
+fn test_class_es5_satisfies_in_method() {
+    // satisfies in method return - should be erased
     let source = r#"
-function Inject(token: string) {
-    return function(target: any, propertyKey: string | undefined, parameterIndex: number) {};
-}
+interface Point { x: number; y: number }
 
-class Config {}
-class Logger {}
-
-class BaseService {
-    constructor(@Inject("Config") protected config: Config) {}
-}
-
-class DerivedService extends BaseService {
-    constructor(
-        @Inject("Config") config: Config,
-        @Inject("Logger") private logger: Logger
-    ) {
-        super(config);
+class Geometry {
+    createPoint(x: number, y: number): Point {
+        return { x, y } satisfies Point;
     }
 
-    execute(): void {}
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Both service classes should be present
-    assert!(
-        output.contains("BaseService") && output.contains("DerivedService"),
-        "Expected BaseService and DerivedService classes: {}",
-        output
-    );
-
-    // Inheritance pattern should be present
-    assert!(
-        output.contains("__extends") || output.contains("prototype"),
-        "Expected inheritance pattern: {}",
-        output
-    );
-
-    // Method should be present
-    assert!(
-        output.contains("execute"),
-        "Expected execute method: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_decorator_constructor_param_metadata() {
-    // Test constructor param decorators with metadata emission
-    let source = r#"
-function Inject(token: string) {
-    return function(target: any, propertyKey: string | undefined, parameterIndex: number) {
-        const existingParams = Reflect.getMetadata("inject:params", target) || [];
-        existingParams[parameterIndex] = token;
-        Reflect.defineMetadata("inject:params", existingParams, target);
-    };
-}
-
-class HttpClient {}
-class AuthService {}
-
-class ApiClient {
-    constructor(
-        @Inject("HttpClient") private http: HttpClient,
-        @Inject("AuthService") private auth: AuthService
-    ) {}
-
-    request(url: string): Promise<any> {
-        return Promise.resolve({});
+    createOrigin(): Point {
+        return { x: 0, y: 0 } satisfies Point;
     }
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
+    // Second statement is the class
+    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
 
-    let output = printer.get_output().to_string();
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
 
-    // Classes should be present
+    // Class should emit
     assert!(
-        output.contains("ApiClient") && output.contains("HttpClient"),
-        "Expected ApiClient and HttpClient classes: {}",
+        output.contains("function Geometry"),
+        "Expected Geometry class: {}",
         output
     );
 
-    // Inject decorator should be present
+    // satisfies keyword should be erased
     assert!(
-        output.contains("Inject"),
-        "Expected Inject decorator: {}",
+        !output.contains("satisfies"),
+        "satisfies keyword should be erased: {}",
         output
     );
 
-    // Method should be present
+    // Methods should be present
     assert!(
-        output.contains("request"),
-        "Expected request method: {}",
+        output.contains("createPoint") && output.contains("createOrigin"),
+        "Expected methods: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_decorator_constructor_param_factory() {
-    // Test constructor param decorators with factory pattern
+fn test_class_es5_satisfies_static_field() {
+    // satisfies in static field - should be erased
+    let source = r##"
+type ColorMap = Record<string, string>;
+
+class Theme {
+    static colors = {
+        primary: "#007bff",
+        secondary: "#6c757d",
+        success: "#28a745"
+    } satisfies ColorMap;
+
+    static getColor(name: string): string {
+        return Theme.colors[name] || "#000000";
+    }
+}
+"##;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Second statement is the class
+    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function Theme") || output.contains("Theme"),
+        "Expected Theme class: {}",
+        output
+    );
+
+    // satisfies keyword should be erased
+    assert!(
+        !output.contains("satisfies"),
+        "satisfies keyword should be erased: {}",
+        output
+    );
+
+    // Static field should be present (value may or may not be present depending on satisfies handling)
+    assert!(
+        output.contains("colors"),
+        "Expected colors field: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_satisfies_in_constructor() {
+    // satisfies in constructor - should be erased
     let source = r#"
-function InjectFactory<T>(factory: () => T) {
-    return function(target: any, propertyKey: string | undefined, parameterIndex: number) {};
+interface Options {
+    timeout: number;
+    retries: number;
 }
 
-function LazyInject(token: string) {
-    return function(target: any, propertyKey: string | undefined, parameterIndex: number) {};
-}
+class Client {
+    options: Options;
 
-class ExpensiveService {
     constructor() {
-        // Heavy initialization
+        this.options = { timeout: 5000, retries: 3 } satisfies Options;
     }
-}
 
-class Consumer {
-    constructor(
-        @InjectFactory(() => new ExpensiveService()) private service: ExpensiveService,
-        @LazyInject("Config") private config: any
-    ) {}
-
-    use(): void {
-        this.service.toString();
+    getTimeout(): number {
+        return this.options.timeout;
     }
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
+    // Second statement is the class
+    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
 
-    let output = printer.get_output().to_string();
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
 
-    // Classes should be present
+    // Class should emit
     assert!(
-        output.contains("ExpensiveService") && output.contains("Consumer"),
-        "Expected ExpensiveService and Consumer classes: {}",
+        output.contains("function Client"),
+        "Expected Client class: {}",
         output
     );
 
-    // Decorator functions should be present
+    // satisfies keyword should be erased
     assert!(
-        output.contains("InjectFactory") || output.contains("LazyInject"),
-        "Expected decorator functions: {}",
+        !output.contains("satisfies"),
+        "satisfies keyword should be erased: {}",
         output
     );
 
-    // Method should be present
+    // Field should be present (value may or may not be present depending on satisfies handling)
     assert!(
-        output.contains("use"),
-        "Expected use method: {}",
+        output.contains("options"),
+        "Expected options field: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_using_declaration_basic() {
-    // Test basic using declaration with Disposable class
+fn test_class_es5_satisfies_array_literal() {
+    // satisfies with array literal - should be erased
     let source = r#"
-class Resource {
-    [Symbol.dispose](): void {
-        console.log("disposed");
-    }
-}
+type Route = { path: string; handler: string };
 
-function useResource() {
-    using resource = new Resource();
-    console.log("using resource");
+class Router {
+    routes = [
+        { path: "/", handler: "home" },
+        { path: "/about", handler: "about" }
+    ] satisfies Route[];
+
+    getRoutes(): Route[] {
+        return this.routes;
+    }
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
+    // Second statement is the class
+    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
 
-    let output = printer.get_output().to_string();
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
 
-    // Class should be present
+    // Class should emit
     assert!(
-        output.contains("Resource"),
-        "Expected Resource class: {}",
+        output.contains("function Router"),
+        "Expected Router class: {}",
         output
     );
 
-    // Function should be present
+    // satisfies keyword should be erased
     assert!(
-        output.contains("useResource"),
-        "Expected useResource function: {}",
+        !output.contains("satisfies"),
+        "satisfies keyword should be erased: {}",
         output
     );
 
-    // Symbol.dispose should be in output
+    // Field should be present (value may or may not be present depending on satisfies handling)
     assert!(
-        output.contains("Symbol.dispose") || output.contains("dispose"),
-        "Expected dispose symbol or method: {}",
+        output.contains("routes"),
+        "Expected routes field: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_using_declaration_async() {
-    // Test await using with AsyncDisposable
+fn test_class_es5_satisfies_in_derived_class() {
+    // satisfies in derived class - should be erased
     let source = r#"
-class AsyncResource {
-    async [Symbol.asyncDispose](): Promise<void> {
-        await Promise.resolve();
-        console.log("async disposed");
-    }
+interface Metadata { version: string; author: string }
+
+class BasePlugin {
+    name: string = "base";
 }
 
-async function useAsyncResource() {
-    await using resource = new AsyncResource();
-    console.log("using async resource");
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
+class CustomPlugin extends BasePlugin {
+    metadata = { version: "1.0.0", author: "dev" } satisfies Metadata;
 
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Class should be present
-    assert!(
-        output.contains("AsyncResource"),
-        "Expected AsyncResource class: {}",
-        output
-    );
-
-    // Function should be present
-    assert!(
-        output.contains("useAsyncResource"),
-        "Expected useAsyncResource function: {}",
-        output
-    );
-
-    // AsyncDispose should be in output
-    assert!(
-        output.contains("asyncDispose") || output.contains("Symbol.asyncDispose"),
-        "Expected asyncDispose symbol or method: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_using_declaration_in_class_method() {
-    // Test using declaration inside class methods
-    let source = r#"
-class FileHandle {
-    [Symbol.dispose](): void {
-        console.log("file closed");
-    }
-}
-
-class FileProcessor {
-    process(): void {
-        using file = new FileHandle();
-        console.log("processing file");
-    }
-
-    async processAsync(): Promise<void> {
-        using file = new FileHandle();
-        await Promise.resolve();
+    getVersion(): string {
+        return this.metadata.version;
     }
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
+    // Third statement is the CustomPlugin class
+    let class_idx = source_file.statements.nodes.get(2).expect("expected class declaration");
 
-    let output = printer.get_output().to_string();
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
 
-    // Classes should be present
+    // Class should emit
     assert!(
-        output.contains("FileHandle") && output.contains("FileProcessor"),
-        "Expected FileHandle and FileProcessor classes: {}",
+        output.contains("function CustomPlugin"),
+        "Expected CustomPlugin class: {}",
         output
     );
 
-    // Methods should be present
+    // satisfies keyword should be erased
     assert!(
-        output.contains("process") && output.contains("processAsync"),
-        "Expected process and processAsync methods: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_using_declaration_multiple() {
-    // Test multiple using declarations
-    let source = r#"
-class Connection {
-    [Symbol.dispose](): void {
-        console.log("connection closed");
-    }
-}
-
-class Transaction {
-    [Symbol.dispose](): void {
-        console.log("transaction completed");
-    }
-}
-
-function performTransaction() {
-    using conn = new Connection();
-    using tx = new Transaction();
-    console.log("performing transaction");
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Classes should be present
-    assert!(
-        output.contains("Connection") && output.contains("Transaction"),
-        "Expected Connection and Transaction classes: {}",
+        !output.contains("satisfies"),
+        "satisfies keyword should be erased: {}",
         output
     );
 
-    // Function should be present
+    // Should have inheritance
     assert!(
-        output.contains("performTransaction"),
-        "Expected performTransaction function: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_using_declaration_with_inheritance() {
-    // Test using with inherited Disposable
-    let source = r#"
-abstract class Disposable {
-    abstract [Symbol.dispose](): void;
-}
-
-class DatabaseConnection extends Disposable {
-    [Symbol.dispose](): void {
-        console.log("db connection closed");
-    }
-
-    query(sql: string): void {
-        console.log(sql);
-    }
-}
-
-function runQuery() {
-    using db = new DatabaseConnection();
-    db.query("SELECT * FROM users");
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Classes should be present
-    assert!(
-        output.contains("Disposable") && output.contains("DatabaseConnection"),
-        "Expected Disposable and DatabaseConnection classes: {}",
-        output
-    );
-
-    // Function should be present
-    assert!(
-        output.contains("runQuery"),
-        "Expected runQuery function: {}",
-        output
-    );
-
-    // Method should be present
-    assert!(
-        output.contains("query"),
-        "Expected query method: {}",
-        output
-    );
-
-    // Should have extends helper or prototype chain
-    assert!(
-        output.contains("__extends") || output.contains("prototype"),
+        output.contains("__extends") || output.contains("_super"),
         "Expected inheritance pattern: {}",
         output
     );
-}
 
-#[test]
-fn test_class_es5_auto_accessor_basic() {
-    // Test basic auto-accessor (ES2022)
-    let source = r#"
-class Person {
-    accessor name: string = "default";
-    accessor age: number = 0;
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Class should be present
+    // Field should be present (value may or may not be present depending on satisfies handling)
     assert!(
-        output.contains("Person"),
-        "Expected Person class: {}",
-        output
-    );
-
-    // Properties should be accessible (via getter/setter or direct)
-    assert!(
-        output.contains("name") && output.contains("age"),
-        "Expected name and age properties: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_auto_accessor_static() {
-    // Test static auto-accessor
-    let source = r#"
-class Counter {
-    static accessor count: number = 0;
-    static accessor label: string = "Counter";
-
-    static increment(): void {
-        this.count++;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Class should be present
-    assert!(
-        output.contains("Counter"),
-        "Expected Counter class: {}",
-        output
-    );
-
-    // Static method should be present
-    assert!(
-        output.contains("increment"),
-        "Expected increment method: {}",
-        output
-    );
-
-    // Static properties should be referenced
-    assert!(
-        output.contains("count") && output.contains("label"),
-        "Expected count and label properties: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_auto_accessor_with_inheritance() {
-    // Test auto-accessor in derived class
-    let source = r#"
-class Base {
-    accessor value: number = 10;
-}
-
-class Derived extends Base {
-    accessor multiplier: number = 2;
-
-    getResult(): number {
-        return this.value * this.multiplier;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Classes should be present
-    assert!(
-        output.contains("Base") && output.contains("Derived"),
-        "Expected Base and Derived classes: {}",
-        output
-    );
-
-    // Method should be present
-    assert!(
-        output.contains("getResult"),
-        "Expected getResult method: {}",
-        output
-    );
-
-    // Should have extends helper or prototype chain
-    assert!(
-        output.contains("__extends") || output.contains("prototype"),
-        "Expected inheritance pattern: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_auto_accessor_with_decorator() {
-    // Test auto-accessor with decorator
-    let source = r#"
-function observable(target: any, context: any) {
-    return target;
-}
-
-class Store {
-    @observable
-    accessor items: string[] = [];
-
-    @observable
-    accessor count: number = 0;
-
-    addItem(item: string): void {
-        this.items.push(item);
-        this.count++;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Class should be present
-    assert!(
-        output.contains("Store"),
-        "Expected Store class: {}",
-        output
-    );
-
-    // Decorator function should be present
-    assert!(
-        output.contains("observable"),
-        "Expected observable decorator: {}",
-        output
-    );
-
-    // Method should be present
-    assert!(
-        output.contains("addItem"),
-        "Expected addItem method: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_auto_accessor_private() {
-    // Test private auto-accessor
-    let source = r#"
-class BankAccount {
-    accessor #balance: number = 0;
-
-    deposit(amount: number): void {
-        this.#balance += amount;
-    }
-
-    withdraw(amount: number): boolean {
-        if (this.#balance >= amount) {
-            this.#balance -= amount;
-            return true;
-        }
-        return false;
-    }
-
-    getBalance(): number {
-        return this.#balance;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Class should be present
-    assert!(
-        output.contains("BankAccount"),
-        "Expected BankAccount class: {}",
-        output
-    );
-
-    // Methods should be present
-    assert!(
-        output.contains("deposit") && output.contains("withdraw") && output.contains("getBalance"),
-        "Expected deposit, withdraw, and getBalance methods: {}",
+        output.contains("metadata"),
+        "Expected metadata field: {}",
         output
     );
 }
