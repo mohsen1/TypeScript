@@ -1782,6 +1782,102 @@ fn test_strict_function_variance() {
 }
 
 #[test]
+fn test_function_variance_param_contravariance() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let wide_param = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let narrow_param = TypeId::STRING;
+
+    let source = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo {
+                name: Some(interner.intern_string("x")),
+                type_id: wide_param,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("y")),
+                type_id: TypeId::BOOLEAN,
+                optional: false,
+                rest: false,
+            },
+        ],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let target = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo {
+                name: Some(interner.intern_string("x")),
+                type_id: narrow_param,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("y")),
+                type_id: TypeId::BOOLEAN,
+                optional: false,
+                rest: false,
+            },
+        ],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    assert!(checker.is_subtype_of(source, target));
+    assert!(!checker.is_subtype_of(target, source));
+}
+
+#[test]
+fn test_function_variance_return_covariance() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let narrow_return = TypeId::STRING;
+    let wide_return = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    let source = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::BOOLEAN,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: narrow_return,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let target = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::BOOLEAN,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: wide_return,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    assert!(checker.is_subtype_of(source, target));
+    assert!(!checker.is_subtype_of(target, source));
+}
+
+#[test]
 fn test_this_parameter_variance() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
