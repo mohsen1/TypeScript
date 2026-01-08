@@ -5873,3 +5873,290 @@ class ExtendedService extends BaseService {
         output
     );
 }
+
+#[test]
+fn test_class_es5_constructor_overloads_basic() {
+    // Test basic constructor overloads
+    let source = r#"
+class Point {
+    x: number;
+    y: number;
+
+    constructor();
+    constructor(x: number);
+    constructor(x: number, y: number);
+    constructor(x?: number, y?: number) {
+        this.x = x || 0;
+        this.y = y || 0;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should transform class to function
+    assert!(
+        output.contains("function Point") || output.contains("var Point"),
+        "Expected Point class transformation: {}",
+        output
+    );
+
+    // Constructor implementation should be present
+    assert!(
+        output.contains("this.x") && output.contains("this.y"),
+        "Expected property assignments: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_constructor_overloads_with_types() {
+    // Test constructor overloads with different parameter types
+    let source = r#"
+class Data {
+    value: any;
+
+    constructor(value: string);
+    constructor(value: number);
+    constructor(value: object);
+    constructor(value: any) {
+        this.value = value;
+    }
+
+    getValue(): any {
+        return this.value;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should transform class
+    assert!(
+        output.contains("function Data") || output.contains("var Data"),
+        "Expected Data class transformation: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("getValue"),
+        "Expected getValue method: {}",
+        output
+    );
+
+    // Constructor body should be present
+    assert!(
+        output.contains("this.value"),
+        "Expected value assignment: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_constructor_overloads_inheritance() {
+    // Test constructor overloads with inheritance
+    let source = r#"
+class Animal {
+    name: string;
+
+    constructor();
+    constructor(name: string);
+    constructor(name?: string) {
+        this.name = name || "unknown";
+    }
+}
+
+class Dog extends Animal {
+    breed: string;
+
+    constructor();
+    constructor(name: string);
+    constructor(name: string, breed: string);
+    constructor(name?: string, breed?: string) {
+        super(name);
+        this.breed = breed || "mixed";
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Both classes should be transformed
+    assert!(
+        output.contains("Animal") && output.contains("Dog"),
+        "Expected both class transformations: {}",
+        output
+    );
+
+    // Inheritance should be present
+    assert!(
+        output.contains("__extends") || output.contains("prototype"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+
+    // Properties should be assigned
+    assert!(
+        output.contains("name") && output.contains("breed"),
+        "Expected property assignments: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_constructor_overloads_with_defaults() {
+    // Test constructor overloads with default values
+    let source = r#"
+class Config {
+    host: string;
+    port: number;
+    secure: boolean;
+
+    constructor();
+    constructor(host: string);
+    constructor(host: string, port: number);
+    constructor(host: string, port: number, secure: boolean);
+    constructor(host: string = "localhost", port: number = 8080, secure: boolean = false) {
+        this.host = host;
+        this.port = port;
+        this.secure = secure;
+    }
+
+    getUrl(): string {
+        const protocol = this.secure ? "https" : "http";
+        return protocol + "://" + this.host + ":" + this.port;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should transform class
+    assert!(
+        output.contains("function Config") || output.contains("var Config"),
+        "Expected Config class transformation: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("getUrl"),
+        "Expected getUrl method: {}",
+        output
+    );
+
+    // All properties should be assigned
+    assert!(
+        output.contains("host") && output.contains("port") && output.contains("secure"),
+        "Expected property assignments: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_constructor_overloads_generic() {
+    // Test constructor overloads with generic types
+    let source = r#"
+class Container<T> {
+    items: T[];
+
+    constructor();
+    constructor(items: T[]);
+    constructor(items?: T[]) {
+        this.items = items || [];
+    }
+
+    add(item: T): void {
+        this.items.push(item);
+    }
+
+    get(index: number): T {
+        return this.items[index];
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should transform class
+    assert!(
+        output.contains("function Container") || output.contains("var Container"),
+        "Expected Container class transformation: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("add") && output.contains("get"),
+        "Expected add and get methods: {}",
+        output
+    );
+
+    // Items property should be present
+    assert!(
+        output.contains("items"),
+        "Expected items property: {}",
+        output
+    );
+}
