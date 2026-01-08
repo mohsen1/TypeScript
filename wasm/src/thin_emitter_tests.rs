@@ -1995,6 +1995,33 @@ fn test_commonjs_import_namespace() {
 }
 
 #[test]
+fn test_commonjs_type_only_namespace_import_is_erased() {
+    let source = r#"import type * as ns from "./module"; const x = 1;"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        !output.contains("require(\"./module\")"),
+        "Type-only namespace import should not emit require: {}",
+        output
+    );
+    assert!(
+        !output.contains("__importStar"),
+        "Type-only namespace import should not emit helpers: {}",
+        output
+    );
+    assert!(output.contains("const x = 1"), "Expected value statement in output: {}", output);
+}
+
+#[test]
 fn test_commonjs_import_namespace_emits_helpers() {
     let source = r#"import * as ns from "./module";"#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
