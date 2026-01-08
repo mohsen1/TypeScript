@@ -7,7 +7,7 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- Complete: Added for-loop initializer/incrementor await coverage and variable-declaration-list await detection in `wasm/src/transforms/async_es5.rs` and `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (PASS).
+- Complete: Added variable-initializer await coverage in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (PASS).
 
 ## Task Queue
 - [ ] (empty)
@@ -27,6 +27,7 @@ Priority: 5
 - [x] Added switch discriminant/case-expression await detection tests in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Reverted `wasm/src/parallel_tests.rs` changes to stay in anvil scope.
 - [x] Added for-loop initializer/incrementor await coverage and variable-declaration-list await detection in `wasm/src/transforms/async_es5.rs` and `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (PASS).
+- [x] Added variable-initializer await coverage in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (PASS).
 
 ## Ready for Merge
 Yes
