@@ -1069,3 +1069,93 @@ fn test_parity_es5_for_of_loop() {
         output
     );
 }
+
+/// Parity test for ES5 array destructuring in function parameters.
+/// Array destructuring params should be downleveled to indexed access.
+#[test]
+fn test_parity_es5_array_destructuring_param() {
+    let source = "function swap([a, b]) { return [b, a]; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 array destructuring param downlevel
+    assert!(
+        output.contains("function swap"),
+        "ES5 output should define swap function: {}",
+        output
+    );
+    // Destructuring should be converted to indexed access or temp variable
+    // tsc outputs: function swap(_a) { var a = _a[0], b = _a[1]; return [b, a]; }
+    assert!(
+        output.contains("[0]") || output.contains("_a") || output.contains("_b"),
+        "ES5 output should use indexed access or temp variables: {}",
+        output
+    );
+    // No destructuring in parameter list
+    assert!(
+        !output.contains("([a, b])") && !output.contains("([a,b])"),
+        "ES5 output should not contain array destructuring in params: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 object destructuring in function parameters.
+/// Object destructuring params should be downleveled to property access.
+#[test]
+fn test_parity_es5_object_destructuring_param() {
+    let source = "function greet({ name, age }) { return name + ' is ' + age; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 object destructuring param downlevel
+    assert!(
+        output.contains("function greet"),
+        "ES5 output should define greet function: {}",
+        output
+    );
+    // Destructuring should be converted to property access
+    // tsc outputs: function greet(_a) { var name = _a.name, age = _a.age; ... }
+    assert!(
+        output.contains(".name") || output.contains(".age") || output.contains("_a"),
+        "ES5 output should use property access or temp variables: {}",
+        output
+    );
+    // No destructuring in parameter list
+    assert!(
+        !output.contains("({ name") && !output.contains("({name"),
+        "ES5 output should not contain object destructuring in params: {}",
+        output
+    );
+}
