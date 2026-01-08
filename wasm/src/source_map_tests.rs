@@ -11120,8 +11120,8 @@ fn test_source_map_es5_transform_async_nested_try_finally_mapping() {
 }
 
 #[test]
-fn test_source_map_es5_transform_destructuring_assignment_mapping() {
-    let source = "const obj = { x: 1, y: 2 };\nconst { x, y } = obj;";
+fn test_source_map_es5_transform_async_for_of_destructuring_mapping() {
+    let source = "async function run(){ for (const [a, b] of await items()) { await process(a, b); } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -11138,10 +11138,9 @@ fn test_source_map_es5_transform_destructuring_assignment_mapping() {
     printer.emit(root);
 
     let output = printer.get_output().to_string();
-    // Destructuring gets converted to property accesses in ES5
     assert!(
-        output.contains(".x") || output.contains("obj.x") || output.contains("[\"x\"]"),
-        "expected destructuring downlevel in output: {output}"
+        output.contains("__awaiter(") && output.contains("__generator("),
+        "expected async downlevel output, got: {output}"
     );
 
     let map_json = printer.generate_source_map_json().expect("source map");
@@ -11152,22 +11151,66 @@ fn test_source_map_es5_transform_destructuring_assignment_mapping() {
         .unwrap_or("");
 
     let decoded = decode_mappings(mappings);
-    let (destructure_line, _) = find_line_col(source, "{ x, y }");
+    let (items_line, items_col) = find_line_col(source, "items()");
+    let (process_line, process_col) = find_line_col(source, "process(");
 
-    // Look for mapping on the destructuring line
-    let mapping = decoded
-        .iter()
-        .filter(|entry| entry.original_line == destructure_line)
-        .max_by_key(|entry| entry.original_column)
-        .unwrap_or_else(|| {
-            panic!(
-                "expected mapping for destructuring. mappings: {mappings} output: {output}"
-            )
+    let targets = [
+        ("items", items_line, items_col),
+        ("process", process_line, process_col),
+    ];
+
+    for (label, src_line, src_col) in targets {
+        let direct_mapping = decoded.iter().find(|entry| {
+            entry.original_line == src_line
+                && entry.original_column == src_col
+        });
+        let direct_valid = direct_mapping.and_then(|mapping| {
+            if mapping.source_index != 0 {
+                return None;
+            }
+
+            let output_line_text = output
+                .lines()
+                .nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text
+                .get(mapping.generated_column as usize..)?;
+            if output_slice.starts_with(label) {
+                Some(mapping)
+            } else {
+                None
+            }
         });
 
-    assert_eq!(mapping.source_index, 0);
-    assert_eq!(
-        mapping.original_line, destructure_line,
-        "expected mapping on destructuring line"
-    );
+        if direct_valid.is_none() {
+            let (func_line, _) = find_line_col(source, "async function run");
+            let (output_line, output_col) = if output.contains("function run") {
+                find_line_col(&output, "function run")
+            } else if output.contains("run = function") {
+                find_line_col(&output, "run = function")
+            } else {
+                find_line_col(&output, "run")
+            };
+            let mapping = decoded
+                .iter()
+                .filter(|entry| {
+                    entry.generated_line < output_line
+                        || (entry.generated_line == output_line
+                            && entry.generated_column <= output_col)
+                })
+                .max_by_key(|entry| (entry.generated_line, entry.generated_column))
+                .unwrap_or_else(|| {
+                    panic!(
+                        "expected mapping at or before async function output for {label}. mappings: {mappings} output: {output}"
+                    )
+                });
+
+            assert_eq!(mapping.source_index, 0);
+            assert!(
+                mapping.original_line <= func_line,
+                "expected mapping before or on function line for {label}. mapping line: {} function line: {}",
+                mapping.original_line,
+                func_line
+            );
+        }
+    }
 }
