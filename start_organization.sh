@@ -60,16 +60,75 @@ AUTO_MONITOR="${AUTO_MONITOR:-1}"
 AUTO_ATTACH="${AUTO_ATTACH:-1}"
 
 # =============================================================================
-# Kill mode
+# Session state file for resume
+# =============================================================================
+STATE_FILE="${STATE_FILE:-$HOME/.zang-org-state.json}"
+
+save_session_state() {
+  echo "Saving session state to $STATE_FILE..."
+  local state="{\"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\", \"panes\": {"
+  local first=1
+
+  for window in director forge anvil; do
+    if ! tmux list-windows -t "$SESSION" -F "#{window_name}" 2>/dev/null | grep -qx "$window"; then
+      continue
+    fi
+
+    pane_count=$(tmux list-panes -t "$SESSION:$window" 2>/dev/null | wc -l | tr -d ' ')
+    pane=0
+    while [ "$pane" -lt "$pane_count" ]; do
+      # Capture last 500 lines of each pane for context
+      content=$(tmux capture-pane -p -t "$SESSION:$window.$pane" -S -500 2>/dev/null | tail -200 || true)
+      # Escape for JSON
+      content_escaped=$(printf '%s' "$content" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))' 2>/dev/null || echo '""')
+
+      # Get current directory
+      pane_path=$(tmux display-message -p -t "$SESSION:$window.$pane" '#{pane_current_path}' 2>/dev/null || echo "")
+
+      if [ "$first" = "1" ]; then
+        first=0
+      else
+        state="$state,"
+      fi
+      state="$state \"${window}_${pane}\": {\"path\": \"$pane_path\", \"context\": $content_escaped}"
+
+      pane=$((pane + 1))
+    done
+  done
+
+  state="$state }}"
+  echo "$state" > "$STATE_FILE"
+  echo "Session state saved."
+}
+
+# =============================================================================
+# Kill mode (with state save)
 # =============================================================================
 if [ "${1:-}" = "--kill" ]; then
   if tmux has-session -t "$SESSION" 2>/dev/null; then
+    save_session_state
     tmux kill-session -t "$SESSION"
     echo "Killed tmux session: $SESSION"
+    echo "State saved to: $STATE_FILE"
+    echo "Use '$0 --resume' to continue where you left off"
   else
     echo "No tmux session found: $SESSION"
   fi
   exit 0
+fi
+
+# =============================================================================
+# Resume mode - restore from saved state
+# =============================================================================
+RESUME_MODE=0
+if [ "${1:-}" = "--resume" ]; then
+  if [ -f "$STATE_FILE" ]; then
+    RESUME_MODE=1
+    echo "Resume mode: will restore from $STATE_FILE"
+  else
+    echo "No state file found at $STATE_FILE"
+    echo "Starting fresh session instead..."
+  fi
 fi
 
 # =============================================================================
@@ -607,10 +666,15 @@ get_idle_threshold() {
   local window="$1"
   local pane="$2"
 
-  if [ "$window" = "director" ]; then
+  if [ "$window" = "director" ] && [ "$pane" = "0" ]; then
+    # Director is pane 0 in director window
     echo "$DIRECTOR_IDLE_SECONDS"
-  elif [ "$pane" = "0" ]; then
+  elif [ "$window" = "director" ] && [ "$pane" != "0" ]; then
+    # EMs are panes 1 and 2 in director window
     echo "$EM_IDLE_SECONDS"
+  elif [ "$window" = "forge" ] || [ "$window" = "anvil" ]; then
+    # Workers are in forge/anvil windows
+    echo "$WORKER_IDLE_SECONDS"
   else
     echo "$WORKER_IDLE_SECONDS"
   fi
@@ -620,10 +684,15 @@ get_poke_message() {
   local window="$1"
   local pane="$2"
 
-  if [ "$window" = "director" ]; then
+  if [ "$window" = "director" ] && [ "$pane" = "0" ]; then
+    # Director is pane 0 in director window
     echo "$DIRECTOR_POKE"
-  elif [ "$pane" = "0" ]; then
+  elif [ "$window" = "director" ] && [ "$pane" != "0" ]; then
+    # EMs are panes 1 and 2 in director window
     echo "$EM_POKE"
+  elif [ "$window" = "forge" ] || [ "$window" = "anvil" ]; then
+    # Workers are in forge/anvil windows
+    echo "$WORKER_POKE"
   else
     echo "$WORKER_POKE"
   fi

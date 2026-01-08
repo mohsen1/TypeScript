@@ -11394,3 +11394,75 @@ console.log(result);"#;
         "sourcesContent should exactly match original source"
     );
 }
+
+#[test]
+fn test_source_map_with_decorators() {
+    // Test decorators on class and method
+    let source = r#"function sealed(target: Function) {}
+function log(target: any, key: string) {}
+
+@sealed
+class Example {
+    @log
+    greet() { return "hello"; }
+}"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the decorator functions
+    let (sealed_line, sealed_col) = find_line_col(source, "function sealed");
+    let has_sealed_mapping = decoded.iter().any(|entry| {
+        entry.original_line == sealed_line
+            && entry.original_column >= sealed_col
+            && entry.original_column <= sealed_col + 15
+    });
+
+    let (log_line, log_col) = find_line_col(source, "function log");
+    let has_log_mapping = decoded.iter().any(|entry| {
+        entry.original_line == log_line
+            && entry.original_column >= log_col
+            && entry.original_column <= log_col + 12
+    });
+
+    // Verify we have mappings for decorator functions
+    assert!(
+        has_sealed_mapping || has_log_mapping,
+        "expected mappings for decorator functions. mappings: {mappings}"
+    );
+
+    // Verify output contains the decorated class emitted as ES5 IIFE
+    assert!(
+        output.contains("Example") && output.contains("greet"),
+        "expected output to contain decorated class and method. output: {output}"
+    );
+
+    // Verify source map has non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for decorated code"
+    );
+}

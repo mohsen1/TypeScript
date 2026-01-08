@@ -521,3 +521,59 @@ fn test_parity_es5_async_generator_function() {
         output
     );
 }
+
+/// Parity test for ES5 arrow function with rest parameters.
+/// Rest parameters should be converted to use arguments with slice.
+#[test]
+fn test_parity_es5_arrow_rest_parameters() {
+    let source = "const sum = (...nums) => nums.reduce((a, b) => a + b, 0);";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 arrow function with rest parameters
+    assert!(
+        output.contains("var sum = function"),
+        "ES5 output should convert arrow to function expression: {}",
+        output
+    );
+    // Rest parameters should be converted using arguments (either slice or for loop)
+    assert!(
+        output.contains("arguments"),
+        "ES5 output should reference arguments for rest params: {}",
+        output
+    );
+    // Should define nums from arguments (var nums = [] with for loop, or slice)
+    assert!(
+        output.contains("var nums"),
+        "ES5 output should define nums variable: {}",
+        output
+    );
+    // No arrow syntax
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should not contain arrow syntax: {}",
+        output
+    );
+    // No rest parameter syntax
+    assert!(
+        !output.contains("...nums"),
+        "ES5 output should not contain rest parameter syntax: {}",
+        output
+    );
+}

@@ -3,11 +3,11 @@ ROOT_DIR=/Users/mohsenazimi/code/TypeScript
 SQUAD_DIR=/Users/mohsenazimi/code/TypeScript/wasm/specs/squads
 
 DIRECTOR_IDLE_SECONDS=600
-DIRECTOR_POKE=Check\ if\ any\ intervention\ is\ needed.\ Merge\ EM\ branches\ if\ ready.\ If\ EMs\ are\ working\,\ do\ nothing.
-EM_IDLE_SECONDS=120
-EM_POKE=FIRST:\ Run\ ./wasm/test.sh\ 2\>\&1\ \|\ head\ -50\ to\ check\ build\ health.\ If\ build\ fails\,\ fix\ it\ yourself.\ Then\ check\ worker\ panes\ for\ stuck\ workers.
+DIRECTOR_POKE="MERGE TIME! Tell both EMs to pause work and push branches. Wait 4 minutes for them to finish, then merge squad/forge and squad/anvil into rust. After merging, tell EMs to sync workers from origin/rust."
+EM_IDLE_SECONDS=60
+EM_POKE="Check worker panes for stuck workers. If all workers are busy, check for Ready for Merge branches and merge them into squad branch."
 WORKER_IDLE_SECONDS=300
-WORKER_POKE=How\ is\ your\ task\ going\?\ If\ you\ need\ help\,\ describe\ what\ you\ are\ stuck\ on.
+WORKER_POKE="How is your task going? If you need help, describe what you are stuck on."
 SEND_ENTER_PAUSE=1
 
 STATE_DIR="/tmp/zang-org-monitor-$$"
@@ -18,10 +18,15 @@ get_idle_threshold() {
   local window="$1"
   local pane="$2"
 
-  if [ "$window" = "director" ]; then
+  if [ "$window" = "director" ] && [ "$pane" = "0" ]; then
+    # Director is pane 0 in director window
     echo "$DIRECTOR_IDLE_SECONDS"
-  elif [ "$pane" = "0" ]; then
+  elif [ "$window" = "director" ] && [ "$pane" != "0" ]; then
+    # EMs are panes 1 and 2 in director window
     echo "$EM_IDLE_SECONDS"
+  elif [ "$window" = "forge" ] || [ "$window" = "anvil" ]; then
+    # Workers are in forge/anvil windows
+    echo "$WORKER_IDLE_SECONDS"
   else
     echo "$WORKER_IDLE_SECONDS"
   fi
@@ -31,10 +36,15 @@ get_poke_message() {
   local window="$1"
   local pane="$2"
 
-  if [ "$window" = "director" ]; then
+  if [ "$window" = "director" ] && [ "$pane" = "0" ]; then
+    # Director is pane 0 in director window
     echo "$DIRECTOR_POKE"
-  elif [ "$pane" = "0" ]; then
+  elif [ "$window" = "director" ] && [ "$pane" != "0" ]; then
+    # EMs are panes 1 and 2 in director window
     echo "$EM_POKE"
+  elif [ "$window" = "forge" ] || [ "$window" = "anvil" ]; then
+    # Workers are in forge/anvil windows
+    echo "$WORKER_POKE"
   else
     echo "$WORKER_POKE"
   fi
