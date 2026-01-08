@@ -384,6 +384,17 @@ fn test_apply_contextual_unknown_uses_context() {
 }
 
 #[test]
+fn test_apply_contextual_union_preserves_literal() {
+    let interner = TypeInterner::new();
+    let literal = interner.literal_string("ready");
+    let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    // Union context should not widen a literal expression.
+    let result = apply_contextual_type(&interner, literal, Some(union));
+    assert_eq!(result, literal);
+}
+
+#[test]
 fn test_apply_contextual_same_type() {
     let interner = TypeInterner::new();
 
