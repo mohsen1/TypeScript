@@ -558,3 +558,53 @@ fn test_class_es5_static_field_async_arrow() {
         output
     );
 }
+
+#[test]
+fn test_class_es5_private_field_access_in_async_method() {
+    let source = r#"
+class Foo {
+    #value = 1;
+    async getValue() {
+        await fetch();
+        return this.#value;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Should emit __awaiter for async method
+    assert!(
+        output.contains("__awaiter"),
+        "Expected async method to use __awaiter: {}",
+        output
+    );
+
+    // Should emit __classPrivateFieldGet for private field access
+    assert!(
+        output.contains("__classPrivateFieldGet"),
+        "Expected private field access to use __classPrivateFieldGet: {}",
+        output
+    );
+
+    // Should emit WeakMap for private field storage
+    assert!(
+        output.contains("_Foo_value"),
+        "Expected private field WeakMap name: {}",
+        output
+    );
+}
