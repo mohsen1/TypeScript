@@ -55,8 +55,8 @@ const DEFAULT_IDLE_THRESHOLDS: IdleThresholds = {
 
 const DEFAULT_POKE_MESSAGES: PokeMessages = {
   director:
-    'MERGE TIME! Tell both EMs to pause work and push branches. Wait 4 minutes for them to finish, then merge squad/forge and squad/anvil into rust. After merging, tell EMs to sync workers from origin/rust.',
-  em: 'Check worker panes for stuck workers. If all workers are busy, check for Ready for Merge branches and merge them into squad branch.',
+    'MERGE CHECK: Check if EMs have branches ready to merge. Only merge squad branches that EMs have already pushed. Do NOT interrupt workers. After merging, EMs can tell workers to sync when they reach a natural stopping point.',
+  em: 'Check for worker branches that are already pushed and marked "Ready for Merge" in their plan files. Merge those into squad branch. Do NOT interrupt workers who are mid-task - let them finish their current work naturally.',
   worker:
     'How is your task going? If you need help, describe what you are stuck on.',
 };
