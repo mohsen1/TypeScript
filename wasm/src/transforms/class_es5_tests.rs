@@ -1029,3 +1029,102 @@ class Derived extends Base {
         );
     }
 }
+
+#[test]
+fn test_class_es5_template_literal_in_method() {
+    let source = r#"
+class Greeter {
+    name = "World";
+
+    greet() {
+        return `Hello, ${this.name}!`;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Should NOT contain template literal backticks (ES5 doesn't support them)
+    assert!(
+        !output.contains('`'),
+        "Expected template literal to be transformed, not raw backticks: {}",
+        output
+    );
+
+    // Should use string concatenation for ES5
+    assert!(
+        output.contains("+") || output.contains("concat"),
+        "Expected ES5 template literal to use string concatenation: {}",
+        output
+    );
+
+    // Should preserve the literal parts
+    assert!(
+        output.contains("Hello") && output.contains("!"),
+        "Expected template literal parts to be preserved: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_destructuring_in_method() {
+    let source = r#"
+class Parser {
+    parse(input: { text: string, line: number }) {
+        const { text, line } = input;
+        return `${text} at line ${line}`;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Should NOT contain destructuring syntax (ES5 doesn't support it)
+    assert!(
+        !output.contains("{ text, line }") && !output.contains("{text, line}"),
+        "Expected destructuring to be transformed, not raw destructuring syntax: {}",
+        output
+    );
+
+    // Should extract properties individually for ES5
+    assert!(
+        output.contains(".text") && output.contains(".line"),
+        "Expected ES5 destructuring to access properties individually: {}",
+        output
+    );
+
+    // Variables should be assigned
+    assert!(
+        output.contains("text") && output.contains("line"),
+        "Expected destructured variables to be present: {}",
+        output
+    );
+}
