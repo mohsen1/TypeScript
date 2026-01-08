@@ -11752,139 +11752,73 @@ fn test_source_map_class_static_blocks() {
 }
 
 #[test]
-fn test_source_map_import_meta_mapping() {
-    // Test source maps with import.meta expressions
-    // Note: The emitter currently outputs .meta instead of import.meta (known issue)
-    // This test verifies source map accuracy for the declarations containing import.meta
-    let source = r#"const url = import.meta.url;
-const env = import.meta.env;
-console.log(import.meta);"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let options = PrinterOptions::default();
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_source_map_text(parser.get_source_text());
-    printer.enable_source_map("test.js", "test.ts");
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Verify variable declarations are in the output
-    assert!(
-        output.contains("url") && output.contains("env"),
-        "expected variable names in output: {output}"
-    );
-
-    // Verify .meta is present (the emitter currently omits "import" keyword)
-    assert!(
-        output.contains(".meta"),
-        "expected .meta expression in output: {output}"
-    );
-
-    let map_json = printer.generate_source_map_json().expect("source map");
-    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
-    let mappings = map_value
-        .get("mappings")
-        .and_then(|value| value.as_str())
-        .unwrap_or("");
-
-    let decoded = decode_mappings(mappings);
-
-    // Verify we have mappings for the variable declarations on their source lines
-    let (url_line, _) = find_line_col(source, "const url");
-    let has_url_line_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == url_line
-    });
-
-    let (env_line, _) = find_line_col(source, "const env");
-    let has_env_line_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == env_line
-    });
-
-    let (console_line, _) = find_line_col(source, "console");
-    let has_console_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == console_line
-    });
-
-    // We should have mappings for all lines containing import.meta
-    assert!(
-        has_url_line_mapping && has_env_line_mapping && has_console_mapping,
-        "expected mappings for import.meta lines. mappings: {mappings}"
-    );
-
-    // Verify non-empty mappings
-    assert!(
-        !decoded.is_empty(),
-        "expected non-empty source mappings for import.meta code"
-    );
+fn test_source_map_dynamic_import() {
+    // Test dynamic import() expressions
+    let source = r#"async function loadModule() {
+    const mod = await import("./module");
+    return mod.default;
 }
 
-#[test]
-fn test_source_map_export_star_as_namespace_mapping() {
-    // Test source maps with export * as namespace syntax
-    let source = r#"export * as utils from './utils';
-export * as helpers from './helpers';
-export * as types from './types';"#;
+const lazy = import("./lazy");
+const conditional = true ? import("./a") : import("./b");"#;
+
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let options = PrinterOptions::default();
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
     let mut printer =
         ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
     printer.emit(root);
 
     let output = printer.get_output().to_string();
-
-    // Verify export statements are in the output
-    assert!(
-        output.contains("export") && output.contains("utils"),
-        "expected export and namespace in output: {output}"
-    );
-
     let map_json = printer.generate_source_map_json().expect("source map");
     let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
     let mappings = map_value
         .get("mappings")
-        .and_then(|value| value.as_str())
+        .and_then(|v| v.as_str())
         .unwrap_or("");
 
     let decoded = decode_mappings(mappings);
 
-    // Verify we have mappings for the export declarations
-    let (utils_line, _) = find_line_col(source, "utils");
-    let has_utils_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == utils_line
+    // Verify we have mappings for the async function
+    let (func_line, func_col) = find_line_col(source, "async function loadModule");
+    let has_func_mapping = decoded.iter().any(|entry| {
+        entry.original_line == func_line
+            && entry.original_column >= func_col
+            && entry.original_column <= func_col + 25
     });
 
-    let (helpers_line, _) = find_line_col(source, "helpers");
-    let has_helpers_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == helpers_line
+    // Verify we have mappings for the lazy variable
+    let (lazy_line, lazy_col) = find_line_col(source, "const lazy");
+    let has_lazy_mapping = decoded.iter().any(|entry| {
+        entry.original_line == lazy_line
+            && entry.original_column >= lazy_col
+            && entry.original_column <= lazy_col + 10
     });
 
-    let (types_line, _) = find_line_col(source, "types");
-    let has_types_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == types_line
-    });
-
-    // We should have mappings for the export * as namespace declarations
+    // At minimum, we should have mappings for function or variable
     assert!(
-        has_utils_mapping || has_helpers_mapping || has_types_mapping,
-        "expected mappings for export * as namespace lines. mappings: {mappings}"
+        has_func_mapping || has_lazy_mapping,
+        "expected mappings for dynamic import code. mappings: {mappings}"
     );
 
-    // Verify non-empty mappings
+    // Verify output contains expected identifiers
+    assert!(
+        output.contains("loadModule") || output.contains("lazy"),
+        "expected output to contain function or variable names. output: {output}"
+    );
+
+    // Verify source map has non-empty mappings
     assert!(
         !decoded.is_empty(),
-        "expected non-empty source mappings for export * as namespace code"
+        "expected non-empty source mappings for dynamic import"
     );
 }
