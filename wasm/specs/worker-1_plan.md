@@ -44,6 +44,7 @@ Priority: 1
 - [x] Optional upper property accepts required lower; added `test_resolve_bounds_optional_property_compatible`. Tests: `./wasm/test.sh test_resolve_bounds_optional_property_compatible`.
 - [x] Optional lower property rejected by required upper; added `test_resolve_bounds_optional_property_mismatch`. Tests: `./wasm/test.sh test_resolve_bounds_optional_property_mismatch`.
 - [x] Missing optional property is allowed; added `test_resolve_bounds_optional_property_missing_ok`. Tests: `./wasm/test.sh test_resolve_bounds_optional_property_missing_ok`.
+- [x] Object keyword upper rejects string lower; added `test_resolve_bounds_object_keyword_rejects_string`. Tests: `./wasm/test.sh test_resolve_bounds_object_keyword_rejects_string`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.

@@ -975,6 +975,29 @@ fn test_resolve_bounds_object_keyword_upper_allows_array() {
 }
 
 #[test]
+fn test_resolve_bounds_object_keyword_rejects_string() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let lower = TypeId::STRING;
+    let upper = TypeId::OBJECT;
+
+    ctx.add_lower_bound(var, lower);
+    ctx.add_upper_bound(var, upper);
+
+    let result = ctx.resolve_with_constraints(var);
+    assert!(matches!(
+        result,
+        Err(InferenceError::BoundsViolation {
+            lower: actual_lower,
+            upper: actual_upper,
+            ..
+        }) if actual_lower == lower && actual_upper == upper
+    ));
+}
+
+#[test]
 fn test_resolve_bounds_object_with_index_subtype() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);
