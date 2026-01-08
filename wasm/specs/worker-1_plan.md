@@ -5,7 +5,6 @@ Execute the highest-impact tasks assigned by the manager across all areas (solve
 
 Status: Active
 Priority: 1
-Ready for merge: yes
 
 ## Current Assignment
 - Awaiting next assignment.
