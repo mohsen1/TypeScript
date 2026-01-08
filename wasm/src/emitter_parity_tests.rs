@@ -1924,3 +1924,53 @@ fn test_parity_type_alias_erasure() {
         output
     );
 }
+
+/// Parity test for function parameter type erasure.
+/// Function parameter types should be removed from output.
+#[test]
+fn test_parity_function_param_type_erasure() {
+    let source = "function greet(name: string, age: number): string { return name + age; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify function exists
+    assert!(
+        output.contains("function greet"),
+        "ES5 output should define greet function: {}",
+        output
+    );
+    // Parameter names should remain
+    assert!(
+        output.contains("name") && output.contains("age"),
+        "ES5 output should have parameter names: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": number"),
+        "Type annotations should be erased: {}",
+        output
+    );
+    // Return type should be erased
+    assert!(
+        !output.contains("): string"),
+        "Return type should be erased: {}",
+        output
+    );
+}
