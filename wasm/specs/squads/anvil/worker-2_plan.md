@@ -7,14 +7,13 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- Audit computed `super[...]` lowering in `wasm/src/transforms/class_es5.rs` for nested arrows and field initializers; add focused regression in `wasm/src/transforms/class_es5_tests.rs`; run `./wasm/test.sh`.
+- Verify ES5 output for computed `super[...]` calls does not leak `super[` in class fields (add emitter transform integration test if needed).
 
 ## Task Queue
-- [ ] Verify ES5 output for computed `super[...]` calls does not leak `super[` in class fields (add emitter transform integration test if needed).
 - [ ] Confirm handling of `super()` ordering relative to field initializers when computed property names are present.
 
 ## Completed
-- [x] (Move finished items here with brief notes and tests run)
+- [x] Added regression for computed `super[...]` in field arrow initializers; `./wasm/test.sh` failed at `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports` (unrelated).
 
 ## Ready for Merge
 No

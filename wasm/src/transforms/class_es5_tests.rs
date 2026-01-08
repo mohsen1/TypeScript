@@ -126,3 +126,42 @@ fn test_class_es5_preserves_pre_super_statement_order() {
         output
     );
 }
+
+#[test]
+fn test_class_es5_computed_super_in_field_arrow_uses_this_capture() {
+    let source = r#"
+        const key = "m";
+        class Base { [key]() {} }
+        class Derived extends Base {
+            field = () => super[key]();
+            constructor() { super(); }
+        }
+    "#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(2)
+        .expect("expected derived class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    assert!(
+        output.contains("_super.prototype[key].call(_this)"),
+        "Expected computed super call to bind _this: {}",
+        output
+    );
+    assert!(
+        !output.contains("super["),
+        "Expected computed super to be lowered in ES5 output: {}",
+        output
+    );
+}
