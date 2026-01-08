@@ -7,7 +7,7 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- Complete: Added lexical-this capture coverage in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
+- Complete: Added lexical-this capture coverage for awaited expressions in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 
 ## Task Queue
 - [ ] (empty)
@@ -17,6 +17,7 @@ Priority: 5
 - [x] Added decode-mappings round-trip test in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Restored async ES5 emitter API compatibility in `wasm/src/transforms/async_es5.rs`; ran `./wasm/test.sh source_map` (PASS) and `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Added lexical-this capture test in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
+- [x] Added awaited lexical-this capture test in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 
 ## Ready for Merge
 Yes
