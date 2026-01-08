@@ -15,6 +15,7 @@ Priority: 2
 ## Completed
 - [x] Solver hardening: added infer/distributive conditional matching in `wasm/src/solver/evaluate.rs`, plus nested/distributive infer tests in `wasm/src/solver/evaluate_tests.rs`. Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_class_extends_helper`).
 - [x] Conditional infer object coverage: added object property/index signature infer matching in `wasm/src/solver/evaluate.rs` and tests in `wasm/src/solver/evaluate_tests.rs`. Tests: `./wasm/test.sh test_conditional_infer_object_`.
+- [x] Emitter blocker analysis: traced `test_class_extends_helper` failure to ES5 helper detection requiring transforms; recommended using `LoweringPass`/`TransformContext` in the test or relaxing the helper expectation when only `target_es5` is set. Tests: not run.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
