@@ -782,10 +782,14 @@ class Derived extends Base {
         "ES5 output should emit __awaiter for async method: {}",
         output
     );
-    // TODO: async ES5 emission should lower computed super element access in arrows.
     assert!(
-        output.contains("super[\"m\"]"),
-        "ES5 output currently leaves computed super element access in returned arrow: {}",
+        output.contains("_super.prototype[\"m\"].call(_this, arguments[0])"),
+        "ES5 output should lower computed super element access in returned arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("super[\"m\"]"),
+        "ES5 output should not contain super element access: {}",
         output
     );
     assert!(
@@ -838,10 +842,14 @@ class Derived extends Base {
         "ES5 output should preserve arguments usage in returned arrow: {}",
         output
     );
-    // TODO: async ES5 emission should lower computed super element access in arrows.
     assert!(
-        output.contains("super[\"m\"]"),
-        "ES5 output currently leaves computed super element access in returned arrow: {}",
+        output.contains("_super.prototype[\"m\"].call(_this"),
+        "ES5 output should lower computed super element access in returned arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("super[\"m\"]"),
+        "ES5 output should not contain super element access: {}",
         output
     );
     assert!(
@@ -880,25 +888,24 @@ class Derived extends Base {
         "ES5 output should emit __awaiter for async method: {}",
         output
     );
-    // TODO: async ES5 emission should preserve returned arrow bodies with computed super access.
     assert!(
-        output.contains("return [2 /*return*/]"),
-        "ES5 output currently drops returned arrow body: {}",
+        output.contains("_super.prototype[key].call(_this"),
+        "ES5 output should lower computed super element access in returned arrow: {}",
         output
     );
     assert!(
-        !output.contains("_this.x"),
-        "ES5 output currently drops this capture in returned arrow: {}",
+        output.contains("_this.x"),
+        "ES5 output should capture this inside returned arrow: {}",
         output
     );
     assert!(
-        !output.contains("arguments[0]"),
-        "ES5 output currently drops arguments usage in returned arrow: {}",
+        output.contains("arguments[0]"),
+        "ES5 output should preserve arguments usage in returned arrow: {}",
         output
     );
     assert!(
         !output.contains("super[key]"),
-        "ES5 output should not contain computed super element access when body is dropped: {}",
+        "ES5 output should not contain super element access: {}",
         output
     );
     assert!(
@@ -937,20 +944,19 @@ class Derived extends Base {
         "ES5 output should emit __awaiter for async method: {}",
         output
     );
-    // TODO: async ES5 emission should preserve returned arrow bodies with computed super access.
     assert!(
-        output.contains("return [2 /*return*/]"),
-        "ES5 output currently drops returned arrow body: {}",
+        output.contains("_super.prototype[key].call(_this, arguments[0])"),
+        "ES5 output should lower computed super element access in returned arrow: {}",
         output
     );
     assert!(
-        !output.contains("arguments[0]"),
-        "ES5 output currently drops arguments usage in returned arrow: {}",
+        output.contains("arguments[0]"),
+        "ES5 output should preserve arguments usage in returned arrow: {}",
         output
     );
     assert!(
         !output.contains("super[key]"),
-        "ES5 output should not contain computed super element access when body is dropped: {}",
+        "ES5 output should not contain super element access: {}",
         output
     );
     assert!(
@@ -1034,25 +1040,24 @@ class Derived extends Base {
         "ES5 output should emit __awaiter for async method: {}",
         output
     );
-    // TODO: async ES5 emission should preserve returned nested arrow bodies with computed super access.
     assert!(
-        output.contains("return [2 /*return*/]"),
-        "ES5 output currently drops returned nested arrow body: {}",
+        output.contains("_super.prototype[key].call(_this"),
+        "ES5 output should lower computed super element access in returned nested arrow: {}",
         output
     );
     assert!(
-        !output.contains("_this.x"),
-        "ES5 output currently drops this capture in returned nested arrow: {}",
+        output.contains("_this.x"),
+        "ES5 output should capture this inside returned nested arrow: {}",
         output
     );
     assert!(
-        !output.contains("arguments[0]"),
-        "ES5 output currently drops arguments usage in returned nested arrow: {}",
+        output.contains("arguments[0]"),
+        "ES5 output should preserve arguments usage in returned nested arrow: {}",
         output
     );
     assert!(
         !output.contains("super[key]"),
-        "ES5 output should not contain computed super element access when body is dropped: {}",
+        "ES5 output should not contain super element access: {}",
         output
     );
     assert!(
@@ -1186,15 +1191,14 @@ class Derived extends Base {
         "ES5 output should emit __awaiter for async method: {}",
         output
     );
-    // TODO: async ES5 emission should preserve returned arrow bodies with computed super access.
     assert!(
-        output.contains("return [2 /*return*/]"),
-        "ES5 output currently drops returned arrow body: {}",
+        output.contains("_super.prototype[key].call(_this)"),
+        "ES5 output should lower computed super element access in returned arrow: {}",
         output
     );
     assert!(
         !output.contains("super[key]"),
-        "ES5 output should not contain computed super element access when body is dropped: {}",
+        "ES5 output should not contain super element access: {}",
         output
     );
     assert!(
@@ -1376,10 +1380,14 @@ class Derived extends Base {
         "ES5 output should emit __awaiter for async method: {}",
         output
     );
-    // TODO: async ES5 emission should lower computed super element access in arrows.
     assert!(
-        output.contains("super[\"m\"]"),
-        "ES5 output currently leaves computed super element access in arrow: {}",
+        output.contains("_super.prototype[\"m\"].call(_this)"),
+        "ES5 output should lower computed super element access in arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("super[\"m\"]"),
+        "ES5 output should not contain super element access: {}",
         output
     );
     assert!(
@@ -1424,10 +1432,14 @@ class Derived extends Base {
         "ES5 output should preserve arguments usage in arrow: {}",
         output
     );
-    // TODO: async ES5 emission should lower computed super element access in arrows.
     assert!(
-        output.contains("super[key]"),
-        "ES5 output currently leaves computed super element access in arrow: {}",
+        output.contains("_super.prototype[key].call(_this, arguments[0])"),
+        "ES5 output should lower computed super element access in arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("super[key]"),
+        "ES5 output should not contain super element access: {}",
         output
     );
     assert!(
@@ -1472,10 +1484,14 @@ class Derived extends Base {
         "ES5 output should capture this inside arrow: {}",
         output
     );
-    // TODO: async ES5 emission should lower computed super element access in arrows.
     assert!(
-        output.contains("super[key]"),
-        "ES5 output currently leaves computed super element access in arrow: {}",
+        output.contains("_super.prototype[key].call(_this"),
+        "ES5 output should lower computed super element access in arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("super[key]"),
+        "ES5 output should not contain super element access: {}",
         output
     );
     assert!(
@@ -1815,10 +1831,14 @@ class Derived extends Base {
         "ES5 output should emit __awaiter for async method: {}",
         output
     );
-    // TODO: async ES5 emission should lower computed super element access in arrows.
     assert!(
-        output.contains("super[\"m\"]"),
-        "ES5 output currently leaves computed super element access in nested arrow: {}",
+        output.contains("_super.prototype[\"m\"].call(_this, arguments[0])"),
+        "ES5 output should lower computed super element access in nested arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("super[\"m\"]"),
+        "ES5 output should not contain super element access: {}",
         output
     );
     assert!(
@@ -1862,10 +1882,14 @@ class Derived extends Base {
         "ES5 output should capture this inside nested arrow: {}",
         output
     );
-    // TODO: async ES5 emission should lower computed super element access in arrows.
     assert!(
-        output.contains("super[\"m\"]"),
-        "ES5 output currently leaves computed super element access in nested arrow: {}",
+        output.contains("_super.prototype[\"m\"].call(_this"),
+        "ES5 output should lower computed super element access in nested arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("super[\"m\"]"),
+        "ES5 output should not contain super element access: {}",
         output
     );
     assert!(
@@ -1914,10 +1938,14 @@ class Derived extends Base {
         "ES5 output should preserve arguments usage in nested arrow: {}",
         output
     );
-    // TODO: async ES5 emission should lower computed super element access in arrows.
     assert!(
-        output.contains("super[\"m\"]"),
-        "ES5 output currently leaves computed super element access in nested arrow: {}",
+        output.contains("_super.prototype[\"m\"].call(_this"),
+        "ES5 output should lower computed super element access in nested arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("super[\"m\"]"),
+        "ES5 output should not contain super element access: {}",
         output
     );
     assert!(
@@ -1967,10 +1995,14 @@ class Derived extends Base {
         "ES5 output should preserve arguments usage in nested arrow: {}",
         output
     );
-    // TODO: async ES5 emission should lower computed super element access in arrows.
     assert!(
-        output.contains("super[key]"),
-        "ES5 output currently leaves computed super element access in nested arrow: {}",
+        output.contains("_super.prototype[key].call(_this"),
+        "ES5 output should lower computed super element access in nested arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("super[key]"),
+        "ES5 output should not contain super element access: {}",
         output
     );
     assert!(
@@ -2015,10 +2047,14 @@ class Derived extends Base {
         "ES5 output should preserve arguments usage in nested arrow: {}",
         output
     );
-    // TODO: async ES5 emission should lower computed super element access in arrows.
     assert!(
-        output.contains("super[key]"),
-        "ES5 output currently leaves computed super element access in nested arrow: {}",
+        output.contains("_super.prototype[key].call(_this, arguments[0])"),
+        "ES5 output should lower computed super element access in nested arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("super[key]"),
+        "ES5 output should not contain super element access: {}",
         output
     );
     assert!(
@@ -2057,10 +2093,14 @@ class Derived extends Base {
         "ES5 output should emit __awaiter for async method: {}",
         output
     );
-    // TODO: async ES5 emission should lower computed super element access in arrows.
     assert!(
-        output.contains("super[\"m\"]"),
-        "ES5 output currently leaves computed super element access in nested arrow: {}",
+        output.contains("_super.prototype[\"m\"].call(_this, arguments[0])"),
+        "ES5 output should lower computed super element access in nested arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("super[\"m\"]"),
+        "ES5 output should not contain super element access: {}",
         output
     );
     assert!(
