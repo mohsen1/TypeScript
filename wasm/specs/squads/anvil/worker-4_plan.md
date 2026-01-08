@@ -16,7 +16,7 @@ Priority: 4
 - [x] Add async/class ES5 transform source-map mappings and offsets. Tests: `./wasm/test.sh source_map`
 
 ## Ready for Merge
-No
+Yes - branch `worker/anvil-4` is ready for merge.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
