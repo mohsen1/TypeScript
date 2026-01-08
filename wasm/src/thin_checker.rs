@@ -5854,11 +5854,7 @@ impl<'a> ThinCheckerState<'a> {
                     // Also recursively check the resolved type for nested Applications
                     let resolved = self.ctx.type_env.borrow().get(SymbolRef(sym_id));
                     if let Some(resolved_type) = resolved {
-                        let resolved_key = self.ctx.types.lookup(resolved_type);
-                        eprintln!("[DEBUG ensure_app] Resolved Ref({}) to {:?} ({:?})", sym_id, resolved_type, resolved_key);
                         self.ensure_application_refs_resolved(resolved_type);
-                    } else {
-                        eprintln!("[DEBUG ensure_app] Ref({}) has no resolved type in env", sym_id);
                     }
                 }
 
@@ -6015,9 +6011,6 @@ impl<'a> ThinCheckerState<'a> {
         use crate::solver::CompatChecker;
 
         // Ensure any cross-file Application refs are resolved (populates type_env)
-        let src_key = self.ctx.types.lookup(source);
-        let tgt_key = self.ctx.types.lookup(target);
-        eprintln!("[DEBUG is_assignable_to] source={:?} ({:?}), target={:?} ({:?})", source, src_key, target, tgt_key);
         self.ensure_application_refs_resolved(source);
         self.ensure_application_refs_resolved(target);
 

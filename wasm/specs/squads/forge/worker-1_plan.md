@@ -8,16 +8,21 @@ Priority: 1
 
 ## Current Assignment
 - [ ] Redux test (`test_check_redux_lodash_style_generics`) has 3 remaining diagnostics:
-  - store.ts:716 - Object literal not assignable to Store<StateFromReducer<R>, ActionFromReducer<R>> where conditional types contain type param R
-  - app.ts:375 (x2) - Action type inference with nested mapped/conditional types
-  - Root cause investigation complete:
-    1. Conditional types with type params ARE being deferred correctly (lines 386-392 in evaluate.rs)
-    2. Application types ARE being expanded correctly (debug confirmed TypeId(177) -> TypeId(236))
-    3. The issue is in comparing function signatures where return types are deferred conditionals
-    4. Source: `getState: () => R extends Reducer<infer S, AnyAction> ? S : never`
-    5. Target after Store expansion: `getState: () => StateFromReducer<R>` (which should evaluate to same conditional)
-    6. Both should be equivalent but the comparison is failing somewhere in the structural Object comparison
-  - Next steps: Add debug to Object subtype comparison to see which property is failing
+  - store.ts:716 - Object literal not assignable to Store type
+  - app.ts:375 (x2) - Action type inference issues
+  - Root cause: `replaceState` property comparison fails
+    1. Source param is `Mapped` type (inline `DeepPartial<S>` evaluated)
+    2. Target param is `Application(DeepPartial, [S])` (unevaluated)
+    3. Cross-file type aliases don't have type params registered in type_env
+  - Progress made:
+    1. Added `ensure_application_refs_resolved` to recursively resolve cross-file refs
+    2. Extended to handle Function, Object, Conditional, Mapped types
+    3. Added fallback type param extraction for Mapped types in `collect_type_params`
+    4. Fallback now extracts 1 type param from DeepPartial's Mapped type
+  - Issue: `instantiate_generic` returns same TypeId as input (substitution not working)
+    - Extracted type param is `K` (mapped iteration var), not `T` (outer param)
+    - Need to find `T` in the `keyof T` constraint, not just the mapped type_param
+  - Next steps: Fix type param extraction to find outer type params from constraint
 
 ## Task Queue
 - [ ] Add callable-parameter inference regressions (e.g., union inputs, overload shapes) in `wasm/src/solver/evaluate_tests.rs`.

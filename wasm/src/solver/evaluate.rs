@@ -243,12 +243,6 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             // Try to get the type parameters for this symbol
             let type_params = self.resolver.get_type_params(symbol);
             let resolved = self.resolver.resolve_ref(symbol, self.interner);
-            if type_params.is_none() {
-                eprintln!("[DEBUG evaluate_application] Ref({}) has no type_params in env", symbol.0);
-            }
-            if resolved.is_none() {
-                eprintln!("[DEBUG evaluate_application] Ref({}) could not be resolved", symbol.0);
-            }
 
             if let Some(type_params) = type_params {
                 // Resolve the base type to get the body
@@ -274,9 +268,6 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                         &app.args,
                     );
                     return self.evaluate(instantiated);
-                } else if symbol.0 == 29 {
-                    eprintln!("[DEBUG evaluate_application] Ref(29) fallback: extracted_params.len()={}, args.len()={}",
-                        extracted_params.len(), app.args.len());
                 }
             }
         }
@@ -349,6 +340,20 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 self.collect_type_params(app.base, seen, params);
                 for &arg in &app.args {
                     self.collect_type_params(arg, seen, params);
+                }
+            }
+            TypeKey::Mapped(mapped_id) => {
+                let mapped = self.interner.mapped_type(mapped_id);
+                // The mapped type's type_param IS a type parameter!
+                if !seen.contains(&mapped.type_param.name) {
+                    seen.insert(mapped.type_param.name);
+                    params.push(mapped.type_param.clone());
+                }
+                // Also check constraint and template for nested type params
+                self.collect_type_params(mapped.constraint, seen, params);
+                self.collect_type_params(mapped.template, seen, params);
+                if let Some(name_type) = mapped.name_type {
+                    self.collect_type_params(name_type, seen, params);
                 }
             }
             _ => {}
