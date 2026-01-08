@@ -132,6 +132,10 @@ impl<'a> AsyncES5Emitter<'a> {
         self.indent_level = level;
     }
 
+    pub fn set_lexical_this(&mut self, capture: bool) {
+        self.this_capture_depth = if capture { 1 } else { 0 };
+    }
+
     pub fn set_source_map_context(&mut self, source_text: &'a str, source_index: u32) {
         self.source_text = Some(source_text);
         self.source_index = source_index;
@@ -359,12 +363,10 @@ impl<'a> AsyncES5Emitter<'a> {
                     }
                 }
 
-                // For non-trivial blocks, emit newlines
+                // For non-trivial blocks, emit statements inline.
                 self.write_line();
                 self.increase_indent();
-                self.write_indent();
-                self.write("return [2 /*return*/];");
-                self.write_line();
+                self.emit_async_body_statements(body_idx);
                 self.decrease_indent();
                 self.write_indent();
                 self.write("});");
@@ -713,41 +715,28 @@ impl<'a> AsyncES5Emitter<'a> {
                 }
             }
             k if k == syntax_kind_ext::CALL_EXPRESSION => {
-                if let Some(call) = self.arena.get_call_expr(node) {
-                    if self.is_super_method_call(call.expression) {
-                        self.emit_super_method_call(call.expression, &call.arguments);
-                    } else if self.is_super_element_call(call.expression) {
-                        self.emit_super_element_call(call.expression, &call.arguments);
-                    } else {
-                        self.emit_expression(call.expression);
-                        self.write("(");
-                        if let Some(args) = &call.arguments {
-                            let mut first = true;
-                            for &arg_idx in &args.nodes {
-                                if !first {
-                                    self.write(", ");
+                    if let Some(call) = self.arena.get_call_expr(node) {
+                        if self.is_super_method_call(call.expression) {
+                            self.emit_super_method_call(call.expression, &call.arguments);
+                        } else if self.is_super_element_call(call.expression) {
+                            self.emit_super_element_call(call.expression, &call.arguments);
+                        } else {
+                            self.emit_expression(call.expression);
+                            self.write("(");
+                            if let Some(args) = &call.arguments {
+                                let mut first = true;
+                                for &arg_idx in &args.nodes {
+                                    if !first {
+                                        self.write(", ");
+                                    }
+                                    first = false;
+                                    self.emit_expression(arg_idx);
                                 }
-                                first = false;
-                                self.emit_expression(arg_idx);
                             }
+                            self.write(")");
                         }
-                        self.write(")");
                     }
                 }
-            }
-                            for &arg_idx in &args.nodes {
-                                if !first {
-                                    self.write(", ");
-                                }
-                                first = false;
-                                self.emit_expression(arg_idx);
-                            }
-                        }
-                        self.write(")");
-                    }
-                }
-            }
-
             k if k == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION => {
                 if let Some(access) = self.arena.get_access_expr(node) {
                     self.emit_expression(access.expression);

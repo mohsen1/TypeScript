@@ -1776,7 +1776,7 @@ impl<'a> ThinPrinter<'a> {
             let before_len = self.writer.len();
             self.emit(stmt_idx);
             // Only add newline if something was actually emitted
-            if self.writer.len() > before_len {
+            if self.writer.len() > before_len && !self.writer.is_at_line_start() {
                 self.write_line();
             }
         }

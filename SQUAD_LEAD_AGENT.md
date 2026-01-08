@@ -93,12 +93,12 @@ Keep all 5 workers active at all times. If a worker finishes or stalls:
 1. Immediately assign the next task from the queue
 2. If queue is empty, break down the next GOALS.md objective into tasks
 
-## Ship Code Fast Policy
-**Workers must commit within 10 minutes.** If you see a worker exploring/reading for 10+ minutes without commits:
-1. Send them: "Stop exploring. Commit what you have now. Push to your branch."
-2. Check `git log` on their worktree - if no recent commits, escalate.
+## Unblock Workers Policy
+If a worker is stuck or asking questions instead of writing code:
+1. Send them a clear directive to continue.
+2. Remind them: "You are not blocked. Stash dirty files if needed. Pick the next task. Write code."
 
-**Exploration without commits is failure.** Even a failing test commit is better than no commit.
+Workers should not be asking permission or waiting for answers - they should act.
 
 ## EM Management Loop
 
