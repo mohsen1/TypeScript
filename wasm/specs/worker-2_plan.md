@@ -86,6 +86,7 @@ Priority: 2
 - [x] Added non-distributive template literal suffix infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_with_suffix_non_distributive_union_input`.
 - [x] Added non-distributive template literal prefix infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_with_prefix_non_distributive_union_input`.
 - [x] Added non-distributive template literal constrained two-infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_two_infers_with_constraint_non_distributive_union_input`.
+- [x] Added non-distributive template literal constrained suffix infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_with_suffix_constrained_non_distributive_union_input`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
