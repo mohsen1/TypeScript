@@ -1317,3 +1317,61 @@ fn test_parity_es5_class_prototype_method() {
         output
     );
 }
+
+/// Parity test for ES5 async arrow function.
+/// Async arrow should be converted to function with __awaiter/__generator.
+#[test]
+fn test_parity_es5_async_arrow() {
+    let source = "const fetchData = async () => { const result = await fetch('/api'); return result; };";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 async arrow downlevel
+    assert!(
+        output.contains("var fetchData"),
+        "ES5 output should define fetchData variable: {}",
+        output
+    );
+    assert!(
+        output.contains("__awaiter"),
+        "ES5 output should include __awaiter helper: {}",
+        output
+    );
+    assert!(
+        output.contains("__generator"),
+        "ES5 output should include __generator helper: {}",
+        output
+    );
+    assert!(
+        output.contains("function"),
+        "ES5 output should use function keyword: {}",
+        output
+    );
+    // No async/arrow syntax
+    assert!(
+        !output.contains("async") || output.contains("__async"),
+        "ES5 output should not contain async keyword: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should not contain arrow syntax: {}",
+        output
+    );
+}
