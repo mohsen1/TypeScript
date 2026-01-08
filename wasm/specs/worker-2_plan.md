@@ -64,6 +64,7 @@ Priority: 2
 - [x] Added optional tuple element array infer test (current behavior omits undefined). Tests: `./wasm/test.sh test_conditional_infer_array_element_from_optional_tuple_element`.
 - [x] Added function this-parameter infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_function_this_param_distributive`.
 - [x] Added optional property present infer test (current behavior omits undefined). Tests: `./wasm/test.sh test_conditional_infer_optional_property_present_distributive`.
+- [x] Added tuple rest infer test (current behavior yields infer placeholder). Tests: `./wasm/test.sh test_conditional_infer_tuple_rest_distributive`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
