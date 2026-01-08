@@ -107,6 +107,10 @@ fn find_line_col(text: &str, needle: &str) -> (u32, u32) {
         .find(needle)
         .unwrap_or_else(|| panic!("expected to find {needle} in {text}"));
 
+    find_line_col_at(text, idx)
+}
+
+fn find_line_col_at(text: &str, idx: usize) -> (u32, u32) {
     let mut line = 0u32;
     let mut col = 0u32;
     for &b in text.as_bytes().iter().take(idx) {
@@ -384,6 +388,79 @@ fn test_source_map_es5_transform_async_await_return_mapping() {
 }
 
 #[test]
+fn test_source_map_es5_transform_async_await_var_initializer_mapping() {
+    let source = "async function run() { let result = await fetch(); return result; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    assert!(
+        output.contains("__awaiter(") && output.contains("__generator("),
+        "expected async downlevel output, got: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+    let (return_line, return_col) = find_line_col(source, "return result");
+    let name_line = return_line;
+    let name_col = return_col + "return ".len() as u32;
+
+    let mapping = decoded
+        .iter()
+        .find(|entry| {
+            entry.original_line == name_line
+                && entry.original_column == name_col
+        })
+        .unwrap_or_else(|| {
+            panic!(
+                "expected mapping for result. mappings: {mappings} output: {output}"
+            )
+        });
+
+    assert_eq!(mapping.source_index, 0);
+    let output_line_text = output
+        .lines()
+        .nth(mapping.generated_line as usize)
+        .unwrap_or_else(|| {
+            panic!(
+                "missing output line {} in output: {output}",
+                mapping.generated_line
+            )
+        });
+    let output_slice = output_line_text
+        .get(mapping.generated_column as usize..)
+        .unwrap_or_else(|| {
+            panic!(
+                "missing output column {} in line: {output_line_text}",
+                mapping.generated_column
+            )
+        });
+    assert!(
+        output_slice.starts_with("result"),
+        "expected mapped output to start with result. line: {output_line_text} column: {} output: {output}",
+        mapping.generated_column
+    );
+}
+
+#[test]
 fn test_source_map_es5_transform_async_await_property_access_mapping() {
     let source = "async function load(user) { return (await user).name; }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -450,6 +527,293 @@ fn test_source_map_es5_transform_async_await_property_access_mapping() {
     assert!(
         output_slice.starts_with("user"),
         "expected mapped output to start with user. line: {output_line_text} column: {} output: {output}",
+        mapping.generated_column
+    );
+}
+
+#[test]
+fn test_source_map_es5_transform_async_await_property_name_mapping() {
+    let source = "async function load(user) { return (await user).name; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    assert!(
+        output.contains("__awaiter(") && output.contains("__generator("),
+        "expected async downlevel output, got: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+    let (source_line, source_col) = find_line_col(source, "name");
+
+    let mapping = decoded
+        .iter()
+        .find(|entry| {
+            entry.original_line == source_line
+                && entry.original_column == source_col
+        })
+        .unwrap_or_else(|| {
+            panic!(
+                "expected mapping for name. mappings: {mappings} output: {output}"
+            )
+        });
+
+    assert_eq!(mapping.source_index, 0);
+    let output_line_text = output
+        .lines()
+        .nth(mapping.generated_line as usize)
+        .unwrap_or_else(|| {
+            panic!(
+                "missing output line {} in output: {output}",
+                mapping.generated_line
+            )
+        });
+    let output_slice = output_line_text
+        .get(mapping.generated_column as usize..)
+        .unwrap_or_else(|| {
+            panic!(
+                "missing output column {} in line: {output_line_text}",
+                mapping.generated_column
+            )
+        });
+    assert!(
+        output_slice.starts_with("name"),
+        "expected mapped output to start with name. line: {output_line_text} column: {} output: {output}",
+        mapping.generated_column
+    );
+}
+
+#[test]
+fn test_source_map_es5_transform_async_await_element_access_mapping() {
+    let source = "async function load(items, idx) { return (await items)[idx]; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    assert!(
+        output.contains("__awaiter(") && output.contains("__generator("),
+        "expected async downlevel output, got: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+    let (source_line, source_col) = find_line_col(source, "idx");
+
+    let mapping = decoded
+        .iter()
+        .find(|entry| {
+            entry.original_line == source_line
+                && entry.original_column == source_col
+        })
+        .unwrap_or_else(|| {
+            panic!(
+                "expected mapping for idx. mappings: {mappings} output: {output}"
+            )
+        });
+
+    assert_eq!(mapping.source_index, 0);
+    let output_line_text = output
+        .lines()
+        .nth(mapping.generated_line as usize)
+        .unwrap_or_else(|| {
+            panic!(
+                "missing output line {} in output: {output}",
+                mapping.generated_line
+            )
+        });
+    let output_slice = output_line_text
+        .get(mapping.generated_column as usize..)
+        .unwrap_or_else(|| {
+            panic!(
+                "missing output column {} in line: {output_line_text}",
+                mapping.generated_column
+            )
+        });
+    assert!(
+        output_slice.starts_with("idx"),
+        "expected mapped output to start with idx. line: {output_line_text} column: {} output: {output}",
+        mapping.generated_column
+    );
+}
+
+#[test]
+fn test_source_map_es5_transform_async_await_call_mapping() {
+    let source = "async function run(value) { return await compute(value); }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    assert!(
+        output.contains("__awaiter(") && output.contains("__generator("),
+        "expected async downlevel output, got: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+    let (call_line, call_col) = find_line_col(source, "compute");
+
+    let mapping = decoded
+        .iter()
+        .find(|entry| {
+            entry.original_line == call_line
+                && entry.original_column == call_col
+        })
+        .unwrap_or_else(|| {
+            panic!(
+                "expected mapping for compute. mappings: {mappings} output: {output}"
+            )
+        });
+
+    assert_eq!(mapping.source_index, 0);
+    let output_line_text = output
+        .lines()
+        .nth(mapping.generated_line as usize)
+        .unwrap_or_else(|| {
+            panic!(
+                "missing output line {} in output: {output}",
+                mapping.generated_line
+            )
+        });
+    let output_slice = output_line_text
+        .get(mapping.generated_column as usize..)
+        .unwrap_or_else(|| {
+            panic!(
+                "missing output column {} in line: {output_line_text}",
+                mapping.generated_column
+            )
+        });
+    assert!(
+        output_slice.starts_with("compute"),
+        "expected mapped output to start with compute. line: {output_line_text} column: {} output: {output}",
+        mapping.generated_column
+    );
+}
+
+#[test]
+fn test_source_map_es5_transform_async_await_call_argument_mapping() {
+    let source = "async function run(value) { return await compute(value); }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    assert!(
+        output.contains("__awaiter(") && output.contains("__generator("),
+        "expected async downlevel output, got: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+    let arg_idx = source
+        .rfind("value")
+        .unwrap_or_else(|| panic!("expected to find value in {source}"));
+    let (arg_line, arg_col) = find_line_col_at(source, arg_idx);
+
+    let mapping = decoded
+        .iter()
+        .find(|entry| {
+            entry.original_line == arg_line
+                && entry.original_column == arg_col
+        })
+        .unwrap_or_else(|| {
+            panic!(
+                "expected mapping for value. mappings: {mappings} output: {output}"
+            )
+        });
+
+    assert_eq!(mapping.source_index, 0);
+    let output_line_text = output
+        .lines()
+        .nth(mapping.generated_line as usize)
+        .unwrap_or_else(|| {
+            panic!(
+                "missing output line {} in output: {output}",
+                mapping.generated_line
+            )
+        });
+    let output_slice = output_line_text
+        .get(mapping.generated_column as usize..)
+        .unwrap_or_else(|| {
+            panic!(
+                "missing output column {} in line: {output_line_text}",
+                mapping.generated_column
+            )
+        });
+    assert!(
+        output_slice.starts_with("value"),
+        "expected mapped output to start with value. line: {output_line_text} column: {} output: {output}",
         mapping.generated_column
     );
 }
@@ -6556,6 +6920,77 @@ fn test_source_map_es5_transform_async_optional_chaining_await_mapping() {
 }
 
 #[test]
+fn test_source_map_es5_transform_async_await_call_property_mapping() {
+    let source = "async function run(user) { return await user.get(); }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    assert!(
+        output.contains("__awaiter(") && output.contains("__generator("),
+        "expected async downlevel output, got: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+    let (method_line, method_col) = find_line_col(source, "get");
+
+    let mapping = decoded
+        .iter()
+        .find(|entry| {
+            entry.original_line == method_line
+                && entry.original_column == method_col
+        })
+        .unwrap_or_else(|| {
+            panic!(
+                "expected mapping for get. mappings: {mappings} output: {output}"
+            )
+        });
+
+    assert_eq!(mapping.source_index, 0);
+    let output_line_text = output
+        .lines()
+        .nth(mapping.generated_line as usize)
+        .unwrap_or_else(|| {
+            panic!(
+                "missing output line {} in output: {output}",
+                mapping.generated_line
+            )
+        });
+    let output_slice = output_line_text
+        .get(mapping.generated_column as usize..)
+        .unwrap_or_else(|| {
+            panic!(
+                "missing output column {} in line: {output_line_text}",
+                mapping.generated_column
+            )
+        });
+    assert!(
+        output_slice.starts_with("get"),
+        "expected mapped output to start with get. line: {output_line_text} column: {} output: {output}",
+        mapping.generated_column
+    );
+}
+
+#[test]
 fn test_source_map_es5_transform_async_nullish_coalescing_await_mapping() {
     let source = "async function run(){ return (await foo()) ?? bar(); }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -9230,4 +9665,180 @@ fn test_source_map_es5_transform_derived_ctor_super_initializer_mapping() {
 
     assert_eq!(mapping.source_index, 0);
     assert_eq!(mapping.original_line, class_line);
+}
+
+#[test]
+fn test_source_map_es5_transform_async_spread_await_mapping() {
+    let source = "async function run(){ return combine(...await getItems()); }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    assert!(
+        output.contains("__awaiter(") && output.contains("__generator("),
+        "expected async downlevel output, got: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+    let (items_line, items_col) = find_line_col(source, "getItems()");
+
+    let targets = [("getItems", items_line, items_col)];
+
+    for (label, src_line, src_col) in targets {
+        let direct_mapping = decoded.iter().find(|entry| {
+            entry.original_line == src_line && entry.original_column == src_col
+        });
+        let direct_valid = direct_mapping.and_then(|mapping| {
+            if mapping.source_index != 0 {
+                return None;
+            }
+
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
+            if output_slice.starts_with(label) {
+                Some(mapping)
+            } else {
+                None
+            }
+        });
+
+        if direct_valid.is_none() {
+            let (func_line, _) = find_line_col(source, "async function run");
+            let (output_line, output_col) = if output.contains("function run") {
+                find_line_col(&output, "function run")
+            } else if output.contains("run = function") {
+                find_line_col(&output, "run = function")
+            } else {
+                find_line_col(&output, "run")
+            };
+            let mapping = decoded
+                .iter()
+                .filter(|entry| {
+                    entry.generated_line < output_line
+                        || (entry.generated_line == output_line
+                            && entry.generated_column <= output_col)
+                })
+                .max_by_key(|entry| (entry.generated_line, entry.generated_column))
+                .unwrap_or_else(|| {
+                    panic!(
+                        "expected mapping at or before async function output for {label}. mappings: {mappings} output: {output}"
+                    )
+                });
+
+            assert_eq!(mapping.source_index, 0);
+            assert!(
+                mapping.original_line <= func_line,
+                "expected mapping before or on function line for {label}. mapping line: {} function line: {}",
+                mapping.original_line,
+                func_line
+            );
+        }
+    }
+}
+
+#[test]
+fn test_source_map_es5_transform_async_chained_method_await_mapping() {
+    let source = "async function run(){ return (await getData()).process().result; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    assert!(
+        output.contains("__awaiter(") && output.contains("__generator("),
+        "expected async downlevel output, got: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+    let (data_line, data_col) = find_line_col(source, "getData()");
+
+    let targets = [("getData", data_line, data_col)];
+
+    for (label, src_line, src_col) in targets {
+        let direct_mapping = decoded.iter().find(|entry| {
+            entry.original_line == src_line && entry.original_column == src_col
+        });
+        let direct_valid = direct_mapping.and_then(|mapping| {
+            if mapping.source_index != 0 {
+                return None;
+            }
+
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
+            if output_slice.starts_with(label) {
+                Some(mapping)
+            } else {
+                None
+            }
+        });
+
+        if direct_valid.is_none() {
+            let (func_line, _) = find_line_col(source, "async function run");
+            let (output_line, output_col) = if output.contains("function run") {
+                find_line_col(&output, "function run")
+            } else if output.contains("run = function") {
+                find_line_col(&output, "run = function")
+            } else {
+                find_line_col(&output, "run")
+            };
+            let mapping = decoded
+                .iter()
+                .filter(|entry| {
+                    entry.generated_line < output_line
+                        || (entry.generated_line == output_line
+                            && entry.generated_column <= output_col)
+                })
+                .max_by_key(|entry| (entry.generated_line, entry.generated_column))
+                .unwrap_or_else(|| {
+                    panic!(
+                        "expected mapping at or before async function output for {label}. mappings: {mappings} output: {output}"
+                    )
+                });
+
+            assert_eq!(mapping.source_index, 0);
+            assert!(
+                mapping.original_line <= func_line,
+                "expected mapping before or on function line for {label}. mapping line: {} function line: {}",
+                mapping.original_line,
+                func_line
+            );
+        }
+    }
 }

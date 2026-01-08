@@ -166,6 +166,182 @@ fn test_class_es5_default_derived_constructor_orders_super_and_props() {
 }
 
 #[test]
+fn test_class_es5_derived_constructor_orders_super_props_and_body() {
+    let source = "class Base {} class Derived extends Base { field = () => this.x; constructor() { super(); this.y = 2; } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected derived class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    let super_pos = output
+        .find("var _this = _super.call(this")
+        .expect("expected super call assignment");
+    let field_pos = output
+        .find("_this.field = function")
+        .expect("expected field initializer");
+    let body_pos = output
+        .find("_this.y = 2")
+        .expect("expected constructor body assignment");
+    let return_pos = output.find("return _this").expect("expected return _this");
+
+    assert!(
+        super_pos < field_pos,
+        "Expected super call before field initializer: {}",
+        output
+    );
+    assert!(
+        field_pos < body_pos,
+        "Expected field initializer before constructor body: {}",
+        output
+    );
+    assert!(
+        body_pos < return_pos,
+        "Expected return after constructor body: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.y = 2;"),
+        "Expected constructor body to use _this: {}",
+        output
+    );
+    assert!(
+        !output.contains(" this.y = 2;"),
+        "Expected constructor body to avoid raw this: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_derived_constructor_preserves_pre_super_and_orders_body() {
+    let source = "class Base {} class Derived extends Base { field = () => this.x; constructor() { prep(); super(); this.y = 2; post(); } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected derived class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    let prep_pos = output.find("prep()").expect("expected prep() call");
+    let super_pos = output
+        .find("var _this = _super.call(this")
+        .expect("expected super call assignment");
+    let field_pos = output
+        .find("_this.field = function")
+        .expect("expected field initializer");
+    let body_pos = output
+        .find("_this.y = 2")
+        .expect("expected constructor body assignment");
+    let post_pos = output.find("post()").expect("expected post() call");
+
+    assert!(
+        prep_pos < super_pos,
+        "Expected prep() before super call: {}",
+        output
+    );
+    assert!(
+        super_pos < field_pos,
+        "Expected field initializer after super call: {}",
+        output
+    );
+    assert!(
+        field_pos < body_pos,
+        "Expected field initializer before constructor body: {}",
+        output
+    );
+    assert!(
+        body_pos < post_pos,
+        "Expected post() after constructor body: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.y = 2;"),
+        "Expected constructor body to use _this: {}",
+        output
+    );
+    assert!(
+        !output.contains(" this.y = 2;"),
+        "Expected constructor body to avoid raw this: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_derived_constructor_orders_param_property_and_field() {
+    let source =
+        "class Base {} class Derived extends Base { y = 1; constructor(public x) { super(); post(); } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected derived class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    let super_pos = output
+        .find("var _this = _super.call(this")
+        .expect("expected super call assignment");
+    let param_pos = output
+        .find("_this.x = x")
+        .expect("expected parameter property assignment");
+    let field_pos = output
+        .find("_this.y = 1")
+        .expect("expected instance property initializer");
+    let post_pos = output.find("post()").expect("expected post() call");
+
+    assert!(
+        super_pos < param_pos,
+        "Expected parameter property after super: {}",
+        output
+    );
+    assert!(
+        param_pos < field_pos,
+        "Expected parameter property before field initializer: {}",
+        output
+    );
+    assert!(
+        field_pos < post_pos,
+        "Expected post() after field initializer: {}",
+        output
+    );
+    assert!(
+        !output.contains(" this.x = x"),
+        "Expected parameter property to avoid raw this: {}",
+        output
+    );
+}
+
+#[test]
 fn test_class_es5_computed_super_arrow_in_field_initializer() {
     let source = r#"
 class Base { m(x) { return x; } }
@@ -373,6 +549,56 @@ class Derived extends Base {
     assert!(
         output.contains("__classPrivateFieldSet(_this, _Derived_count, _this.value"),
         "Expected private field initializer to use _this in derived class: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_derived_constructor_orders_private_and_props() {
+    let source = r#"
+class Base {}
+class Derived extends Base {
+    #count = this.value;
+    y = 1;
+    constructor() {
+        super();
+        post();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected derived class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    let private_pos = output
+        .find("__classPrivateFieldSet(_this, _Derived_count, _this.value")
+        .expect("expected private field initializer");
+    let prop_pos = output
+        .find("_this.y = 1")
+        .expect("expected instance property initializer");
+    let post_pos = output.find("post()").expect("expected post() call");
+
+    assert!(
+        private_pos < prop_pos,
+        "Expected private field init before instance prop: {}",
+        output
+    );
+    assert!(
+        prop_pos < post_pos,
+        "Expected post() after instance prop: {}",
         output
     );
 }

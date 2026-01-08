@@ -17,9 +17,57 @@ Priority: 4
 - [x] Add async nested function source-map offset coverage. Tests: `./wasm/test.sh source_map`
 - [x] Add async await detection test for nested functions. Tests: `./wasm/test.sh body_contains_await`
 - [x] Add ES5 derived default constructor ordering test. Tests: `./wasm/test.sh default_derived_constructor`
+- [x] Add ES5 derived constructor ordering test (super/field/body). Tests: `./wasm/test.sh` (fails in `parallel::tests::test_check_redux_lodash_style_generics`)
+- [x] Add async await initializer assignment coverage. Tests: `./wasm/test.sh async_es5`
+- [x] Restore async ES5 emitter this-capture setter for new call sites. Tests: `./wasm/test.sh async_es5`
+- [x] Add async ES5 this-capture test. Tests: `./wasm/test.sh async_es5`
+- [x] Add derived ctor pre-super ordering test with field init. Tests: `./wasm/test.sh derived_constructor_preserves_pre_super`
+- [x] Add async await var initializer source-map coverage. Tests: `./wasm/test.sh async_await_var_initializer_mapping`
+- [x] Add async await call property source-map coverage. Tests: `./wasm/test.sh async_await_call_property_mapping`
+- [x] Add async await element access source-map coverage. Tests: `./wasm/test.sh async_await_element_access_mapping`
+- [x] Add async await call source-map coverage. Tests: `./wasm/test.sh async_await_call_mapping`
+- [x] Add async await call argument source-map coverage. Tests: `./wasm/test.sh async_await_call_argument_mapping`
+- [x] Add async await detection for call arguments. Tests: `./wasm/test.sh body_contains_await_in_call_argument`
+- [x] Add async await detection for call expression callee. Tests: `./wasm/test.sh body_contains_await_in_call_expression_callee`
+- [x] Add async await detection for binary expressions. Tests: `./wasm/test.sh body_contains_await_in_binary_expression`
+- [x] Add async await detection for conditional expressions. Tests: `./wasm/test.sh body_contains_await_in_conditional_expression`
+- [x] Add async await detection for unary expressions. Tests: `./wasm/test.sh body_contains_await_in_unary_expression`
+- [x] Add async await detection for parenthesized expressions. Tests: `./wasm/test.sh body_contains_await_in_parenthesized_expression`
+- [x] Add async await detection for object literals. Tests: `./wasm/test.sh body_contains_await_in_object_literal`
+- [x] Add async await detection for array literals. Tests: `./wasm/test.sh body_contains_await_in_array_literal`
+- [x] Add async await detection for computed object literal names. Tests: `./wasm/test.sh body_contains_await_in_object_literal_computed_name`
+- [x] Add async await detection for object literal spreads. Tests: `./wasm/test.sh body_contains_await_in_object_literal_spread`
+- [x] Add async await detection for array literal spreads. Tests: `./wasm/test.sh body_contains_await_in_array_literal_spread`
+- [x] Add async await detection for template expressions. Tests: `./wasm/test.sh body_contains_await_in_template_expression`
+- [x] Add async await detection for tagged templates. Tests: `./wasm/test.sh body_contains_await_in_tagged_template`
+- [x] Add async await detection for as expressions. Tests: `./wasm/test.sh body_contains_await_in_as_expression`
+- [x] Add async await detection for type assertions. Tests: `./wasm/test.sh body_contains_await_in_type_assertion`
+- [x] Add async await detection for non-null expressions. Tests: `./wasm/test.sh body_contains_await_in_non_null_expression`
+- [x] Add async await detection for new expressions. Tests: `./wasm/test.sh body_contains_await_in_new_expression`
+- [x] Add async await detection for try statements. Tests: `./wasm/test.sh body_contains_await_in_try_statement`
+- [x] Add async await detection for catch clauses. Tests: `./wasm/test.sh body_contains_await_in_catch_clause`
+- [x] Add async await detection for finally blocks. Tests: `./wasm/test.sh body_contains_await_in_finally_block`
+- [x] Add async await detection for switch expressions. Tests: `./wasm/test.sh body_contains_await_in_switch_expression`
+- [x] Add async await detection for switch case statements. Tests: `./wasm/test.sh body_contains_await_in_switch_case_statement`
+- [x] Add async await detection for switch default clauses. Tests: `./wasm/test.sh body_contains_await_in_switch_default_clause`
+- [x] Add async await detection for for loop conditions. Tests: `./wasm/test.sh body_contains_await_in_for_loop_condition`
+- [x] Add async await detection for for loop incrementor. Tests: `./wasm/test.sh body_contains_await_in_for_loop_incrementor`
+- [x] Add async await detection for for loop initializer. Tests: `./wasm/test.sh body_contains_await_in_for_loop_initializer`
+- [x] Add async await detection for while conditions. Tests: `./wasm/test.sh body_contains_await_in_while_condition`
+- [x] Add async await detection for do-while conditions. Tests: `./wasm/test.sh body_contains_await_in_do_while_condition`
+- [x] Add async await detection for for-of expressions. Tests: `./wasm/test.sh body_contains_await_in_for_of_expression`
+- [x] Add async await detection for for-in expressions. Tests: `./wasm/test.sh body_contains_await_in_for_in_expression`
+- [x] Add derived ctor param property ordering test. Tests: `./wasm/test.sh derived_constructor_orders_param_property`
+- [x] Add derived ctor private field ordering test. Tests: `./wasm/test.sh derived_constructor_orders_private`
+- [x] Add async await property name source-map coverage. Tests: `./wasm/test.sh async_await_property_name_mapping`
+- [x] Add async await detection for if statement conditions. Tests: `./wasm/test.sh body_contains_await_in_if_condition`
+- [x] Add async await detection for if else branches. Tests: `./wasm/test.sh body_contains_await_in_if_else_branch`
+- [x] Add async await detection for throw statements (with fix). Tests: `./wasm/test.sh body_contains_await_in_throw_statement`
+- [x] Add async spread await source-map coverage. Tests: `./wasm/test.sh async_spread_await_mapping`
+- [x] Add async chained method await source-map coverage. Tests: `./wasm/test.sh async_chained_method_await_mapping`
 
 ## Ready for Merge
-No
+Yes
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
@@ -29,6 +77,7 @@ No
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/anvil-4`
 - **NEVER edit**: `DIRECTOR_AGENT.md`, `SQUAD_LEAD_AGENT.md`, `MANAGER_AGENT.md`, `AGENTS.md`, `start_*.sh`
+- `./wasm/test.sh` currently fails on `parallel::tests::test_check_redux_lodash_style_generics` (left 6, right 0).
 - Proposed next tasks for EM assignment:
   - Validate ES5 class downleveling edge cases for `super()` + field initializers in `wasm/src/transforms/class_es5.rs`.
   - Add coverage for async downlevel source-map offsets in `wasm/src/transforms/async_es5.rs`.
