@@ -27,6 +27,15 @@ fn test_intrinsic_subtyping() {
 }
 
 #[test]
+fn test_any_top_bottom_subtyping() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    assert!(checker.is_subtype_of(TypeId::ANY, TypeId::NEVER));
+    assert!(checker.is_subtype_of(TypeId::NEVER, TypeId::ANY));
+}
+
+#[test]
 fn test_legacy_null_undefined_subtyping() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
