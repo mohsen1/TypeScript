@@ -43,6 +43,7 @@ Priority: 2
 - [x] Added non-distributive tuple wrapper array infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_array_element_non_distributive_tuple_wrapper`.
 - [x] Added non-distributive union-array infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_array_element_non_distributive_union_input`.
 - [x] Added non-distributive nested object infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_nested_object_property_non_distributive_union_input`.
+- [x] Added tuple infer test with non-tuple union branch. Tests: `./wasm/test.sh test_conditional_infer_tuple_element_non_tuple_union_branch`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
