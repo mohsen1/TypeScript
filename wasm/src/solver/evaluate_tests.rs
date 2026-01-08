@@ -5478,7 +5478,6 @@ fn test_conditional_infer_tuple_rest_distributive() {
     }));
 
     // T extends [string, ...infer R] ? R : never, with T = [string, number] | [string].
-    // TODO: Variadic tuple inference is not implemented; current behavior yields number.
     let extends_tuple = interner.tuple(vec![
         TupleElement {
             type_id: TypeId::STRING,
@@ -5528,7 +5527,17 @@ fn test_conditional_infer_tuple_rest_distributive() {
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::NUMBER);
+    let expected = interner.union(vec![
+        interner.tuple(vec![TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        interner.tuple(Vec::new()),
+    ]);
+
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -5556,7 +5565,6 @@ fn test_conditional_infer_tuple_rest_with_head_infer_distributive() {
     }));
 
     // T extends [infer H, ...infer R] ? R : never, with T = [string, number] | [boolean].
-    // TODO: Variadic tuple inference is not implemented; current behavior yields number.
     let extends_tuple = interner.tuple(vec![
         TupleElement {
             type_id: infer_h,
@@ -5606,7 +5614,17 @@ fn test_conditional_infer_tuple_rest_with_head_infer_distributive() {
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::NUMBER);
+    let expected = interner.union(vec![
+        interner.tuple(vec![TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        interner.tuple(Vec::new()),
+    ]);
+
+    assert_eq!(result, expected);
 }
 
 #[test]

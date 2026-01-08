@@ -2024,6 +2024,69 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         let source_len = source_elems.len();
         let pattern_len = pattern_elems.len();
 
+        let mut rest_index = None;
+        for (idx, elem) in pattern_elems.iter().enumerate() {
+            if elem.rest {
+                if rest_index.is_some() {
+                    return false;
+                }
+                rest_index = Some(idx);
+            }
+        }
+
+        if let Some(rest_index) = rest_index {
+            if rest_index + 1 != pattern_len {
+                return false;
+            }
+            if source_len < rest_index {
+                return false;
+            }
+
+            for i in 0..rest_index {
+                let source_elem = &source_elems[i];
+                let pattern_elem = &pattern_elems[i];
+                if source_elem.rest || pattern_elem.rest {
+                    return false;
+                }
+                let source_type = if source_elem.optional {
+                    self.interner.union2(source_elem.type_id, TypeId::UNDEFINED)
+                } else {
+                    source_elem.type_id
+                };
+                if !self.match_infer_pattern(
+                    source_type,
+                    pattern_elem.type_id,
+                    bindings,
+                    visited,
+                    checker,
+                ) {
+                    return false;
+                }
+            }
+
+            let mut rest_elems = Vec::new();
+            for source_elem in &source_elems[rest_index..] {
+                if source_elem.rest {
+                    return false;
+                }
+                rest_elems.push(TupleElement {
+                    type_id: source_elem.type_id,
+                    name: source_elem.name,
+                    optional: source_elem.optional,
+                    rest: false,
+                });
+            }
+
+            let rest_tuple = self.interner.tuple(rest_elems);
+            return self.match_infer_pattern(
+                rest_tuple,
+                pattern_elems[rest_index].type_id,
+                bindings,
+                visited,
+                checker,
+            );
+        }
+
         if source_len > pattern_len {
             return false;
         }
