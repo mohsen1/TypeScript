@@ -111,6 +111,35 @@ fn test_interner_intersection_unknown_identity() {
 }
 
 #[test]
+fn test_interner_intersection_flattens_and_dedups() {
+    let interner = TypeInterner::new();
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let inner = interner.intersection(vec![obj_a, obj_b]);
+    let outer = interner.intersection(vec![inner, obj_a]);
+    let dup = interner.intersection(vec![obj_b, obj_a, obj_a]);
+
+    assert_eq!(outer, inner);
+    assert_eq!(dup, inner);
+}
+
+#[test]
 fn test_interner_intersection_disjoint_primitives() {
     let interner = TypeInterner::new();
 
