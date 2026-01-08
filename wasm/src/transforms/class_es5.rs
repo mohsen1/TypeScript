@@ -87,7 +87,7 @@ pub struct ClassES5Emitter<'a> {
     use_this_capture: bool,
     /// Whether a `_this` capture is available in the current scope
     this_capture_available: bool,
-    /// Whether to suppress capturing `this` (e.g., static field initializers)
+    /// Whether to suppress arrow-function this capture (static fields).
     suppress_this_capture: bool,
     /// Counter for temporary variables (_a, _b, _c, etc.)
     temp_var_counter: u32,
@@ -1395,7 +1395,7 @@ impl<'a> ClassES5Emitter<'a> {
     fn emit_async_body(&mut self, body: NodeIndex) {
         let mut async_emitter = AsyncES5Emitter::new(self.arena);
         async_emitter.set_indent_level(self.indent_level + 1);
-        async_emitter.set_lexical_this(self.use_this_capture);
+        async_emitter.set_use_this_capture(self.use_this_capture);
 
         let generator_body = if async_emitter.body_contains_await(body) {
             async_emitter.emit_generator_body_with_await(body)
@@ -1432,7 +1432,7 @@ impl<'a> ClassES5Emitter<'a> {
 
         let mut async_emitter = AsyncES5Emitter::new(self.arena);
         async_emitter.set_indent_level(self.indent_level + 1);
-        async_emitter.set_lexical_this(this_expr != "this");
+        async_emitter.set_use_this_capture(this_expr != "this");
 
         let generator_body = if async_emitter.body_contains_await(func.body) {
             async_emitter.emit_generator_body_with_await(func.body)
@@ -2958,12 +2958,12 @@ impl<'a> ClassES5Emitter<'a> {
             k if k == syntax_kind_ext::ARROW_FUNCTION => {
                 // Transform arrow to function expression
                 if let Some(func) = self.arena.get_function(expr_node) {
-                    let captures_this = contains_this_reference(self.arena, expr_idx);
-                    let needs_capture = captures_this && !self.suppress_this_capture;
+                    let captures_this = !self.suppress_this_capture
+                        && contains_this_reference(self.arena, expr_idx);
                     let has_outer_capture = self.use_this_capture || self.this_capture_available;
-                    let use_iife = needs_capture && !has_outer_capture;
+                    let use_iife = captures_this && !has_outer_capture;
                     let prev_capture = self.use_this_capture;
-                    if needs_capture {
+                    if captures_this {
                         self.use_this_capture = true;
                     }
 
@@ -2973,7 +2973,7 @@ impl<'a> ClassES5Emitter<'a> {
 
                     if func.is_async {
                         let parent_this = if prev_capture { "_this" } else { "this" };
-                        let this_expr = if needs_capture { "_this" } else { parent_this };
+                        let this_expr = if captures_this { "_this" } else { parent_this };
                         self.emit_async_arrow_function(func, this_expr);
                     } else {
                         self.write("function (");
