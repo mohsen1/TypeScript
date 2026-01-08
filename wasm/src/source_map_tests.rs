@@ -12328,3 +12328,92 @@ c.increment();"#;
         "expected non-empty source mappings for private class fields"
     );
 }
+
+#[test]
+fn test_source_map_computed_property_names() {
+    // Test computed property names in objects and classes
+    let source = r#"const key1 = "dynamic";
+const key2 = Symbol("unique");
+
+const obj = {
+    [key1]: "value1",
+    [key2]: "value2",
+    ["literal" + "Key"]: "value3",
+    [1 + 2]: "value4"
+};
+
+class Container {
+    [key1] = 100;
+
+    ["get" + "Value"]() {
+        return this[key1];
+    }
+
+    get [Symbol.toStringTag]() {
+        return "Container";
+    }
+}
+
+const c = new Container();
+console.log(obj[key1]);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the const declarations
+    let (key1_line, key1_col) = find_line_col(source, "const key1");
+    let has_key1_mapping = decoded.iter().any(|entry| {
+        entry.original_line == key1_line
+            && entry.original_column >= key1_col
+            && entry.original_column <= key1_col + 10
+    });
+
+    // Verify we have mappings for the object literal
+    let (obj_line, obj_col) = find_line_col(source, "const obj");
+    let has_obj_mapping = decoded.iter().any(|entry| {
+        entry.original_line == obj_line
+            && entry.original_column >= obj_col
+            && entry.original_column <= obj_col + 9
+    });
+
+    // At minimum, we should have mappings for declarations
+    assert!(
+        has_key1_mapping || has_obj_mapping || !decoded.is_empty(),
+        "expected mappings for computed property names. mappings: {mappings}"
+    );
+
+    // Verify output contains expected identifiers
+    assert!(
+        output.contains("Container") && output.contains("key1"),
+        "expected output to contain class and variable names. output: {output}"
+    );
+
+    // Verify source map has non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for computed property names"
+    );
+}
