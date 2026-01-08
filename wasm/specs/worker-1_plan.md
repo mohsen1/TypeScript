@@ -37,6 +37,7 @@ Priority: 1
 - [x] Error lower bound with literal prefers literal; added `test_resolve_error_lower_with_literal_prefers_literal`. Tests: `./wasm/test.sh test_resolve_error_lower_with_literal_prefers_literal`.
 - [x] Unknown lower bound prefers upper bound; added `test_resolve_unknown_lower_prefers_upper_bound`. Tests: `./wasm/test.sh test_resolve_unknown_lower_prefers_upper_bound`.
 - [x] Unified vars reuse merged constraints; added `test_resolve_unified_vars_merged_constraints`. Tests: `./wasm/test.sh test_resolve_unified_vars_merged_constraints`.
+- [x] Self upper bound with concrete upper resolves to concrete; added `test_resolve_self_upper_bound_with_concrete`. Tests: `./wasm/test.sh test_resolve_self_upper_bound_with_concrete`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.

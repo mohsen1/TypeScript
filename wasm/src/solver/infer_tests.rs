@@ -355,6 +355,26 @@ fn test_resolve_circular_upper_bound_defaults_unknown() {
 }
 
 #[test]
+fn test_resolve_self_upper_bound_with_concrete() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var = ctx.fresh_type_param(t_name);
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    ctx.add_upper_bound(var, t_type);
+    ctx.add_upper_bound(var, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
 fn test_resolve_mutual_circular_upper_bounds_unknown() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);
