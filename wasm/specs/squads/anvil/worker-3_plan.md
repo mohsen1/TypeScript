@@ -24,6 +24,7 @@ Priority: 3
 - [x] Added CommonJS export-name test for multiple named exports; `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 - [x] Added CommonJS export-name test for default export class plus named export; `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 - [x] Added CommonJS export-name test for exported namespaces; `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
+- [x] Added CommonJS export-name test for exported enums; `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 
 ## Ready for Merge
 Yes - worker/anvil-3 ready for merge.
