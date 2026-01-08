@@ -62,6 +62,7 @@ Priority: 3
 - [x] Solver unsoundness: mapped type over primitive bigint keys regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_over_bigint_keys_subtyping`.
 - [x] Solver unsoundness: key remapping to `never` yields empty object in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_key_remap_all_never_empty_object`.
 - [x] Solver unsoundness: mapped optional modifier add yields optional properties in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_optional_modifier_add_subtyping`.
+- [x] Solver unsoundness: mapped readonly modifier add yields readonly properties in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_readonly_modifier_add_subtyping`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
