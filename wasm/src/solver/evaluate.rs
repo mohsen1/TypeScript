@@ -2076,6 +2076,44 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         true
     }
 
+    fn match_signature_params(
+        &self,
+        source_params: &[ParamInfo],
+        pattern_params: &[ParamInfo],
+        bindings: &mut FxHashMap<Atom, TypeId>,
+        visited: &mut FxHashSet<(TypeId, TypeId)>,
+        checker: &mut SubtypeChecker<'_, R>,
+    ) -> bool {
+        if source_params.len() != pattern_params.len() {
+            return false;
+        }
+        for (source_param, pattern_param) in
+            source_params.iter().zip(pattern_params.iter())
+        {
+            if source_param.optional != pattern_param.optional
+                || source_param.rest != pattern_param.rest
+            {
+                return false;
+            }
+            let source_param_type = if source_param.optional {
+                self.interner
+                    .union2(source_param.type_id, TypeId::UNDEFINED)
+            } else {
+                source_param.type_id
+            };
+            if !self.match_infer_pattern(
+                source_param_type,
+                pattern_param.type_id,
+                bindings,
+                visited,
+                checker,
+            ) {
+                return false;
+            }
+        }
+        true
+    }
+
     fn match_infer_pattern(
         &self,
         source: TypeId,
@@ -2427,50 +2465,23 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     .any(|param| self.type_contains_infer(param.type_id));
                 let has_return_infer = self.type_contains_infer(pattern_sig.return_type);
                 if pattern_sig.this_type.is_none() && has_param_infer && has_return_infer {
-                    let mut match_callable_params_and_return = |source_type: TypeId,
-                                                                source_shape_id: CallableShapeId,
-                                                                bindings: &mut FxHashMap<Atom, TypeId>|
+                    let mut match_params_and_return = |source_type: TypeId,
+                                                       source_params: &[ParamInfo],
+                                                       source_return: TypeId,
+                                                       bindings: &mut FxHashMap<Atom, TypeId>|
                      -> bool {
-                        let source_shape = self.interner.callable_shape(source_shape_id);
-                        if source_shape.call_signatures.len() != 1
-                            || !source_shape.construct_signatures.is_empty()
-                            || !source_shape.properties.is_empty()
-                        {
-                            return false;
-                        }
-                        let source_sig = &source_shape.call_signatures[0];
-                        if source_sig.params.len() != pattern_sig.params.len() {
-                            return false;
-                        }
                         let mut local_visited = FxHashSet::default();
-                        for (source_param, pattern_param) in source_sig
-                            .params
-                            .iter()
-                            .zip(pattern_sig.params.iter())
-                        {
-                            if source_param.optional != pattern_param.optional
-                                || source_param.rest != pattern_param.rest
-                            {
-                                return false;
-                            }
-                            let source_param_type = if source_param.optional {
-                                self.interner
-                                    .union2(source_param.type_id, TypeId::UNDEFINED)
-                            } else {
-                                source_param.type_id
-                            };
-                            if !self.match_infer_pattern(
-                                source_param_type,
-                                pattern_param.type_id,
-                                bindings,
-                                &mut local_visited,
-                                checker,
-                            ) {
-                                return false;
-                            }
+                        if !self.match_signature_params(
+                            source_params,
+                            &pattern_sig.params,
+                            bindings,
+                            &mut local_visited,
+                            checker,
+                        ) {
+                            return false;
                         }
                         if !self.match_infer_pattern(
-                            source_sig.return_type,
+                            source_return,
                             pattern_sig.return_type,
                             bindings,
                             &mut local_visited,
@@ -2484,24 +2495,68 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
 
                     return match self.interner.lookup(source) {
                         Some(TypeKey::Callable(source_shape_id)) => {
-                            match_callable_params_and_return(source, source_shape_id, bindings)
+                            let source_shape = self.interner.callable_shape(source_shape_id);
+                            if source_shape.call_signatures.len() != 1
+                                || !source_shape.construct_signatures.is_empty()
+                                || !source_shape.properties.is_empty()
+                            {
+                                return false;
+                            }
+                            let source_sig = &source_shape.call_signatures[0];
+                            match_params_and_return(
+                                source,
+                                &source_sig.params,
+                                source_sig.return_type,
+                                bindings,
+                            )
+                        }
+                        Some(TypeKey::Function(source_fn_id)) => {
+                            let source_fn = self.interner.function_shape(source_fn_id);
+                            match_params_and_return(
+                                source,
+                                &source_fn.params,
+                                source_fn.return_type,
+                                bindings,
+                            )
                         }
                         Some(TypeKey::Union(members)) => {
                             let members = self.interner.type_list(members);
                             let mut combined = FxHashMap::default();
                             for &member in members.iter() {
-                                let Some(TypeKey::Callable(source_shape_id)) =
-                                    self.interner.lookup(member)
-                                else {
-                                    return false;
-                                };
                                 let mut member_bindings = FxHashMap::default();
-                                if !match_callable_params_and_return(
-                                    member,
-                                    source_shape_id,
-                                    &mut member_bindings,
-                                ) {
-                                    return false;
+                                match self.interner.lookup(member) {
+                                    Some(TypeKey::Callable(source_shape_id)) => {
+                                        let source_shape =
+                                            self.interner.callable_shape(source_shape_id);
+                                        if source_shape.call_signatures.len() != 1
+                                            || !source_shape.construct_signatures.is_empty()
+                                            || !source_shape.properties.is_empty()
+                                        {
+                                            return false;
+                                        }
+                                        let source_sig = &source_shape.call_signatures[0];
+                                        if !match_params_and_return(
+                                            member,
+                                            &source_sig.params,
+                                            source_sig.return_type,
+                                            &mut member_bindings,
+                                        ) {
+                                            return false;
+                                        }
+                                    }
+                                    Some(TypeKey::Function(source_fn_id)) => {
+                                        let source_fn =
+                                            self.interner.function_shape(source_fn_id);
+                                        if !match_params_and_return(
+                                            member,
+                                            &source_fn.params,
+                                            source_fn.return_type,
+                                            &mut member_bindings,
+                                        ) {
+                                            return false;
+                                        }
+                                    }
+                                    _ => return false,
                                 }
                                 for (name, ty) in member_bindings {
                                     combined
@@ -2519,47 +2574,19 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     };
                 }
                 if pattern_sig.this_type.is_none() && has_param_infer && !has_return_infer {
-                    let mut match_callable_params = |source_type: TypeId,
-                                                     source_shape_id: CallableShapeId,
-                                                     bindings: &mut FxHashMap<Atom, TypeId>|
+                    let mut match_params = |source_type: TypeId,
+                                            source_params: &[ParamInfo],
+                                            bindings: &mut FxHashMap<Atom, TypeId>|
                      -> bool {
-                        let source_shape = self.interner.callable_shape(source_shape_id);
-                        if source_shape.call_signatures.len() != 1
-                            || !source_shape.construct_signatures.is_empty()
-                            || !source_shape.properties.is_empty()
-                        {
-                            return false;
-                        }
-                        let source_sig = &source_shape.call_signatures[0];
-                        if source_sig.params.len() != pattern_sig.params.len() {
-                            return false;
-                        }
                         let mut local_visited = FxHashSet::default();
-                        for (source_param, pattern_param) in source_sig
-                            .params
-                            .iter()
-                            .zip(pattern_sig.params.iter())
-                        {
-                            if source_param.optional != pattern_param.optional
-                                || source_param.rest != pattern_param.rest
-                            {
-                                return false;
-                            }
-                            let source_param_type = if source_param.optional {
-                                self.interner
-                                    .union2(source_param.type_id, TypeId::UNDEFINED)
-                            } else {
-                                source_param.type_id
-                            };
-                            if !self.match_infer_pattern(
-                                source_param_type,
-                                pattern_param.type_id,
-                                bindings,
-                                &mut local_visited,
-                                checker,
-                            ) {
-                                return false;
-                            }
+                        if !self.match_signature_params(
+                            source_params,
+                            &pattern_sig.params,
+                            bindings,
+                            &mut local_visited,
+                            checker,
+                        ) {
+                            return false;
                         }
                         let substituted = self.substitute_infer(pattern, bindings);
                         checker.is_subtype_of(source_type, substituted)
@@ -2567,24 +2594,56 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
 
                     return match self.interner.lookup(source) {
                         Some(TypeKey::Callable(source_shape_id)) => {
-                            match_callable_params(source, source_shape_id, bindings)
+                            let source_shape = self.interner.callable_shape(source_shape_id);
+                            if source_shape.call_signatures.len() != 1
+                                || !source_shape.construct_signatures.is_empty()
+                                || !source_shape.properties.is_empty()
+                            {
+                                return false;
+                            }
+                            let source_sig = &source_shape.call_signatures[0];
+                            match_params(source, &source_sig.params, bindings)
+                        }
+                        Some(TypeKey::Function(source_fn_id)) => {
+                            let source_fn = self.interner.function_shape(source_fn_id);
+                            match_params(source, &source_fn.params, bindings)
                         }
                         Some(TypeKey::Union(members)) => {
                             let members = self.interner.type_list(members);
                             let mut combined = FxHashMap::default();
                             for &member in members.iter() {
-                                let Some(TypeKey::Callable(source_shape_id)) =
-                                    self.interner.lookup(member)
-                                else {
-                                    return false;
-                                };
                                 let mut member_bindings = FxHashMap::default();
-                                if !match_callable_params(
-                                    member,
-                                    source_shape_id,
-                                    &mut member_bindings,
-                                ) {
-                                    return false;
+                                match self.interner.lookup(member) {
+                                    Some(TypeKey::Callable(source_shape_id)) => {
+                                        let source_shape =
+                                            self.interner.callable_shape(source_shape_id);
+                                        if source_shape.call_signatures.len() != 1
+                                            || !source_shape.construct_signatures.is_empty()
+                                            || !source_shape.properties.is_empty()
+                                        {
+                                            return false;
+                                        }
+                                        let source_sig = &source_shape.call_signatures[0];
+                                        if !match_params(
+                                            member,
+                                            &source_sig.params,
+                                            &mut member_bindings,
+                                        ) {
+                                            return false;
+                                        }
+                                    }
+                                    Some(TypeKey::Function(source_fn_id)) => {
+                                        let source_fn =
+                                            self.interner.function_shape(source_fn_id);
+                                        if !match_params(
+                                            member,
+                                            &source_fn.params,
+                                            &mut member_bindings,
+                                        ) {
+                                            return false;
+                                        }
+                                    }
+                                    _ => return false,
                                 }
                                 for (name, ty) in member_bindings {
                                     combined
@@ -2603,21 +2662,13 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 }
 
                 if pattern_sig.this_type.is_none() && !has_param_infer && has_return_infer {
-                    let mut match_callable_return = |source_type: TypeId,
-                                                     source_shape_id: CallableShapeId,
-                                                     bindings: &mut FxHashMap<Atom, TypeId>|
+                    let mut match_return = |source_type: TypeId,
+                                            source_return: TypeId,
+                                            bindings: &mut FxHashMap<Atom, TypeId>|
                      -> bool {
-                        let source_shape = self.interner.callable_shape(source_shape_id);
-                        if source_shape.call_signatures.len() != 1
-                            || !source_shape.construct_signatures.is_empty()
-                            || !source_shape.properties.is_empty()
-                        {
-                            return false;
-                        }
-                        let source_sig = &source_shape.call_signatures[0];
                         let mut local_visited = FxHashSet::default();
                         if !self.match_infer_pattern(
-                            source_sig.return_type,
+                            source_return,
                             pattern_sig.return_type,
                             bindings,
                             &mut local_visited,
@@ -2631,24 +2682,56 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
 
                     return match self.interner.lookup(source) {
                         Some(TypeKey::Callable(source_shape_id)) => {
-                            match_callable_return(source, source_shape_id, bindings)
+                            let source_shape = self.interner.callable_shape(source_shape_id);
+                            if source_shape.call_signatures.len() != 1
+                                || !source_shape.construct_signatures.is_empty()
+                                || !source_shape.properties.is_empty()
+                            {
+                                return false;
+                            }
+                            let source_sig = &source_shape.call_signatures[0];
+                            match_return(source, source_sig.return_type, bindings)
+                        }
+                        Some(TypeKey::Function(source_fn_id)) => {
+                            let source_fn = self.interner.function_shape(source_fn_id);
+                            match_return(source, source_fn.return_type, bindings)
                         }
                         Some(TypeKey::Union(members)) => {
                             let members = self.interner.type_list(members);
                             let mut combined = FxHashMap::default();
                             for &member in members.iter() {
-                                let Some(TypeKey::Callable(source_shape_id)) =
-                                    self.interner.lookup(member)
-                                else {
-                                    return false;
-                                };
                                 let mut member_bindings = FxHashMap::default();
-                                if !match_callable_return(
-                                    member,
-                                    source_shape_id,
-                                    &mut member_bindings,
-                                ) {
-                                    return false;
+                                match self.interner.lookup(member) {
+                                    Some(TypeKey::Callable(source_shape_id)) => {
+                                        let source_shape =
+                                            self.interner.callable_shape(source_shape_id);
+                                        if source_shape.call_signatures.len() != 1
+                                            || !source_shape.construct_signatures.is_empty()
+                                            || !source_shape.properties.is_empty()
+                                        {
+                                            return false;
+                                        }
+                                        let source_sig = &source_shape.call_signatures[0];
+                                        if !match_return(
+                                            member,
+                                            source_sig.return_type,
+                                            &mut member_bindings,
+                                        ) {
+                                            return false;
+                                        }
+                                    }
+                                    Some(TypeKey::Function(source_fn_id)) => {
+                                        let source_fn =
+                                            self.interner.function_shape(source_fn_id);
+                                        if !match_return(
+                                            member,
+                                            source_fn.return_type,
+                                            &mut member_bindings,
+                                        ) {
+                                            return false;
+                                        }
+                                    }
+                                    _ => return false,
                                 }
                                 for (name, ty) in member_bindings {
                                     combined
