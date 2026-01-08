@@ -14,6 +14,7 @@ Priority: 3
 
 ## Completed
 - [x] CLI: derive default typesVersions compiler version from `package.json` with fallback to 6.0.0. Tests: not run (no direct coverage).
+- [x] Solver inference: include function/callable `this` types in occurs-checks and add `test_inference_occurs_check_function_this_type`. Tests: `./wasm/test.sh test_inference_occurs_check_function_this_type`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
