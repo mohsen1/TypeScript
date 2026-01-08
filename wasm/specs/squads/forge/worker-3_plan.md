@@ -45,9 +45,10 @@ Priority: 3
 - [x] Added best common type array literal regression coverage. Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_parse_error_tolerance`).
 - [x] Added correlated union index-access regression coverage (cross-product). Tests: `./wasm/test.sh` (fails: `emitter_parity_tests::test_parity_commonjs_export`).
 - [x] Rechecked FunctionId build error in `wasm/src/solver/evaluate.rs` after sync; not reproducible. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
+- [x] Tuple-array assignment (TS unsoundness #15): added thin checker coverage for tuple -> array ok and array -> tuple rejection. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
 
 ## Ready for Merge
-No
+Yes
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize solver correctness (inference/conditional/subtype) before new features.
