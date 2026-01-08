@@ -4173,3 +4173,42 @@ fn test_mapped_type_key_remap_subtyping() {
     assert!(checker.is_subtype_of(mapped, expected));
     assert!(!checker.is_subtype_of(mapped, requires_a));
 }
+
+#[test]
+fn test_mapped_type_key_remap_all_never_empty_object() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let key_a = interner.literal_string("a");
+    let key_b = interner.literal_string("b");
+    let keys = interner.union(vec![key_a, key_b]);
+
+    let key_param = TypeParamInfo {
+        name: interner.intern_string("K"),
+        constraint: Some(keys),
+        default: None,
+    };
+    let key_param_id = interner.intern(TypeKey::TypeParameter(key_param.clone()));
+
+    let name_type = interner.conditional(ConditionalType {
+        check_type: key_param_id,
+        extends_type: TypeId::STRING,
+        true_type: TypeId::NEVER,
+        false_type: key_param_id,
+        is_distributive: true,
+    });
+
+    let mapped = interner.mapped(MappedType {
+        type_param: key_param,
+        constraint: keys,
+        name_type: Some(name_type),
+        template: TypeId::BOOLEAN,
+        readonly_modifier: None,
+        optional_modifier: None,
+    });
+
+    let empty_object = interner.object(Vec::new());
+
+    assert!(checker.is_subtype_of(mapped, empty_object));
+    assert!(checker.is_subtype_of(empty_object, mapped));
+}
