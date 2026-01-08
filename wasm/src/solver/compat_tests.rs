@@ -2644,3 +2644,19 @@ fn test_unique_symbol_nominal_assignability() {
     assert!(checker.is_assignable(sym_a, sym_a));
     assert!(!checker.is_assignable(sym_a, sym_b));
 }
+
+#[test]
+fn test_template_literal_expansion_limit_widens_to_string() {
+    let interner = TypeInterner::new();
+
+    let count = crate::solver::TEMPLATE_LITERAL_EXPANSION_LIMIT + 1;
+    let mut members = Vec::with_capacity(count);
+    for idx in 0..count {
+        let literal = interner.literal_string(&format!("k{idx}"));
+        members.push(literal);
+    }
+    let union = interner.union(members);
+    let template = interner.template_literal(vec![TemplateSpan::Type(union)]);
+
+    assert_eq!(template, TypeId::STRING);
+}

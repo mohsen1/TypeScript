@@ -13,6 +13,7 @@ Priority: 3
 - [ ] Coordinate with manager if unsure which unsoundness case to prioritize next.
 
 ## Completed
+- [x] Template string expansion limits (TS unsoundness #22): added expansion guard and coverage. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
 - [x] `unique symbol` nominal primitives (TS unsoundness #37): added nominal assignability coverage. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
 - [x] Homomorphic mapped types over boolean primitives (TS unsoundness #27): added boolean key mapping assignability coverage. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
 - [x] Recursion depth circuit breaker (TS unsoundness #35): treat deep array instantiation as assignable to avoid runaway recursion. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
