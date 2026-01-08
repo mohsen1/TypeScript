@@ -878,7 +878,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         let resolved = self.resolver.resolve_ref(sym_ref, self.interner)?;
 
         // First, try to get type parameters from the resolver (if implemented)
-        if let Some(type_params) = self.resolver.get_type_params(sym_ref, self.interner) {
+        if let Some(type_params) = self.resolver.get_type_params(sym_ref) {
             if !type_params.is_empty() && type_params.len() == app.args.len() {
                 // Build substitution: map type param names to type arguments
                 let mut substitution = TypeSubstitution::new();
