@@ -19,7 +19,7 @@ Priority: 4
 - [x] Add ES5 derived default constructor ordering test. Tests: `./wasm/test.sh default_derived_constructor`
 
 ## Ready for Merge
-Yes - branch `worker/anvil-4` is ready for merge.
+No
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
