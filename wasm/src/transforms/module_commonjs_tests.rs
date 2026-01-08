@@ -45,6 +45,13 @@ fn test_emit_reexport_property() {
 }
 
 #[test]
+fn test_emit_reexport_property_alias() {
+    let result = emit_reexport_property("foo", "module_1", "bar");
+    assert!(result.contains("\"foo\""));
+    assert!(result.contains("module_1.bar"));
+}
+
+#[test]
 fn test_collect_export_names_with_parsed_ast() {
     use crate::parser::syntax_kind_ext;
     use crate::scanner::SyntaxKind;
