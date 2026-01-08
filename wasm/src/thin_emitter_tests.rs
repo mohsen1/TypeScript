@@ -2412,6 +2412,33 @@ fn test_commonjs_export_default_expression() {
 }
 
 #[test]
+fn test_commonjs_export_default_arrow() {
+    let source = "export default () => 1;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(output.contains("__esModule"), "Expected __esModule marker in CommonJS output: {}", output);
+    assert!(
+        output.contains("exports.default ="),
+        "Expected default export assignment in CommonJS output: {}",
+        output
+    );
+    assert!(
+        output.contains("=>"),
+        "Expected arrow function emit in CommonJS output: {}",
+        output
+    );
+}
+
+#[test]
 fn test_commonjs_export_function() {
     let source = "export function add(a, b) { return a + b; }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
