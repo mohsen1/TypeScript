@@ -93,6 +93,7 @@ Priority: 4
 - [x] Add for-of/for-in loops source-map test. Tests: `./wasm/test.sh for_of_for_in_loops_mapping`
 - [x] Add for-await-of ES5 async iteration source-map test. Tests: `./wasm/test.sh for_await_of_es5_mapping`
 - [x] Add class getters/setters source-map test. Tests: `./wasm/test.sh class_getters_setters_mapping`
+- [x] Add TypeScript namespace source-map test. Tests: `./wasm/test.sh typescript_namespace_mapping`
 
 ## Ready for Merge
 Yes

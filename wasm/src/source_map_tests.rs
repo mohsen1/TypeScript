@@ -13431,3 +13431,102 @@ const obj = {
         unique_source_lines
     );
 }
+
+#[test]
+fn test_source_map_typescript_namespace_mapping() {
+    // Test source-map accuracy for TypeScript namespaces
+    let source = r#"namespace Utils {
+    export function add(a: number, b: number): number {
+        return a + b;
+    }
+
+    export function multiply(a: number, b: number): number {
+        return a * b;
+    }
+
+    export const PI = 3.14159;
+
+    export class Calculator {
+        private value: number = 0;
+
+        add(n: number): this {
+            this.value += n;
+            return this;
+        }
+
+        getValue(): number {
+            return this.value;
+        }
+    }
+}
+
+namespace Nested.Inner {
+    export function helper(): string {
+        return "helper";
+    }
+}
+
+const result = Utils.add(1, 2);
+const calc = new Utils.Calculator();"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions::default();
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the Utils namespace
+    let (namespace_line, _) = find_line_col(source, "namespace Utils");
+    let has_namespace_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == namespace_line
+    });
+
+    // Verify we have mappings for the add function
+    let (add_line, _) = find_line_col(source, "export function add");
+    let has_add_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == add_line
+    });
+
+    // Verify we have mappings for the Calculator class
+    let (calc_line, _) = find_line_col(source, "export class Calculator");
+    let has_calc_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == calc_line
+    });
+
+    assert!(
+        has_namespace_mapping || has_add_mapping || has_calc_mapping,
+        "expected mappings for TypeScript namespace. mappings: {mappings}"
+    );
+
+    // Verify source map has non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for TypeScript namespace"
+    );
+
+    // Should have mappings from multiple source lines
+    let unique_source_lines: std::collections::HashSet<_> =
+        decoded.iter().map(|m| m.original_line).collect();
+    assert!(
+        unique_source_lines.len() >= 3,
+        "expected mappings from at least 3 different source lines for TypeScript namespace, got: {:?}",
+        unique_source_lines
+    );
+}
