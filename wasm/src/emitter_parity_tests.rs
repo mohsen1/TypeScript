@@ -2737,3 +2737,131 @@ fn test_parity_es5_generator_yield_type_erasure() {
         output
     );
 }
+
+/// Parity test for ES5 async generator function type erasure.
+/// Async generator type annotations should be erased.
+#[test]
+fn test_parity_es5_async_generator_type_erasure() {
+    let source = r#"async function* fetchPages(urls: string[]): AsyncGenerator<string> {
+    for (const url of urls) {
+        yield await fetch(url);
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify function exists
+    assert!(
+        output.contains("fetchPages"),
+        "Output should define fetchPages function: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string[]") && !output.contains("AsyncGenerator<"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 async generator method in class.
+/// Async generator methods should have types erased.
+#[test]
+fn test_parity_es5_async_generator_method() {
+    let source = r#"class DataStream {
+    async *items(): AsyncGenerator<number> {
+        yield 1;
+        yield 2;
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 class structure
+    assert!(
+        output.contains("var DataStream") || output.contains("function DataStream"),
+        "ES5 output should define DataStream class: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": AsyncGenerator<number>"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 async generator with await and yield.
+/// Both await and yield should be preserved in output.
+#[test]
+fn test_parity_es5_async_generator_await_yield() {
+    let source = r#"async function* process(items: Promise<number>[]): AsyncGenerator<number> {
+    for (const item of items) {
+        const value = await item;
+        yield value * 2;
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify function exists
+    assert!(
+        output.contains("process"),
+        "Output should define process function: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains("Promise<number>[]") && !output.contains("AsyncGenerator<"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
