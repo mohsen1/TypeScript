@@ -5343,3 +5343,268 @@ const Counter = class {
         output
     );
 }
+
+#[test]
+fn test_class_es5_accessor_basic() {
+    // Test basic accessor keyword (ES2022)
+    let source = r#"
+class Person {
+    accessor name: string = "default";
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should transform class to function
+    assert!(
+        output.contains("function Person") || output.contains("var Person"),
+        "Expected Person class transformation: {}",
+        output
+    );
+
+    // Accessor should generate getter/setter pattern
+    // Either via Object.defineProperty or direct get/set
+    assert!(
+        output.contains("defineProperty")
+            || output.contains("get")
+            || output.contains("name"),
+        "Expected accessor transformation: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_accessor_with_initializer() {
+    // Test accessor with non-trivial initializer
+    let source = r#"
+class Counter {
+    accessor count: number = 0;
+    accessor label: string = "Counter: ";
+
+    increment(): void {
+        this.count++;
+    }
+
+    display(): string {
+        return this.label + this.count;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should transform class
+    assert!(
+        output.contains("function Counter") || output.contains("var Counter"),
+        "Expected Counter class transformation: {}",
+        output
+    );
+
+    // Methods should be on prototype
+    assert!(
+        output.contains("increment") && output.contains("display"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Accessors should be handled
+    assert!(
+        output.contains("count") && output.contains("label"),
+        "Expected accessor properties: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_accessor_static() {
+    // Test static accessor keyword
+    let source = r#"
+class Config {
+    static accessor debug: boolean = false;
+    static accessor version: string = "1.0.0";
+
+    static enableDebug(): void {
+        Config.debug = true;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should transform class
+    assert!(
+        output.contains("function Config") || output.contains("var Config"),
+        "Expected Config class transformation: {}",
+        output
+    );
+
+    // Static accessors should reference the constructor
+    assert!(
+        output.contains("Config") && output.contains("debug"),
+        "Expected static accessor reference: {}",
+        output
+    );
+
+    // Static method should be present
+    assert!(
+        output.contains("enableDebug"),
+        "Expected enableDebug method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_accessor_inheritance() {
+    // Test accessor with inheritance
+    let source = r#"
+class Animal {
+    accessor name: string = "unnamed";
+
+    speak(): string {
+        return this.name + " makes a sound";
+    }
+}
+
+class Dog extends Animal {
+    accessor breed: string = "unknown";
+
+    speak(): string {
+        return this.name + " barks";
+    }
+
+    describe(): string {
+        return this.name + " is a " + this.breed;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Both classes should be transformed
+    assert!(
+        output.contains("Animal") && output.contains("Dog"),
+        "Expected both class transformations: {}",
+        output
+    );
+
+    // Inheritance pattern should be present
+    assert!(
+        output.contains("__extends") || output.contains("prototype"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+
+    // Accessors from both classes
+    assert!(
+        output.contains("name") && output.contains("breed"),
+        "Expected accessor properties: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_accessor_private_backing() {
+    // Test that accessor generates private backing field pattern
+    let source = r#"
+class SecureValue {
+    accessor value: number = 0;
+
+    increment(): void {
+        this.value = this.value + 1;
+    }
+
+    getValue(): number {
+        return this.value;
+    }
+
+    setValue(v: number): void {
+        this.value = v;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should transform class
+    assert!(
+        output.contains("function SecureValue") || output.contains("var SecureValue"),
+        "Expected SecureValue class transformation: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("increment")
+            && output.contains("getValue")
+            && output.contains("setValue"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Value accessor should be present
+    assert!(
+        output.contains("value"),
+        "Expected value accessor: {}",
+        output
+    );
+}
