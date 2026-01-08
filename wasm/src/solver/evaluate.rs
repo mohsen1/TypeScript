@@ -247,10 +247,9 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 return self.interner.conditional(cond.clone());
             }
 
-            let mut subst = TypeSubstitution::new();
-            subst.insert(info.name, check_type);
-
             if check_type == TypeId::ANY {
+                let mut subst = TypeSubstitution::new();
+                subst.insert(info.name, check_type);
                 let true_eval = self.evaluate(instantiate_type_with_infer(
                     self.interner,
                     cond.true_type,
@@ -264,17 +263,25 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 return self.interner.union2(true_eval, false_eval);
             }
 
+            let mut subst = TypeSubstitution::new();
+            subst.insert(info.name, check_type);
+            let mut inferred = check_type;
             if let Some(constraint) = info.constraint {
                 let mut checker = SubtypeChecker::with_resolver(self.interner, self.resolver);
-                if !checker.is_subtype_of(check_type, constraint) {
+                let Some(filtered) =
+                    self.filter_inferred_by_constraint(inferred, constraint, &mut checker)
+                else {
                     let false_inst = instantiate_type_with_infer(
                         self.interner,
                         cond.false_type,
                         &subst,
                     );
                     return self.evaluate(false_inst);
-                }
+                };
+                inferred = filtered;
             }
+
+            subst.insert(info.name, inferred);
 
             let true_inst = instantiate_type_with_infer(
                 self.interner,
@@ -309,13 +316,15 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                         let mut parts = Vec::new();
                         for element in elements.iter() {
                             if element.rest {
-                                let rest_type = match self.interner.lookup(element.type_id) {
-                                    Some(TypeKey::Array(rest_elem)) => rest_elem,
-                                    _ => element.type_id,
-                                };
+                                let rest_type = self.rest_element_type(element.type_id);
                                 parts.push(rest_type);
                             } else {
-                                parts.push(element.type_id);
+                                let elem_type = if element.optional {
+                                    self.interner.union2(element.type_id, TypeId::UNDEFINED)
+                                } else {
+                                    element.type_id
+                                };
+                                parts.push(elem_type);
                             }
                         }
                         if parts.is_empty() {
@@ -324,10 +333,34 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                             Some(self.interner.union(parts))
                         }
                     }
+                    Some(TypeKey::Union(members)) => {
+                        let members = self.interner.type_list(members);
+                        let mut parts = Vec::new();
+                        for &member in members.iter() {
+                            match self.interner.lookup(member) {
+                                Some(TypeKey::Array(elem)) => parts.push(elem),
+                                Some(TypeKey::ReadonlyType(inner)) => {
+                                    let Some(TypeKey::Array(elem)) = self.interner.lookup(inner)
+                                    else {
+                                        return self.evaluate(cond.false_type);
+                                    };
+                                    parts.push(elem);
+                                }
+                                _ => return self.evaluate(cond.false_type),
+                            }
+                        }
+                        if parts.is_empty() {
+                            None
+                        } else if parts.len() == 1 {
+                            Some(parts[0])
+                        } else {
+                            Some(self.interner.union(parts))
+                        }
+                    }
                     _ => None,
                 };
 
-                let Some(inferred) = inferred else {
+                let Some(mut inferred) = inferred else {
                     return self.evaluate(cond.false_type);
                 };
 
@@ -336,14 +369,18 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
 
                 if let Some(constraint) = info.constraint {
                     let mut checker = SubtypeChecker::with_resolver(self.interner, self.resolver);
-                    if !checker.is_subtype_of(inferred, constraint) {
+                    let Some(filtered) =
+                        self.filter_inferred_by_constraint(inferred, constraint, &mut checker)
+                    else {
                         let false_inst = instantiate_type_with_infer(
                             self.interner,
                             cond.false_type,
                             &subst,
                         );
                         return self.evaluate(false_inst);
-                    }
+                    };
+                    inferred = filtered;
+                    subst.insert(info.name, inferred);
                 }
 
                 let true_inst = instantiate_type_with_infer(
@@ -371,16 +408,69 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     let inferred = match self.interner.lookup(check_unwrapped) {
                         Some(TypeKey::Tuple(check_elements)) => {
                             let check_elements = self.interner.tuple_list(check_elements);
-                            if check_elements.len() == 1 && !check_elements[0].rest {
-                                Some(check_elements[0].type_id)
+                            if check_elements.is_empty() {
+                                extends_elements[0]
+                                    .optional
+                                    .then_some(TypeId::UNDEFINED)
+                            } else if check_elements.len() == 1 && !check_elements[0].rest {
+                                let elem = &check_elements[0];
+                                Some(if elem.optional {
+                                    self.interner.union2(elem.type_id, TypeId::UNDEFINED)
+                                } else {
+                                    elem.type_id
+                                })
                             } else {
                                 None
+                            }
+                        }
+                        Some(TypeKey::Union(members)) => {
+                            let members = self.interner.type_list(members);
+                            let mut inferred_members = Vec::new();
+                            for &member in members.iter() {
+                                let member_type = match self.interner.lookup(member) {
+                                    Some(TypeKey::ReadonlyType(inner)) => inner,
+                                    _ => member,
+                                };
+                                match self.interner.lookup(member_type) {
+                                    Some(TypeKey::Tuple(check_elements)) => {
+                                        let check_elements = self.interner.tuple_list(check_elements);
+                                        if check_elements.is_empty() {
+                                            if extends_elements[0].optional {
+                                                inferred_members.push(TypeId::UNDEFINED);
+                                                continue;
+                                            }
+                                            return self.evaluate(cond.false_type);
+                                        }
+                                        if check_elements.len() == 1 && !check_elements[0].rest {
+                                            let elem = &check_elements[0];
+                                            let elem_type = if elem.optional {
+                                                self.interner.union2(
+                                                    elem.type_id,
+                                                    TypeId::UNDEFINED,
+                                                )
+                                            } else {
+                                                elem.type_id
+                                            };
+                                            inferred_members.push(elem_type);
+                                        } else {
+                                            return self.evaluate(cond.false_type);
+                                        }
+                                    }
+                                    _ => return self.evaluate(cond.false_type),
+                                }
+                            }
+                            if inferred_members.is_empty() {
+                                None
+                            } else if inferred_members.len() == 1 {
+                                Some(inferred_members[0])
+                            } else {
+                                Some(self.interner.union(inferred_members))
                             }
                         }
                         _ => None,
                     };
 
-                    let Some(inferred) = inferred else {
+                    let Some(mut inferred) = inferred else {
                         return self.evaluate(cond.false_type);
                     };
 
@@ -390,14 +480,18 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     if let Some(constraint) = info.constraint {
                         let mut checker =
                             SubtypeChecker::with_resolver(self.interner, self.resolver);
-                        if !checker.is_subtype_of(inferred, constraint) {
+                        let Some(filtered) =
+                            self.filter_inferred_by_constraint(inferred, constraint, &mut checker)
+                        else {
                             let false_inst = instantiate_type_with_infer(
                                 self.interner,
                                 cond.false_type,
                                 &subst,
                             );
                             return self.evaluate(false_inst);
-                        }
+                        };
+                        inferred = filtered;
+                        subst.insert(info.name, inferred);
                     }
 
                     let true_inst = instantiate_type_with_infer(
@@ -425,7 +519,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                         infer_nested = None;
                         break;
                     }
-                    infer_prop = Some((prop.name, info));
+                    infer_prop = Some((prop.name, info, prop.optional));
                     continue;
                 }
 
@@ -463,7 +557,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 }
             }
 
-            if let Some((prop_name, info)) = infer_prop {
+            if let Some((prop_name, info, prop_optional)) = infer_prop {
                 if matches!(
                     self.interner.lookup(check_unwrapped),
                     Some(TypeKey::TypeParameter(_)) | Some(TypeKey::Infer(_))
@@ -478,12 +572,45 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                             .properties
                             .iter()
                             .find(|prop| prop.name == prop_name)
-                            .map(|prop| prop.type_id)
+                            .map(|prop| {
+                                if prop_optional {
+                                    self.optional_property_type(prop)
+                                } else {
+                                    prop.type_id
+                                }
+                            })
+                            .or_else(|| prop_optional.then_some(TypeId::UNDEFINED))
+                    }
+                    Some(TypeKey::Union(members)) if prop_optional => {
+                        let members = self.interner.type_list(members);
+                        let mut inferred_members = Vec::new();
+                        for &member in members.iter() {
+                            match self.interner.lookup(member) {
+                                Some(TypeKey::Object(shape_id) | TypeKey::ObjectWithIndex(shape_id)) => {
+                                    let shape = self.interner.object_shape(shape_id);
+                                    if let Some(prop) =
+                                        shape.properties.iter().find(|prop| prop.name == prop_name)
+                                    {
+                                        inferred_members.push(self.optional_property_type(prop));
+                                    } else {
+                                        inferred_members.push(TypeId::UNDEFINED);
+                                    }
+                                }
+                                _ => return self.evaluate(cond.false_type),
+                            }
+                        }
+                        if inferred_members.is_empty() {
+                            None
+                        } else if inferred_members.len() == 1 {
+                            Some(inferred_members[0])
+                        } else {
+                            Some(self.interner.union(inferred_members))
+                        }
                     }
                     _ => None,
                 };
 
-                let Some(inferred) = inferred else {
+                let Some(mut inferred) = inferred else {
                     return self.evaluate(cond.false_type);
                 };
 
@@ -493,14 +620,18 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 if let Some(constraint) = info.constraint {
                     let mut checker =
                         SubtypeChecker::with_resolver(self.interner, self.resolver);
-                    if !checker.is_subtype_of(inferred, constraint) {
+                    let Some(filtered) =
+                        self.filter_inferred_by_constraint(inferred, constraint, &mut checker)
+                    else {
                         let false_inst = instantiate_type_with_infer(
                             self.interner,
                             cond.false_type,
                             &subst,
                         );
                         return self.evaluate(false_inst);
-                    }
+                    };
+                    inferred = filtered;
+                    subst.insert(info.name, inferred);
                 }
 
                 let true_inst = instantiate_type_with_infer(
@@ -549,7 +680,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     _ => None,
                 };
 
-                let Some(inferred) = inferred else {
+                let Some(mut inferred) = inferred else {
                     return self.evaluate(cond.false_type);
                 };
 
@@ -559,14 +690,18 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 if let Some(constraint) = info.constraint {
                     let mut checker =
                         SubtypeChecker::with_resolver(self.interner, self.resolver);
-                    if !checker.is_subtype_of(inferred, constraint) {
+                    let Some(filtered) =
+                        self.filter_inferred_by_constraint(inferred, constraint, &mut checker)
+                    else {
                         let false_inst = instantiate_type_with_infer(
                             self.interner,
                             cond.false_type,
                             &subst,
                         );
                         return self.evaluate(false_inst);
-                    }
+                    };
+                    inferred = filtered;
+                    subst.insert(info.name, inferred);
                 }
 
                 let true_inst = instantiate_type_with_infer(
@@ -1821,6 +1956,126 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         }
     }
 
+    fn filter_inferred_by_constraint(
+        &self,
+        inferred: TypeId,
+        constraint: TypeId,
+        checker: &mut SubtypeChecker<'_, R>,
+    ) -> Option<TypeId> {
+        if inferred == constraint {
+            return Some(inferred);
+        }
+
+        if let Some(TypeKey::Union(members)) = self.interner.lookup(inferred) {
+            let members = self.interner.type_list(members);
+            let mut filtered = Vec::new();
+            for &member in members.iter() {
+                if checker.is_subtype_of(member, constraint) {
+                    filtered.push(member);
+                }
+            }
+            return match filtered.len() {
+                0 => None,
+                1 => Some(filtered[0]),
+                _ => Some(self.interner.union(filtered)),
+            };
+        }
+
+        if checker.is_subtype_of(inferred, constraint) {
+            Some(inferred)
+        } else {
+            None
+        }
+    }
+
+    fn bind_infer(
+        &self,
+        info: &TypeParamInfo,
+        inferred: TypeId,
+        bindings: &mut FxHashMap<Atom, TypeId>,
+        checker: &mut SubtypeChecker<'_, R>,
+    ) -> bool {
+        let mut inferred = inferred;
+        if let Some(constraint) = info.constraint {
+            let Some(filtered) = self.filter_inferred_by_constraint(inferred, constraint, checker)
+            else {
+                return false;
+            };
+            inferred = filtered;
+        }
+
+        if let Some(existing) = bindings.get(&info.name) {
+            return checker.is_subtype_of(inferred, *existing)
+                && checker.is_subtype_of(*existing, inferred);
+        }
+
+        bindings.insert(info.name, inferred);
+        true
+    }
+
+    fn match_tuple_elements(
+        &self,
+        source_elems: &[TupleElement],
+        pattern_elems: &[TupleElement],
+        bindings: &mut FxHashMap<Atom, TypeId>,
+        visited: &mut FxHashSet<(TypeId, TypeId)>,
+        checker: &mut SubtypeChecker<'_, R>,
+    ) -> bool {
+        let source_len = source_elems.len();
+        let pattern_len = pattern_elems.len();
+
+        if source_len > pattern_len {
+            return false;
+        }
+
+        let shared = std::cmp::min(source_len, pattern_len);
+        for i in 0..shared {
+            let source_elem = &source_elems[i];
+            let pattern_elem = &pattern_elems[i];
+            if source_elem.rest || pattern_elem.rest {
+                return false;
+            }
+            let source_type = if source_elem.optional {
+                self.interner.union2(source_elem.type_id, TypeId::UNDEFINED)
+            } else {
+                source_elem.type_id
+            };
+            if !self.match_infer_pattern(
+                source_type,
+                pattern_elem.type_id,
+                bindings,
+                visited,
+                checker,
+            ) {
+                return false;
+            }
+        }
+
+        if source_len < pattern_len {
+            for pattern_elem in &pattern_elems[source_len..] {
+                if pattern_elem.rest {
+                    return false;
+                }
+                if !pattern_elem.optional {
+                    return false;
+                }
+                if self.type_contains_infer(pattern_elem.type_id)
+                    && !self.match_infer_pattern(
+                        TypeId::UNDEFINED,
+                        pattern_elem.type_id,
+                        bindings,
+                        visited,
+                        checker,
+                    )
+                {
+                    return false;
+                }
+            }
+        }
+
+        true
+    }
+
     fn match_infer_pattern(
         &self,
         source: TypeId,
@@ -1837,25 +2092,111 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             return true;
         }
 
+        if let Some(TypeKey::Union(members)) = self.interner.lookup(source) {
+            let members = self.interner.type_list(members);
+            let base = bindings.clone();
+            let mut merged = base.clone();
+
+            for &member in members.iter() {
+                let mut local = base.clone();
+                if !self.match_infer_pattern(member, pattern, &mut local, visited, checker) {
+                    return false;
+                }
+
+                for (name, ty) in local {
+                    if base.contains_key(&name) {
+                        continue;
+                    }
+
+                    if let Some(existing) = merged.get_mut(&name) {
+                        if *existing != ty {
+                            *existing = self.interner.union2(*existing, ty);
+                        }
+                    } else {
+                        merged.insert(name, ty);
+                    }
+                }
+            }
+
+            *bindings = merged;
+            return true;
+        }
+
         let Some(pattern_key) = self.interner.lookup(pattern) else {
             return false;
         };
 
         match pattern_key {
-            TypeKey::Infer(info) => {
-                if let Some(constraint) = info.constraint {
-                    if !checker.is_subtype_of(source, constraint) {
+            TypeKey::Infer(info) => self.bind_infer(&info, source, bindings, checker),
+            TypeKey::Function(pattern_fn_id) => {
+                let pattern_fn = self.interner.function_shape(pattern_fn_id);
+                let Some(pattern_this) = pattern_fn.this_type else {
+                    return checker.is_subtype_of(source, pattern);
+                };
+                if !self.type_contains_infer(pattern_this) {
+                    return checker.is_subtype_of(source, pattern);
+                }
+
+                if pattern_fn
+                    .params
+                    .iter()
+                    .any(|param| self.type_contains_infer(param.type_id))
+                    || self.type_contains_infer(pattern_fn.return_type)
+                {
+                    return false;
+                }
+
+                let mut match_function_this = |source_type: TypeId,
+                                               source_fn_id: FunctionShapeId,
+                                               bindings: &mut FxHashMap<Atom, TypeId>|
+                 -> bool {
+                    let source_fn = self.interner.function_shape(source_fn_id);
+                    let source_this = source_fn.this_type.unwrap_or(TypeId::ANY);
+                    let mut local_visited = FxHashSet::default();
+                    if !self.match_infer_pattern(
+                        source_this,
+                        pattern_this,
+                        bindings,
+                        &mut local_visited,
+                        checker,
+                    ) {
                         return false;
                     }
-                }
+                    let substituted = self.substitute_infer(pattern, bindings);
+                    checker.is_subtype_of(source_type, substituted)
+                };
 
-                if let Some(existing) = bindings.get(&info.name) {
-                    return checker.is_subtype_of(source, *existing)
-                        && checker.is_subtype_of(*existing, source);
+                match self.interner.lookup(source) {
+                    Some(TypeKey::Function(source_fn_id)) => {
+                        match_function_this(source, source_fn_id, bindings)
+                    }
+                    Some(TypeKey::Union(members)) => {
+                        let members = self.interner.type_list(members);
+                        let mut combined = FxHashMap::default();
+                        for &member in members.iter() {
+                            let Some(TypeKey::Function(source_fn_id)) =
+                                self.interner.lookup(member)
+                            else {
+                                return false;
+                            };
+                            let mut member_bindings = FxHashMap::default();
+                            if !match_function_this(member, source_fn_id, &mut member_bindings) {
+                                return false;
+                            }
+                            for (name, ty) in member_bindings {
+                                combined
+                                    .entry(name)
+                                    .and_modify(|existing| {
+                                        *existing = self.interner.union2(*existing, ty);
+                                    })
+                                    .or_insert(ty);
+                            }
+                        }
+                        bindings.extend(combined);
+                        true
+                    }
+                    _ => false,
                 }
-
-                bindings.insert(info.name, source);
-                true
             }
             TypeKey::Array(pattern_elem) => match self.interner.lookup(source) {
                 Some(TypeKey::Array(source_elem)) => self.match_infer_pattern(
@@ -1865,28 +2206,81 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     visited,
                     checker,
                 ),
+                Some(TypeKey::Union(members)) => {
+                    let members = self.interner.type_list(members);
+                    let mut combined = FxHashMap::default();
+                    for &member in members.iter() {
+                        let Some(TypeKey::Array(source_elem)) = self.interner.lookup(member) else {
+                            return false;
+                        };
+                        let mut member_bindings = FxHashMap::default();
+                        let mut local_visited = FxHashSet::default();
+                        if !self.match_infer_pattern(
+                            source_elem,
+                            pattern_elem,
+                            &mut member_bindings,
+                            &mut local_visited,
+                            checker,
+                        ) {
+                            return false;
+                        }
+                        for (name, ty) in member_bindings {
+                            combined
+                                .entry(name)
+                                .and_modify(|existing| {
+                                    *existing = self.interner.union2(*existing, ty);
+                                })
+                                .or_insert(ty);
+                        }
+                    }
+                    bindings.extend(combined);
+                    true
+                }
                 _ => false,
             },
             TypeKey::Tuple(pattern_elems) => match self.interner.lookup(source) {
                 Some(TypeKey::Tuple(source_elems)) => {
                     let source_elems = self.interner.tuple_list(source_elems);
                     let pattern_elems = self.interner.tuple_list(pattern_elems);
-                    if source_elems.len() != pattern_elems.len() {
-                        return false;
-                    }
-                    for (source_elem, pattern_elem) in
-                        source_elems.iter().zip(pattern_elems.iter())
-                    {
-                        if !self.match_infer_pattern(
-                            source_elem.type_id,
-                            pattern_elem.type_id,
-                            bindings,
-                            visited,
+                    self.match_tuple_elements(
+                        &source_elems,
+                        &pattern_elems,
+                        bindings,
+                        visited,
+                        checker,
+                    )
+                }
+                Some(TypeKey::Union(members)) => {
+                    let members = self.interner.type_list(members);
+                    let mut combined = FxHashMap::default();
+                    for &member in members.iter() {
+                        let Some(TypeKey::Tuple(source_elems)) = self.interner.lookup(member)
+                        else {
+                            return false;
+                        };
+                        let source_elems = self.interner.tuple_list(source_elems);
+                        let pattern_elems = self.interner.tuple_list(pattern_elems);
+                        let mut member_bindings = FxHashMap::default();
+                        let mut local_visited = FxHashSet::default();
+                        if !self.match_tuple_elements(
+                            &source_elems,
+                            &pattern_elems,
+                            &mut member_bindings,
+                            &mut local_visited,
                             checker,
                         ) {
                             return false;
                         }
+                        for (name, ty) in member_bindings {
+                            combined
+                                .entry(name)
+                                .and_modify(|existing| {
+                                    *existing = self.interner.union2(*existing, ty);
+                                })
+                                .or_insert(ty);
+                        }
                     }
+                    bindings.extend(combined);
                     true
                 }
                 _ => false,
@@ -1915,10 +2309,25 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                             .iter()
                             .find(|prop| prop.name == pattern_prop.name);
                         let Some(source_prop) = source_prop else {
+                            if pattern_prop.optional {
+                                if self.type_contains_infer(pattern_prop.type_id)
+                                    && !self.match_infer_pattern(
+                                        TypeId::UNDEFINED,
+                                        pattern_prop.type_id,
+                                        bindings,
+                                        visited,
+                                        checker,
+                                    )
+                                {
+                                    return false;
+                                }
+                                continue;
+                            }
                             return false;
                         };
+                        let source_type = self.optional_property_type(source_prop);
                         if !self.match_infer_pattern(
-                            source_prop.type_id,
+                            source_type,
                             pattern_prop.type_id,
                             bindings,
                             visited,
@@ -1927,6 +2336,33 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                             return false;
                         }
                     }
+                    true
+                }
+                Some(TypeKey::Union(members)) => {
+                    let members = self.interner.type_list(members);
+                    let mut combined = FxHashMap::default();
+                    for &member in members.iter() {
+                        let mut member_bindings = FxHashMap::default();
+                        let mut local_visited = FxHashSet::default();
+                        if !self.match_infer_pattern(
+                            member,
+                            pattern,
+                            &mut member_bindings,
+                            &mut local_visited,
+                            checker,
+                        ) {
+                            return false;
+                        }
+                        for (name, ty) in member_bindings {
+                            combined
+                                .entry(name)
+                                .and_modify(|existing| {
+                                    *existing = self.interner.union2(*existing, ty);
+                                })
+                                .or_insert(ty);
+                        }
+                    }
+                    bindings.extend(combined);
                     true
                 }
                 _ => false,
@@ -1942,10 +2378,25 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                             .iter()
                             .find(|prop| prop.name == pattern_prop.name);
                         let Some(source_prop) = source_prop else {
+                            if pattern_prop.optional {
+                                if self.type_contains_infer(pattern_prop.type_id)
+                                    && !self.match_infer_pattern(
+                                        TypeId::UNDEFINED,
+                                        pattern_prop.type_id,
+                                        bindings,
+                                        visited,
+                                        checker,
+                                    )
+                                {
+                                    return false;
+                                }
+                                continue;
+                            }
                             return false;
                         };
+                        let source_type = self.optional_property_type(source_prop);
                         if !self.match_infer_pattern(
-                            source_prop.type_id,
+                            source_type,
                             pattern_prop.type_id,
                             bindings,
                             visited,
@@ -1956,53 +2407,145 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     }
 
                     if let Some(pattern_index) = &pattern_shape.string_index {
-                        let Some(source_index) = &source_shape.string_index else {
-                            return false;
-                        };
-                        if !self.match_infer_pattern(
-                            source_index.key_type,
-                            pattern_index.key_type,
-                            bindings,
-                            visited,
-                            checker,
-                        ) {
-                            return false;
-                        }
-                        if !self.match_infer_pattern(
-                            source_index.value_type,
-                            pattern_index.value_type,
-                            bindings,
-                            visited,
-                            checker,
-                        ) {
-                            return false;
+                        if let Some(source_index) = &source_shape.string_index {
+                            if !self.match_infer_pattern(
+                                source_index.key_type,
+                                pattern_index.key_type,
+                                bindings,
+                                visited,
+                                checker,
+                            ) {
+                                return false;
+                            }
+                            if !self.match_infer_pattern(
+                                source_index.value_type,
+                                pattern_index.value_type,
+                                bindings,
+                                visited,
+                                checker,
+                            ) {
+                                return false;
+                            }
+                        } else {
+                            let mut local_visited = FxHashSet::default();
+                            if !self.match_infer_pattern(
+                                TypeId::STRING,
+                                pattern_index.key_type,
+                                bindings,
+                                &mut local_visited,
+                                checker,
+                            ) {
+                                return false;
+                            }
+                            let values: Vec<TypeId> = source_shape
+                                .properties
+                                .iter()
+                                .map(|prop| self.optional_property_type(prop))
+                                .collect();
+                            let value_type = if values.is_empty() {
+                                TypeId::NEVER
+                            } else if values.len() == 1 {
+                                values[0]
+                            } else {
+                                self.interner.union(values)
+                            };
+                            let mut local_visited = FxHashSet::default();
+                            if !self.match_infer_pattern(
+                                value_type,
+                                pattern_index.value_type,
+                                bindings,
+                                &mut local_visited,
+                                checker,
+                            ) {
+                                return false;
+                            }
                         }
                     }
 
                     if let Some(pattern_index) = &pattern_shape.number_index {
-                        let Some(source_index) = &source_shape.number_index else {
-                            return false;
-                        };
-                        if !self.match_infer_pattern(
-                            source_index.key_type,
-                            pattern_index.key_type,
-                            bindings,
-                            visited,
-                            checker,
-                        ) {
-                            return false;
-                        }
-                        if !self.match_infer_pattern(
-                            source_index.value_type,
-                            pattern_index.value_type,
-                            bindings,
-                            visited,
-                            checker,
-                        ) {
-                            return false;
+                        if let Some(source_index) = &source_shape.number_index {
+                            if !self.match_infer_pattern(
+                                source_index.key_type,
+                                pattern_index.key_type,
+                                bindings,
+                                visited,
+                                checker,
+                            ) {
+                                return false;
+                            }
+                            if !self.match_infer_pattern(
+                                source_index.value_type,
+                                pattern_index.value_type,
+                                bindings,
+                                visited,
+                                checker,
+                            ) {
+                                return false;
+                            }
+                        } else {
+                            let mut local_visited = FxHashSet::default();
+                            if !self.match_infer_pattern(
+                                TypeId::NUMBER,
+                                pattern_index.key_type,
+                                bindings,
+                                &mut local_visited,
+                                checker,
+                            ) {
+                                return false;
+                            }
+                            let values: Vec<TypeId> = source_shape
+                                .properties
+                                .iter()
+                                .filter(|prop| self.is_numeric_property_name(prop.name))
+                                .map(|prop| self.optional_property_type(prop))
+                                .collect();
+                            let value_type = if values.is_empty() {
+                                TypeId::NEVER
+                            } else if values.len() == 1 {
+                                values[0]
+                            } else {
+                                self.interner.union(values)
+                            };
+                            let mut local_visited = FxHashSet::default();
+                            if !self.match_infer_pattern(
+                                value_type,
+                                pattern_index.value_type,
+                                bindings,
+                                &mut local_visited,
+                                checker,
+                            ) {
+                                return false;
+                            }
                         }
                     }
 
+                    true
+                }
+                Some(TypeKey::Union(members)) => {
+                    let members = self.interner.type_list(members);
+                    let mut combined = FxHashMap::default();
+                    for &member in members.iter() {
+                        let mut member_bindings = FxHashMap::default();
+                        let mut local_visited = FxHashSet::default();
+                        if !self.match_infer_pattern(
+                            member,
+                            pattern,
+                            &mut member_bindings,
+                            &mut local_visited,
+                            checker,
+                        ) {
+                            return false;
+                        }
+                        for (name, ty) in member_bindings {
+                            combined
+                                .entry(name)
+                                .and_modify(|existing| {
+                                    *existing = self.interner.union2(*existing, ty);
+                                })
+                                .or_insert(ty);
+                        }
+                    }
+                    bindings.extend(combined);
                     true
                 }
                 _ => false,
@@ -2036,8 +2579,182 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 }
                 _ => false,
             },
+            TypeKey::TemplateLiteral(pattern_spans_id) => {
+                let pattern_spans = self.interner.template_list(pattern_spans_id);
+                match self.interner.lookup(source) {
+                    Some(TypeKey::Literal(LiteralValue::String(atom))) => {
+                        let source_text = self.interner.resolve_atom_ref(atom);
+                        self.match_template_literal_string(
+                            source_text.as_ref(),
+                            pattern_spans.as_ref(),
+                            bindings,
+                            checker,
+                        )
+                    }
+                    Some(TypeKey::TemplateLiteral(source_spans_id)) => {
+                        let source_spans = self.interner.template_list(source_spans_id);
+                        self.match_template_literal_spans(
+                            source,
+                            source_spans.as_ref(),
+                            pattern_spans.as_ref(),
+                            bindings,
+                            checker,
+                        )
+                    }
+                    Some(TypeKey::Intrinsic(IntrinsicKind::String)) => {
+                        self.match_template_literal_string_type(
+                            pattern_spans.as_ref(),
+                            bindings,
+                            checker,
+                        )
+                    }
+                    _ => false,
+                }
+            }
             _ => checker.is_subtype_of(source, pattern),
         }
+    }
+
+    fn match_template_literal_string(
+        &self,
+        source: &str,
+        pattern: &[TemplateSpan],
+        bindings: &mut FxHashMap<Atom, TypeId>,
+        checker: &mut SubtypeChecker<'_, R>,
+    ) -> bool {
+        let mut pos = 0;
+        let mut index = 0;
+
+        while index < pattern.len() {
+            match pattern[index] {
+                TemplateSpan::Text(text) => {
+                    let text_value = self.interner.resolve_atom_ref(text);
+                    let text_value = text_value.as_ref();
+                    if !source[pos..].starts_with(text_value) {
+                        return false;
+                    }
+                    pos += text_value.len();
+                    index += 1;
+                }
+                TemplateSpan::Type(type_id) => {
+                    let next_text = pattern[index + 1..]
+                        .iter()
+                        .find_map(|span| match span {
+                            TemplateSpan::Text(text) => Some(*text),
+                            TemplateSpan::Type(_) => None,
+                        });
+                    let end = if let Some(next_text) = next_text {
+                        let next_value = self.interner.resolve_atom_ref(next_text);
+                        match source[pos..].find(next_value.as_ref()) {
+                            Some(offset) => pos + offset,
+                            None => return false,
+                        }
+                    } else {
+                        source.len()
+                    };
+
+                    let captured = &source[pos..end];
+                    pos = end;
+                    let captured_type = self.interner.literal_string(captured);
+
+                    if let Some(TypeKey::Infer(info)) = self.interner.lookup(type_id) {
+                        if !self.bind_infer(&info, captured_type, bindings, checker) {
+                            return false;
+                        }
+                    } else if !checker.is_subtype_of(captured_type, type_id) {
+                        return false;
+                    }
+                    index += 1;
+                }
+            }
+        }
+
+        pos == source.len()
+    }
+
+    fn match_template_literal_spans(
+        &self,
+        source: TypeId,
+        source_spans: &[TemplateSpan],
+        pattern_spans: &[TemplateSpan],
+        bindings: &mut FxHashMap<Atom, TypeId>,
+        checker: &mut SubtypeChecker<'_, R>,
+    ) -> bool {
+        if pattern_spans.len() == 1 {
+            if let TemplateSpan::Type(type_id) = pattern_spans[0] {
+                if let Some(TypeKey::Infer(info)) = self.interner.lookup(type_id) {
+                    let inferred = if source_spans
+                        .iter()
+                        .all(|span| matches!(span, TemplateSpan::Type(_)))
+                    {
+                        TypeId::STRING
+                    } else {
+                        source
+                    };
+                    return self.bind_infer(&info, inferred, bindings, checker);
+                }
+                return checker.is_subtype_of(source, type_id);
+            }
+        }
+
+        if source_spans.len() != pattern_spans.len() {
+            return false;
+        }
+
+        for (source_span, pattern_span) in source_spans.iter().zip(pattern_spans.iter()) {
+            match pattern_span {
+                TemplateSpan::Text(text) => match source_span {
+                    TemplateSpan::Text(source_text) if source_text == text => {}
+                    _ => return false,
+                },
+                TemplateSpan::Type(type_id) => {
+                    let inferred = match source_span {
+                        TemplateSpan::Text(text) => {
+                            let text_value = self.interner.resolve_atom_ref(*text);
+                            self.interner.literal_string(text_value.as_ref())
+                        }
+                        TemplateSpan::Type(source_type) => *source_type,
+                    };
+                    if let Some(TypeKey::Infer(info)) = self.interner.lookup(*type_id) {
+                        if !self.bind_infer(&info, inferred, bindings, checker) {
+                            return false;
+                        }
+                    } else if !checker.is_subtype_of(inferred, *type_id) {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        true
+    }
+
+    fn match_template_literal_string_type(
+        &self,
+        pattern_spans: &[TemplateSpan],
+        bindings: &mut FxHashMap<Atom, TypeId>,
+        checker: &mut SubtypeChecker<'_, R>,
+    ) -> bool {
+        if pattern_spans
+            .iter()
+            .any(|span| matches!(span, TemplateSpan::Text(_)))
+        {
+            return false;
+        }
+
+        for span in pattern_spans {
+            if let TemplateSpan::Type(type_id) = span {
+                if let Some(TypeKey::Infer(info)) = self.interner.lookup(*type_id) {
+                    if !self.bind_infer(&info, TypeId::STRING, bindings, checker) {
+                        return false;
+                    }
+                } else if !checker.is_subtype_of(TypeId::STRING, *type_id) {
+                    return false;
+                }
+            }
+        }
+
+        true
     }
 
     fn is_numeric_property_name(&self, name: Atom) -> bool {

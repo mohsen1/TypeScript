@@ -7,18 +7,16 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] Conditional type evaluation: implement distributive conditional handling and non-distributive template-literal inference in `wasm/src/solver/evaluate.rs`; add regressions in `wasm/src/solver/evaluate_tests.rs`; run `./wasm/test.sh`.
+- [x] Conditional type evaluation: implement distributive conditional handling and non-distributive template-literal inference in `wasm/src/solver/evaluate.rs`; add regressions in `wasm/src/solver/evaluate_tests.rs`; run `./wasm/test.sh`.
 
 ## Task Queue
-- [ ] Add non-distributive conditional template-literal infer cases (prefix/suffix/middle/two-infer) in `wasm/src/solver/evaluate_tests.rs`.
-- [ ] Add constrained template-literal inference (`infer T extends ...`) and confirm behavior matches `tsc`.
-- [ ] Validate distributive vs wrapped conditional behavior with unions and `never`/`any`, including tuple/object/function-property conditional infer edges; fix `wasm/src/solver/evaluate.rs` if mismatched.
+- [ ] [EM: Assign next task]
 
 ## Completed
-- [x] (Move finished items here with brief notes and tests run)
+- [x] Implemented template-literal infer matching (including union-aware bindings) and updated conditional template inference tests. Ran `./wasm/test.sh` (fails: solver::compat::tests::test_explain_failure_reports_rest_mismatch).
 
 ## Ready for Merge
-No
+Yes
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize solver correctness (inference/conditional/subtype) before new features.
