@@ -18,6 +18,7 @@ Priority: 5
 - [x] **Circular Reference Analysis for Worker 1**: Investigated SymbolId(0) circular reference issue with type predicates. Root cause identified below.
 - [x] Added type predicate circular reference repro tests in `wasm/src/thin_checker_tests.rs`: `test_type_predicate_self_referential_guard` and `test_type_predicate_interface_self_reference`.
 - [x] Added detailed doc comment on `get_type_of_symbol` in `thin_checker.rs:2769-2804` explaining the circular reference issue, call chain, why interfaces work but functions don't, and fix approaches for Worker 1.
+- [x] Added 9 type predicate tests in `narrowing_tests.rs`: TypePredicate structure tests (basic, asserts, this target, asserts without type), FunctionShape/CallSignature with predicates, and narrowing simulations for true/false branches and interface types.
 
 ### Circular Reference Root Cause (for Worker 1)
 
