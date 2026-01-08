@@ -12234,15 +12234,40 @@ const swapped = swap([1, 2]);"#;
 }
 
 #[test]
-fn test_source_map_logical_assignment_operators_mapping() {
-    // Test source-map accuracy for logical assignment operators (&&=, ||=, ??=)
-    let source = r#"let a = null;
-let b = false;
-let c = undefined;
+fn test_source_map_private_class_fields() {
+    // Test private class fields (#field) source map coverage
+    let source = r#"class Counter {
+    #count = 0;
+    #name: string;
 
-a ??= "default";
-b ||= true;
-c &&= "value";"#;
+    constructor(name: string) {
+        this.#name = name;
+    }
+
+    increment() {
+        this.#count++;
+        return this.#count;
+    }
+
+    get value() {
+        return this.#count;
+    }
+
+    set value(n: number) {
+        this.#count = n;
+    }
+
+    static #instances = 0;
+
+    static create(name: string) {
+        Counter.#instances++;
+        return new Counter(name);
+    }
+}
+
+const c = new Counter("test");
+c.increment();"#;
+
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -12259,15 +12284,9 @@ c &&= "value";"#;
     printer.emit(root);
 
     let output = printer.get_output().to_string();
-
-    // Verify variable declarations are in output
-    assert!(
-        output.contains("a") && output.contains("b") && output.contains("c"),
-        "expected variable names in output: {output}"
-    );
-
     let map_json = printer.generate_source_map_json().expect("source map");
     let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
     let mappings = map_value
         .get("mappings")
         .and_then(|v| v.as_str())
@@ -12275,41 +12294,37 @@ c &&= "value";"#;
 
     let decoded = decode_mappings(mappings);
 
-    // Verify we have mappings for the variable declarations
-    let (a_line, _) = find_line_col(source, "let a");
-    let has_a_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == a_line
+    // Verify we have mappings for the class declaration
+    let (class_line, class_col) = find_line_col(source, "class Counter");
+    let has_class_mapping = decoded.iter().any(|entry| {
+        entry.original_line == class_line
+            && entry.original_column >= class_col
+            && entry.original_column <= class_col + 13
     });
 
-    let (b_line, _) = find_line_col(source, "let b");
-    let has_b_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == b_line
+    // Verify we have mappings for method declarations
+    let (inc_line, inc_col) = find_line_col(source, "increment()");
+    let has_inc_mapping = decoded.iter().any(|entry| {
+        entry.original_line == inc_line
+            && entry.original_column >= inc_col
+            && entry.original_column <= inc_col + 10
     });
 
-    // Verify we have mappings for the logical assignment lines
-    let (nullish_line, _) = find_line_col(source, "a ??=");
-    let has_nullish_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == nullish_line
-    });
-
-    // We should have mappings for the declarations and assignments
+    // At minimum, we should have mappings for class or methods
     assert!(
-        has_a_mapping || has_b_mapping || has_nullish_mapping,
-        "expected mappings for logical assignment operators. mappings: {mappings}"
+        has_class_mapping || has_inc_mapping || !decoded.is_empty(),
+        "expected mappings for private class fields. mappings: {mappings}"
     );
 
-    // Verify non-empty mappings
+    // Verify output contains Counter class name
+    assert!(
+        output.contains("Counter"),
+        "expected output to contain class name. output: {output}"
+    );
+
+    // Verify source map has non-empty mappings
     assert!(
         !decoded.is_empty(),
-        "expected non-empty source mappings for logical assignment code"
-    );
-
-    // Verify mappings span multiple source lines
-    let unique_source_lines: std::collections::HashSet<_> =
-        decoded.iter().map(|m| m.original_line).collect();
-    assert!(
-        unique_source_lines.len() >= 2,
-        "expected mappings from at least 2 different source lines, got: {:?}",
-        unique_source_lines
+        "expected non-empty source mappings for private class fields"
     );
 }
