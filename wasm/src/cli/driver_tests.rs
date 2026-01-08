@@ -5187,3 +5187,124 @@ export function getPort(config: Config): number {
     let js = std::fs::read_to_string(base.join("dist/src/defaults.js")).expect("read js");
     assert!(!js.is_empty(), "JS output should not be empty");
 }
+
+#[test]
+fn compile_optional_chaining() {
+    // Test optional chaining (?.) compilation
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/optional.ts"),
+        r#"
+interface User {
+    name: string;
+    address?: {
+        city: string;
+    };
+}
+
+export function getCity(user: User): string | undefined {
+    return user.address?.city;
+}
+
+export function getLength(arr?: string[]): number | undefined {
+    return arr?.length;
+}
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+
+    let js = std::fs::read_to_string(base.join("dist/src/optional.js")).expect("read js");
+    assert!(!js.is_empty(), "JS output should not be empty");
+}
+
+#[test]
+fn compile_nullish_coalescing() {
+    // Test nullish coalescing (??) compilation
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/nullish.ts"),
+        r#"
+export function getValueOrDefault(value: string | null | undefined): string {
+    return value ?? "default";
+}
+
+export function getNumberOrZero(num: number | null): number {
+    return num ?? 0;
+}
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+
+    let js = std::fs::read_to_string(base.join("dist/src/nullish.js")).expect("read js");
+    assert!(!js.is_empty(), "JS output should not be empty");
+}
+
+#[test]
+fn compile_optional_chaining_with_call() {
+    // Test optional chaining with method calls
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/optcall.ts"),
+        r#"
+interface Logger {
+    log?: (msg: string) => void;
+}
+
+export function maybeLog(logger: Logger, msg: string): void {
+    logger.log?.(msg);
+}
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+
+    let js = std::fs::read_to_string(base.join("dist/src/optcall.js")).expect("read js");
+    assert!(!js.is_empty(), "JS output should not be empty");
+}
