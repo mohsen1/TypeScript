@@ -416,14 +416,50 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         } {
             let extends_shape = self.interner.object_shape(extends_shape_id);
             let mut infer_prop = None;
+            let mut infer_nested = None;
 
             for prop in extends_shape.properties.iter() {
                 if let Some(TypeKey::Infer(info)) = self.interner.lookup(prop.type_id) {
-                    if infer_prop.is_some() {
+                    if infer_prop.is_some() || infer_nested.is_some() {
                         infer_prop = None;
+                        infer_nested = None;
                         break;
                     }
                     infer_prop = Some((prop.name, info));
+                    continue;
+                }
+
+                let nested_type = match self.interner.lookup(prop.type_id) {
+                    Some(TypeKey::ReadonlyType(inner)) => inner,
+                    _ => prop.type_id,
+                };
+                if let Some(nested_shape_id) = match self.interner.lookup(nested_type) {
+                    Some(TypeKey::Object(shape_id) | TypeKey::ObjectWithIndex(shape_id)) => {
+                        Some(shape_id)
+                    }
+                    _ => None,
+                } {
+                    let nested_shape = self.interner.object_shape(nested_shape_id);
+                    let mut nested_infer = None;
+                    for nested_prop in nested_shape.properties.iter() {
+                        if let Some(TypeKey::Infer(info)) =
+                            self.interner.lookup(nested_prop.type_id)
+                        {
+                            if nested_infer.is_some() {
+                                nested_infer = None;
+                                break;
+                            }
+                            nested_infer = Some((nested_prop.name, info));
+                        }
+                    }
+                    if let Some((nested_name, info)) = nested_infer {
+                        if infer_prop.is_some() || infer_nested.is_some() {
+                            infer_prop = None;
+                            infer_nested = None;
+                            break;
+                        }
+                        infer_nested = Some((prop.name, nested_name, info));
+                    }
                 }
             }
 
@@ -443,6 +479,72 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                             .iter()
                             .find(|prop| prop.name == prop_name)
                             .map(|prop| prop.type_id)
+                    }
+                    _ => None,
+                };
+
+                let Some(inferred) = inferred else {
+                    return self.evaluate(cond.false_type);
+                };
+
+                let mut subst = TypeSubstitution::new();
+                subst.insert(info.name, inferred);
+
+                if let Some(constraint) = info.constraint {
+                    let mut checker =
+                        SubtypeChecker::with_resolver(self.interner, self.resolver);
+                    if !checker.is_subtype_of(inferred, constraint) {
+                        let false_inst = instantiate_type_with_infer(
+                            self.interner,
+                            cond.false_type,
+                            &subst,
+                        );
+                        return self.evaluate(false_inst);
+                    }
+                }
+
+                let true_inst = instantiate_type_with_infer(
+                    self.interner,
+                    cond.true_type,
+                    &subst,
+                );
+                return self.evaluate(true_inst);
+            } else if let Some((outer_name, inner_name, info)) = infer_nested {
+                if matches!(
+                    self.interner.lookup(check_unwrapped),
+                    Some(TypeKey::TypeParameter(_)) | Some(TypeKey::Infer(_))
+                ) {
+                    return self.interner.conditional(cond.clone());
+                }
+
+                let inferred = match self.interner.lookup(check_unwrapped) {
+                    Some(TypeKey::Object(shape_id) | TypeKey::ObjectWithIndex(shape_id)) => {
+                        let shape = self.interner.object_shape(shape_id);
+                        shape
+                            .properties
+                            .iter()
+                            .find(|prop| prop.name == outer_name)
+                            .and_then(|prop| {
+                                let inner_type = match self.interner.lookup(prop.type_id) {
+                                    Some(TypeKey::ReadonlyType(inner)) => inner,
+                                    _ => prop.type_id,
+                                };
+                                match self.interner.lookup(inner_type) {
+                                    Some(
+                                        TypeKey::Object(inner_shape_id)
+                                        | TypeKey::ObjectWithIndex(inner_shape_id),
+                                    ) => {
+                                        let inner_shape =
+                                            self.interner.object_shape(inner_shape_id);
+                                        inner_shape
+                                            .properties
+                                            .iter()
+                                            .find(|prop| prop.name == inner_name)
+                                            .map(|prop| prop.type_id)
+                                    }
+                                    _ => None,
+                                }
+                            })
                     }
                     _ => None,
                 };
