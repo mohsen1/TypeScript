@@ -7,7 +7,7 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [x] Add solver tests for Awaited<T>, ThisParameterType<T>, and OmitThisParameter<T> utility types. **Done:** Added 6 tests covering Promise unwrapping and this parameter extraction/removal.
+- [x] Add solver tests for Partial<T>, Readonly<T>, and mapped type modifiers (+readonly, -readonly, +?, -?). **Done:** Added 5 tests covering these patterns with keyof/index access.
 
 ## Task Queue
 (empty - awaiting next assignment)
@@ -66,6 +66,11 @@ Priority: 4
 - [x] Added solver coverage for ThisParameterType with no this (returns unknown). Tests: `./wasm/test.sh`.
 - [x] Added solver coverage for OmitThisParameter utility type pattern. Tests: `./wasm/test.sh`.
 - [x] Added solver coverage for OmitThisParameter with no this. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for Partial<T> pattern with keyof and index access. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for Readonly<T> pattern with keyof and index access. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for -readonly modifier (Mutable pattern). Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for combined modifiers (-readonly -?). Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for combined modifiers (+readonly +?). Tests: `./wasm/test.sh`.
 
 ## Ready for Merge
 Yes
