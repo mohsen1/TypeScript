@@ -7,7 +7,7 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [x] Add solver tests for distributive conditional with mapped type interactions (FunctionKeys, PickByValue patterns). **Done:** Added 15 tests covering mapped + conditional patterns.
+- [x] Add solver tests for variadic tuple types ([...T, string], spread operations). **Done:** Added 20 tests covering variadic tuple patterns.
 
 ## Task Queue
 (empty - awaiting next assignment)
@@ -99,6 +99,7 @@ Priority: 4
 - [x] Added solver coverage for template literal dot notation parse. Tests: `./wasm/test.sh`.
 - [x] Added solver coverage for recursive conditional types (Flatten, Awaited, DeepReadonly patterns). Tests: `./wasm/test.sh`.
 - [x] Added solver coverage for distributive conditional with mapped type interactions (FunctionKeys, PickByValue, Getters/Setters, NestedKeyOf patterns). Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for variadic tuple types (spread, concat, push/pop, shift/unshift, labeled rest, infer patterns). Tests: `./wasm/test.sh`.
 
 ## Ready for Merge
 Yes
