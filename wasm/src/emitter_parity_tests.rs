@@ -1974,3 +1974,147 @@ fn test_parity_function_param_type_erasure() {
         output
     );
 }
+
+/// Parity test for generic type parameter erasure.
+/// Generic type parameters should be removed from output.
+#[test]
+fn test_parity_generic_type_erasure() {
+    let source = "function identity<T>(value: T): T { return value; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify function exists
+    assert!(
+        output.contains("function identity"),
+        "Output should define identity function: {}",
+        output
+    );
+    // Parameter name should remain
+    assert!(
+        output.contains("value"),
+        "Output should have parameter name: {}",
+        output
+    );
+    // Generic type parameter should be erased
+    assert!(
+        !output.contains("<T>"),
+        "Generic type parameter <T> should be erased: {}",
+        output
+    );
+    // Type annotation should be erased
+    assert!(
+        !output.contains(": T"),
+        "Type annotation : T should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for optional parameter question mark erasure.
+/// The ? marker on optional parameters should be removed.
+#[test]
+fn test_parity_optional_param_erasure() {
+    let source = "function greet(name?: string) { return name || 'World'; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify function exists
+    assert!(
+        output.contains("function greet"),
+        "Output should define greet function: {}",
+        output
+    );
+    // Parameter name should remain
+    assert!(
+        output.contains("name"),
+        "Output should have parameter name: {}",
+        output
+    );
+    // Optional marker should be erased
+    assert!(
+        !output.contains("?"),
+        "Optional marker ? should be erased: {}",
+        output
+    );
+    // Type annotation should be erased
+    assert!(
+        !output.contains(": string"),
+        "Type annotation should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for rest parameters ES5 downlevel.
+/// Rest parameters should be converted to arguments slicing.
+#[test]
+fn test_parity_es5_rest_params() {
+    let source = "function sum(...nums: number[]) { return nums.reduce((a, b) => a + b, 0); }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify function exists
+    assert!(
+        output.contains("function sum"),
+        "Output should define sum function: {}",
+        output
+    );
+    // Rest parameter syntax should be removed
+    assert!(
+        !output.contains("...nums"),
+        "Rest parameter syntax should be removed: {}",
+        output
+    );
+    // Type annotation should be erased
+    assert!(
+        !output.contains(": number[]"),
+        "Type annotation should be erased: {}",
+        output
+    );
+}
