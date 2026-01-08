@@ -39,6 +39,43 @@ fn test_class_es5_emits_param_and_static_properties() {
 }
 
 #[test]
+fn test_class_es5_static_field_arrow_keeps_this() {
+    let source = "class Foo { static field = () => this.value; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    assert!(
+        output.contains("Foo.field = function"),
+        "Expected static field initializer to emit a function expression: {}",
+        output
+    );
+    assert!(
+        output.contains("return this.value;"),
+        "Expected static field arrow to preserve `this`: {}",
+        output
+    );
+    assert!(
+        !output.contains("_this"),
+        "Did not expect static field arrow to capture `_this`: {}",
+        output
+    );
+}
+
+#[test]
 fn test_class_es5_async_method_emits_awaiter() {
     let source = "class Foo { async bar() { await baz(); return 1; } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
