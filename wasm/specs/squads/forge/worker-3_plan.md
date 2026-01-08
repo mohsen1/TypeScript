@@ -7,12 +7,13 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] Pick the next unsoundness case from `wasm/specs/TS_UNSOUNDNESS_CATALOG.md` and add coverage if missing.
+- [x] Pick the next unsoundness case from `wasm/specs/TS_UNSOUNDNESS_CATALOG.md` and add coverage if missing.
 
 ## Task Queue
 - [ ] Coordinate with manager if unsure which unsoundness case to prioritize next.
 
 ## Completed
+- [x] Covariant mutable arrays (TS unsoundness #3) coverage in compat assignability. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
 - [x] Structural property/method variance: allow bivariant checks when either side is a method; added mixed method vs function-property test. Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
 - [x] Function variance across union/intersection targets regression test. Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
 - [x] Method vs function-property variance coverage for function-source to method-target. Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
@@ -28,7 +29,7 @@ Priority: 3
 - [x] Rechecked FunctionId build error in `wasm/src/solver/evaluate.rs` after sync; not reproducible. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
 
 ## Ready for Merge
-No
+Yes
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize solver correctness (inference/conditional/subtype) before new features.
