@@ -2320,6 +2320,7 @@ fn test_commonjs_export_const() {
     printer.emit(root);
 
     let output = printer.get_output();
+    assert!(output.contains("__esModule"), "Expected __esModule marker in CommonJS output: {}", output);
     assert!(output.contains("const x = 42;"), "Expected 'const x = 42;' in CommonJS output: {}", output);
     assert!(output.contains("exports.x = x;"), "Expected 'exports.x = x;' in CommonJS output: {}", output);
 }
