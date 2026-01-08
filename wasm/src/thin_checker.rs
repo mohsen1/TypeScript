@@ -3153,6 +3153,29 @@ impl<'a> ThinCheckerState<'a> {
 
         // Interface - return interface type with call signatures
         if flags & symbol_flags::INTERFACE != 0 {
+            let decl_file_idx = symbol.decl_file_idx;
+
+            // For cross-file interfaces, use the correct arena
+            if decl_file_idx != u32::MAX && self.ctx.all_arenas.is_some() && !symbol.declarations.is_empty() {
+                let arena = self.ctx.get_arena_for_file(decl_file_idx);
+                let type_resolver = |node_idx: NodeIndex| {
+                    self.resolve_type_symbol_in_arena(node_idx, arena)
+                };
+                let value_resolver = |node_idx: NodeIndex| {
+                    self.resolve_value_symbol_in_arena(node_idx, arena)
+                };
+                let lowering = TypeLowering::with_resolvers(
+                    arena,
+                    self.ctx.types,
+                    &type_resolver,
+                    &value_resolver,
+                );
+                lowering.import_type_params(self.ctx.type_parameter_scope.iter());
+                let interface_type = lowering.lower_interface_declarations(&symbol.declarations);
+                return interface_type;
+            }
+
+            // Same-file interface
             if !symbol.declarations.is_empty() {
                 let type_resolver = |node_idx: NodeIndex| self.resolve_type_symbol_for_lowering(node_idx);
                 let value_resolver = |node_idx: NodeIndex| self.resolve_value_symbol_for_lowering(node_idx);
@@ -5117,12 +5140,6 @@ impl<'a> ThinCheckerState<'a> {
         self.resolve_refs_in_type(target);
 
         let env = self.ctx.type_env.borrow();
-
-        // Debug: check if TypeEnvironment has entries for Application expansion
-        if let Some(crate::solver::TypeKey::Application(_)) = self.ctx.types.lookup(target) {
-            eprintln!("[DEBUG] is_assignable_to: target is Application, env has {} entries", env.len());
-        }
-
         if let Some(result) = self.enum_assignability_override(source, target, Some(&*env)) {
             return result;
         }
@@ -5273,9 +5290,12 @@ impl<'a> ThinCheckerState<'a> {
             TypeKey::Ref(sym_ref) => {
                 // Resolve this symbol to populate the TypeEnvironment
                 let sym_id = SymbolId(sym_ref.0);
-                eprintln!("[DEBUG] resolve_refs: resolving Ref({})", sym_ref.0);
-                let resolved = self.get_type_of_symbol(sym_id);
-                eprintln!("[DEBUG] resolve_refs: Ref({}) resolved to {:?}", sym_ref.0, resolved);
+                let _ = self.get_type_of_symbol(sym_id);
+            }
+            TypeKey::TypeQuery(sym_ref) => {
+                // Resolve the symbol for typeof expressions
+                let sym_id = SymbolId(sym_ref.0);
+                let _ = self.get_type_of_symbol(sym_id);
             }
             TypeKey::Application(app_id) => {
                 let app = self.ctx.types.type_application(*app_id);
@@ -5434,10 +5454,29 @@ impl<'a> ThinCheckerState<'a> {
             }
         };
 
-        // Now use the extracted data with mutable self
+        // Extract type param infos directly using the correct arena (for cross-file support)
         if let Some(tp_list) = type_params_list {
-            let (params, updates) = self.push_type_parameters(&Some(tp_list));
-            self.pop_type_parameters(updates);
+            let arena = self.ctx.get_arena_for_file(decl_file_idx);
+            let mut params = Vec::new();
+            for &param_idx in &tp_list.nodes {
+                if let Some(node) = arena.get(param_idx) {
+                    if let Some(data) = arena.get_type_parameter(node) {
+                        let name = arena.get(data.name)
+                            .and_then(|name_node| arena.get_identifier(name_node))
+                            .map(|id_data| id_data.escaped_text.clone())
+                            .unwrap_or_else(|| "T".to_string());
+                        let atom = self.ctx.types.intern_string(&name);
+
+                        // For constraints/defaults, we'd need cross-file type resolution
+                        // For now, just get the name which is sufficient for Application expansion
+                        params.push(crate::solver::TypeParamInfo {
+                            name: atom,
+                            constraint: None,
+                            default: None,
+                        });
+                    }
+                }
+            }
             return params;
         }
 
