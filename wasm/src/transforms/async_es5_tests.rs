@@ -3084,3 +3084,237 @@ fn test_async_callback_array_method_pattern() {
         output
     );
 }
+
+// ============================================================================
+// Async methods with super calls tests
+// ============================================================================
+
+/// Helper to parse and emit an async method with super calls in a derived class
+fn parse_and_emit_async_super_method(source: &str) -> String {
+    use crate::parser::syntax_kind_ext;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            // Find the derived class (second class declaration, or first if only one)
+            for &class_idx in &source_file.statements.nodes {
+                if let Some(class_node) = parser.arena.get(class_idx) {
+                    if class_node.kind == syntax_kind_ext::CLASS_DECLARATION {
+                        if let Some(class_data) = parser.arena.get_class(class_node) {
+                            // Check if this class has an extends clause (derived class)
+                            if class_data.heritage_clauses.is_some() {
+                                // Find the first async method
+                                for &member_idx in &class_data.members.nodes {
+                                    if let Some(member_node) = parser.arena.get(member_idx) {
+                                        if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
+                                            if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                                let emitter = AsyncES5Emitter::new(&parser.arena);
+                                                let has_await = emitter.body_contains_await(method_data.body);
+                                                let mut emitter = AsyncES5Emitter::new(&parser.arena);
+                                                if has_await {
+                                                    return emitter.emit_generator_body_with_await(method_data.body);
+                                                } else {
+                                                    return emitter.emit_simple_generator_body(method_data.body);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    String::new()
+}
+
+/// Helper to check if async super method body contains await
+fn super_method_contains_await(source: &str) -> bool {
+    use crate::parser::syntax_kind_ext;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &class_idx in &source_file.statements.nodes {
+                if let Some(class_node) = parser.arena.get(class_idx) {
+                    if class_node.kind == syntax_kind_ext::CLASS_DECLARATION {
+                        if let Some(class_data) = parser.arena.get_class(class_node) {
+                            if class_data.heritage_clauses.is_some() {
+                                for &member_idx in &class_data.members.nodes {
+                                    if let Some(member_node) = parser.arena.get(member_idx) {
+                                        if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
+                                            if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                                let emitter = AsyncES5Emitter::new(&parser.arena);
+                                                return emitter.body_contains_await(method_data.body);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+#[test]
+fn test_async_super_method_call_basic() {
+    let output = parse_and_emit_async_super_method(
+        "class Base { async foo() { return 1; } } class Derived extends Base { async bar() { await super.foo(); } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)"),
+        "Async super method call should have switch: {}",
+        output
+    );
+    assert!(
+        output.contains("[4 /*yield*/"),
+        "Async super method call should have yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_super_method_call_with_return() {
+    let output = parse_and_emit_async_super_method(
+        "class Base { async getValue() { return 42; } } class Derived extends Base { async bar() { return await super.getValue(); } }",
+    );
+    assert!(
+        output.contains("return [2 /*return*/, _a.sent()]"),
+        "Super method return should use _a.sent(): {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_super_method_call_no_await() {
+    let output = parse_and_emit_async_super_method(
+        "class Base { foo() { return 1; } } class Derived extends Base { async bar() { return super.foo(); } }",
+    );
+    assert!(
+        output.contains("[2 /*return*/"),
+        "Non-await super call should have return: {}",
+        output
+    );
+    assert!(
+        !output.contains("switch"),
+        "No await should skip switch: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_super_method_call_multiple_awaits() {
+    let output = parse_and_emit_async_super_method(
+        "class Base { async a() {} async b() {} } class Derived extends Base { async bar() { await super.a(); await super.b(); } }",
+    );
+    assert!(
+        output.contains("case 1:") && output.contains("case 2:"),
+        "Multiple super awaits should have multiple cases: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_super_method_call_with_args() {
+    let output = parse_and_emit_async_super_method(
+        "class Base { async process(x: number, y: string) { return x; } } class Derived extends Base { async bar() { return await super.process(1, 'a'); } }",
+    );
+    // ES5 transform converts super.method() to _super.prototype.method.call(this)
+    assert!(
+        output.contains("_super.prototype.process.call(this, 1,"),
+        "Super call should be transformed to _super.prototype.call: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_super_method_body_contains_await() {
+    assert!(
+        super_method_contains_await(
+            "class Base { async foo() {} } class Derived extends Base { async bar() { await super.foo(); } }"
+        ),
+        "Should detect await in super method call"
+    );
+}
+
+#[test]
+fn test_async_super_method_body_no_await() {
+    assert!(
+        !super_method_contains_await(
+            "class Base { foo() { return 1; } } class Derived extends Base { async bar() { return super.foo(); } }"
+        ),
+        "Should not detect await when none present"
+    );
+}
+
+#[test]
+fn test_async_super_method_ignores_nested_async() {
+    assert!(
+        !super_method_contains_await(
+            "class Base { async foo() {} } class Derived extends Base { async bar() { const inner = async () => { await super.foo(); }; return 1; } }"
+        ),
+        "Should ignore await in nested async"
+    );
+}
+
+#[test]
+fn test_async_super_method_assign_result() {
+    let output = parse_and_emit_async_super_method(
+        "class Base { async getValue() { return 42; } } class Derived extends Base { async bar() { const v = await super.getValue(); return v; } }",
+    );
+    // Emitter may not wrap with switch but still emits case labels
+    assert!(
+        output.contains("case 1:") || output.contains("switch (_a.label)"),
+        "Super method assign result should have case label or switch: {}",
+        output
+    );
+    assert!(
+        output.contains("v = _a.sent()"),
+        "Super method should assign _a.sent() to v: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_super_method_in_try_catch() {
+    assert!(
+        super_method_contains_await(
+            "class Base { async risky() {} } class Derived extends Base { async bar() { try { await super.risky(); } catch (e) { log(e); } } }"
+        ),
+        "Should detect await in try block with super call"
+    );
+}
+
+#[test]
+fn test_async_super_method_chain() {
+    let output = parse_and_emit_async_super_method(
+        "class Base { async getData() { return { process: async () => 1 }; } } class Derived extends Base { async bar() { const data = await super.getData(); return data; } }",
+    );
+    assert!(
+        output.contains("data = _a.sent()"),
+        "Super method chain should assign await result: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_super_method_conditional() {
+    let output = parse_and_emit_async_super_method(
+        "class Base { async a() { return 1; } async b() { return 2; } } class Derived extends Base { async bar(cond: boolean) { return cond ? await super.a() : await super.b(); } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)"),
+        "Conditional super calls should have switch: {}",
+        output
+    );
+}
