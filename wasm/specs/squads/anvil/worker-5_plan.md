@@ -7,7 +7,7 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- Complete: Added 12 async method expression tests (basic, with return, no await, multiple awaits, with parameters, body_contains_await, ignores nested async, shorthand syntax, try/catch, in loop, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (112 tests PASS).
+- [ ] Add ES5 async tests for async generator functions in `wasm/src/transforms/async_es5_tests.rs`. Run `./wasm/test.sh async_es5_tests`.
 
 ## Task Queue
 - [ ] (empty)
