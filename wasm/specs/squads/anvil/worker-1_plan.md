@@ -7,7 +7,7 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-- Complete: Added shorthand properties ES5 method test; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` - pre-existing Forge domain failure).
+- Complete: Added getter/setter ES5 accessors test; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` - pre-existing Forge domain failure).
 
 ## Task Queue
 - [x] Inspect `wasm/src/emitter_edge_case_tests.rs` to capture the failing case and expected output.
@@ -51,6 +51,7 @@ Priority: 1
 - [x] Added default parameters ES5 method test; verifies `add(a, b = 0, c = 1)` is transformed to void 0/undefined checks. Ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Added rest parameters ES5 method test; verifies `log(prefix, ...messages)` is transformed to slice/arguments pattern. Ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Added shorthand properties ES5 method test; verifies `{ x, y }` shorthand is correctly emitted in class methods. Ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
+- [x] Added getter/setter ES5 accessors test; verifies `get count()` and `set count(value)` use Object.defineProperty. Ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 
 ## Ready for Merge
 Yes
