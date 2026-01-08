@@ -15,9 +15,13 @@ use crate::interner::Atom;
 use crate::solver::types::*;
 use crate::solver::{apparent_primitive_members, ApparentMemberKind, TypeDatabase};
 use crate::solver::infer::InferenceContext;
-use crate::solver::subtype::{SubtypeChecker, TypeResolver, NoopResolver};
-use crate::solver::instantiate::{TypeSubstitution, instantiate_type};
-use rustc_hash::FxHashSet;
+use crate::solver::instantiate::{
+    instantiate_type,
+    instantiate_type_with_infer,
+    TypeSubstitution,
+};
+use crate::solver::subtype::{NoopResolver, SubtypeChecker, TypeResolver};
+use rustc_hash::{FxHashMap, FxHashSet};
 
 #[cfg(test)]
 use crate::solver::TypeInterner;
@@ -235,14 +239,370 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             }
         }
 
+        if let Some(TypeKey::Infer(info)) = self.interner.lookup(extends_type) {
+            if matches!(
+                self.interner.lookup(check_type),
+                Some(TypeKey::TypeParameter(_)) | Some(TypeKey::Infer(_))
+            ) {
+                return self.interner.conditional(cond.clone());
+            }
+
+            let mut subst = TypeSubstitution::new();
+            subst.insert(info.name, check_type);
+
+            if check_type == TypeId::ANY {
+                let true_eval = self.evaluate(instantiate_type_with_infer(
+                    self.interner,
+                    cond.true_type,
+                    &subst,
+                ));
+                let false_eval = self.evaluate(instantiate_type_with_infer(
+                    self.interner,
+                    cond.false_type,
+                    &subst,
+                ));
+                return self.interner.union2(true_eval, false_eval);
+            }
+
+            if let Some(constraint) = info.constraint {
+                let mut checker = SubtypeChecker::with_resolver(self.interner, self.resolver);
+                if !checker.is_subtype_of(check_type, constraint) {
+                    let false_inst = instantiate_type_with_infer(
+                        self.interner,
+                        cond.false_type,
+                        &subst,
+                    );
+                    return self.evaluate(false_inst);
+                }
+            }
+
+            let true_inst = instantiate_type_with_infer(
+                self.interner,
+                cond.true_type,
+                &subst,
+            );
+            return self.evaluate(true_inst);
+        }
+
+        let extends_unwrapped = match self.interner.lookup(extends_type) {
+            Some(TypeKey::ReadonlyType(inner)) => inner,
+            _ => extends_type,
+        };
+        let check_unwrapped = match self.interner.lookup(check_type) {
+            Some(TypeKey::ReadonlyType(inner)) => inner,
+            _ => check_type,
+        };
+
+        if let Some(TypeKey::Array(ext_elem)) = self.interner.lookup(extends_unwrapped) {
+            if let Some(TypeKey::Infer(info)) = self.interner.lookup(ext_elem) {
+                if matches!(
+                    self.interner.lookup(check_unwrapped),
+                    Some(TypeKey::TypeParameter(_)) | Some(TypeKey::Infer(_))
+                ) {
+                    return self.interner.conditional(cond.clone());
+                }
+
+                let inferred = match self.interner.lookup(check_unwrapped) {
+                    Some(TypeKey::Array(elem)) => Some(elem),
+                    Some(TypeKey::Tuple(elements)) => {
+                        let elements = self.interner.tuple_list(elements);
+                        let mut parts = Vec::new();
+                        for element in elements.iter() {
+                            if element.rest {
+                                let rest_type = match self.interner.lookup(element.type_id) {
+                                    Some(TypeKey::Array(rest_elem)) => rest_elem,
+                                    _ => element.type_id,
+                                };
+                                parts.push(rest_type);
+                            } else {
+                                parts.push(element.type_id);
+                            }
+                        }
+                        if parts.is_empty() {
+                            None
+                        } else {
+                            Some(self.interner.union(parts))
+                        }
+                    }
+                    _ => None,
+                };
+
+                let Some(inferred) = inferred else {
+                    return self.evaluate(cond.false_type);
+                };
+
+                let mut subst = TypeSubstitution::new();
+                subst.insert(info.name, inferred);
+
+                if let Some(constraint) = info.constraint {
+                    let mut checker = SubtypeChecker::with_resolver(self.interner, self.resolver);
+                    if !checker.is_subtype_of(inferred, constraint) {
+                        let false_inst = instantiate_type_with_infer(
+                            self.interner,
+                            cond.false_type,
+                            &subst,
+                        );
+                        return self.evaluate(false_inst);
+                    }
+                }
+
+                let true_inst = instantiate_type_with_infer(
+                    self.interner,
+                    cond.true_type,
+                    &subst,
+                );
+                return self.evaluate(true_inst);
+            }
+        }
+
+        if let Some(TypeKey::Tuple(extends_elements)) = self.interner.lookup(extends_unwrapped) {
+            let extends_elements = self.interner.tuple_list(extends_elements);
+            if extends_elements.len() == 1 && !extends_elements[0].rest {
+                if let Some(TypeKey::Infer(info)) =
+                    self.interner.lookup(extends_elements[0].type_id)
+                {
+                    if matches!(
+                        self.interner.lookup(check_unwrapped),
+                        Some(TypeKey::TypeParameter(_)) | Some(TypeKey::Infer(_))
+                    ) {
+                        return self.interner.conditional(cond.clone());
+                    }
+
+                    let inferred = match self.interner.lookup(check_unwrapped) {
+                        Some(TypeKey::Tuple(check_elements)) => {
+                            let check_elements = self.interner.tuple_list(check_elements);
+                            if check_elements.len() == 1 && !check_elements[0].rest {
+                                Some(check_elements[0].type_id)
+                            } else {
+                                None
+                            }
+                        }
+                        _ => None,
+                    };
+
+                    let Some(inferred) = inferred else {
+                        return self.evaluate(cond.false_type);
+                    };
+
+                    let mut subst = TypeSubstitution::new();
+                    subst.insert(info.name, inferred);
+
+                    if let Some(constraint) = info.constraint {
+                        let mut checker =
+                            SubtypeChecker::with_resolver(self.interner, self.resolver);
+                        if !checker.is_subtype_of(inferred, constraint) {
+                            let false_inst = instantiate_type_with_infer(
+                                self.interner,
+                                cond.false_type,
+                                &subst,
+                            );
+                            return self.evaluate(false_inst);
+                        }
+                    }
+
+                    let true_inst = instantiate_type_with_infer(
+                        self.interner,
+                        cond.true_type,
+                        &subst,
+                    );
+                    return self.evaluate(true_inst);
+                }
+            }
+        }
+
+        if let Some(extends_shape_id) = match self.interner.lookup(extends_unwrapped) {
+            Some(TypeKey::Object(shape_id) | TypeKey::ObjectWithIndex(shape_id)) => Some(shape_id),
+            _ => None,
+        } {
+            let extends_shape = self.interner.object_shape(extends_shape_id);
+            let mut infer_prop = None;
+            let mut infer_nested = None;
+
+            for prop in extends_shape.properties.iter() {
+                if let Some(TypeKey::Infer(info)) = self.interner.lookup(prop.type_id) {
+                    if infer_prop.is_some() || infer_nested.is_some() {
+                        infer_prop = None;
+                        infer_nested = None;
+                        break;
+                    }
+                    infer_prop = Some((prop.name, info));
+                    continue;
+                }
+
+                let nested_type = match self.interner.lookup(prop.type_id) {
+                    Some(TypeKey::ReadonlyType(inner)) => inner,
+                    _ => prop.type_id,
+                };
+                if let Some(nested_shape_id) = match self.interner.lookup(nested_type) {
+                    Some(TypeKey::Object(shape_id) | TypeKey::ObjectWithIndex(shape_id)) => {
+                        Some(shape_id)
+                    }
+                    _ => None,
+                } {
+                    let nested_shape = self.interner.object_shape(nested_shape_id);
+                    let mut nested_infer = None;
+                    for nested_prop in nested_shape.properties.iter() {
+                        if let Some(TypeKey::Infer(info)) =
+                            self.interner.lookup(nested_prop.type_id)
+                        {
+                            if nested_infer.is_some() {
+                                nested_infer = None;
+                                break;
+                            }
+                            nested_infer = Some((nested_prop.name, info));
+                        }
+                    }
+                    if let Some((nested_name, info)) = nested_infer {
+                        if infer_prop.is_some() || infer_nested.is_some() {
+                            infer_prop = None;
+                            infer_nested = None;
+                            break;
+                        }
+                        infer_nested = Some((prop.name, nested_name, info));
+                    }
+                }
+            }
+
+            if let Some((prop_name, info)) = infer_prop {
+                if matches!(
+                    self.interner.lookup(check_unwrapped),
+                    Some(TypeKey::TypeParameter(_)) | Some(TypeKey::Infer(_))
+                ) {
+                    return self.interner.conditional(cond.clone());
+                }
+
+                let inferred = match self.interner.lookup(check_unwrapped) {
+                    Some(TypeKey::Object(shape_id) | TypeKey::ObjectWithIndex(shape_id)) => {
+                        let shape = self.interner.object_shape(shape_id);
+                        shape
+                            .properties
+                            .iter()
+                            .find(|prop| prop.name == prop_name)
+                            .map(|prop| prop.type_id)
+                    }
+                    _ => None,
+                };
+
+                let Some(inferred) = inferred else {
+                    return self.evaluate(cond.false_type);
+                };
+
+                let mut subst = TypeSubstitution::new();
+                subst.insert(info.name, inferred);
+
+                if let Some(constraint) = info.constraint {
+                    let mut checker =
+                        SubtypeChecker::with_resolver(self.interner, self.resolver);
+                    if !checker.is_subtype_of(inferred, constraint) {
+                        let false_inst = instantiate_type_with_infer(
+                            self.interner,
+                            cond.false_type,
+                            &subst,
+                        );
+                        return self.evaluate(false_inst);
+                    }
+                }
+
+                let true_inst = instantiate_type_with_infer(
+                    self.interner,
+                    cond.true_type,
+                    &subst,
+                );
+                return self.evaluate(true_inst);
+            } else if let Some((outer_name, inner_name, info)) = infer_nested {
+                if matches!(
+                    self.interner.lookup(check_unwrapped),
+                    Some(TypeKey::TypeParameter(_)) | Some(TypeKey::Infer(_))
+                ) {
+                    return self.interner.conditional(cond.clone());
+                }
+
+                let inferred = match self.interner.lookup(check_unwrapped) {
+                    Some(TypeKey::Object(shape_id) | TypeKey::ObjectWithIndex(shape_id)) => {
+                        let shape = self.interner.object_shape(shape_id);
+                        shape
+                            .properties
+                            .iter()
+                            .find(|prop| prop.name == outer_name)
+                            .and_then(|prop| {
+                                let inner_type = match self.interner.lookup(prop.type_id) {
+                                    Some(TypeKey::ReadonlyType(inner)) => inner,
+                                    _ => prop.type_id,
+                                };
+                                match self.interner.lookup(inner_type) {
+                                    Some(
+                                        TypeKey::Object(inner_shape_id)
+                                        | TypeKey::ObjectWithIndex(inner_shape_id),
+                                    ) => {
+                                        let inner_shape =
+                                            self.interner.object_shape(inner_shape_id);
+                                        inner_shape
+                                            .properties
+                                            .iter()
+                                            .find(|prop| prop.name == inner_name)
+                                            .map(|prop| prop.type_id)
+                                    }
+                                    _ => None,
+                                }
+                            })
+                    }
+                    _ => None,
+                };
+
+                let Some(inferred) = inferred else {
+                    return self.evaluate(cond.false_type);
+                };
+
+                let mut subst = TypeSubstitution::new();
+                subst.insert(info.name, inferred);
+
+                if let Some(constraint) = info.constraint {
+                    let mut checker =
+                        SubtypeChecker::with_resolver(self.interner, self.resolver);
+                    if !checker.is_subtype_of(inferred, constraint) {
+                        let false_inst = instantiate_type_with_infer(
+                            self.interner,
+                            cond.false_type,
+                            &subst,
+                        );
+                        return self.evaluate(false_inst);
+                    }
+                }
+
+                let true_inst = instantiate_type_with_infer(
+                    self.interner,
+                    cond.true_type,
+                    &subst,
+                );
+                return self.evaluate(true_inst);
+            }
+        }
+
         // Step 2: Check for naked type parameter (defer)
         if let Some(TypeKey::TypeParameter(_)) = self.interner.lookup(check_type) {
             // Type parameter hasn't been substituted - defer evaluation
             return self.interner.conditional(cond.clone());
         }
 
-        // Step 3: Perform subtype check
+        // Step 3: Perform subtype check or infer pattern matching
         let mut checker = SubtypeChecker::with_resolver(self.interner, self.resolver);
+
+        if self.type_contains_infer(extends_type) {
+            let mut bindings = FxHashMap::default();
+            let mut visited = FxHashSet::default();
+            if self.match_infer_pattern(
+                check_type,
+                extends_type,
+                &mut bindings,
+                &mut visited,
+                &mut checker,
+            ) {
+                let substituted_true = self.substitute_infer(cond.true_type, &bindings);
+                return self.evaluate(substituted_true);
+            }
+
+            return self.evaluate(cond.false_type);
+        }
 
         if checker.is_subtype_of(check_type, extends_type) {
             // T <: U -> true branch
@@ -1296,9 +1656,663 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         }
     }
 
+    fn substitute_infer(&self, type_id: TypeId, bindings: &FxHashMap<Atom, TypeId>) -> TypeId {
+        if bindings.is_empty() {
+            return type_id;
+        }
+        let mut substitutor = InferSubstitutor::new(self.interner, bindings);
+        substitutor.substitute(type_id)
+    }
+
+    fn type_contains_infer(&self, type_id: TypeId) -> bool {
+        let mut visited = FxHashSet::default();
+        self.type_contains_infer_inner(type_id, &mut visited)
+    }
+
+    fn type_contains_infer_inner(&self, type_id: TypeId, visited: &mut FxHashSet<TypeId>) -> bool {
+        if !visited.insert(type_id) {
+            return false;
+        }
+
+        let Some(key) = self.interner.lookup(type_id) else {
+            return false;
+        };
+
+        match key {
+            TypeKey::Infer(_) => true,
+            TypeKey::Array(elem) => self.type_contains_infer_inner(elem, visited),
+            TypeKey::Tuple(elements) => {
+                let elements = self.interner.tuple_list(elements);
+                elements
+                    .iter()
+                    .any(|element| self.type_contains_infer_inner(element.type_id, visited))
+            }
+            TypeKey::Union(members) | TypeKey::Intersection(members) => {
+                let members = self.interner.type_list(members);
+                members
+                    .iter()
+                    .any(|&member| self.type_contains_infer_inner(member, visited))
+            }
+            TypeKey::Object(shape_id) => {
+                let shape = self.interner.object_shape(shape_id);
+                shape
+                    .properties
+                    .iter()
+                    .any(|prop| self.type_contains_infer_inner(prop.type_id, visited))
+            }
+            TypeKey::ObjectWithIndex(shape_id) => {
+                let shape = self.interner.object_shape(shape_id);
+                if shape
+                    .properties
+                    .iter()
+                    .any(|prop| self.type_contains_infer_inner(prop.type_id, visited))
+                {
+                    return true;
+                }
+                if let Some(index) = &shape.string_index {
+                    if self.type_contains_infer_inner(index.key_type, visited)
+                        || self.type_contains_infer_inner(index.value_type, visited)
+                    {
+                        return true;
+                    }
+                }
+                if let Some(index) = &shape.number_index {
+                    if self.type_contains_infer_inner(index.key_type, visited)
+                        || self.type_contains_infer_inner(index.value_type, visited)
+                    {
+                        return true;
+                    }
+                }
+                false
+            }
+            TypeKey::Function(shape_id) => {
+                let shape = self.interner.function_shape(shape_id);
+                shape
+                    .params
+                    .iter()
+                    .any(|param| self.type_contains_infer_inner(param.type_id, visited))
+                    || shape
+                        .this_type
+                        .is_some_and(|this_type| self.type_contains_infer_inner(this_type, visited))
+                    || self.type_contains_infer_inner(shape.return_type, visited)
+            }
+            TypeKey::Callable(shape_id) => {
+                let shape = self.interner.callable_shape(shape_id);
+                shape.call_signatures.iter().any(|sig| {
+                    sig.params
+                        .iter()
+                        .any(|param| self.type_contains_infer_inner(param.type_id, visited))
+                        || sig
+                            .this_type
+                            .is_some_and(|this_type| self.type_contains_infer_inner(this_type, visited))
+                        || self.type_contains_infer_inner(sig.return_type, visited)
+                }) || shape.construct_signatures.iter().any(|sig| {
+                    sig.params
+                        .iter()
+                        .any(|param| self.type_contains_infer_inner(param.type_id, visited))
+                        || sig
+                            .this_type
+                            .is_some_and(|this_type| self.type_contains_infer_inner(this_type, visited))
+                        || self.type_contains_infer_inner(sig.return_type, visited)
+                }) || shape
+                    .properties
+                    .iter()
+                    .any(|prop| self.type_contains_infer_inner(prop.type_id, visited))
+            }
+            TypeKey::TypeParameter(info) => {
+                info.constraint
+                    .is_some_and(|constraint| self.type_contains_infer_inner(constraint, visited))
+                    || info
+                        .default
+                        .is_some_and(|default| self.type_contains_infer_inner(default, visited))
+            }
+            TypeKey::Application(app_id) => {
+                let app = self.interner.type_application(app_id);
+                self.type_contains_infer_inner(app.base, visited)
+                    || app
+                        .args
+                        .iter()
+                        .any(|&arg| self.type_contains_infer_inner(arg, visited))
+            }
+            TypeKey::Conditional(cond_id) => {
+                let cond = self.interner.conditional_type(cond_id);
+                self.type_contains_infer_inner(cond.check_type, visited)
+                    || self.type_contains_infer_inner(cond.extends_type, visited)
+                    || self.type_contains_infer_inner(cond.true_type, visited)
+                    || self.type_contains_infer_inner(cond.false_type, visited)
+            }
+            TypeKey::Mapped(mapped_id) => {
+                let mapped = self.interner.mapped_type(mapped_id);
+                mapped
+                    .type_param
+                    .constraint
+                    .is_some_and(|constraint| self.type_contains_infer_inner(constraint, visited))
+                    || mapped
+                        .type_param
+                        .default
+                        .is_some_and(|default| self.type_contains_infer_inner(default, visited))
+                    || self.type_contains_infer_inner(mapped.constraint, visited)
+                    || mapped
+                        .name_type
+                        .is_some_and(|name_type| self.type_contains_infer_inner(name_type, visited))
+                    || self.type_contains_infer_inner(mapped.template, visited)
+            }
+            TypeKey::IndexAccess(obj, idx) => {
+                self.type_contains_infer_inner(obj, visited)
+                    || self.type_contains_infer_inner(idx, visited)
+            }
+            TypeKey::KeyOf(inner) | TypeKey::ReadonlyType(inner) => {
+                self.type_contains_infer_inner(inner, visited)
+            }
+            TypeKey::TemplateLiteral(spans) => {
+                let spans = self.interner.template_list(spans);
+                spans.iter().any(|span| match span {
+                    TemplateSpan::Text(_) => false,
+                    TemplateSpan::Type(inner) => self.type_contains_infer_inner(*inner, visited),
+                })
+            }
+            TypeKey::Intrinsic(_)
+            | TypeKey::Literal(_)
+            | TypeKey::Ref(_)
+            | TypeKey::TypeQuery(_)
+            | TypeKey::UniqueSymbol(_)
+            | TypeKey::ThisType
+            | TypeKey::Error => false,
+        }
+    }
+
+    fn match_infer_pattern(
+        &self,
+        source: TypeId,
+        pattern: TypeId,
+        bindings: &mut FxHashMap<Atom, TypeId>,
+        visited: &mut FxHashSet<(TypeId, TypeId)>,
+        checker: &mut SubtypeChecker<'_, R>,
+    ) -> bool {
+        if !visited.insert((source, pattern)) {
+            return true;
+        }
+
+        if source == pattern {
+            return true;
+        }
+
+        let Some(pattern_key) = self.interner.lookup(pattern) else {
+            return false;
+        };
+
+        match pattern_key {
+            TypeKey::Infer(info) => {
+                if let Some(constraint) = info.constraint {
+                    if !checker.is_subtype_of(source, constraint) {
+                        return false;
+                    }
+                }
+
+                if let Some(existing) = bindings.get(&info.name) {
+                    return checker.is_subtype_of(source, *existing)
+                        && checker.is_subtype_of(*existing, source);
+                }
+
+                bindings.insert(info.name, source);
+                true
+            }
+            TypeKey::Array(pattern_elem) => match self.interner.lookup(source) {
+                Some(TypeKey::Array(source_elem)) => self.match_infer_pattern(
+                    source_elem,
+                    pattern_elem,
+                    bindings,
+                    visited,
+                    checker,
+                ),
+                _ => false,
+            },
+            TypeKey::Tuple(pattern_elems) => match self.interner.lookup(source) {
+                Some(TypeKey::Tuple(source_elems)) => {
+                    let source_elems = self.interner.tuple_list(source_elems);
+                    let pattern_elems = self.interner.tuple_list(pattern_elems);
+                    if source_elems.len() != pattern_elems.len() {
+                        return false;
+                    }
+                    for (source_elem, pattern_elem) in
+                        source_elems.iter().zip(pattern_elems.iter())
+                    {
+                        if !self.match_infer_pattern(
+                            source_elem.type_id,
+                            pattern_elem.type_id,
+                            bindings,
+                            visited,
+                            checker,
+                        ) {
+                            return false;
+                        }
+                    }
+                    true
+                }
+                _ => false,
+            },
+            TypeKey::ReadonlyType(pattern_inner) => {
+                let source_inner = match self.interner.lookup(source) {
+                    Some(TypeKey::ReadonlyType(inner)) => inner,
+                    _ => source,
+                };
+                self.match_infer_pattern(
+                    source_inner,
+                    pattern_inner,
+                    bindings,
+                    visited,
+                    checker,
+                )
+            }
+            TypeKey::Object(pattern_shape_id) => match self.interner.lookup(source) {
+                Some(TypeKey::Object(source_shape_id))
+                | Some(TypeKey::ObjectWithIndex(source_shape_id)) => {
+                    let source_shape = self.interner.object_shape(source_shape_id);
+                    let pattern_shape = self.interner.object_shape(pattern_shape_id);
+                    for pattern_prop in &pattern_shape.properties {
+                        let source_prop = source_shape
+                            .properties
+                            .iter()
+                            .find(|prop| prop.name == pattern_prop.name);
+                        let Some(source_prop) = source_prop else {
+                            return false;
+                        };
+                        if !self.match_infer_pattern(
+                            source_prop.type_id,
+                            pattern_prop.type_id,
+                            bindings,
+                            visited,
+                            checker,
+                        ) {
+                            return false;
+                        }
+                    }
+                    true
+                }
+                _ => false,
+            },
+            TypeKey::ObjectWithIndex(pattern_shape_id) => match self.interner.lookup(source) {
+                Some(TypeKey::Object(source_shape_id))
+                | Some(TypeKey::ObjectWithIndex(source_shape_id)) => {
+                    let source_shape = self.interner.object_shape(source_shape_id);
+                    let pattern_shape = self.interner.object_shape(pattern_shape_id);
+                    for pattern_prop in &pattern_shape.properties {
+                        let source_prop = source_shape
+                            .properties
+                            .iter()
+                            .find(|prop| prop.name == pattern_prop.name);
+                        let Some(source_prop) = source_prop else {
+                            return false;
+                        };
+                        if !self.match_infer_pattern(
+                            source_prop.type_id,
+                            pattern_prop.type_id,
+                            bindings,
+                            visited,
+                            checker,
+                        ) {
+                            return false;
+                        }
+                    }
+
+                    if let Some(pattern_index) = &pattern_shape.string_index {
+                        let Some(source_index) = &source_shape.string_index else {
+                            return false;
+                        };
+                        if !self.match_infer_pattern(
+                            source_index.key_type,
+                            pattern_index.key_type,
+                            bindings,
+                            visited,
+                            checker,
+                        ) {
+                            return false;
+                        }
+                        if !self.match_infer_pattern(
+                            source_index.value_type,
+                            pattern_index.value_type,
+                            bindings,
+                            visited,
+                            checker,
+                        ) {
+                            return false;
+                        }
+                    }
+
+                    if let Some(pattern_index) = &pattern_shape.number_index {
+                        let Some(source_index) = &source_shape.number_index else {
+                            return false;
+                        };
+                        if !self.match_infer_pattern(
+                            source_index.key_type,
+                            pattern_index.key_type,
+                            bindings,
+                            visited,
+                            checker,
+                        ) {
+                            return false;
+                        }
+                        if !self.match_infer_pattern(
+                            source_index.value_type,
+                            pattern_index.value_type,
+                            bindings,
+                            visited,
+                            checker,
+                        ) {
+                            return false;
+                        }
+                    }
+
+                    true
+                }
+                _ => false,
+            },
+            TypeKey::Application(pattern_app_id) => match self.interner.lookup(source) {
+                Some(TypeKey::Application(source_app_id)) => {
+                    let source_app = self.interner.type_application(source_app_id);
+                    let pattern_app = self.interner.type_application(pattern_app_id);
+                    if source_app.args.len() != pattern_app.args.len() {
+                        return false;
+                    }
+                    if !checker.is_subtype_of(source_app.base, pattern_app.base)
+                        || !checker.is_subtype_of(pattern_app.base, source_app.base)
+                    {
+                        return false;
+                    }
+                    for (source_arg, pattern_arg) in
+                        source_app.args.iter().zip(pattern_app.args.iter())
+                    {
+                        if !self.match_infer_pattern(
+                            *source_arg,
+                            *pattern_arg,
+                            bindings,
+                            visited,
+                            checker,
+                        ) {
+                            return false;
+                        }
+                    }
+                    true
+                }
+                _ => false,
+            },
+            _ => checker.is_subtype_of(source, pattern),
+        }
+    }
+
     fn is_numeric_property_name(&self, name: Atom) -> bool {
         let prop_name = self.interner.resolve_atom_ref(name);
         InferenceContext::is_numeric_literal_name(prop_name.as_ref())
+    }
+}
+
+struct InferSubstitutor<'a> {
+    interner: &'a dyn TypeDatabase,
+    bindings: &'a FxHashMap<Atom, TypeId>,
+    visiting: FxHashMap<TypeId, TypeId>,
+}
+
+impl<'a> InferSubstitutor<'a> {
+    fn new(interner: &'a dyn TypeDatabase, bindings: &'a FxHashMap<Atom, TypeId>) -> Self {
+        InferSubstitutor {
+            interner,
+            bindings,
+            visiting: FxHashMap::default(),
+        }
+    }
+
+    fn substitute(&mut self, type_id: TypeId) -> TypeId {
+        if let Some(&cached) = self.visiting.get(&type_id) {
+            return cached;
+        }
+
+        let Some(key) = self.interner.lookup(type_id) else {
+            return type_id;
+        };
+
+        self.visiting.insert(type_id, type_id);
+
+        let result = match key {
+            TypeKey::Infer(info) => self
+                .bindings
+                .get(&info.name)
+                .copied()
+                .unwrap_or(type_id),
+            TypeKey::Array(elem) => {
+                let substituted = self.substitute(elem);
+                if substituted == elem {
+                    type_id
+                } else {
+                    self.interner.array(substituted)
+                }
+            }
+            TypeKey::Tuple(elements) => {
+                let elements = self.interner.tuple_list(elements);
+                let mut changed = false;
+                let mut new_elements = Vec::with_capacity(elements.len());
+                for element in elements.iter() {
+                    let substituted = self.substitute(element.type_id);
+                    if substituted != element.type_id {
+                        changed = true;
+                    }
+                    new_elements.push(TupleElement {
+                        type_id: substituted,
+                        name: element.name,
+                        optional: element.optional,
+                        rest: element.rest,
+                    });
+                }
+                if changed {
+                    self.interner.tuple(new_elements)
+                } else {
+                    type_id
+                }
+            }
+            TypeKey::Union(members) => {
+                let members = self.interner.type_list(members);
+                let mut changed = false;
+                let mut new_members = Vec::with_capacity(members.len());
+                for &member in members.iter() {
+                    let substituted = self.substitute(member);
+                    if substituted != member {
+                        changed = true;
+                    }
+                    new_members.push(substituted);
+                }
+                if changed {
+                    self.interner.union(new_members)
+                } else {
+                    type_id
+                }
+            }
+            TypeKey::Intersection(members) => {
+                let members = self.interner.type_list(members);
+                let mut changed = false;
+                let mut new_members = Vec::with_capacity(members.len());
+                for &member in members.iter() {
+                    let substituted = self.substitute(member);
+                    if substituted != member {
+                        changed = true;
+                    }
+                    new_members.push(substituted);
+                }
+                if changed {
+                    self.interner.intersection(new_members)
+                } else {
+                    type_id
+                }
+            }
+            TypeKey::Object(shape_id) => {
+                let shape = self.interner.object_shape(shape_id);
+                let mut changed = false;
+                let mut properties = Vec::with_capacity(shape.properties.len());
+                for prop in shape.properties.iter() {
+                    let type_id = self.substitute(prop.type_id);
+                    let write_type = self.substitute(prop.write_type);
+                    if type_id != prop.type_id || write_type != prop.write_type {
+                        changed = true;
+                    }
+                    properties.push(PropertyInfo {
+                        name: prop.name,
+                        type_id,
+                        write_type,
+                        optional: prop.optional,
+                        readonly: prop.readonly,
+                        is_method: prop.is_method,
+                    });
+                }
+                if changed {
+                    self.interner.object(properties)
+                } else {
+                    type_id
+                }
+            }
+            TypeKey::ObjectWithIndex(shape_id) => {
+                let shape = self.interner.object_shape(shape_id);
+                let mut changed = false;
+                let mut properties = Vec::with_capacity(shape.properties.len());
+                for prop in shape.properties.iter() {
+                    let type_id = self.substitute(prop.type_id);
+                    let write_type = self.substitute(prop.write_type);
+                    if type_id != prop.type_id || write_type != prop.write_type {
+                        changed = true;
+                    }
+                    properties.push(PropertyInfo {
+                        name: prop.name,
+                        type_id,
+                        write_type,
+                        optional: prop.optional,
+                        readonly: prop.readonly,
+                        is_method: prop.is_method,
+                    });
+                }
+                let string_index = shape.string_index.as_ref().map(|index| {
+                    let key_type = self.substitute(index.key_type);
+                    let value_type = self.substitute(index.value_type);
+                    if key_type != index.key_type || value_type != index.value_type {
+                        changed = true;
+                    }
+                    IndexSignature {
+                        key_type,
+                        value_type,
+                        readonly: index.readonly,
+                    }
+                });
+                let number_index = shape.number_index.as_ref().map(|index| {
+                    let key_type = self.substitute(index.key_type);
+                    let value_type = self.substitute(index.value_type);
+                    if key_type != index.key_type || value_type != index.value_type {
+                        changed = true;
+                    }
+                    IndexSignature {
+                        key_type,
+                        value_type,
+                        readonly: index.readonly,
+                    }
+                });
+                if changed {
+                    self.interner.object_with_index(ObjectShape {
+                        properties,
+                        string_index,
+                        number_index,
+                    })
+                } else {
+                    type_id
+                }
+            }
+            TypeKey::Conditional(cond_id) => {
+                let cond = self.interner.conditional_type(cond_id);
+                let check_type = self.substitute(cond.check_type);
+                let extends_type = self.substitute(cond.extends_type);
+                let true_type = self.substitute(cond.true_type);
+                let false_type = self.substitute(cond.false_type);
+                if check_type == cond.check_type
+                    && extends_type == cond.extends_type
+                    && true_type == cond.true_type
+                    && false_type == cond.false_type
+                {
+                    type_id
+                } else {
+                    self.interner.conditional(ConditionalType {
+                        check_type,
+                        extends_type,
+                        true_type,
+                        false_type,
+                        is_distributive: cond.is_distributive,
+                    })
+                }
+            }
+            TypeKey::IndexAccess(obj, idx) => {
+                let new_obj = self.substitute(obj);
+                let new_idx = self.substitute(idx);
+                if new_obj == obj && new_idx == idx {
+                    type_id
+                } else {
+                    self.interner.intern(TypeKey::IndexAccess(new_obj, new_idx))
+                }
+            }
+            TypeKey::KeyOf(inner) => {
+                let new_inner = self.substitute(inner);
+                if new_inner == inner {
+                    type_id
+                } else {
+                    self.interner.intern(TypeKey::KeyOf(new_inner))
+                }
+            }
+            TypeKey::ReadonlyType(inner) => {
+                let new_inner = self.substitute(inner);
+                if new_inner == inner {
+                    type_id
+                } else {
+                    self.interner.intern(TypeKey::ReadonlyType(new_inner))
+                }
+            }
+            TypeKey::TemplateLiteral(spans) => {
+                let spans = self.interner.template_list(spans);
+                let mut changed = false;
+                let mut new_spans = Vec::with_capacity(spans.len());
+                for span in spans.iter() {
+                    let new_span = match span {
+                        TemplateSpan::Text(text) => TemplateSpan::Text(*text),
+                        TemplateSpan::Type(inner) => {
+                            let substituted = self.substitute(*inner);
+                            if substituted != *inner {
+                                changed = true;
+                            }
+                            TemplateSpan::Type(substituted)
+                        }
+                    };
+                    new_spans.push(new_span);
+                }
+                if changed {
+                    self.interner.template_literal(new_spans)
+                } else {
+                    type_id
+                }
+            }
+            TypeKey::Application(app_id) => {
+                let app = self.interner.type_application(app_id);
+                let base = self.substitute(app.base);
+                let mut changed = base != app.base;
+                let mut new_args = Vec::with_capacity(app.args.len());
+                for &arg in &app.args {
+                    let substituted = self.substitute(arg);
+                    if substituted != arg {
+                        changed = true;
+                    }
+                    new_args.push(substituted);
+                }
+                if changed {
+                    self.interner.application(base, new_args)
+                } else {
+                    type_id
+                }
+            }
+            _ => type_id,
+        };
+
+        self.visiting.insert(type_id, result);
+        result
     }
 }
 

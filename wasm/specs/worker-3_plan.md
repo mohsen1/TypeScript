@@ -13,6 +13,8 @@ Priority: 3
 - [ ] (none)
 
 ## Completed
+- [x] CLI: derive default typesVersions compiler version from `package.json` with fallback to 6.0.0. Tests: not run (no direct coverage).
+- [x] Solver inference: include function/callable `this` types in occurs-checks and add `test_inference_occurs_check_function_this_type`. Tests: `./wasm/test.sh test_inference_occurs_check_function_this_type`.
 - [x] Solver variance: added param contravariance and return covariance tests in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_function_variance_`.
 - [x] Solver variance: added optional/rest method/constructor edge cases in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_variance_optional_rest_`.
 - [x] Solver variance: required vs optional parameter count coverage plus required-count checks in `wasm/src/solver/subtype.rs`. Tests: `./wasm/test.sh test_function_required_count_`.

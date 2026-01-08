@@ -1588,6 +1588,22 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             }
         }
 
+        if source_has_rest {
+            let rest_param = source.params.last().unwrap();
+            let rest_elem_type = self.get_array_element_type(rest_param.type_id);
+            let rest_is_top = self.allow_bivariant_rest
+                && (rest_elem_type == TypeId::ANY || rest_elem_type == TypeId::UNKNOWN);
+
+            if !rest_is_top {
+                for i in source_fixed_count..target_fixed_count {
+                    let t_param = &target.params[i];
+                    if !self.are_parameters_compatible(rest_elem_type, t_param.type_id) {
+                        return SubtypeResult::False;
+                    }
+                }
+            }
+        }
+
         SubtypeResult::True
     }
 
@@ -1733,9 +1749,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
             for i in target_fixed_count..source_fixed_count {
                 let s_param = &source.params[i];
-                if !self.check_subtype(s_param.type_id, rest_elem_type).is_true()
-                    && !self.check_subtype(rest_elem_type, s_param.type_id).is_true()
-                {
+                if !self.are_parameters_compatible(s_param.type_id, rest_elem_type) {
                     return SubtypeResult::False;
                 }
             }
@@ -1746,6 +1760,22 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 // Check rest-to-rest parameter compatibility
                 if !self.are_parameters_compatible(s_rest_elem, rest_elem_type) {
                     return SubtypeResult::False;
+                }
+            }
+        }
+
+        if source_has_rest {
+            let rest_param = source.params.last().unwrap();
+            let rest_elem_type = self.get_array_element_type(rest_param.type_id);
+            let rest_is_top = self.allow_bivariant_rest
+                && (rest_elem_type == TypeId::ANY || rest_elem_type == TypeId::UNKNOWN);
+
+            if !rest_is_top {
+                for i in source_fixed_count..target_fixed_count {
+                    let t_param = &target.params[i];
+                    if !self.are_parameters_compatible(rest_elem_type, t_param.type_id) {
+                        return SubtypeResult::False;
+                    }
                 }
             }
         }
@@ -1805,9 +1835,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
             for i in target_fixed_count..source_fixed_count {
                 let s_param = &source.params[i];
-                if !self.check_subtype(s_param.type_id, rest_elem_type).is_true()
-                    && !self.check_subtype(rest_elem_type, s_param.type_id).is_true()
-                {
+                if !self.are_parameters_compatible(s_param.type_id, rest_elem_type) {
                     return SubtypeResult::False;
                 }
             }
@@ -1818,6 +1846,22 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 // Check rest-to-rest parameter compatibility
                 if !self.are_parameters_compatible(s_rest_elem, rest_elem_type) {
                     return SubtypeResult::False;
+                }
+            }
+        }
+
+        if source_has_rest {
+            let rest_param = source.params.last().unwrap();
+            let rest_elem_type = self.get_array_element_type(rest_param.type_id);
+            let rest_is_top = self.allow_bivariant_rest
+                && (rest_elem_type == TypeId::ANY || rest_elem_type == TypeId::UNKNOWN);
+
+            if !rest_is_top {
+                for i in source_fixed_count..target_fixed_count {
+                    let t_param = &target.params[i];
+                    if !self.are_parameters_compatible(rest_elem_type, t_param.type_id) {
+                        return SubtypeResult::False;
+                    }
                 }
             }
         }
@@ -1877,9 +1921,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
             for i in target_fixed_count..source_fixed_count {
                 let s_param = &source.params[i];
-                if !self.check_subtype(s_param.type_id, rest_elem_type).is_true()
-                    && !self.check_subtype(rest_elem_type, s_param.type_id).is_true()
-                {
+                if !self.are_parameters_compatible(s_param.type_id, rest_elem_type) {
                     return SubtypeResult::False;
                 }
             }
@@ -1890,6 +1932,22 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 // Check rest-to-rest parameter compatibility
                 if !self.are_parameters_compatible(s_rest_elem, rest_elem_type) {
                     return SubtypeResult::False;
+                }
+            }
+        }
+
+        if source_has_rest {
+            let rest_param = source.params.last().unwrap();
+            let rest_elem_type = self.get_array_element_type(rest_param.type_id);
+            let rest_is_top = self.allow_bivariant_rest
+                && (rest_elem_type == TypeId::ANY || rest_elem_type == TypeId::UNKNOWN);
+
+            if !rest_is_top {
+                for i in source_fixed_count..target_fixed_count {
+                    let t_param = &target.params[i];
+                    if !self.are_parameters_compatible(rest_elem_type, t_param.type_id) {
+                        return SubtypeResult::False;
+                    }
                 }
             }
         }
@@ -2600,6 +2658,26 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                         source_param: s_rest_elem,
                         target_param: rest_elem_type,
                     });
+                }
+            }
+        }
+
+        if source_has_rest {
+            let rest_param = source.params.last().unwrap();
+            let rest_elem_type = self.get_array_element_type(rest_param.type_id);
+            let rest_is_top = self.allow_bivariant_rest
+                && (rest_elem_type == TypeId::ANY || rest_elem_type == TypeId::UNKNOWN);
+
+            if !rest_is_top {
+                for i in source_fixed_count..target_fixed_count {
+                    let t_param = &target.params[i];
+                    if !self.are_parameters_compatible(rest_elem_type, t_param.type_id) {
+                        return Some(SubtypeFailureReason::ParameterTypeMismatch {
+                            param_index: i,
+                            source_param: rest_elem_type,
+                            target_param: t_param.type_id,
+                        });
+                    }
                 }
             }
         }
