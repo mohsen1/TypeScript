@@ -4952,3 +4952,114 @@ export function log(...items: string[]): void {
     let js = std::fs::read_to_string(base.join("dist/src/calls.js")).expect("read js");
     assert!(!js.is_empty(), "JS output should not be empty");
 }
+
+// =============================================================================
+// E2E: Template Literal Compilation
+// =============================================================================
+
+#[test]
+fn compile_basic_template_literal() {
+    // Test basic template literal compilation
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/greet.ts"),
+        r#"
+export function greet(name: string): string {
+    return `Hello, ${name}!`;
+}
+
+export function format(a: number, b: number): string {
+    return `${a} + ${b} = ${a + b}`;
+}
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+
+    let js = std::fs::read_to_string(base.join("dist/src/greet.js")).expect("read js");
+    assert!(!js.is_empty(), "JS output should not be empty");
+}
+
+#[test]
+fn compile_multiline_template_literal() {
+    // Test multiline template literal compilation
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/html.ts"),
+        r#"
+export function createDiv(content: string): string {
+    const result = `<div><p>${content}</p></div>`;
+    return result;
+}
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+
+    let js = std::fs::read_to_string(base.join("dist/src/html.js")).expect("read js");
+    assert!(!js.is_empty(), "JS output should not be empty");
+}
+
+#[test]
+fn compile_nested_template_literal() {
+    // Test nested template expressions
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/nested.ts"),
+        r#"
+export function wrap(inner: string, outer: string): string {
+    return `${outer}: ${`[${inner}]`}`;
+}
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+
+    let js = std::fs::read_to_string(base.join("dist/src/nested.js")).expect("read js");
+    assert!(!js.is_empty(), "JS output should not be empty");
+}
