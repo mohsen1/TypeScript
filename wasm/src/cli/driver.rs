@@ -1426,7 +1426,7 @@ impl SemVer {
 
 // NOTE: Keep this in sync with the TypeScript version this compiler targets.
 // TODO: Make this configurable once CLI plumbing is available.
-const TYPES_VERSIONS_COMPILER_VERSION: SemVer = SemVer {
+const TYPES_VERSIONS_COMPILER_VERSION_FALLBACK: SemVer = SemVer {
     major: 6,
     minor: 0,
     patch: 0,
@@ -1437,7 +1437,18 @@ fn types_versions_compiler_version(options: &ResolvedCompilerOptions) -> SemVer 
         .types_versions_compiler_version
         .as_deref()
         .and_then(parse_semver)
-        .unwrap_or(TYPES_VERSIONS_COMPILER_VERSION)
+        .unwrap_or_else(default_types_versions_compiler_version)
+}
+
+fn default_types_versions_compiler_version() -> SemVer {
+    static DEFAULT: std::sync::OnceLock<SemVer> = std::sync::OnceLock::new();
+    *DEFAULT.get_or_init(|| {
+        let version = serde_json::from_str::<serde_json::Value>(include_str!("../../../package.json"))
+            .ok()
+            .and_then(|value| value.get("version").and_then(|value| value.as_str()))
+            .and_then(parse_semver);
+        version.unwrap_or(TYPES_VERSIONS_COMPILER_VERSION_FALLBACK)
+    })
 }
 
 fn export_conditions(options: &ResolvedCompilerOptions) -> Vec<&'static str> {
