@@ -46,6 +46,7 @@ engine on top to match TypeScript behavior while preserving correctness where po
 Last updated: 2026-01-08
 
 - Overall: Added numeric separator index-name regression (`1_0`), non-distributive template literal union input + non-string union branch (current behavior yields never), template literal apparent member + number index subtyping, async return arrow super computed-key no-args regression (current behavior drops body), and async compound-assignment subtract/modulo await source-map mappings, alongside optional-parameter conditional infer and non-function union infer (current behavior yields never), index signature consistency, and async return arrow super method no-args/this-capture regressions; main repo is synced to `origin/rust`; no CLI/LSP feature work in flight.
+- Direction: Conformance-driven integration; prioritize solver inference gaps and ES5 emitter fidelity over new features.
 - Director update: Squad goals refreshed to emphasize conformance-driven integration and solver/emitter correctness bottlenecks; no new code or test deltas in this cycle.
 - EM-Forge: Blocker is `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`; FunctionId build error not reproducible post-sync; pending merge is a plan-only worker/forge-1 update.
 - Anvil update (worker-1): fixed const initializer parse-error recovery and pushed branch; now blocked on `emitter_parity_tests::test_parity_commonjs_export` (likely trailing newline mismatch); awaiting next assignment.
