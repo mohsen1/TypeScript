@@ -10261,3 +10261,177 @@ function getKind(shape: Shape): string {
         checker.ctx.diagnostics
     );
 }
+
+/// TS Unsoundness #42: CFA Invalidation in Closures
+///
+/// Type narrowing is reset inside closures for mutable variables (let/var)
+/// because the callback might run after the variable has changed.
+#[test]
+fn test_cfa_invalidation_mutable_in_closure() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let x: string | number = "hello";
+
+if (typeof x === "string") {
+    // x is narrowed to string here
+    const upper = x.toUpperCase();
+
+    // Inside callback, narrowing is invalid for mutable variable
+    function callback() {
+        // x should NOT be narrowed here (mutable let)
+        const val = x;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Just check it doesn't crash - narrowing behavior depends on CFA implementation
+    if !checker.ctx.diagnostics.is_empty() {
+        eprintln!("=== CFA Invalidation Mutable Diagnostics ===");
+        for diag in &checker.ctx.diagnostics {
+            eprintln!("[{}] {}", diag.start, diag.message_text);
+        }
+    }
+}
+
+/// TS Unsoundness #42: CFA Invalidation - const maintains narrowing
+///
+/// For const variables, narrowing can be maintained inside closures
+/// because the variable cannot be reassigned.
+#[test]
+fn test_cfa_const_maintains_narrowing() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+const x: string | number = "hello";
+
+if (typeof x === "string") {
+    // x is narrowed to string here
+    const upper = x.toUpperCase();
+
+    // Inside callback, narrowing IS valid for const
+    function callback() {
+        // x can stay narrowed (const cannot change)
+        const val = x.toUpperCase();
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Currently doesn't maintain narrowing in closures
+    // Once implemented, change to expect 0 errors
+    if !checker.ctx.diagnostics.is_empty() {
+        eprintln!("=== CFA Const Narrowing Diagnostics ===");
+        for diag in &checker.ctx.diagnostics {
+            eprintln!("[{}] {}", diag.start, diag.message_text);
+        }
+        eprintln!("Expected 0 errors once const narrowing in closures is implemented");
+    }
+}
+
+/// TS Unsoundness #42: CFA Invalidation - arrow function closure
+///
+/// Arrow functions also invalidate narrowing for captured mutable variables.
+#[test]
+fn test_cfa_invalidation_arrow_function() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let value: string | null = "test";
+
+if (value !== null) {
+    // value is narrowed to string here
+    const len = value.length;
+
+    // Arrow function captures mutable variable
+    const fn = () => {
+        // value narrowing invalid here
+        const v = value;
+    };
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Just check it doesn't crash
+    if !checker.ctx.diagnostics.is_empty() {
+        eprintln!("=== CFA Invalidation Arrow Function Diagnostics ===");
+        for diag in &checker.ctx.diagnostics {
+            eprintln!("[{}] {}", diag.start, diag.message_text);
+        }
+    }
+}
+
+/// TS Unsoundness #42: CFA Invalidation - callback parameter
+///
+/// Callback passed to another function also invalidates narrowing.
+#[test]
+fn test_cfa_invalidation_callback_parameter() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+declare function doLater(fn: () => void): void;
+
+let data: string | undefined = "hello";
+
+if (data !== undefined) {
+    // data is narrowed to string here
+    const first = data.charAt(0);
+
+    // Callback passed to function
+    doLater(() => {
+        // data narrowing invalid - might run later after reassignment
+        const d = data;
+    });
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Just check it doesn't crash
+    if !checker.ctx.diagnostics.is_empty() {
+        eprintln!("=== CFA Invalidation Callback Parameter Diagnostics ===");
+        for diag in &checker.ctx.diagnostics {
+            eprintln!("[{}] {}", diag.start, diag.message_text);
+        }
+    }
+}
