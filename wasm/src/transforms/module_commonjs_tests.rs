@@ -13,6 +13,7 @@ fn test_sanitize_module_name() {
     );
     assert_eq!(sanitize_module_name("foo/bar"), "foo_bar");
     assert_eq!(sanitize_module_name("foo-bar"), "foo_bar");
+    assert_eq!(sanitize_module_name("foo.bar/baz"), "foo_bar_baz");
 }
 
 #[test]
