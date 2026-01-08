@@ -70,6 +70,7 @@ Priority: 3
 - [x] Added comprehensive module re-export tests (named, renamed, star, chained, mixed, type-only, default, barrel file); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 - [x] Added generic class compilation test (constructor pattern, type preservation in declarations); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 - [x] Added namespace export compilation tests (basic, nested, with class); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
+- [x] Added enum compilation E2E tests (numeric, string, const, computed); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 
 ## Ready for Merge
 Yes
