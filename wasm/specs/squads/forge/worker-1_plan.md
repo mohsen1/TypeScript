@@ -13,6 +13,7 @@ Priority: 1
 - [ ] [EM: Add queued tasks]
 
 ## Completed
+- [x] Added callable-parameter inference regressions for optional/rest parameters (distributive + non-distributive) in `wasm/src/solver/evaluate_tests.rs`. Ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `src/transforms/async_es5.rs`).
 - [x] Added callable-parameter inference regressions (union inputs + overload shapes) in `wasm/src/solver/evaluate_tests.rs`. Ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `src/transforms/async_es5.rs`).
 - [x] Covered function optional/rest parameter inference in conditional types (distributive + non-distributive) in `wasm/src/solver/evaluate_tests.rs`. Ran `./wasm/test.sh` (fails: parallel::tests::test_check_redux_lodash_style_generics).
 - [x] Conditional type evaluation: implement function parameter/return inference in `wasm/src/solver/evaluate.rs`; updated regressions in `wasm/src/solver/evaluate_tests.rs`. Ran `./wasm/test.sh` (fails: parallel::tests::test_check_redux_lodash_style_generics).
