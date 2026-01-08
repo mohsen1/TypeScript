@@ -184,6 +184,23 @@ fn test_constraint_merge_on_unify() {
 // =============================================================================
 
 #[test]
+fn test_resolve_unified_vars_merged_constraints() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var_a = ctx.fresh_var();
+    let var_b = ctx.fresh_var();
+    let hello = interner.literal_string("hello");
+
+    ctx.add_lower_bound(var_a, hello);
+    ctx.add_upper_bound(var_b, TypeId::STRING);
+    ctx.unify_vars(var_a, var_b).unwrap();
+
+    let result = ctx.resolve_with_constraints(var_a).unwrap();
+    assert_eq!(result, hello);
+}
+
+#[test]
 fn test_resolve_single_lower_bound() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);
@@ -243,6 +260,20 @@ fn test_resolve_any_lower_prefers_upper_bound() {
     let var = ctx.fresh_type_param(interner.intern_string("T"));
 
     ctx.add_lower_bound(var, TypeId::ANY);
+    ctx.add_upper_bound(var, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_resolve_unknown_lower_prefers_upper_bound() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+
+    ctx.add_lower_bound(var, TypeId::UNKNOWN);
     ctx.add_upper_bound(var, TypeId::STRING);
 
     let result = ctx.resolve_with_constraints(var).unwrap();

@@ -35,6 +35,8 @@ Priority: 1
 - [x] Contextual generic return uses union context for `any`; added `test_contextual_generic_return_union_any_uses_context`. Tests: `./wasm/test.sh test_contextual_generic_return_union_any_uses_context`.
 - [x] Mutual circular upper bounds with concrete bound resolves to concrete; added `test_resolve_mutual_circular_upper_bounds_with_concrete`. Tests: `./wasm/test.sh test_resolve_mutual_circular_upper_bounds_with_concrete`.
 - [x] Error lower bound with literal prefers literal; added `test_resolve_error_lower_with_literal_prefers_literal`. Tests: `./wasm/test.sh test_resolve_error_lower_with_literal_prefers_literal`.
+- [x] Unknown lower bound prefers upper bound; added `test_resolve_unknown_lower_prefers_upper_bound`. Tests: `./wasm/test.sh test_resolve_unknown_lower_prefers_upper_bound`.
+- [x] Unified vars reuse merged constraints; added `test_resolve_unified_vars_merged_constraints`. Tests: `./wasm/test.sh test_resolve_unified_vars_merged_constraints`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
