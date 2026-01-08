@@ -3197,6 +3197,31 @@ fn test_conditional_infer_union_false_branch_distributive() {
 }
 
 #[test]
+fn test_conditional_infer_any_check_type_distributive() {
+    let interner = TypeInterner::new();
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // any extends string ? infer R : never
+    // any produces union of branches; infer should survive in true branch.
+    let cond = ConditionalType {
+        check_type: TypeId::ANY,
+        extends_type: TypeId::STRING,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, infer_r);
+}
+
+#[test]
 fn test_conditional_infer_readonly_array_element_extraction() {
     let interner = TypeInterner::new();
 

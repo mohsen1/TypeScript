@@ -67,6 +67,7 @@ Priority: 2
 - [x] Added tuple rest infer test (current behavior yields infer placeholder). Tests: `./wasm/test.sh test_conditional_infer_tuple_rest_distributive`.
 - [x] Added union true-branch infer preservation test. Tests: `./wasm/test.sh test_conditional_infer_union_true_branch_distributive`.
 - [x] Added union false-branch infer preservation test. Tests: `./wasm/test.sh test_conditional_infer_union_false_branch_distributive`.
+- [x] Added any-check infer preservation test. Tests: `./wasm/test.sh test_conditional_infer_any_check_type_distributive`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
