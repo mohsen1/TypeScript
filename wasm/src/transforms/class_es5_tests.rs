@@ -3842,3 +3842,268 @@ class Builder {
         output
     );
 }
+
+#[test]
+fn test_class_es5_async_method_decorator_pattern() {
+    // Test class with async methods that would have decorator metadata
+    // Similar to NestJS controller with @Get/@Post decorators on async handlers
+    let source = r#"
+class ApiController {
+    static __routes__ = [
+        { method: "GET", path: "/users", handler: "getUsers" },
+        { method: "POST", path: "/users", handler: "createUser" }
+    ];
+
+    private db: any;
+
+    constructor(db: any) {
+        this.db = db;
+    }
+
+    async getUsers(): Promise<any[]> {
+        return await this.db.query("SELECT * FROM users");
+    }
+
+    async createUser(data: any): Promise<any> {
+        return await this.db.insert("users", data);
+    }
+
+    async deleteUser(id: number): Promise<void> {
+        await this.db.delete("users", id);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // ApiController should emit as function
+    assert!(
+        output.contains("function ApiController"),
+        "Expected ApiController to emit as function: {}",
+        output
+    );
+
+    // Static routes metadata
+    assert!(
+        output.contains("ApiController.__routes__"),
+        "Expected static __routes__ property: {}",
+        output
+    );
+
+    // Async methods should be on prototype
+    assert!(
+        output.contains(".prototype.getUsers") || output.contains("prototype[\"getUsers\"]"),
+        "Expected getUsers method on prototype: {}",
+        output
+    );
+    assert!(
+        output.contains(".prototype.createUser") || output.contains("prototype[\"createUser\"]"),
+        "Expected createUser method on prototype: {}",
+        output
+    );
+    assert!(
+        output.contains(".prototype.deleteUser") || output.contains("prototype[\"deleteUser\"]"),
+        "Expected deleteUser method on prototype: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_async_lifecycle_decorator_pattern() {
+    // Test class with async lifecycle methods that would have decorators
+    // Similar to Angular component with @OnInit, @OnDestroy on async methods
+    let source = r#"
+class LifecycleComponent {
+    static __lifecycle__ = ["onInit", "onDestroy"];
+
+    private subscription: any = null;
+    private data: any[] = [];
+
+    async onInit(): Promise<void> {
+        this.subscription = await this.subscribe();
+        this.data = await this.loadInitialData();
+    }
+
+    async onDestroy(): Promise<void> {
+        if (this.subscription) {
+            await this.subscription.unsubscribe();
+        }
+        this.data = [];
+    }
+
+    private async subscribe(): Promise<any> {
+        return { unsubscribe: async () => {} };
+    }
+
+    private async loadInitialData(): Promise<any[]> {
+        return [];
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // LifecycleComponent should emit as function
+    assert!(
+        output.contains("function LifecycleComponent"),
+        "Expected LifecycleComponent to emit as function: {}",
+        output
+    );
+
+    // Static lifecycle metadata
+    assert!(
+        output.contains("LifecycleComponent.__lifecycle__"),
+        "Expected static __lifecycle__ property: {}",
+        output
+    );
+
+    // Instance fields should be initialized
+    assert!(
+        output.contains("this.subscription = null"),
+        "Expected subscription field initialization: {}",
+        output
+    );
+
+    // Async lifecycle methods should be on prototype
+    assert!(
+        output.contains(".prototype.onInit") || output.contains("prototype[\"onInit\"]"),
+        "Expected onInit method on prototype: {}",
+        output
+    );
+    assert!(
+        output.contains(".prototype.onDestroy") || output.contains("prototype[\"onDestroy\"]"),
+        "Expected onDestroy method on prototype: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_async_event_handler_decorator_pattern() {
+    // Test class with async event handlers that would have decorator metadata
+    // Similar to event-driven architecture with @EventHandler decorators
+    let source = r#"
+class EventProcessor {
+    static __events__ = {
+        "user.created": "handleUserCreated",
+        "user.updated": "handleUserUpdated",
+        "user.deleted": "handleUserDeleted"
+    };
+    static __retryPolicy__ = { maxRetries: 3, delay: 1000 };
+
+    private eventBus: any;
+    private logger: any;
+
+    constructor(eventBus: any, logger: any) {
+        this.eventBus = eventBus;
+        this.logger = logger;
+    }
+
+    async handleUserCreated(event: any): Promise<void> {
+        this.logger.info("User created:", event);
+        await this.eventBus.publish("notifications", event);
+    }
+
+    async handleUserUpdated(event: any): Promise<void> {
+        this.logger.info("User updated:", event);
+        await this.eventBus.publish("sync", event);
+    }
+
+    async handleUserDeleted(event: any): Promise<void> {
+        this.logger.warn("User deleted:", event);
+        await this.eventBus.publish("cleanup", event);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // EventProcessor should emit as function
+    assert!(
+        output.contains("function EventProcessor"),
+        "Expected EventProcessor to emit as function: {}",
+        output
+    );
+
+    // Static event metadata
+    assert!(
+        output.contains("EventProcessor.__events__"),
+        "Expected static __events__ property: {}",
+        output
+    );
+    assert!(
+        output.contains("EventProcessor.__retryPolicy__"),
+        "Expected static __retryPolicy__ property: {}",
+        output
+    );
+
+    // Constructor should assign dependencies
+    assert!(
+        output.contains("this.eventBus = eventBus"),
+        "Expected eventBus assignment: {}",
+        output
+    );
+    assert!(
+        output.contains("this.logger = logger"),
+        "Expected logger assignment: {}",
+        output
+    );
+
+    // Async event handlers should be on prototype
+    assert!(
+        output.contains(".prototype.handleUserCreated") || output.contains("prototype[\"handleUserCreated\"]"),
+        "Expected handleUserCreated method on prototype: {}",
+        output
+    );
+    assert!(
+        output.contains(".prototype.handleUserUpdated") || output.contains("prototype[\"handleUserUpdated\"]"),
+        "Expected handleUserUpdated method on prototype: {}",
+        output
+    );
+    assert!(
+        output.contains(".prototype.handleUserDeleted") || output.contains("prototype[\"handleUserDeleted\"]"),
+        "Expected handleUserDeleted method on prototype: {}",
+        output
+    );
+}
