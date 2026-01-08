@@ -67,6 +67,8 @@ Priority: 5
       Tests: `./wasm/test.sh test_source_map_es5_transform_async_ternary_mapping`.
 - [x] Added ES5 async switch default await source map mapping test in `wasm/src/source_map_tests.rs`.
       Tests: `./wasm/test.sh test_source_map_es5_transform_async_switch_default_await_mapping`.
+- [x] Added ES5 async try/finally await source map mapping test in `wasm/src/source_map_tests.rs`.
+      Tests: `./wasm/test.sh test_source_map_es5_transform_async_try_finally_await_mapping`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
