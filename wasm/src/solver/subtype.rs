@@ -1639,9 +1639,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
             for i in target_fixed_count..source_fixed_count {
                 let s_param = &source.params[i];
-                if !self.check_subtype(s_param.type_id, rest_elem_type).is_true()
-                    && !self.check_subtype(rest_elem_type, s_param.type_id).is_true()
-                {
+                if !self.are_parameters_compatible(s_param.type_id, rest_elem_type) {
                     return SubtypeResult::False;
                 }
             }
@@ -1707,9 +1705,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
             for i in target_fixed_count..source_fixed_count {
                 let s_param = &source.params[i];
-                if !self.check_subtype(s_param.type_id, rest_elem_type).is_true()
-                    && !self.check_subtype(rest_elem_type, s_param.type_id).is_true()
-                {
+                if !self.are_parameters_compatible(s_param.type_id, rest_elem_type) {
                     return SubtypeResult::False;
                 }
             }
@@ -1775,9 +1771,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
             for i in target_fixed_count..source_fixed_count {
                 let s_param = &source.params[i];
-                if !self.check_subtype(s_param.type_id, rest_elem_type).is_true()
-                    && !self.check_subtype(rest_elem_type, s_param.type_id).is_true()
-                {
+                if !self.are_parameters_compatible(s_param.type_id, rest_elem_type) {
                     return SubtypeResult::False;
                 }
             }
