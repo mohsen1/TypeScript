@@ -2,6 +2,10 @@ use super::*;
 use crate::thin_parser::ThinParserState;
 
 fn parse_and_emit_async(source: &str) -> String {
+    parse_and_emit_async_with_capture(source, false)
+}
+
+fn parse_and_emit_async_with_capture(source: &str, capture_this: bool) -> String {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -13,6 +17,7 @@ fn parse_and_emit_async(source: &str) -> String {
                         let emitter = AsyncES5Emitter::new(&parser.arena);
                         let has_await = emitter.body_contains_await(func.body);
                         let mut emitter = AsyncES5Emitter::new(&parser.arena);
+                        emitter.set_use_this_capture(capture_this);
                         if has_await {
                             return emitter.emit_generator_body_with_await(func.body);
                         } else {
@@ -46,6 +51,16 @@ fn test_async_with_await() {
     assert!(output.contains("switch (_a.label)"), "Should have switch statement");
     assert!(output.contains("[4 /*yield*/"), "Should have yield instruction");
     assert!(output.contains("_a.sent()"), "Should call _a.sent()");
+}
+
+#[test]
+fn test_async_simple_return_captures_this() {
+    let output = parse_and_emit_async_with_capture("async function foo() { return this; }", true);
+    assert!(
+        output.contains("return [2 /*return*/, _this]"),
+        "Should emit _this when capture is enabled: {}",
+        output
+    );
 }
 
 #[test]

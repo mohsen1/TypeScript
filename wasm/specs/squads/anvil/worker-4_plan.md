@@ -20,6 +20,7 @@ Priority: 4
 - [x] Add ES5 derived constructor ordering test (super/field/body). Tests: `./wasm/test.sh` (fails in `parallel::tests::test_check_redux_lodash_style_generics`)
 - [x] Add async await initializer assignment coverage. Tests: `./wasm/test.sh async_es5`
 - [x] Restore async ES5 emitter this-capture setter for new call sites. Tests: `./wasm/test.sh async_es5`
+- [x] Add async ES5 this-capture test. Tests: `./wasm/test.sh async_es5`
 
 ## Ready for Merge
 Yes
