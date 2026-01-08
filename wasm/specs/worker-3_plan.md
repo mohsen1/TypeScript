@@ -23,6 +23,7 @@ Priority: 3
 - [x] Solver unsoundness: Function top assignability regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_function_top_assignability`.
 - [x] Solver unsoundness: covariant mutable arrays regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_array_covariant_mutable_unsoundness`.
 - [x] Solver unsoundness: rest parameter bivariance regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_rest_any_bivariant_subtyping_toggle`.
+- [x] Solver unsoundness: tuple-array assignment regressions in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_tuple_array_assignment_`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.

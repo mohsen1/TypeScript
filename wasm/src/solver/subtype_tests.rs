@@ -989,6 +989,21 @@ fn test_tuple_to_array_mixed_types() {
 }
 
 #[test]
+fn test_tuple_array_assignment_tuple_to_union_array() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let union_elem = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let union_array = interner.array(union_elem);
+    let source = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+
+    assert!(checker.is_subtype_of(source, union_array));
+}
+
+#[test]
 fn test_array_to_variadic_tuple() {
     // string[] is NOT assignable to [...string[]]
     let interner = TypeInterner::new();
@@ -997,6 +1012,20 @@ fn test_array_to_variadic_tuple() {
     let string_array = interner.array(TypeId::STRING);
     let target = interner.tuple(vec![
         TupleElement { type_id: string_array, name: None, optional: false, rest: true },
+    ]);
+
+    assert!(!checker.is_subtype_of(string_array, target));
+}
+
+#[test]
+fn test_tuple_array_assignment_array_to_tuple_rejected() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let string_array = interner.array(TypeId::STRING);
+    let target = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
     ]);
 
     assert!(!checker.is_subtype_of(string_array, target));
@@ -1044,6 +1073,20 @@ fn test_array_to_fixed_optional_tuple() {
     ]);
 
     assert!(!checker.is_subtype_of(string_array, target));
+}
+
+#[test]
+fn test_tuple_array_assignment_empty_array_optional_tuple() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let empty_array = interner.array(TypeId::NEVER);
+    let optional_tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: true, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: true, rest: false },
+    ]);
+
+    assert!(checker.is_subtype_of(empty_array, optional_tuple));
 }
 
 #[test]
