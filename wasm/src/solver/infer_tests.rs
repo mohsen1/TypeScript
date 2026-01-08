@@ -2181,6 +2181,44 @@ fn test_resolve_bounds_number_index_ignores_negative_hex_name() {
 }
 
 #[test]
+fn test_resolve_bounds_number_index_ignores_negative_binary_name() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("-0b1");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
 fn test_resolve_bounds_number_index_ignores_negative_exponent_zero() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);
