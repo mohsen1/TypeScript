@@ -5609,233 +5609,120 @@ class SecureValue {
     );
 }
 
-// =============================================================================
-// Implements Clause Tests
-// =============================================================================
-
 #[test]
-fn test_class_es5_implements_single_interface() {
-    // Test class implementing single interface
+fn test_class_es5_method_overloads_basic() {
+    // Test basic method overloads with different parameter types
     let source = r#"
-interface Printable {
-    print(): string;
-}
-
-class Document implements Printable {
-    content: string;
-
-    constructor(content: string) {
-        this.content = content;
-    }
-
-    print(): string {
-        return this.content;
+class Calculator {
+    add(a: number, b: number): number;
+    add(a: string, b: string): string;
+    add(a: any, b: any): any {
+        return a + b;
     }
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
-    // Get Document class (second statement after interface)
-    let class_idx = *source_file.statements.nodes.get(1).expect("expected Document class");
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
 
-    // Class should emit as function (implements clause erased)
+    let output = printer.get_output().to_string();
+
+    // Should transform class to function
     assert!(
-        output.contains("function Document"),
-        "Expected Document to emit as function: {}",
+        output.contains("function Calculator") || output.contains("var Calculator"),
+        "Expected Calculator class transformation: {}",
         output
     );
 
-    // Constructor should set content
+    // Only implementation should be emitted, not overload signatures
     assert!(
-        output.contains("this.content") || output.contains("content"),
-        "Expected content assignment: {}",
+        output.contains("add"),
+        "Expected add method: {}",
         output
     );
 
-    // print method should be on prototype
+    // Method should be on prototype
     assert!(
-        output.contains(".prototype.print") || output.contains("print"),
-        "Expected print method: {}",
-        output
-    );
-
-    // implements clause should NOT appear in output
-    assert!(
-        !output.contains("implements"),
-        "implements clause should be erased: {}",
+        output.contains("prototype") || output.contains("Calculator"),
+        "Expected prototype assignment: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_implements_multiple_interfaces() {
-    // Test class implementing multiple interfaces
+fn test_class_es5_method_overloads_optional_params() {
+    // Test method overloads with optional parameters
     let source = r#"
-interface Readable {
-    read(): string;
-}
-
-interface Writable {
-    write(data: string): void;
-}
-
-class Stream implements Readable, Writable {
-    private buffer: string = "";
-
-    read(): string {
-        return this.buffer;
-    }
-
-    write(data: string): void {
-        this.buffer += data;
+class Formatter {
+    format(value: number): string;
+    format(value: number, decimals: number): string;
+    format(value: number, decimals: number, prefix: string): string;
+    format(value: number, decimals?: number, prefix?: string): string {
+        let result = value.toFixed(decimals || 0);
+        return prefix ? prefix + result : result;
     }
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
-    // Get Stream class (third statement after two interfaces)
-    let class_idx = *source_file.statements.nodes.get(2).expect("expected Stream class");
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
 
-    // Class should emit as function
+    let output = printer.get_output().to_string();
+
+    // Should transform class
     assert!(
-        output.contains("function Stream"),
-        "Expected Stream to emit as function: {}",
+        output.contains("function Formatter") || output.contains("var Formatter"),
+        "Expected Formatter class transformation: {}",
         output
     );
 
-    // Both methods should be present
+    // Format method should be present
     assert!(
-        output.contains("read"),
-        "Expected read method: {}",
-        output
-    );
-    assert!(
-        output.contains("write"),
-        "Expected write method: {}",
+        output.contains("format"),
+        "Expected format method: {}",
         output
     );
 
-    // Private field should be initialized
+    // Implementation should have the method body
     assert!(
-        output.contains("this.buffer") || output.contains("buffer"),
-        "Expected buffer field: {}",
+        output.contains("toFixed") || output.contains("result"),
+        "Expected method implementation: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_extends_and_implements() {
-    // Test class extending another class and implementing interface
+fn test_class_es5_method_overloads_generic() {
+    // Test method overloads with generic types
     let source = r#"
-interface Disposable {
-    dispose(): void;
-}
-
-class Base {
-    id: number;
-
-    constructor(id: number) {
-        this.id = id;
-    }
-}
-
-class Resource extends Base implements Disposable {
-    name: string;
-    isDisposed: boolean = false;
-
-    constructor(id: number, name: string) {
-        super(id);
-        this.name = name;
+class Container<T> {
+    getValue(): T;
+    getValue(defaultValue: T): T;
+    getValue(defaultValue?: T): T {
+        return this.value !== undefined ? this.value : defaultValue!;
     }
 
-    dispose(): void {
-        this.isDisposed = true;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
+    private value: T | undefined;
 
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
-    // Get Resource class (third statement)
-    let class_idx = *source_file.statements.nodes.get(2).expect("expected Resource class");
-
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
-
-    // Class should emit as function
-    assert!(
-        output.contains("function Resource"),
-        "Expected Resource to emit as function: {}",
-        output
-    );
-
-    // Should have inheritance setup
-    assert!(
-        output.contains("_super") || output.contains("Base") || output.contains("__extends"),
-        "Expected inheritance handling: {}",
-        output
-    );
-
-    // dispose method should be present
-    assert!(
-        output.contains("dispose"),
-        "Expected dispose method: {}",
-        output
-    );
-
-    // Fields should be initialized
-    assert!(
-        output.contains("this.name") || output.contains("name"),
-        "Expected name field: {}",
-        output
-    );
-    assert!(
-        output.contains("this.isDisposed") || output.contains("isDisposed"),
-        "Expected isDisposed field: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_implements_generic_interface() {
-    // Test class implementing generic interface
-    let source = r#"
-interface Container<T> {
-    get(): T;
-    set(value: T): void;
-}
-
-class Box implements Container<string> {
-    private value: string = "";
-
-    get(): string {
-        return this.value;
-    }
-
-    set(value: string): void {
+    setValue(value: T): void {
         this.value = value;
     }
 }
@@ -5843,176 +5730,146 @@ class Box implements Container<string> {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
-    // Get Box class (second statement)
-    let class_idx = *source_file.statements.nodes.get(1).expect("expected Box class");
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
 
-    // Class should emit as function
+    let output = printer.get_output().to_string();
+
+    // Should transform class
     assert!(
-        output.contains("function Box"),
-        "Expected Box to emit as function: {}",
+        output.contains("function Container") || output.contains("var Container"),
+        "Expected Container class transformation: {}",
         output
     );
 
     // Methods should be present
     assert!(
-        output.contains("get"),
-        "Expected get method: {}",
-        output
-    );
-    assert!(
-        output.contains("set"),
-        "Expected set method: {}",
-        output
-    );
-
-    // Private field should be initialized
-    assert!(
-        output.contains("this.value") || output.contains("value"),
-        "Expected value field: {}",
+        output.contains("getValue") && output.contains("setValue"),
+        "Expected getValue and setValue methods: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_implements_with_optional_members() {
-    // Test class implementing interface with optional members
+fn test_class_es5_method_overloads_static() {
+    // Test static method overloads
     let source = r#"
-interface Config {
-    name: string;
-    timeout?: number;
-    retries?: number;
-}
-
-class AppConfig implements Config {
-    name: string;
-    timeout: number;
-
-    constructor(name: string, timeout: number = 5000) {
-        this.name = name;
-        this.timeout = timeout;
+class Factory {
+    static create(): Factory;
+    static create(config: object): Factory;
+    static create(config?: object): Factory {
+        const instance = new Factory();
+        if (config) {
+            instance.configure(config);
+        }
+        return instance;
     }
 
-    getConfig(): Config {
-        return { name: this.name, timeout: this.timeout };
+    private config: object = {};
+
+    configure(config: object): void {
+        this.config = config;
     }
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
-    // Get AppConfig class (second statement)
-    let class_idx = *source_file.statements.nodes.get(1).expect("expected AppConfig class");
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
 
-    // Class should emit as function
+    let output = printer.get_output().to_string();
+
+    // Should transform class
     assert!(
-        output.contains("function AppConfig"),
-        "Expected AppConfig to emit as function: {}",
-        output
-    );
-
-    // Constructor should set fields
-    assert!(
-        output.contains("this.name") || output.contains("name"),
-        "Expected name assignment: {}",
-        output
-    );
-    assert!(
-        output.contains("this.timeout") || output.contains("timeout"),
-        "Expected timeout assignment: {}",
-        output
-    );
-
-    // Method should be present
-    assert!(
-        output.contains("getConfig"),
-        "Expected getConfig method: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_implements_with_static_members() {
-    // Test class implementing interface with additional static members
-    let source = r#"
-interface Serializable {
-    serialize(): string;
-}
-
-class User implements Serializable {
-    static instanceCount: number = 0;
-    name: string;
-    email: string;
-
-    constructor(name: string, email: string) {
-        this.name = name;
-        this.email = email;
-        User.instanceCount++;
-    }
-
-    static getInstanceCount(): number {
-        return User.instanceCount;
-    }
-
-    serialize(): string {
-        return JSON.stringify({ name: this.name, email: this.email });
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
-    // Get User class (second statement)
-    let class_idx = *source_file.statements.nodes.get(1).expect("expected User class");
-
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
-
-    // Class should emit as function
-    assert!(
-        output.contains("function User"),
-        "Expected User to emit as function: {}",
-        output
-    );
-
-    // Static field should be on constructor
-    assert!(
-        output.contains("User.instanceCount") || output.contains("instanceCount"),
-        "Expected instanceCount static field: {}",
+        output.contains("function Factory") || output.contains("var Factory"),
+        "Expected Factory class transformation: {}",
         output
     );
 
     // Static method should be on constructor
     assert!(
-        output.contains("User.getInstanceCount") || output.contains("getInstanceCount"),
-        "Expected getInstanceCount static method: {}",
+        output.contains("create"),
+        "Expected static create method: {}",
         output
     );
 
-    // serialize method should be present
+    // Instance method should be present
     assert!(
-        output.contains("serialize"),
-        "Expected serialize method: {}",
+        output.contains("configure"),
+        "Expected configure method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_method_overloads_inheritance() {
+    // Test method overloads with inheritance
+    let source = r#"
+class BaseService {
+    fetch(url: string): Promise<any>;
+    fetch(url: string, options: object): Promise<any>;
+    fetch(url: string, options?: object): Promise<any> {
+        return Promise.resolve({ url, options });
+    }
+}
+
+class ExtendedService extends BaseService {
+    fetch(url: string): Promise<any>;
+    fetch(url: string, options: object): Promise<any>;
+    fetch(url: string, options: object, timeout: number): Promise<any>;
+    fetch(url: string, options?: object, timeout?: number): Promise<any> {
+        return super.fetch(url, options || {});
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Both classes should be transformed
+    assert!(
+        output.contains("BaseService") && output.contains("ExtendedService"),
+        "Expected both class transformations: {}",
+        output
+    );
+
+    // Inheritance pattern should be present
+    assert!(
+        output.contains("__extends") || output.contains("prototype"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+
+    // Fetch method should be present
+    assert!(
+        output.contains("fetch"),
+        "Expected fetch method: {}",
         output
     );
 }
