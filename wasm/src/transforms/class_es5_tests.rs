@@ -8381,3 +8381,257 @@ function runQuery() {
         output
     );
 }
+
+#[test]
+fn test_class_es5_auto_accessor_basic() {
+    // Test basic auto-accessor (ES2022)
+    let source = r#"
+class Person {
+    accessor name: string = "default";
+    accessor age: number = 0;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be present
+    assert!(
+        output.contains("Person"),
+        "Expected Person class: {}",
+        output
+    );
+
+    // Properties should be accessible (via getter/setter or direct)
+    assert!(
+        output.contains("name") && output.contains("age"),
+        "Expected name and age properties: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_auto_accessor_static() {
+    // Test static auto-accessor
+    let source = r#"
+class Counter {
+    static accessor count: number = 0;
+    static accessor label: string = "Counter";
+
+    static increment(): void {
+        this.count++;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be present
+    assert!(
+        output.contains("Counter"),
+        "Expected Counter class: {}",
+        output
+    );
+
+    // Static method should be present
+    assert!(
+        output.contains("increment"),
+        "Expected increment method: {}",
+        output
+    );
+
+    // Static properties should be referenced
+    assert!(
+        output.contains("count") && output.contains("label"),
+        "Expected count and label properties: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_auto_accessor_with_inheritance() {
+    // Test auto-accessor in derived class
+    let source = r#"
+class Base {
+    accessor value: number = 10;
+}
+
+class Derived extends Base {
+    accessor multiplier: number = 2;
+
+    getResult(): number {
+        return this.value * this.multiplier;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be present
+    assert!(
+        output.contains("Base") && output.contains("Derived"),
+        "Expected Base and Derived classes: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("getResult"),
+        "Expected getResult method: {}",
+        output
+    );
+
+    // Should have extends helper or prototype chain
+    assert!(
+        output.contains("__extends") || output.contains("prototype"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_auto_accessor_with_decorator() {
+    // Test auto-accessor with decorator
+    let source = r#"
+function observable(target: any, context: any) {
+    return target;
+}
+
+class Store {
+    @observable
+    accessor items: string[] = [];
+
+    @observable
+    accessor count: number = 0;
+
+    addItem(item: string): void {
+        this.items.push(item);
+        this.count++;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be present
+    assert!(
+        output.contains("Store"),
+        "Expected Store class: {}",
+        output
+    );
+
+    // Decorator function should be present
+    assert!(
+        output.contains("observable"),
+        "Expected observable decorator: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("addItem"),
+        "Expected addItem method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_auto_accessor_private() {
+    // Test private auto-accessor
+    let source = r#"
+class BankAccount {
+    accessor #balance: number = 0;
+
+    deposit(amount: number): void {
+        this.#balance += amount;
+    }
+
+    withdraw(amount: number): boolean {
+        if (this.#balance >= amount) {
+            this.#balance -= amount;
+            return true;
+        }
+        return false;
+    }
+
+    getBalance(): number {
+        return this.#balance;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be present
+    assert!(
+        output.contains("BankAccount"),
+        "Expected BankAccount class: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("deposit") && output.contains("withdraw") && output.contains("getBalance"),
+        "Expected deposit, withdraw, and getBalance methods: {}",
+        output
+    );
+}
