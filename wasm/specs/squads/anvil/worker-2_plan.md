@@ -15,6 +15,7 @@ Priority: 2
 ## Completed
 - [x] Added integration coverage for computed `super[...]` in class field arrow initializers; `./wasm/test.sh` failed at `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports` (unrelated).
 - [x] Confirmed `super()` ordering remains stable with computed field initializers via regression; `./wasm/test.sh` failed at `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports` (unrelated).
+- [x] Updated emitter edge case and parity tests for CommonJS export/parse error tolerance; `./wasm/test.sh` now fails at `solver::compat::tests::test_explain_failure_reports_rest_mismatch` (unrelated).
 
 ## Ready for Merge
 No

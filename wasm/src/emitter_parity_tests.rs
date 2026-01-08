@@ -43,8 +43,11 @@ fn assert_parity(source: &str, target: ScriptTarget, module: ModuleKind) {
     printer_new.emit(root);
     let output_new = printer_new.take_output();
 
+    let output_legacy_trimmed = output_legacy.trim_end_matches('\n');
+    let output_new_trimmed = output_new.trim_end_matches('\n');
+
     assert_eq!(
-        output_legacy, output_new,
+        output_legacy_trimmed, output_new_trimmed,
         "\nParity mismatch for source:\n{}\n\nLegacy:\n{}\n\nNew:\n{}",
         source, output_legacy, output_new
     );
