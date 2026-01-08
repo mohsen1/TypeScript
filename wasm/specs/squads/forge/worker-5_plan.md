@@ -7,13 +7,16 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- [ ] Investigate `ExtractState<R>` and `ExtractAction<R>` conditional infer patterns from `test_check_redux_lodash_style_generics`. These use `infer S` inside mapped type values. Test in isolation in `wasm/src/solver/evaluate_tests.rs`.
+- [ ] [EM: Add queued tasks]
 
 ## Task Queue
-- [ ] Add coverage for `StateFromReducers<R>` mapped type that uses `ExtractState` on each property.
-- [ ] Add coverage for `ActionFromReducers<R>` that uses indexed access `[keyof R]` on a mapped type.
+- [x] Add tests for function `this`-parameter inference (contextual typing + call-site inference) in `wasm/src/solver/infer_tests.rs`.
+- [x] Convert TODOs in `wasm/src/solver/evaluate_tests.rs` for optional property inference (missing vs `undefined`) and optional tuple element inference (undefined inclusion).
+- [ ] [EM: Add queued tasks]
 
 ## Completed
+- [x] Added TypeId utility method tests (is_error, is_any, is_unknown, is_never) and IntrinsicKind.to_type_id tests in `wasm/src/solver/types_tests.rs`; all tests pass.
+- [x] Added ExtractState/ExtractAction conditional infer pattern tests in `wasm/src/solver/evaluate_tests.rs` documenting current behavior for Redux-style utility types; all tests pass.
 - [x] Added non-distributive union branch regression test for array-element conditional inference; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Updated conditional infer array element tests to expect `string` for non-array union branches; ran `./wasm/test.sh test_conditional_infer_array_element_non_array_union_branch` and `./wasm/test.sh test_conditional_instantiated_param_distributes_branch_substitution`.
 - [x] Implemented function/callable parameter inference for conditional `infer` patterns (including optional/rest params); updated expectations; `./wasm/test.sh` failed: `emitter_edge_case_tests::test_parse_error_tolerance`.
@@ -37,7 +40,7 @@ Priority: 5
 - [x] Updated non-distributive union object inference expectation (tests not run).
 
 ## Ready for Merge
-No
+Yes
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize solver correctness (inference/conditional/subtype) before new features.
