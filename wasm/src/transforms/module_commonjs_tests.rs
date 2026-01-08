@@ -474,6 +474,26 @@ fn test_collect_export_names_ignores_export_assignment() {
 }
 
 #[test]
+fn test_collect_export_names_ignores_default_reexport_named() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = "export { default as Foo } from \"./foo\";";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let Some(source_file) = parser.arena.get_source_file(parser.arena.get(root).unwrap()) else {
+        panic!("Failed to get source file");
+    };
+
+    let export_names = collect_export_names(&parser.arena, &source_file.statements.nodes);
+
+    assert!(
+        export_names.is_empty(),
+        "Expected no runtime exports for default re-export named"
+    );
+}
+
+#[test]
 fn test_collect_export_names_ignores_const_enum() {
     use crate::thin_parser::ThinParserState;
 
