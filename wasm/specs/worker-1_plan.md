@@ -70,6 +70,7 @@ Priority: 1
 - [x] Number index ignores negative binary literal; added `test_resolve_bounds_number_index_ignores_negative_binary_name`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_negative_binary_name`.
 - [x] Number index ignores negative octal literal; added `test_resolve_bounds_number_index_ignores_negative_octal_name`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_negative_octal_name`.
 - [x] Number index ignores double-sign exponent; added `test_resolve_bounds_number_index_ignores_exponent_double_sign`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_exponent_double_sign`.
+- [x] Number index ignores double-minus exponent; added `test_resolve_bounds_number_index_ignores_exponent_double_minus`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_exponent_double_minus`.
 - [x] Number index ignores missing exponent digits; added `test_resolve_bounds_number_index_ignores_exponent_missing_digits`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_exponent_missing_digits`.
 - [x] Number index ignores missing negative exponent digits; added `test_resolve_bounds_number_index_ignores_exponent_minus_missing_digits`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_exponent_minus_missing_digits`.
 - [x] Number index ignores -0 exponent form; added `test_resolve_bounds_number_index_ignores_negative_exponent_zero`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_negative_exponent_zero`.
