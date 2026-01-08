@@ -13,6 +13,7 @@ Priority: 4
 - [ ] Stand by for next emitter fidelity task.
 
 ## Completed
+- [x] Async ES5 nested arrow regression with this + arguments usage; test `./wasm/test.sh nested_arrow_arguments_capture`.
 - [x] Async ES5 deep nested arrow regression (async + nested arrow this capture); test `./wasm/test.sh deep_nested_arrow_this_capture`.
 - [x] Async ES5 let declaration regression test for arrow this capture; test `./wasm/test.sh let_arrow_this_capture`.
 - [x] Async ES5 multi-declarator var statement regression test (await + arrow this capture); test `./wasm/test.sh multi_decl_this_capture`.
