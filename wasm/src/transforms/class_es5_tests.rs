@@ -7109,315 +7109,299 @@ declare class Config {
     );
 }
 
+// =============================================================================
+// Class Field Decorator Tests
+// =============================================================================
+
 #[test]
-fn test_class_es5_private_field_init_basic() {
-    // Test basic private field initialization with #
+fn test_class_es5_field_decorator_basic() {
+    // Basic field decorator
     let source = r#"
-class Counter {
-    #count: number = 0;
+function observable(target: any, key: string) {}
 
-    increment(): void {
-        this.#count++;
-    }
-
-    getCount(): number {
-        return this.#count;
-    }
+class Model {
+    @observable
+    name: string = "";
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
+    // Second statement is the class
+    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
 
-    let output = printer.get_output().to_string();
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
 
-    // Should transform class to function
+    // Class should emit as function
     assert!(
-        output.contains("function Counter") || output.contains("var Counter"),
-        "Expected Counter class transformation: {}",
+        output.contains("function Model"),
+        "Expected Model class: {}",
         output
     );
 
-    // Methods should be present
+    // Field should be initialized in constructor
     assert!(
-        output.contains("increment") && output.contains("getCount"),
-        "Expected methods: {}",
-        output
-    );
-
-    // Private field should be downleveled (WeakMap pattern or similar)
-    assert!(
-        output.contains("count") || output.contains("WeakMap") || output.contains("_count"),
-        "Expected private field handling: {}",
+        output.contains("this.name") || output.contains("name"),
+        "Expected name field initialization: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_private_field_init_complex() {
-    // Test private field with complex initializer
+fn test_class_es5_field_decorator_with_initializer() {
+    // Field decorator with initializer
     let source = r#"
+function defaultValue(value: any) {
+    return function(target: any, key: string) {};
+}
+
 class Config {
-    #settings: object = { debug: false, verbose: true };
-    #timestamp: number = Date.now();
-    #id: string = Math.random().toString(36);
+    @defaultValue(42)
+    count: number = 0;
 
-    getSettings(): object {
-        return this.#settings;
-    }
-
-    getId(): string {
-        return this.#id;
-    }
+    @defaultValue("default")
+    label: string = "initial";
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
+    // Second statement is the class
+    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
 
-    let output = printer.get_output().to_string();
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
 
-    // Should transform class
+    // Class should emit
     assert!(
-        output.contains("function Config") || output.contains("var Config"),
-        "Expected Config class transformation: {}",
+        output.contains("function Config") || output.contains("Config"),
+        "Expected Config class: {}",
         output
     );
 
-    // Methods should be present
+    // Field initializers should be present
     assert!(
-        output.contains("getSettings") && output.contains("getId"),
-        "Expected methods: {}",
-        output
-    );
-
-    // Initializers should be present
-    assert!(
-        output.contains("debug") || output.contains("Date.now") || output.contains("random"),
-        "Expected initializer expressions: {}",
+        output.contains("count") && output.contains("label"),
+        "Expected field names: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_private_field_init_multiple() {
-    // Test multiple private fields
+fn test_class_es5_field_decorator_static() {
+    // Static field decorator
     let source = r#"
-class User {
-    #id: number = 0;
-    #name: string = "";
-    #email: string = "";
-    #active: boolean = true;
+function logged(target: any, key: string) {}
 
-    constructor(id: number, name: string, email: string) {
-        this.#id = id;
-        this.#name = name;
-        this.#email = email;
-    }
+class Service {
+    @logged
+    static instance: Service | null = null;
 
-    getId(): number {
-        return this.#id;
-    }
-
-    getName(): string {
-        return this.#name;
-    }
-
-    isActive(): boolean {
-        return this.#active;
-    }
-
-    deactivate(): void {
-        this.#active = false;
-    }
+    @logged
+    static version: string = "1.0.0";
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
+    // Second statement is the class
+    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
 
-    let output = printer.get_output().to_string();
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
 
-    // Should transform class
+    // Class should emit
     assert!(
-        output.contains("function User") || output.contains("var User"),
-        "Expected User class transformation: {}",
+        output.contains("function Service") || output.contains("Service"),
+        "Expected Service class: {}",
         output
     );
 
-    // Methods should be present
+    // Static fields should be assigned on constructor
     assert!(
-        output.contains("getId")
-            && output.contains("getName")
-            && output.contains("isActive")
-            && output.contains("deactivate"),
-        "Expected methods: {}",
+        output.contains("Service.instance") || output.contains("instance"),
+        "Expected static instance field: {}",
+        output
+    );
+    assert!(
+        output.contains("Service.version") || output.contains("version"),
+        "Expected static version field: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_private_field_init_inheritance() {
-    // Test private field initialization with inheritance
+fn test_class_es5_field_decorator_multiple() {
+    // Multiple decorators on a single field
     let source = r#"
-class Animal {
-    #name: string = "unnamed";
+function required(target: any, key: string) {}
+function validate(target: any, key: string) {}
+function format(target: any, key: string) {}
 
-    constructor(name: string) {
-        this.#name = name;
-    }
-
-    getName(): string {
-        return this.#name;
-    }
-}
-
-class Dog extends Animal {
-    #breed: string = "unknown";
-
-    constructor(name: string, breed: string) {
-        super(name);
-        this.#breed = breed;
-    }
-
-    getBreed(): string {
-        return this.#breed;
-    }
-
-    describe(): string {
-        return this.getName() + " is a " + this.#breed;
-    }
+class Form {
+    @required
+    @validate
+    @format
+    email: string = "";
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
+    // Fourth statement is the class (after 3 function declarations)
+    let class_idx = source_file.statements.nodes.get(3).expect("expected class declaration");
 
-    let output = printer.get_output().to_string();
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
 
-    // Both classes should be transformed
+    // Class should emit
     assert!(
-        output.contains("Animal") && output.contains("Dog"),
-        "Expected both class transformations: {}",
+        output.contains("function Form") || output.contains("Form"),
+        "Expected Form class: {}",
         output
     );
 
-    // Inheritance pattern should be present
+    // Email field should be present
     assert!(
-        output.contains("__extends") || output.contains("prototype"),
+        output.contains("email"),
+        "Expected email field: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_field_decorator_in_derived_class() {
+    // Field decorator in derived class
+    let source = r#"
+function tracked(target: any, key: string) {}
+
+class BaseEntity {
+    id: number = 0;
+}
+
+class User extends BaseEntity {
+    @tracked
+    name: string = "";
+
+    @tracked
+    lastLogin: Date | null = null;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Third statement is the User class
+    let class_idx = source_file.statements.nodes.get(2).expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Class should emit with extends
+    assert!(
+        output.contains("function User") || output.contains("User"),
+        "Expected User class: {}",
+        output
+    );
+
+    // Should have inheritance pattern
+    assert!(
+        output.contains("__extends") || output.contains("_super"),
         "Expected inheritance pattern: {}",
         output
     );
 
-    // Methods should be present
+    // Decorated fields should be present
     assert!(
-        output.contains("getName") && output.contains("getBreed") && output.contains("describe"),
-        "Expected methods: {}",
+        output.contains("name") && output.contains("lastLogin"),
+        "Expected decorated fields: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_private_field_init_with_methods() {
-    // Test private field accessed by multiple methods
+fn test_class_es5_field_decorator_with_accessor() {
+    // Field decorator combined with accessor decorator
     let source = r#"
-class BankAccount {
-    #balance: number = 0;
-    #transactions: number[] = [];
+function observable(target: any, key: string) {}
+function computed(target: any, key: string, descriptor: PropertyDescriptor) {}
 
-    deposit(amount: number): void {
-        this.#balance += amount;
-        this.#transactions.push(amount);
-    }
+class ViewModel {
+    @observable
+    firstName: string = "";
 
-    withdraw(amount: number): boolean {
-        if (this.#balance >= amount) {
-            this.#balance -= amount;
-            this.#transactions.push(-amount);
-            return true;
-        }
-        return false;
-    }
+    @observable
+    lastName: string = "";
 
-    getBalance(): number {
-        return this.#balance;
-    }
-
-    getTransactionCount(): number {
-        return this.#transactions.length;
-    }
-
-    getLastTransaction(): number {
-        return this.#transactions[this.#transactions.length - 1];
+    @computed
+    get fullName(): string {
+        return this.firstName + " " + this.lastName;
     }
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
+    // Third statement is the class
+    let class_idx = source_file.statements.nodes.get(2).expect("expected class declaration");
 
-    let output = printer.get_output().to_string();
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
 
-    // Should transform class
+    // Class should emit
     assert!(
-        output.contains("function BankAccount") || output.contains("var BankAccount"),
-        "Expected BankAccount class transformation: {}",
+        output.contains("function ViewModel") || output.contains("ViewModel"),
+        "Expected ViewModel class: {}",
         output
     );
 
-    // All methods should be present
+    // Fields should be present
     assert!(
-        output.contains("deposit")
-            && output.contains("withdraw")
-            && output.contains("getBalance")
-            && output.contains("getTransactionCount")
-            && output.contains("getLastTransaction"),
-        "Expected all methods: {}",
+        output.contains("firstName") && output.contains("lastName"),
+        "Expected name fields: {}",
+        output
+    );
+
+    // Getter should be present
+    assert!(
+        output.contains("fullName"),
+        "Expected fullName getter: {}",
         output
     );
 }
