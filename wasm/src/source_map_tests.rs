@@ -11981,3 +11981,82 @@ rect.width = 10;"#;
         "expected non-empty source mappings for class accessors"
     );
 }
+
+#[test]
+fn test_source_map_typescript_enums() {
+    // Test TypeScript enum declarations (downleveled to IIFE)
+    let source = r#"enum Color {
+    Red,
+    Green,
+    Blue
+}
+
+enum Status {
+    Active = 1,
+    Inactive = 2,
+    Pending = 3
+}
+
+const myColor = Color.Red;
+const myStatus = Status.Active;"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the enum declaration
+    let (color_line, color_col) = find_line_col(source, "enum Color");
+    let has_color_mapping = decoded.iter().any(|entry| {
+        entry.original_line == color_line
+            && entry.original_column >= color_col
+            && entry.original_column <= color_col + 10
+    });
+
+    // Verify we have mappings for the variable declaration
+    let (var_line, var_col) = find_line_col(source, "const myColor");
+    let has_var_mapping = decoded.iter().any(|entry| {
+        entry.original_line == var_line
+            && entry.original_column >= var_col
+            && entry.original_column <= var_col + 13
+    });
+
+    // At minimum, we should have mappings for enum or variable
+    assert!(
+        has_color_mapping || has_var_mapping,
+        "expected mappings for enum declarations. mappings: {mappings}"
+    );
+
+    // Verify output contains the enum names
+    assert!(
+        output.contains("Color") && output.contains("Status"),
+        "expected output to contain enum names. output: {output}"
+    );
+
+    // Verify source map has non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for TypeScript enums"
+    );
+}
