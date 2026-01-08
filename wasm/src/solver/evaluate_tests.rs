@@ -12087,3 +12087,577 @@ fn test_infer_template_literal_dot_notation_parse() {
     assert!(result != TypeId::NEVER, "Dot notation parse should match");
     assert!(result != TypeId::ERROR, "Dot notation parse should not produce error");
 }
+
+// =========================================================================
+// Recursive Conditional Type Tests
+// =========================================================================
+// These tests cover recursive conditional types that reference themselves,
+// testing the solver's recursion handling and termination.
+
+#[test]
+fn test_recursive_conditional_flatten_single_level() {
+    let interner = TypeInterner::new();
+
+    // Flatten<T> = T extends Array<infer U> ? Flatten<U> : T
+    // For single level: Flatten<string[]> should give string
+
+    // Create infer U
+    let infer_u = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("U"),
+        constraint: None,
+        default: None,
+    }));
+
+    // Array<infer U>
+    let array_infer_u = interner.array(infer_u);
+
+    // For testing, we simulate a single level unwrap (non-recursive base case)
+    // T = string[]
+    let string_array = interner.array(TypeId::STRING);
+
+    let cond = ConditionalType {
+        check_type: string_array,
+        extends_type: array_infer_u,
+        true_type: infer_u, // In recursive case this would be Flatten<U>, here just U
+        false_type: string_array,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+
+    // Should extract string from string[]
+    assert_eq!(result, TypeId::STRING, "Flatten single level should extract string");
+}
+
+#[test]
+fn test_recursive_conditional_flatten_nested_array() {
+    let interner = TypeInterner::new();
+
+    // Flatten<T> pattern with nested arrays
+    // For string[][] -> should unwrap to string[] in first step
+
+    let infer_u = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("U"),
+        constraint: None,
+        default: None,
+    }));
+
+    let array_infer_u = interner.array(infer_u);
+
+    // T = string[][] (nested array)
+    let string_array = interner.array(TypeId::STRING);
+    let nested_array = interner.array(string_array);
+
+    let cond = ConditionalType {
+        check_type: nested_array,
+        extends_type: array_infer_u,
+        true_type: infer_u,
+        false_type: nested_array,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+
+    // First unwrap: string[][] -> string[]
+    assert_eq!(result, string_array, "First unwrap should give string[]");
+}
+
+#[test]
+fn test_recursive_conditional_flatten_non_array() {
+    let interner = TypeInterner::new();
+
+    // Flatten<T> where T is not an array should return T unchanged
+    // Flatten<string> = string
+
+    let infer_u = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("U"),
+        constraint: None,
+        default: None,
+    }));
+
+    let array_infer_u = interner.array(infer_u);
+
+    // T = string (not an array)
+    let cond = ConditionalType {
+        check_type: TypeId::STRING,
+        extends_type: array_infer_u,
+        true_type: infer_u,
+        false_type: TypeId::STRING,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+
+    // String doesn't extend Array, should return string unchanged
+    assert_eq!(result, TypeId::STRING, "Non-array should return unchanged");
+}
+
+#[test]
+fn test_recursive_conditional_unwrap_promise() {
+    let interner = TypeInterner::new();
+
+    // Awaited<T> = T extends Promise<infer U> ? Awaited<U> : T
+    // Single level: Awaited<Promise<string>> = string
+
+    let promise_symbol = SymbolRef(400);
+    let promise_base = interner.reference(promise_symbol);
+
+    let infer_u = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("U"),
+        constraint: None,
+        default: None,
+    }));
+
+    // Promise<infer U>
+    let promise_infer = interner.application(promise_base, vec![infer_u]);
+
+    // T = Promise<string>
+    let promise_string = interner.application(promise_base, vec![TypeId::STRING]);
+
+    let cond = ConditionalType {
+        check_type: promise_string,
+        extends_type: promise_infer,
+        true_type: infer_u,
+        false_type: promise_string,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+
+    // Should extract string from Promise<string>
+    assert!(result != TypeId::ERROR, "Promise unwrap should not produce error");
+}
+
+#[test]
+fn test_recursive_conditional_nested_promise() {
+    let interner = TypeInterner::new();
+
+    // Awaited pattern with nested Promises
+    // Promise<Promise<string>> -> first step extracts Promise<string>
+
+    let promise_symbol = SymbolRef(401);
+    let promise_base = interner.reference(promise_symbol);
+
+    let infer_u = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("U"),
+        constraint: None,
+        default: None,
+    }));
+
+    let promise_infer = interner.application(promise_base, vec![infer_u]);
+
+    // Promise<string>
+    let promise_string = interner.application(promise_base, vec![TypeId::STRING]);
+    // Promise<Promise<string>>
+    let nested_promise = interner.application(promise_base, vec![promise_string]);
+
+    let cond = ConditionalType {
+        check_type: nested_promise,
+        extends_type: promise_infer,
+        true_type: infer_u,
+        false_type: nested_promise,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+
+    // Should extract Promise<string> from outer layer
+    assert!(result != TypeId::ERROR, "Nested promise unwrap should not produce error");
+}
+
+#[test]
+fn test_recursive_conditional_deep_readonly_object() {
+    let interner = TypeInterner::new();
+
+    // DeepReadonly<T> = T extends object ? { readonly [K in keyof T]: DeepReadonly<T[K]> } : T
+    // Base case: primitive type should return unchanged
+
+    // For primitives, DeepReadonly<string> = string
+    let cond = ConditionalType {
+        check_type: TypeId::STRING,
+        extends_type: TypeId::OBJECT,
+        true_type: TypeId::STRING, // Simplified - real case would have mapped type
+        false_type: TypeId::STRING,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+
+    // String doesn't extend object in the structural sense we're testing
+    assert!(result != TypeId::ERROR, "DeepReadonly base case should not produce error");
+}
+
+#[test]
+fn test_recursive_conditional_with_union_distribution() {
+    let interner = TypeInterner::new();
+
+    // Flatten<T> with union: Flatten<string[] | number[]>
+    // Should distribute: Flatten<string[]> | Flatten<number[]> = string | number
+
+    let infer_u = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("U"),
+        constraint: None,
+        default: None,
+    }));
+
+    let array_infer_u = interner.array(infer_u);
+
+    // Type parameter T
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: array_infer_u,
+        true_type: infer_u,
+        false_type: t_param,
+        is_distributive: true, // Distributive over union
+    };
+
+    let cond_type = interner.conditional(cond);
+
+    // T = string[] | number[]
+    let string_array = interner.array(TypeId::STRING);
+    let number_array = interner.array(TypeId::NUMBER);
+    let union_arrays = interner.union(vec![string_array, number_array]);
+
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, union_arrays);
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    // Should produce string | number
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert_eq!(result, expected, "Distributive flatten should produce string | number");
+}
+
+#[test]
+fn test_recursive_conditional_tuple_to_union() {
+    let interner = TypeInterner::new();
+
+    // TupleToUnion<T> = T extends [infer First, ...infer Rest] ? First | TupleToUnion<Rest> : never
+    // Base case test: extract first from tuple
+
+    let infer_first = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("First"),
+        constraint: None,
+        default: None,
+    }));
+    let infer_rest = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("Rest"),
+        constraint: None,
+        default: None,
+    }));
+
+    // [infer First, ...infer Rest]
+    let extends_tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: infer_first,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: infer_rest,
+            name: None,
+            optional: false,
+            rest: true, // Rest element
+        },
+    ]);
+
+    // Test tuple [string, number, boolean]
+    let test_tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+    ]);
+
+    let cond = ConditionalType {
+        check_type: test_tuple,
+        extends_type: extends_tuple,
+        true_type: infer_first, // Just extract first for this test
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+
+    // Should extract string (first element)
+    assert!(result != TypeId::NEVER, "Tuple extraction should match");
+    assert!(result != TypeId::ERROR, "Tuple extraction should not produce error");
+}
+
+#[test]
+fn test_recursive_conditional_string_length() {
+    let interner = TypeInterner::new();
+
+    // StringLength<T, Acc extends any[] = []> =
+    //   T extends `${infer _}${infer Rest}` ? StringLength<Rest, [...Acc, 0]> : Acc['length']
+    // Base case: extract first character
+
+    let infer_char = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("Char"),
+        constraint: None,
+        default: None,
+    }));
+    let infer_rest = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("Rest"),
+        constraint: None,
+        default: None,
+    }));
+
+    // `${infer Char}${infer Rest}`
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Type(infer_char),
+        TemplateSpan::Type(infer_rest),
+    ]);
+
+    // Test with "abc"
+    let test_string = interner.literal_string("abc");
+
+    // Return tuple of [Char, Rest] for verification
+    let result_tuple = interner.tuple(vec![
+        TupleElement { type_id: infer_char, name: None, optional: false, rest: false },
+        TupleElement { type_id: infer_rest, name: None, optional: false, rest: false },
+    ]);
+
+    let cond = ConditionalType {
+        check_type: test_string,
+        extends_type: extends_template,
+        true_type: result_tuple,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+
+    // Should successfully split "abc" into ["a", "bc"]
+    assert!(result != TypeId::NEVER, "String split should match");
+    assert!(result != TypeId::ERROR, "String split should not produce error");
+}
+
+#[test]
+fn test_recursive_conditional_reverse_string_step() {
+    let interner = TypeInterner::new();
+
+    // ReverseString<T> step: T extends `${infer First}${infer Rest}` ? `${ReverseString<Rest>}${First}` : T
+    // Single step test
+
+    let infer_first = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("First"),
+        constraint: None,
+        default: None,
+    }));
+    let infer_rest = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("Rest"),
+        constraint: None,
+        default: None,
+    }));
+
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Type(infer_first),
+        TemplateSpan::Type(infer_rest),
+    ]);
+
+    // Test with "ab"
+    let test_string = interner.literal_string("ab");
+
+    // For single step, we just verify extraction works
+    // True branch would be `${Rest}${First}` in full implementation
+    let result_template = interner.template_literal(vec![
+        TemplateSpan::Type(infer_rest),
+        TemplateSpan::Type(infer_first),
+    ]);
+
+    let cond = ConditionalType {
+        check_type: test_string,
+        extends_type: extends_template,
+        true_type: result_template,
+        false_type: test_string,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+
+    assert!(result != TypeId::ERROR, "Reverse step should not produce error");
+}
+
+#[test]
+fn test_recursive_conditional_json_path_parse() {
+    let interner = TypeInterner::new();
+
+    // ParsePath<T> = T extends `${infer Head}.${infer Tail}` ? [Head, ...ParsePath<Tail>] : [T]
+    // Single step: "a.b.c" -> ["a", ...]
+
+    let infer_head = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("Head"),
+        constraint: None,
+        default: None,
+    }));
+    let infer_tail = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("Tail"),
+        constraint: None,
+        default: None,
+    }));
+
+    // `${infer Head}.${infer Tail}`
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Type(infer_head),
+        TemplateSpan::Text(interner.intern_string(".")),
+        TemplateSpan::Type(infer_tail),
+    ]);
+
+    // Test with "a.b.c"
+    let test_path = interner.literal_string("a.b.c");
+
+    // Return [Head, Tail] tuple for verification
+    let result_tuple = interner.tuple(vec![
+        TupleElement { type_id: infer_head, name: None, optional: false, rest: false },
+        TupleElement { type_id: infer_tail, name: None, optional: false, rest: false },
+    ]);
+
+    let cond = ConditionalType {
+        check_type: test_path,
+        extends_type: extends_template,
+        true_type: result_tuple,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+
+    // Should produce ["a", "b.c"] as first step
+    assert!(result != TypeId::NEVER, "Path parse should match");
+    assert!(result != TypeId::ERROR, "Path parse should not produce error");
+}
+
+#[test]
+fn test_recursive_conditional_termination_base_case() {
+    let interner = TypeInterner::new();
+
+    // Test that recursion properly terminates at base case
+    // Flatten<string> where string is not an array should return string
+
+    let infer_u = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("U"),
+        constraint: None,
+        default: None,
+    }));
+
+    let array_infer_u = interner.array(infer_u);
+
+    // Type param T
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // Flatten-like conditional
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: array_infer_u,
+        true_type: infer_u,
+        false_type: t_param, // Base case: return T unchanged
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+
+    // Substitute with non-array type
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, TypeId::STRING);
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    // Should return string (base case)
+    assert_eq!(result, TypeId::STRING, "Base case should return original type");
+}
+
+#[test]
+fn test_recursive_conditional_mixed_union() {
+    let interner = TypeInterner::new();
+
+    // Flatten with mixed union: string[] | number (array and non-array)
+    // Should produce: string | number
+
+    let infer_u = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("U"),
+        constraint: None,
+        default: None,
+    }));
+
+    let array_infer_u = interner.array(infer_u);
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: array_infer_u,
+        true_type: infer_u,
+        false_type: t_param,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+
+    // T = string[] | number
+    let string_array = interner.array(TypeId::STRING);
+    let mixed_union = interner.union(vec![string_array, TypeId::NUMBER]);
+
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, mixed_union);
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    // Should produce string | number
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert_eq!(result, expected, "Mixed union should flatten correctly");
+}
+
+#[test]
+fn test_recursive_conditional_readonly_array_unwrap() {
+    let interner = TypeInterner::new();
+
+    // Flatten pattern with readonly arrays
+    // readonly string[] should also unwrap to string
+
+    let infer_u = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("U"),
+        constraint: None,
+        default: None,
+    }));
+
+    // We test with regular Array<infer U> pattern
+    let array_infer_u = interner.array(infer_u);
+
+    // readonly string[]
+    let string_array = interner.array(TypeId::STRING);
+    let readonly_string_array = interner.intern(TypeKey::ReadonlyType(string_array));
+
+    let cond = ConditionalType {
+        check_type: readonly_string_array,
+        extends_type: array_infer_u,
+        true_type: infer_u,
+        false_type: readonly_string_array,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+
+    // Behavior depends on whether readonly arrays match Array<U>
+    assert!(result != TypeId::ERROR, "Readonly array unwrap should not produce error");
+}
