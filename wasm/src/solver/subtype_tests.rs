@@ -91,6 +91,23 @@ fn test_literal_subtyping() {
 }
 
 #[test]
+fn test_template_literal_subtyping_to_string() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let red = interner.literal_string("red");
+    let blue = interner.literal_string("blue");
+    let colors = interner.union(vec![red, blue]);
+    let template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("color-")),
+        TemplateSpan::Type(colors),
+    ]);
+
+    assert!(checker.is_subtype_of(template, TypeId::STRING));
+    assert!(!checker.is_subtype_of(TypeId::STRING, template));
+}
+
+#[test]
 fn test_apparent_number_member_subtyping() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
