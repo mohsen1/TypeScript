@@ -284,6 +284,68 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             return self.evaluate(true_inst);
         }
 
+        if let Some(TypeKey::Array(ext_elem)) = self.interner.lookup(extends_type) {
+            if let Some(TypeKey::Infer(info)) = self.interner.lookup(ext_elem) {
+                if matches!(
+                    self.interner.lookup(check_type),
+                    Some(TypeKey::TypeParameter(_)) | Some(TypeKey::Infer(_))
+                ) {
+                    return self.interner.conditional(cond.clone());
+                }
+
+                let inferred = match self.interner.lookup(check_type) {
+                    Some(TypeKey::Array(elem)) => Some(elem),
+                    Some(TypeKey::Tuple(elements)) => {
+                        let elements = self.interner.tuple_list(elements);
+                        let mut parts = Vec::new();
+                        for element in elements.iter() {
+                            if element.rest {
+                                let rest_type = match self.interner.lookup(element.type_id) {
+                                    Some(TypeKey::Array(rest_elem)) => rest_elem,
+                                    _ => element.type_id,
+                                };
+                                parts.push(rest_type);
+                            } else {
+                                parts.push(element.type_id);
+                            }
+                        }
+                        if parts.is_empty() {
+                            None
+                        } else {
+                            Some(self.interner.union(parts))
+                        }
+                    }
+                    _ => None,
+                };
+
+                let Some(inferred) = inferred else {
+                    return self.evaluate(cond.false_type);
+                };
+
+                let mut subst = TypeSubstitution::new();
+                subst.insert(info.name, inferred);
+
+                if let Some(constraint) = info.constraint {
+                    let mut checker = SubtypeChecker::with_resolver(self.interner, self.resolver);
+                    if !checker.is_subtype_of(inferred, constraint) {
+                        let false_inst = instantiate_type_with_infer(
+                            self.interner,
+                            cond.false_type,
+                            &subst,
+                        );
+                        return self.evaluate(false_inst);
+                    }
+                }
+
+                let true_inst = instantiate_type_with_infer(
+                    self.interner,
+                    cond.true_type,
+                    &subst,
+                );
+                return self.evaluate(true_inst);
+            }
+        }
+
         // Step 2: Check for naked type parameter (defer)
         if let Some(TypeKey::TypeParameter(_)) = self.interner.lookup(check_type) {
             // Type parameter hasn't been substituted - defer evaluation
