@@ -15,6 +15,7 @@ Priority: 5
 - [ ] [EM: Add queued tasks]
 
 ## Completed
+- [x] Added minimal repro tests for cross-file type alias resolution in `wasm/src/thin_checker_tests.rs`: simple alias works, generic alias fails due to type params not being imported (shows `Ref(0)<number>` instead of `{ value: number }`).
 - [x] Added TypeId utility method tests (is_error, is_any, is_unknown, is_never) and IntrinsicKind.to_type_id tests in `wasm/src/solver/types_tests.rs`; all tests pass.
 - [x] Added ExtractState/ExtractAction conditional infer pattern tests in `wasm/src/solver/evaluate_tests.rs` documenting current behavior for Redux-style utility types; all tests pass.
 - [x] Added non-distributive union branch regression test for array-element conditional inference; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
