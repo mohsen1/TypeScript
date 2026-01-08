@@ -7,12 +7,13 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- Complete: Added async computed object literal source-map coverage in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
+- Complete: Added async array literal spread source-map coverage in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added async array literal spread source-map coverage in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
 - [x] Added async loop/try source-map tests and loosened mapping assertions to fall back to function-level mappings when transforms omit statements; ran `./wasm/test.sh source_map` (PASS).
 - [x] Added decode-mappings round-trip test in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Restored async ES5 emitter API compatibility in `wasm/src/transforms/async_es5.rs`; ran `./wasm/test.sh source_map` (PASS) and `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
