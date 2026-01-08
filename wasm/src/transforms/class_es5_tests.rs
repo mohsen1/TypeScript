@@ -2781,3 +2781,149 @@ class DynamicClass {
         output
     );
 }
+
+#[test]
+fn test_class_es5_optional_and_readonly_properties() {
+    // Test class with optional and readonly properties
+    let source = r#"
+class Config {
+    readonly version: string = "1.0.0";
+    readonly buildDate: Date;
+    name?: string;
+    description?: string = "Default description";
+
+    constructor(buildDate: Date) {
+        this.buildDate = buildDate;
+    }
+
+    getVersion(): string {
+        return this.version;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Config should emit as function
+    assert!(
+        output.contains("function Config"),
+        "Expected Config class to emit as function: {}",
+        output
+    );
+
+    // readonly properties with initializers should be emitted
+    assert!(
+        output.contains("this.version = \"1.0.0\""),
+        "Expected readonly version property with initializer: {}",
+        output
+    );
+
+    // buildDate should be assigned in constructor
+    assert!(
+        output.contains("this.buildDate"),
+        "Expected readonly buildDate property assignment: {}",
+        output
+    );
+
+    // optional property with default should be emitted
+    assert!(
+        output.contains("this.description = \"Default description\""),
+        "Expected optional description property with default: {}",
+        output
+    );
+
+    // Method should be on prototype
+    assert!(
+        output.contains(".prototype.getVersion") || output.contains("prototype[\"getVersion\"]"),
+        "Expected getVersion method on prototype: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_constructor_overloads() {
+    // Test class with constructor overloads
+    let source = r#"
+class Point {
+    x: number;
+    y: number;
+
+    constructor();
+    constructor(x: number, y: number);
+    constructor(point: { x: number; y: number });
+    constructor(xOrPoint?: number | { x: number; y: number }, y?: number) {
+        if (typeof xOrPoint === 'object') {
+            this.x = xOrPoint.x;
+            this.y = xOrPoint.y;
+        } else {
+            this.x = xOrPoint ?? 0;
+            this.y = y ?? 0;
+        }
+    }
+
+    distanceTo(other: Point): number {
+        return Math.sqrt((this.x - other.x) ** 2 + (this.y - other.y) ** 2);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Point should emit as function
+    assert!(
+        output.contains("function Point"),
+        "Expected Point class to emit as function: {}",
+        output
+    );
+
+    // Only one constructor implementation should be emitted
+    let function_point_count = output.matches("function Point").count();
+    assert!(
+        function_point_count == 1,
+        "Expected exactly one Point constructor, found {}: {}",
+        function_point_count,
+        output
+    );
+
+    // Constructor body should have the implementation logic
+    assert!(
+        output.contains("this.x") && output.contains("this.y"),
+        "Expected x and y property assignments: {}",
+        output
+    );
+
+    // Method should be on prototype
+    assert!(
+        output.contains(".prototype.distanceTo") || output.contains("prototype[\"distanceTo\"]"),
+        "Expected distanceTo method on prototype: {}",
+        output
+    );
+}
