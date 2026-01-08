@@ -7,7 +7,7 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-- [ ] Solver inference hardening: handle circular `extends` constraints and usage-based inference in `wasm/src/solver/infer.rs`; add regressions in `wasm/src/solver/infer_tests.rs`; run `./wasm/test.sh`.
+- [x] Solver inference hardening: handle circular `extends` constraints and usage-based inference in `wasm/src/solver/infer.rs`; add regressions in `wasm/src/solver/infer_tests.rs`; run `./wasm/test.sh`.
 
 ## Task Queue
 - [ ] Add context-sensitive typing inference cases (contextual signatures + `extends` constraints) in `wasm/src/solver/infer_tests.rs`.
@@ -15,7 +15,7 @@ Priority: 1
 - [ ] Add coverage for union targets with placeholder members in `wasm/src/solver/infer_tests.rs` if still failing vs `tsc`.
 
 ## Completed
-- [x] (Move finished items here with brief notes and tests run)
+- [x] Solver inference hardening: add cyclic upper bound expansion + usage-based inference tests. Ran `./wasm/test.sh` (fails: emitter_edge_case_tests::test_export_assignment_suppresses_other_exports).
 
 ## Ready for Merge
 No

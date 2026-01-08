@@ -475,7 +475,7 @@ fn test_resolve_mutual_circular_upper_bounds_with_concrete() {
     let result_u = ctx.resolve_with_constraints(var_u).unwrap();
 
     assert_eq!(result_t, TypeId::STRING);
-    assert_eq!(result_u, TypeId::UNKNOWN);
+    assert_eq!(result_u, TypeId::STRING);
 }
 
 #[test]
@@ -4318,6 +4318,74 @@ fn test_resolve_no_constraints() {
     // No constraints at all
     let result = ctx.resolve_with_constraints(var).unwrap();
     assert_eq!(result, TypeId::UNKNOWN);
+}
+
+#[test]
+fn test_resolve_circular_extends_with_concrete_bound() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let u_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: u_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // Simulate: <T extends U, U extends T, U extends string>
+    ctx.add_upper_bound(var_t, u_type);
+    ctx.add_upper_bound(var_u, t_type);
+    ctx.add_upper_bound(var_u, TypeId::STRING);
+
+    let result_t = ctx.resolve_with_constraints(var_t).unwrap();
+    let result_u = ctx.resolve_with_constraints(var_u).unwrap();
+
+    assert_eq!(result_t, TypeId::STRING);
+    assert_eq!(result_u, TypeId::STRING);
+}
+
+#[test]
+fn test_resolve_usage_based_inference_from_bound_param() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let u_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: u_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // Simulate: <T extends U, U extends T> with usage-based lower bound on U.
+    ctx.add_upper_bound(var_t, u_type);
+    ctx.add_upper_bound(var_u, t_type);
+
+    let hello = interner.literal_string("hello");
+    ctx.add_lower_bound(var_u, hello);
+
+    let result_t = ctx.resolve_with_constraints(var_t).unwrap();
+    let result_u = ctx.resolve_with_constraints(var_u).unwrap();
+
+    assert_eq!(result_t, hello);
+    assert_eq!(result_u, hello);
 }
 
 // =============================================================================
