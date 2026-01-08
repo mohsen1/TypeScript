@@ -18320,3 +18320,548 @@ console.log(fmt.format("test message"));"#;
         "expected mappings to reference source file"
     );
 }
+
+// ============================================================================
+// Destructuring Transform Source Map Tests
+// ============================================================================
+
+#[test]
+fn test_source_map_destructuring_object_basic() {
+    // Test basic object destructuring
+    let source = r#"const obj = { a: 1, b: 2, c: 3 };
+const { a, b, c } = obj;
+console.log(a, b, c);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify output contains variable names
+    assert!(
+        output.contains("obj"),
+        "expected output to contain variable name. output: {output}"
+    );
+
+    // Verify we have source mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for object destructuring"
+    );
+
+    // Verify at least some mappings reference the source file
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_destructuring_array_basic() {
+    // Test basic array destructuring
+    let source = r#"const arr = [1, 2, 3];
+const [first, second, third] = arr;
+console.log(first, second, third);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify output contains variable names
+    assert!(
+        output.contains("arr"),
+        "expected output to contain variable name. output: {output}"
+    );
+
+    // Verify we have source mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for array destructuring"
+    );
+
+    // Verify at least some mappings reference the source file
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_destructuring_object_with_rename() {
+    // Test object destructuring with property renaming
+    let source = r#"const person = { firstName: "John", lastName: "Doe" };
+const { firstName: first, lastName: last } = person;
+console.log(first, last);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify output contains variable name
+    assert!(
+        output.contains("person"),
+        "expected output to contain variable name. output: {output}"
+    );
+
+    // Verify we have source mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for object destructuring with rename"
+    );
+
+    // Verify at least some mappings reference the source file
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_destructuring_array_with_skip() {
+    // Test array destructuring with skipped elements
+    let source = r#"const numbers = [1, 2, 3, 4, 5];
+const [first, , third, , fifth] = numbers;
+console.log(first, third, fifth);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify output contains variable name
+    assert!(
+        output.contains("numbers"),
+        "expected output to contain variable name. output: {output}"
+    );
+
+    // Verify we have source mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for array destructuring with skip"
+    );
+
+    // Verify at least some mappings reference the source file
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_destructuring_nested_object() {
+    // Test nested object destructuring
+    let source = r#"const user = {
+    name: "John",
+    address: { city: "NYC", zip: "10001" }
+};
+const { name, address: { city, zip } } = user;
+console.log(name, city, zip);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify output contains variable name
+    assert!(
+        output.contains("user"),
+        "expected output to contain variable name. output: {output}"
+    );
+
+    // Verify we have source mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for nested object destructuring"
+    );
+
+    // Verify at least some mappings reference the source file
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_destructuring_nested_array() {
+    // Test nested array destructuring
+    let source = r#"const matrix = [[1, 2], [3, 4], [5, 6]];
+const [[a, b], [c, d]] = matrix;
+console.log(a, b, c, d);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify output contains variable name
+    assert!(
+        output.contains("matrix"),
+        "expected output to contain variable name. output: {output}"
+    );
+
+    // Verify we have source mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for nested array destructuring"
+    );
+
+    // Verify at least some mappings reference the source file
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_destructuring_object_with_defaults() {
+    // Test object destructuring with default values
+    let source = r#"const config = { host: "localhost" };
+const { host, port = 3000, protocol = "http" } = config;
+console.log(host, port, protocol);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify output contains variable name
+    assert!(
+        output.contains("config"),
+        "expected output to contain variable name. output: {output}"
+    );
+
+    // Verify we have source mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for object destructuring with defaults"
+    );
+
+    // Verify at least some mappings reference the source file
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_destructuring_array_with_defaults() {
+    // Test array destructuring with default values
+    let source = r#"const partial = [1];
+const [x = 0, y = 0, z = 0] = partial;
+console.log(x, y, z);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify output contains variable name
+    assert!(
+        output.contains("partial"),
+        "expected output to contain variable name. output: {output}"
+    );
+
+    // Verify we have source mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for array destructuring with defaults"
+    );
+
+    // Verify at least some mappings reference the source file
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_destructuring_function_params() {
+    // Test destructuring in function parameters
+    let source = r#"function processUser({ name, age }: { name: string, age: number }) {
+    console.log(name, age);
+}
+function processCoords([x, y]: [number, number]) {
+    console.log(x, y);
+}
+processUser({ name: "John", age: 30 });
+processCoords([10, 20]);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify output contains function names
+    assert!(
+        output.contains("processUser"),
+        "expected output to contain function name. output: {output}"
+    );
+
+    // Verify we have source mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for destructuring in function params"
+    );
+
+    // Verify at least some mappings reference the source file
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_destructuring_mixed() {
+    // Test mixed object and array destructuring
+    let source = r#"const data = {
+    items: [1, 2, 3],
+    meta: { count: 3, page: 1 }
+};
+const { items: [first, second], meta: { count } } = data;
+console.log(first, second, count);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify output contains variable name
+    assert!(
+        output.contains("data"),
+        "expected output to contain variable name. output: {output}"
+    );
+
+    // Verify we have source mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for mixed destructuring"
+    );
+
+    // Verify at least some mappings reference the source file
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
