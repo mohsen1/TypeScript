@@ -1,16 +1,27 @@
 # Worker 4 Plan
 
+## 🔥 CRUCIBLE - TEST PORTING (REASSIGNED)
+
+**Per wasm/README.md Project Direction: Reassigned from Anvil to Crucible test porting.**
+
+- ⛔ NO more emitter work
+- ⛔ NO more ES5 class tests
+- ✅ Port solver tests from official TypeScript repo ONLY
+
 ## Mission
-Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transforms, cli, lsp).
+Port mapped type tests from official TypeScript repo into `tests/cases/`.
 
 Status: Active
 Priority: 4
+Mode: **CRUCIBLE - TEST PORTING**
 
 ## Current Assignment
-- [ ] Add ES5 class tests for parameter properties in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
+- [ ] Port `mappedTypes1.ts` and `mappedTypes2.ts` from `microsoft/TypeScript/tests/cases/conformance/types/mapped/`
 
 ## Task Queue
-- [ ] (empty)
+- [ ] Port `mappedTypeConstraints.ts` - constraint handling
+- [ ] Port `keyRemappingKeyof.ts` - key remapping tests
+- [ ] Target: 15-20 mapped type tests this week
 
 ## Completed
 - [x] Add ES5 class tests for constructor overloads. Tests: `./wasm/test.sh class_es5_tests`

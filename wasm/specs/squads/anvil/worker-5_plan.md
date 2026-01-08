@@ -1,16 +1,27 @@
 # Worker 5 Plan
 
+## 🔥 CRUCIBLE - TEST PORTING (REASSIGNED)
+
+**Per wasm/README.md Project Direction: Reassigned from Anvil to Crucible test porting.**
+
+- ⛔ NO more emitter work
+- ⛔ NO more async ES5 tests
+- ✅ Port solver tests from official TypeScript repo ONLY
+
 ## Mission
-Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transforms, cli, lsp).
+Port conditional and mapped type tests from official TypeScript repo into `tests/cases/`.
 
 Status: Active
 Priority: 5
+Mode: **CRUCIBLE - TEST PORTING**
 
 ## Current Assignment
-- [ ] Add ES5 async tests for async IIFE patterns in `wasm/src/transforms/async_es5_tests.rs`. Run `./wasm/test.sh async_es5_tests`.
+- [ ] Port `distributiveConditionalTypes.ts` from `microsoft/TypeScript/tests/cases/conformance/types/conditional/`
 
 ## Task Queue
-- [ ] (empty)
+- [ ] Port `templateLiteralTypes1.ts` - template literal type tests
+- [ ] Port `mappedTypeRecursiveInference.ts` - recursive mapped types
+- [ ] Target: 15-20 conditional/mapped type tests this week
 
 ## Completed
 - [x] Added 12 async generator function tests (basic yield, with await, yield await, multiple yields, yield in loop, body_contains_await, ignores nested async, for-await-of, try/catch, yield*, return value) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (124 tests PASS).

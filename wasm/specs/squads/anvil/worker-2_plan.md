@@ -1,16 +1,25 @@
 # Worker 2 Plan
 
+## ⛔ OPERATION CRUCIBLE - BUG FIXES ONLY
+
+**Per wasm/README.md Project Direction: Emitter is 80% complete. MAINTENANCE MODE.**
+
+- ⛔ NO new parity tests
+- ⛔ NO new source map tests
+- ✅ Bug fixes ONLY
+
 ## Mission
-Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transforms, cli, lsp).
+Execute bug fix tasks for the Anvil squad.
 
 Status: Active
 Priority: 2
+Mode: **BUG FIXES ONLY**
 
 ## Current Assignment
-- [ ] (awaiting next task)
+- [ ] Fix critical source map bug: verify source maps attach correctly in debuggers for async ES5 transforms
 
-## Task Queue
-- [ ] (empty)
+## Task Queue (BUG FIXES ONLY)
+- [ ] Fix any source map validation issues that block debugger attachment
 
 ## Completed
 - [x] Added ES5 logical assignment operator parity tests (||=, &&=, ??=, property) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (92 tests).
