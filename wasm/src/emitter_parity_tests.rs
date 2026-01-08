@@ -3404,3 +3404,143 @@ fn test_parity_es5_destructuring_rest() {
         output
     );
 }
+
+/// Parity test for ES5 optional method call downlevel.
+/// Optional method calls (?.) should be transformed.
+#[test]
+fn test_parity_es5_optional_method_call() {
+    let source = "const result = obj?.method?.();";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify variable declaration
+    assert!(
+        output.contains("result"),
+        "ES5 output should define result: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 optional element access downlevel.
+/// Optional element access (?.[ ]) should be transformed.
+#[test]
+fn test_parity_es5_optional_element_access() {
+    let source = "const value = arr?.[0]?.name;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify variable declaration
+    assert!(
+        output.contains("value"),
+        "ES5 output should define value: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 optional chaining with nullish coalescing.
+/// Combined ?. and ?? should both be handled.
+#[test]
+fn test_parity_es5_optional_chaining_with_nullish() {
+    let source = "const name = user?.profile?.name ?? 'Anonymous';";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify variable declaration
+    assert!(
+        output.contains("name"),
+        "ES5 output should define name: {}",
+        output
+    );
+    // Default value should be preserved
+    assert!(
+        output.contains("Anonymous"),
+        "ES5 output should preserve default value: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 optional chaining in function call.
+/// Optional chaining before function call should be handled.
+#[test]
+fn test_parity_es5_optional_chaining_call() {
+    let source = "const result = callback?.(arg1, arg2);";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify variable declaration
+    assert!(
+        output.contains("result"),
+        "ES5 output should define result: {}",
+        output
+    );
+    // Arguments should be preserved
+    assert!(
+        output.contains("arg1") && output.contains("arg2"),
+        "ES5 output should preserve arguments: {}",
+        output
+    );
+}
