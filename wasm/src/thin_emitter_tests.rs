@@ -2218,6 +2218,32 @@ fn test_commonjs_helpers_before_esmodule_marker() {
 }
 
 #[test]
+fn test_commonjs_esmodule_marker_before_exports_init() {
+    let source = "export const x = 1;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    let esmodule_pos = output
+        .find("__esModule")
+        .expect("Expected __esModule marker");
+    let exports_init_pos = output
+        .find("exports.x = void 0")
+        .expect("Expected exports initialization");
+    assert!(
+        esmodule_pos < exports_init_pos,
+        "__esModule marker should precede exports initialization"
+    );
+}
+
+#[test]
 fn test_commonjs_export_const() {
     let source = "export const x = 42;";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
