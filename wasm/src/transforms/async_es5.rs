@@ -230,6 +230,9 @@ impl<'a> AsyncES5Emitter<'a> {
                     };
 
                     if let Some(decl) = self.arena.get_variable_declaration(decl_list_node) {
+                        if self.contains_await_recursive(decl.name) {
+                            return true;
+                        }
                         if self.contains_await_recursive(decl.initializer) {
                             return true;
                         }
@@ -242,6 +245,9 @@ impl<'a> AsyncES5Emitter<'a> {
                                 continue;
                             };
                             if let Some(decl) = self.arena.get_variable_declaration(decl_node) {
+                                if self.contains_await_recursive(decl.name) {
+                                    return true;
+                                }
                                 if self.contains_await_recursive(decl.initializer) {
                                     return true;
                                 }
@@ -254,7 +260,53 @@ impl<'a> AsyncES5Emitter<'a> {
 
         if node.kind == syntax_kind_ext::VARIABLE_DECLARATION {
             if let Some(decl) = self.arena.get_variable_declaration(node) {
+                if self.contains_await_recursive(decl.name) {
+                    return true;
+                }
                 if self.contains_await_recursive(decl.initializer) {
+                    return true;
+                }
+            }
+        }
+
+        if node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN
+            || node.kind == syntax_kind_ext::ARRAY_BINDING_PATTERN
+        {
+            if let Some(pattern) = self.arena.get_binding_pattern(node) {
+                for &elem_idx in &pattern.elements.nodes {
+                    if elem_idx.is_none() {
+                        continue;
+                    }
+                    if self.contains_await_recursive(elem_idx) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        if node.kind == syntax_kind_ext::BINDING_ELEMENT {
+            if let Some(binding) = self.arena.get_binding_element(node) {
+                if binding.property_name.is_some()
+                    && self.contains_await_recursive(binding.property_name)
+                {
+                    return true;
+                }
+                if binding.name.is_some()
+                    && self.contains_await_recursive(binding.name)
+                {
+                    return true;
+                }
+                if binding.initializer.is_some()
+                    && self.contains_await_recursive(binding.initializer)
+                {
+                    return true;
+                }
+            }
+        }
+
+        if node.kind == syntax_kind_ext::COMPUTED_PROPERTY_NAME {
+            if let Some(computed) = self.arena.get_computed_property(node) {
+                if self.contains_await_recursive(computed.expression) {
                     return true;
                 }
             }
@@ -457,6 +509,9 @@ impl<'a> AsyncES5Emitter<'a> {
 
         if node.kind == syntax_kind_ext::PROPERTY_ASSIGNMENT {
             if let Some(prop) = self.arena.get_property_assignment(node) {
+                if self.contains_await_recursive(prop.name) {
+                    return true;
+                }
                 if self.contains_await_recursive(prop.initializer) {
                     return true;
                 }
