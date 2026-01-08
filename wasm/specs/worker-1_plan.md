@@ -5,15 +5,20 @@ Execute the highest-impact tasks assigned by the manager across all areas (solve
 
 Status: Active
 Priority: 1
+Ready for merge: yes
 
 ## Current Assignment
 - Awaiting next assignment.
 
 ## Task Queue
+- [ ] Investigate and resolve Docker build failure in `wasm/src/cli/driver.rs` (E0515 in latest rust merge).
 - [ ] Add mixed-case exponent negative leading zeros test (`1Ee-0001`).
 - [ ] Add mixed-case exponent missing sign with leading zeros test (`1Ee01`).
 - [ ] Add mixed-case exponent trailing double-minus test (`1Ee--`).
 - [ ] Add uppercase exponent leading zeros with zero exponent test (`1E+00`).
+- [ ] Add lowercase exponent plus missing digits test (`1e+`).
+- [ ] Add uppercase exponent plus missing digits test (`1E+`).
+- [ ] Add numeric separator underscore name test (`1_0` or `1_0e1`).
 
 ## Completed
 - [x] Conditional infer object coverage in `wasm/src/solver/evaluate.rs` with tests in `wasm/src/solver/evaluate_tests.rs`. Tests: `./wasm/test.sh test_conditional_infer_object_`.
