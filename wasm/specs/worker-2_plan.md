@@ -7,13 +7,14 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- Solver hardening: stress test conditional type evaluation in `wasm/src/solver/evaluate.rs`. Add or extend tests in `wasm/src/solver/evaluate_tests.rs` for distributive conditionals over unions and fix any mismatches.
+- Awaiting next assignment.
 
 ## Task Queue
+- [ ] Solver hardening: stress test conditional type evaluation in `wasm/src/solver/evaluate.rs`. Add or extend tests in `wasm/src/solver/evaluate_tests.rs` for distributive conditionals over unions and fix any mismatches.
 - [ ] If conditionals already pass, add coverage for nested/distributive conditionals with `extends` and `infer` positions.
 
 ## Completed
-- [x] (Move finished items here with brief notes and tests run.)
+- [x] Added optional/rest/`this` assignability edge cases and tightened parameter matching; ran `./wasm/test.sh optional_parameter_assignability`, `./wasm/test.sh this_parameter_assignability`, `./wasm/test.sh rest_parameter_assignability`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
