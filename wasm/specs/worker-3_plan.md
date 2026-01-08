@@ -7,10 +7,10 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- (Manager to fill in.)
+- Emitter fidelity: run `emitter_parity_tests::test_parity_async_es5` in your worktree with `--nocapture` if possible and report the actual output/diff versus expected (no code edits yet).
 
 ## Task Queue
-- [ ] (Manager to fill in.)
+- [ ] If the diff is noisy, trim to the smallest failing snippet and highlight the first semantic mismatch.
 
 ## Completed
 - [x] (Move finished items here with brief notes and tests run.)

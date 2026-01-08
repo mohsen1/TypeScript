@@ -7,10 +7,10 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-- (Manager to fill in.)
+- Emitter fidelity: investigate `emitter_parity_tests::test_parity_async_es5`. Run targeted test, capture actual vs expected output, and propose the minimal fix (test or code). Coordinate with worker-4/5.
 
 ## Task Queue
-- [ ] (Manager to fill in.)
+- [ ] If parity_async_es5 fix is unclear, isolate the failing snippet and report minimal repro with expected/actual output.
 
 ## Completed
 - [x] (Move finished items here with brief notes and tests run.)
