@@ -24,16 +24,17 @@ engine on top to match TypeScript behavior while preserving correctness where po
 ### Critical Objectives (Ranked)
 
 1.  **Solver Hardening (The "Brain")**
+    *   **🚨 BLOCKER: Redux/Lodash Generics** - `test_check_redux_lodash_style_generics` must pass. This test combines mapped types, conditional inference, AND cross-file resolution simultaneously. The bug is likely in `TypeEvaluator` handling deferred resolution of `MappedType` constraints when they depend on imported symbols. **Swarm this until it's green.**
     *   **Generic Inference:** `solver/infer.rs` is critical. Focus on inference from usage, context-sensitive typing, and handling circular constraints in `extends` clauses.
     *   **Conditional Types:** Stress test `solver/evaluate.rs` with distributive conditional types over unions. This is where most "toy" compilers fail.
     *   **Structural Compatibility:** Verify `subtype.rs` handles variance correctly (covariance for results, contravariance for parameters) in all edge cases.
 
 2.  **Emitter Fidelity (The "Voice")**
     *   **ES5 Downleveling:** Ensure `transforms/class_es5.rs` and `async_es5.rs` produce semantically identical JavaScript to `tsc`. Edge cases: `super()` calls in derived classes with property initializers, and `this` capture in deeply nested arrow/async functions.
-    *   **Source Maps:** Verify `source_writer.rs` generates valid maps that debuggers can actually attach to.
+    *   **Source Map Validation:** Verify `source_writer.rs` generates valid maps that debuggers can actually attach to. **Prioritize validating that debuggers can step through downleveled async code** - this is where source map bugs hide.
 
-3.  **End-to-End Validation**
-    *   Stop adding AST nodes. Start compiling real code.
+3.  **Performance Regression Check**
+    *   Run `./wasm/bench.sh` regularly. The 500 MB/s throughput goal must not regress as we add correctness checks to `evaluate.rs` and transform passes.
     *   **Metric:** Successfully compile a non-trivial generic library (e.g., `redux` or `lodash` types) without panicking.
 
 ### Anti-Priorities (Do Not Work On)

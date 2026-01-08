@@ -58,6 +58,12 @@ Phase 8 - Conformance, Convergence, and Hardening: Type-system correctness in th
 - Read `wasm/specs/TS_UNSOUNDNESS_CATALOG.md` for known TypeScript unsoundness
 - Use Docker for tests: `./wasm/test.sh`
 
+## Management Strategy
+Per Project Direction: **Autocratic Scheduling**
+- The Manager is the single source of truth for priority
+- Squads are generic workers - if Solver needs more workers, they get assigned regardless of previous track
+- Zero-Idle: If a high-priority task is blocked, swarm it
+
 ## Squad Status
 - Last EM Report: 2026-01-08 17:30
 - Workers Active: 5/5
