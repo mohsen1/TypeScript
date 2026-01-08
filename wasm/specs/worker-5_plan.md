@@ -218,4 +218,3 @@ Priority: 5
 - Re-ran `./wasm/test.sh test_source_map_es5_transform_async_await_conditional_mapping`.
 - Re-ran `./wasm/test.sh test_source_map_es5_transform_async_arrow_captures_this_mapping`.
 - Re-ran `./wasm/test.sh test_source_map_es5_transform_async_binary_modulo_mapping`.
-- Ready for merge.
