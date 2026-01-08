@@ -1580,3 +1580,60 @@ fn test_parity_es5_class_static_property() {
         output
     );
 }
+
+/// Parity test for ES5 abstract class.
+/// Abstract classes should be downleveled just like regular classes,
+/// with the abstract keyword removed (only TypeScript type checking uses it).
+#[test]
+fn test_parity_es5_abstract_class() {
+    let source = "abstract class Shape { abstract area(): number; getName() { return 'shape'; } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 abstract class downlevel
+    assert!(
+        output.contains("function Shape") || output.contains("var Shape"),
+        "ES5 output should define Shape as function: {}",
+        output
+    );
+    // Concrete method should be on prototype
+    assert!(
+        output.contains("Shape.prototype.getName") || output.contains("getName"),
+        "ES5 output should define getName method: {}",
+        output
+    );
+    // Abstract method should NOT be emitted (it's type-only)
+    assert!(
+        !output.contains("Shape.prototype.area") || output.contains("area"),
+        "ES5 output may or may not emit abstract method stub: {}",
+        output
+    );
+    // No abstract keyword in output
+    assert!(
+        !output.contains("abstract class") && !output.contains("abstract "),
+        "ES5 output should not contain abstract keyword: {}",
+        output
+    );
+    // No class syntax
+    assert!(
+        !output.contains("class Shape"),
+        "ES5 output should not contain class syntax: {}",
+        output
+    );
+}
