@@ -102,7 +102,6 @@ Priority: 2
 - [x] Added non-distributive template literal suffix infer test with non-string union branch (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_with_suffix_non_distributive_non_string_union_branch`.
 
 ## Notes
-- Ready for merge.
 - Blocker: Docker tests fail with E0515 in `wasm/src/cli/driver.rs` after merging `origin/rust`; waiting on fix.
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
 - Use Docker for Rust tests (`./wasm/test.sh`), never `cargo test` directly.
