@@ -17,6 +17,8 @@ Priority: 5
       Tests: `./wasm/test.sh test_source_map_es5_transform_async_await_mapping`.
 - [x] Added ES5 class extends source map mapping test in `wasm/src/source_map_tests.rs`.
       Tests: `./wasm/test.sh test_source_map_es5_transform_class_extends_mapping`.
+- [x] Added ES5 class property initializer source map mapping test in `wasm/src/source_map_tests.rs`.
+      Tests: `./wasm/test.sh test_source_map_es5_transform_class_property_initializer_mapping`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
