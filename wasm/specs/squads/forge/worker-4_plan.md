@@ -7,7 +7,7 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [x] Add solver tests for Parameters<T>, ConstructorParameters<T>, and InstanceType<T> utility types. **Done:** Added 5 tests covering these patterns with optional and rest param variations.
+- [x] Add solver tests for Awaited<T>, ThisParameterType<T>, and OmitThisParameter<T> utility types. **Done:** Added 6 tests covering Promise unwrapping and this parameter extraction/removal.
 
 ## Task Queue
 (empty - awaiting next assignment)
@@ -60,6 +60,12 @@ Priority: 4
 - [x] Added solver coverage for InstanceType utility type pattern. Tests: `./wasm/test.sh`.
 - [x] Added solver coverage for Parameters with optional params. Tests: `./wasm/test.sh`.
 - [x] Added solver coverage for Parameters with rest params. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for Awaited utility type pattern. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for Awaited with non-Promise (returns T). Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for ThisParameterType utility type pattern. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for ThisParameterType with no this (returns unknown). Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for OmitThisParameter utility type pattern. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for OmitThisParameter with no this. Tests: `./wasm/test.sh`.
 
 ## Ready for Merge
 Yes
