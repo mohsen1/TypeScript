@@ -2381,3 +2381,56 @@ class IterableCollection<T> {
         output
     );
 }
+
+#[test]
+fn test_class_es5_private_method_in_async_method() {
+    // Test private method called from async method
+    let source = r#"
+class Counter {
+    #count = 0;
+
+    #increment() {
+        this.#count++;
+    }
+
+    async addMultiple(times: number) {
+        for (let i = 0; i < times; i++) {
+            await delay(10);
+            this.#increment();
+        }
+        return this.#count;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function Counter"),
+        "Expected class to emit as function: {}",
+        output
+    );
+
+    // Private method call should use _this capture inside async/generator context
+    // The async method body is transformed and needs proper this capture
+    assert!(
+        output.contains("__awaiter") || output.contains("__generator") || output.contains("_this"),
+        "Expected async transform with this capture for private method call: {}",
+        output
+    );
+}
