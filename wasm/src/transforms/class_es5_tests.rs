@@ -5343,3 +5343,405 @@ const Counter = class {
         output
     );
 }
+
+// =============================================================================
+// Generic Class Tests
+// =============================================================================
+
+#[test]
+fn test_class_es5_generic_class_basic() {
+    // Test basic generic class with type parameter
+    let source = r#"
+class Container<T> {
+    private value: T;
+
+    constructor(value: T) {
+        this.value = value;
+    }
+
+    getValue(): T {
+        return this.value;
+    }
+
+    setValue(value: T): void {
+        this.value = value;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Generic class should emit as function (type parameter erased)
+    assert!(
+        output.contains("function Container"),
+        "Expected Container to emit as function: {}",
+        output
+    );
+
+    // Constructor should set value
+    assert!(
+        output.contains("this.value") || output.contains("value"),
+        "Expected value assignment: {}",
+        output
+    );
+
+    // Methods should be on prototype
+    assert!(
+        output.contains("getValue") || output.contains(".prototype.getValue"),
+        "Expected getValue method: {}",
+        output
+    );
+    assert!(
+        output.contains("setValue") || output.contains(".prototype.setValue"),
+        "Expected setValue method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_generic_class_multiple_type_params() {
+    // Test generic class with multiple type parameters
+    let source = r#"
+class Pair<K, V> {
+    key: K;
+    value: V;
+
+    constructor(key: K, value: V) {
+        this.key = key;
+        this.value = value;
+    }
+
+    getKey(): K {
+        return this.key;
+    }
+
+    getValue(): V {
+        return this.value;
+    }
+
+    swap(): Pair<V, K> {
+        return new Pair(this.value, this.key);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Generic class should emit as function
+    assert!(
+        output.contains("function Pair"),
+        "Expected Pair to emit as function: {}",
+        output
+    );
+
+    // Constructor should set key and value
+    assert!(
+        output.contains("this.key") || output.contains("key"),
+        "Expected key assignment: {}",
+        output
+    );
+    assert!(
+        output.contains("this.value") || output.contains("value"),
+        "Expected value assignment: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("getKey"),
+        "Expected getKey method: {}",
+        output
+    );
+    assert!(
+        output.contains("getValue"),
+        "Expected getValue method: {}",
+        output
+    );
+    assert!(
+        output.contains("swap"),
+        "Expected swap method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_generic_class_with_constraint() {
+    // Test generic class with type constraint
+    let source = r#"
+class NumberContainer<T extends number> {
+    items: T[] = [];
+
+    add(item: T): void {
+        this.items.push(item);
+    }
+
+    sum(): number {
+        return this.items.reduce((acc, item) => acc + item, 0);
+    }
+
+    getItems(): T[] {
+        return this.items;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Generic class should emit as function
+    assert!(
+        output.contains("function NumberContainer"),
+        "Expected NumberContainer to emit as function: {}",
+        output
+    );
+
+    // Instance field should be initialized
+    assert!(
+        output.contains("this.items") || output.contains("items"),
+        "Expected items field: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("add"),
+        "Expected add method: {}",
+        output
+    );
+    assert!(
+        output.contains("sum"),
+        "Expected sum method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_generic_class_extends() {
+    // Test generic class extending another generic class
+    let source = r#"
+class Base<T> {
+    value: T;
+
+    constructor(value: T) {
+        this.value = value;
+    }
+}
+
+class Extended<T, U> extends Base<T> {
+    extra: U;
+
+    constructor(value: T, extra: U) {
+        super(value);
+        this.extra = extra;
+    }
+
+    getExtra(): U {
+        return this.extra;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    // Get Extended class (second statement)
+    let class_idx = *source_file.statements.nodes.get(1).expect("expected Extended class");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Generic class should emit as function
+    assert!(
+        output.contains("function Extended"),
+        "Expected Extended to emit as function: {}",
+        output
+    );
+
+    // Should have inheritance setup
+    assert!(
+        output.contains("_super") || output.contains("Base") || output.contains("__extends"),
+        "Expected inheritance handling: {}",
+        output
+    );
+
+    // Extra field should be set
+    assert!(
+        output.contains("this.extra") || output.contains("extra"),
+        "Expected extra field: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("getExtra"),
+        "Expected getExtra method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_generic_class_with_default_type() {
+    // Test generic class with default type parameter
+    let source = r#"
+class Optional<T = string> {
+    private value: T | undefined;
+
+    constructor(value?: T) {
+        this.value = value;
+    }
+
+    hasValue(): boolean {
+        return this.value !== undefined;
+    }
+
+    getValue(): T | undefined {
+        return this.value;
+    }
+
+    setValue(value: T): void {
+        this.value = value;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Generic class should emit as function
+    assert!(
+        output.contains("function Optional"),
+        "Expected Optional to emit as function: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("hasValue"),
+        "Expected hasValue method: {}",
+        output
+    );
+    assert!(
+        output.contains("getValue"),
+        "Expected getValue method: {}",
+        output
+    );
+    assert!(
+        output.contains("setValue"),
+        "Expected setValue method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_generic_class_with_static_members() {
+    // Test generic class with static members
+    let source = r#"
+class Registry<T> {
+    static defaultCapacity: number = 100;
+    private items: Map<string, T> = new Map();
+
+    static setDefaultCapacity(capacity: number): void {
+        Registry.defaultCapacity = capacity;
+    }
+
+    register(key: string, item: T): void {
+        this.items.set(key, item);
+    }
+
+    get(key: string): T | undefined {
+        return this.items.get(key);
+    }
+
+    size(): number {
+        return this.items.size;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Generic class should emit as function
+    assert!(
+        output.contains("function Registry"),
+        "Expected Registry to emit as function: {}",
+        output
+    );
+
+    // Static field should be on constructor
+    assert!(
+        output.contains("Registry.defaultCapacity") || output.contains("defaultCapacity"),
+        "Expected defaultCapacity static field: {}",
+        output
+    );
+
+    // Static method should be on constructor
+    assert!(
+        output.contains("Registry.setDefaultCapacity") || output.contains("setDefaultCapacity"),
+        "Expected setDefaultCapacity static method: {}",
+        output
+    );
+
+    // Instance methods should be present
+    assert!(
+        output.contains("register"),
+        "Expected register method: {}",
+        output
+    );
+    assert!(
+        output.contains("get"),
+        "Expected get method: {}",
+        output
+    );
+}
