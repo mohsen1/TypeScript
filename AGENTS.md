@@ -66,13 +66,17 @@ This ensures:
 
 ## Workflow (loop)
 
-1. **Sync first**: `git fetch origin && git merge origin/rust --no-edit` (resolve conflicts if any)
-2. Read your worker *_plan.md and manager assignment.
-3. Execute the highest-impact assigned task (no self-switching).
-4. Add tests and run `./wasm/test.sh` (Docker only).
-5. Update your plan, commit, and push to your worker branch.
-6. **Signal manager**: After pushing, note in your plan that branch is ready for merge.
-7. Repeat from step 1 (sync again before next task).
+**⚠️ CRITICAL: Commit within 10 minutes. No lengthy exploration. Ship code fast.**
+
+1. **Sync first**: `git fetch origin && git merge origin/rust --no-edit`
+2. Read your plan file (30 seconds max).
+3. **Write code immediately**. Don't spend more than 5 minutes reading/exploring.
+4. Add a test. Run `./wasm/test.sh`.
+5. **Commit and push** - even partial progress is better than no commits.
+6. Mark "Ready for Merge: Yes" in your plan.
+7. Repeat.
+
+**If you've been working for 10+ minutes without a commit, STOP and commit what you have.**
 
 
 ## ✅ Commit Format
