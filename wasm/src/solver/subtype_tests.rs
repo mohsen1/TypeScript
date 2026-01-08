@@ -693,6 +693,38 @@ fn test_no_unchecked_indexed_access_array_subtyping() {
 }
 
 #[test]
+fn test_no_unchecked_indexed_access_tuple_subtyping() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+    let index_access = interner.intern(TypeKey::IndexAccess(tuple, TypeId::NUMBER));
+    let string_or_number = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    assert!(checker.is_subtype_of(index_access, string_or_number));
+
+    checker.no_unchecked_indexed_access = true;
+    assert!(!checker.is_subtype_of(index_access, string_or_number));
+
+    let string_number_or_undefined =
+        interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::UNDEFINED]);
+    assert!(checker.is_subtype_of(index_access, string_number_or_undefined));
+}
+
+#[test]
 fn test_no_unchecked_object_index_signature_subtyping() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
