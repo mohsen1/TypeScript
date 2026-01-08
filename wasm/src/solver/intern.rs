@@ -20,6 +20,7 @@ const SHARD_COUNT: usize = 1 << SHARD_BITS; // 64 shards
 const SHARD_MASK: u32 = (SHARD_COUNT as u32) - 1;
 const PROPERTY_MAP_THRESHOLD: usize = 24;
 const TYPE_LIST_INLINE: usize = 8;
+pub(crate) const TEMPLATE_LITERAL_EXPANSION_LIMIT: usize = 10000;
 
 type TypeListBuffer = SmallVec<[TypeId; TYPE_LIST_INLINE]>;
 
@@ -924,8 +925,48 @@ impl TypeInterner {
         self.intern(TypeKey::Callable(shape_id))
     }
 
+    fn template_span_cardinality(&self, type_id: TypeId) -> Option<usize> {
+        match self.lookup(type_id) {
+            Some(TypeKey::Literal(LiteralValue::String(_))) => Some(1),
+            Some(TypeKey::Union(list_id)) => {
+                let members = self.type_list(list_id);
+                let mut count = 0usize;
+                for member in members.iter() {
+                    if let Some(TypeKey::Literal(LiteralValue::String(_))) = self.lookup(*member) {
+                        count += 1;
+                    } else {
+                        return None;
+                    }
+                }
+                Some(count)
+            }
+            _ => None,
+        }
+    }
+
+    fn template_literal_exceeds_limit(&self, spans: &[TemplateSpan]) -> bool {
+        let mut total = 1usize;
+        for span in spans {
+            let span_count = match span {
+                TemplateSpan::Text(_) => Some(1),
+                TemplateSpan::Type(type_id) => self.template_span_cardinality(*type_id),
+            };
+            let Some(span_count) = span_count else {
+                return false;
+            };
+            total = total.saturating_mul(span_count);
+            if total > TEMPLATE_LITERAL_EXPANSION_LIMIT {
+                return true;
+            }
+        }
+        false
+    }
+
     /// Intern a template literal type
     pub fn template_literal(&self, spans: Vec<TemplateSpan>) -> TypeId {
+        if self.template_literal_exceeds_limit(&spans) {
+            return TypeId::STRING;
+        }
         let list_id = self.intern_template_list(spans);
         self.intern(TypeKey::TemplateLiteral(list_id))
     }

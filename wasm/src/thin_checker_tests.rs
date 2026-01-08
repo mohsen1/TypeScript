@@ -144,6 +144,36 @@ const ok: Foo = obj;
 }
 
 #[test]
+fn test_literal_widening_for_mutable_bindings() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let x = true;
+const y = true;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let x_sym = binder.file_locals.get("x").expect("x should exist");
+    let y_sym = binder.file_locals.get("y").expect("y should exist");
+    let x_type = checker.get_type_of_symbol(x_sym);
+    let y_type = checker.get_type_of_symbol(y_sym);
+
+    assert_eq!(x_type, TypeId::BOOLEAN);
+    assert_eq!(y_type, types.literal_boolean(true));
+}
+
+#[test]
 fn test_excess_property_in_call_argument() {
     use crate::thin_parser::ThinParserState;
 
@@ -1110,6 +1140,34 @@ class C {
     // Should NOT have generic "cannot find name" error 2304
     assert!(!codes.contains(&2304),
         "Should not have generic error 2304, should have specific 2662 instead. Got: {:?}", codes);
+}
+
+#[test]
+fn test_class_static_side_property_assignability() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class A {
+    static foo: number;
+}
+class B {}
+let ctor: typeof A = B;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(codes.contains(&2741),
+        "Expected error 2741 for missing static member on constructor type, got: {:?}", codes);
 }
 
 #[test]
@@ -4331,6 +4389,90 @@ var x: Alias;
     // Should produce error 2694: Namespace 'NS' has no exported member 'NotExported'
     // This error occurs when the alias is used (var x: Alias), which triggers type resolution
     assert!(codes.contains(&2694), "Expected error 2694 for import alias of non-exported member, got: {:?}", codes);
+}
+
+#[test]
+fn test_import_type_value_usage_errors() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+import type { Foo } from "./types";
+Foo;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let type_only_count = codes.iter().filter(|&&code| code == 2693).count();
+    assert_eq!(
+        type_only_count,
+        1,
+        "Expected error 2693 for using import type as value, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_numeric_enum_open_and_nominal_assignability() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+enum A { X, Y }
+enum B { X, Y }
+let a: A = 1;
+let n: number = a;
+let b: B = a;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count_2322 = codes.iter().filter(|&&code| code == 2322).count();
+    assert_eq!(
+        count_2322,
+        1,
+        "Expected one 2322 error for cross-enum assignment, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_string_enum_rejects_string_literal() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+enum S { A = "a", B = "b" }
+let s: S = "a";
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(codes.contains(&2322), "Expected error 2322 for string enum assignment, got: {:?}", codes);
 }
 
 #[test]
