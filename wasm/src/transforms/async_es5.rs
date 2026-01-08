@@ -260,6 +260,28 @@ impl<'a> AsyncES5Emitter<'a> {
             }
         }
 
+        // Check try/catch/finally statements
+        if node.kind == syntax_kind_ext::TRY_STATEMENT {
+            if let Some(try_stmt) = self.arena.get_try(node) {
+                if self.contains_await_recursive(try_stmt.try_block) {
+                    return true;
+                }
+                if self.contains_await_recursive(try_stmt.catch_clause) {
+                    return true;
+                }
+                if self.contains_await_recursive(try_stmt.finally_block) {
+                    return true;
+                }
+            }
+        }
+
+        // Check catch clauses
+        if node.kind == syntax_kind_ext::CATCH_CLAUSE {
+            if let Some(catch_clause) = self.arena.get_catch_clause(node) {
+                return self.contains_await_recursive(catch_clause.block);
+            }
+        }
+
         // Check call/new expressions
         if node.kind == syntax_kind_ext::CALL_EXPRESSION
             || node.kind == syntax_kind_ext::NEW_EXPRESSION
