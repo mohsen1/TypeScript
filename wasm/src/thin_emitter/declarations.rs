@@ -76,9 +76,22 @@ impl<'a> ThinPrinter<'a> {
 
         // Emit keyword based on node flags.
         let flags = node.flags as u32;
-        let keyword = if flags & crate::parser::node_flags::CONST != 0 {
-            "const"
-        } else if flags & crate::parser::node_flags::LET != 0 {
+        let is_const = flags & crate::parser::node_flags::CONST != 0;
+        let is_let = flags & crate::parser::node_flags::LET != 0;
+        let mut force_void_0 = false;
+        let keyword = if is_const {
+            let has_missing_initializer = decl_list.declarations.nodes.iter().any(|decl_idx| {
+                let Some(decl_node) = self.arena.get(*decl_idx) else { return false };
+                let Some(decl) = self.arena.get_variable_declaration(decl_node) else { return false };
+                decl.initializer.is_none()
+            });
+            if has_missing_initializer {
+                force_void_0 = true;
+                "var"
+            } else {
+                "const"
+            }
+        } else if is_let {
             "let"
         } else {
             "var"
@@ -86,7 +99,12 @@ impl<'a> ThinPrinter<'a> {
         self.write(keyword);
         self.write(" ");
 
+        let prev = self.emit_missing_initializer_as_void_0;
+        if force_void_0 {
+            self.emit_missing_initializer_as_void_0 = true;
+        }
         self.emit_comma_separated(&decl_list.declarations.nodes);
+        self.emit_missing_initializer_as_void_0 = prev;
     }
 
     pub(super) fn emit_variable_declaration(&mut self, node: &ThinNode) {
@@ -98,10 +116,15 @@ impl<'a> ThinPrinter<'a> {
 
         // Skip type annotation for JavaScript emit
 
-        if !decl.initializer.is_none() {
-            self.write(" = ");
-            self.emit_expression(decl.initializer);
+        if decl.initializer.is_none() {
+            if self.emit_missing_initializer_as_void_0 {
+                self.write(" = void 0");
+            }
+            return;
         }
+
+        self.write(" = ");
+        self.emit_expression(decl.initializer);
     }
 
     // =========================================================================
