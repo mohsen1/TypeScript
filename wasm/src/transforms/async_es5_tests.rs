@@ -2595,3 +2595,250 @@ fn test_async_generator_return_value() {
         output
     );
 }
+
+// =============================================================================
+// Async IIFE (Immediately Invoked Function Expression) tests
+// =============================================================================
+
+/// Helper to parse an async IIFE and emit its body
+fn parse_and_emit_async_iife(source: &str) -> String {
+    use crate::parser::syntax_kind_ext;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&stmt_idx) = source_file.statements.nodes.first() {
+                if let Some(stmt_node) = parser.arena.get(stmt_idx) {
+                    // ExpressionStatement -> CallExpression -> ParenthesizedExpression -> Function
+                    if stmt_node.kind == syntax_kind_ext::EXPRESSION_STATEMENT {
+                        if let Some(expr_stmt) = parser.arena.get_expression_statement(stmt_node) {
+                            if let Some(call_node) = parser.arena.get(expr_stmt.expression) {
+                                if call_node.kind == syntax_kind_ext::CALL_EXPRESSION {
+                                    if let Some(call_data) = parser.arena.get_call_expr(call_node) {
+                                        if let Some(paren_node) = parser.arena.get(call_data.expression) {
+                                            if paren_node.kind == syntax_kind_ext::PARENTHESIZED_EXPRESSION {
+                                                if let Some(paren_data) = parser.arena.get_parenthesized(paren_node) {
+                                                    if let Some(func_node) = parser.arena.get(paren_data.expression) {
+                                                        if func_node.kind == syntax_kind_ext::ARROW_FUNCTION
+                                                            || func_node.kind == syntax_kind_ext::FUNCTION_EXPRESSION
+                                                        {
+                                                            if let Some(func) = parser.arena.get_function(func_node) {
+                                                                let emitter = AsyncES5Emitter::new(&parser.arena);
+                                                                let has_await = emitter.body_contains_await(func.body);
+                                                                let mut emitter = AsyncES5Emitter::new(&parser.arena);
+                                                                if has_await {
+                                                                    return emitter.emit_generator_body_with_await(func.body);
+                                                                } else {
+                                                                    return emitter.emit_simple_generator_body(func.body);
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    String::new()
+}
+
+/// Helper to check if async IIFE body contains await
+fn iife_body_contains_await(source: &str) -> bool {
+    use crate::parser::syntax_kind_ext;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&stmt_idx) = source_file.statements.nodes.first() {
+                if let Some(stmt_node) = parser.arena.get(stmt_idx) {
+                    if stmt_node.kind == syntax_kind_ext::EXPRESSION_STATEMENT {
+                        if let Some(expr_stmt) = parser.arena.get_expression_statement(stmt_node) {
+                            if let Some(call_node) = parser.arena.get(expr_stmt.expression) {
+                                if call_node.kind == syntax_kind_ext::CALL_EXPRESSION {
+                                    if let Some(call_data) = parser.arena.get_call_expr(call_node) {
+                                        if let Some(paren_node) = parser.arena.get(call_data.expression) {
+                                            if paren_node.kind == syntax_kind_ext::PARENTHESIZED_EXPRESSION {
+                                                if let Some(paren_data) = parser.arena.get_parenthesized(paren_node) {
+                                                    if let Some(func_node) = parser.arena.get(paren_data.expression) {
+                                                        if func_node.kind == syntax_kind_ext::ARROW_FUNCTION
+                                                            || func_node.kind == syntax_kind_ext::FUNCTION_EXPRESSION
+                                                        {
+                                                            if let Some(func) = parser.arena.get_function(func_node) {
+                                                                let emitter = AsyncES5Emitter::new(&parser.arena);
+                                                                return emitter.body_contains_await(func.body);
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+#[test]
+fn test_async_iife_arrow_basic() {
+    let output = parse_and_emit_async_iife(
+        "(async () => { await init(); })();",
+    );
+    assert!(
+        output.contains("switch (_a.label)"),
+        "Async arrow IIFE should have switch: {}",
+        output
+    );
+    assert!(
+        output.contains("[4 /*yield*/"),
+        "Async arrow IIFE should have yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_iife_function_expression() {
+    let output = parse_and_emit_async_iife(
+        "(async function() { await setup(); })();",
+    );
+    assert!(
+        output.contains("switch (_a.label)"),
+        "Async function IIFE should have switch: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_iife_with_return() {
+    let output = parse_and_emit_async_iife(
+        "(async () => { return await getValue(); })();",
+    );
+    assert!(
+        output.contains("return [4 /*yield*/, getValue()]"),
+        "IIFE should yield getValue(): {}",
+        output
+    );
+    assert!(
+        output.contains("return [2 /*return*/, _a.sent()]"),
+        "IIFE should return _a.sent(): {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_iife_no_await() {
+    let output = parse_and_emit_async_iife(
+        "(async () => { return 42; })();",
+    );
+    assert!(
+        output.contains("[2 /*return*/, 42]"),
+        "Simple async IIFE should return 42: {}",
+        output
+    );
+    assert!(
+        !output.contains("switch"),
+        "No await should skip switch: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_iife_with_arguments() {
+    let output = parse_and_emit_async_iife(
+        "(async (x, y) => { return await compute(x, y); })(1, 2);",
+    );
+    assert!(
+        output.contains("return [4 /*yield*/, compute(x, y)]"),
+        "IIFE with args should yield compute: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_iife_body_contains_await() {
+    assert!(
+        iife_body_contains_await("(async () => { await x; })();"),
+        "Should detect await in async IIFE body"
+    );
+}
+
+#[test]
+fn test_async_iife_body_no_await() {
+    assert!(
+        !iife_body_contains_await("(async () => { return 1; })();"),
+        "Should not detect await when none present"
+    );
+}
+
+#[test]
+fn test_async_iife_ignores_nested_async() {
+    assert!(
+        !iife_body_contains_await(
+            "(async () => { const inner = async () => { await x; }; return 1; })();"
+        ),
+        "Should ignore await in nested async"
+    );
+}
+
+#[test]
+fn test_async_iife_named_function() {
+    let output = parse_and_emit_async_iife(
+        "(async function initialize() { await setup(); await configure(); })();",
+    );
+    assert!(
+        output.contains("case 1:") && output.contains("case 2:"),
+        "Named async IIFE should have multiple cases: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_iife_with_try_catch() {
+    assert!(
+        iife_body_contains_await(
+            "(async () => { try { await risky(); } catch (e) { console.log(e); } })();"
+        ),
+        "Should detect await in try block of IIFE"
+    );
+}
+
+#[test]
+fn test_async_iife_in_expression() {
+    // IIFE with variable assignment inside - test emit
+    let output = parse_and_emit_async_iife(
+        "(async () => { const result = await fetch(); return result; })();",
+    );
+    assert!(
+        output.contains("result = _a.sent()"),
+        "IIFE should assign await result to variable: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_iife_multiple_awaits() {
+    let output = parse_and_emit_async_iife(
+        "(async () => { const a = await first(); const b = await second(); return a + b; })();",
+    );
+    assert!(
+        output.contains("a = _a.sent()") && output.contains("b = _a.sent()"),
+        "Multiple awaits should assign to variables: {}",
+        output
+    );
+}
