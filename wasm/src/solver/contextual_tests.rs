@@ -1,4 +1,5 @@
 use super::*;
+use crate::solver::{CompatChecker, infer_generic_function};
 use std::sync::Arc;
 
 #[test]
@@ -391,6 +392,39 @@ fn test_apply_contextual_union_preserves_literal() {
 
     // Union context should not widen a literal expression.
     let result = apply_contextual_type(&interner, literal, Some(union));
+    assert_eq!(result, literal);
+}
+
+#[test]
+fn test_contextual_generic_call_union_preserves_literal() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+    let func = FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: t_type,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: t_type,
+        type_predicate: None,
+        is_constructor: false,
+    };
+
+    let literal = interner.literal_string("ready");
+    let inferred = infer_generic_function(&interner, &mut checker, &func, &[literal]);
+    let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    let result = apply_contextual_type(&interner, inferred, Some(union));
     assert_eq!(result, literal);
 }
 
