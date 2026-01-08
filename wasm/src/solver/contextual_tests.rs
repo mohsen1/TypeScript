@@ -576,6 +576,44 @@ fn test_contextual_union_arity_param_preserves_literal() {
 }
 
 #[test]
+fn test_contextual_union_rest_param_preserves_literal() {
+    let interner = TypeInterner::new();
+
+    // ((x: string) => string) | ((...args: string[]) => string)
+    let fn_one = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo { name: Some(interner.intern_string("x")), type_id: TypeId::STRING, optional: false, rest: false },
+        ],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let rest_array = interner.array(TypeId::STRING);
+    let fn_rest = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo { name: Some(interner.intern_string("args")), type_id: rest_array, optional: false, rest: true },
+        ],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let union = interner.union(vec![fn_one, fn_rest]);
+
+    let ctx = ContextualTypeContext::with_expected(&interner, union);
+    let param_type = ctx.get_parameter_type(0).unwrap();
+    assert_eq!(param_type, TypeId::STRING);
+
+    let literal = interner.literal_string("ready");
+    let param_ctx = ctx.for_parameter(0);
+    let result = apply_contextual_type(&interner, literal, param_ctx.expected());
+    assert_eq!(result, literal);
+}
+
+#[test]
 fn test_contextual_union_function_param_return_preserves_literal() {
     let interner = TypeInterner::new();
 
