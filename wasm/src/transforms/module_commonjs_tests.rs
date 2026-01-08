@@ -292,6 +292,26 @@ fn test_collect_export_names_ignores_type_only_specifiers() {
 }
 
 #[test]
+fn test_collect_export_names_ignores_only_type_specifiers() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = "type Foo = number; export { type Foo };";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let Some(source_file) = parser.arena.get_source_file(parser.arena.get(root).unwrap()) else {
+        panic!("Failed to get source file");
+    };
+
+    let export_names = collect_export_names(&parser.arena, &source_file.statements.nodes);
+
+    assert!(
+        export_names.is_empty(),
+        "Expected only type-only specifiers to be ignored"
+    );
+}
+
+#[test]
 fn test_collect_export_names_ignores_type_only_reexport() {
     use crate::thin_parser::ThinParserState;
 
