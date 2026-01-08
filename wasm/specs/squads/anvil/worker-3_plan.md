@@ -7,15 +7,16 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- Validate source map `sourcesContent`/`file` fields are set for JS + d.ts outputs when source text is available; adjust `wasm/src/source_writer.rs`, `wasm/src/thin_emitter/mod.rs`, or `wasm/src/declaration_emitter.rs` if needed; add regression in `wasm/src/cli/driver_tests.rs`; run `./wasm/test.sh`.
+- [EM: Assign next task]
 
 ## Task Queue
-- [ ] Add a `wasm/src/cli/driver_tests.rs` assertion that `sourcesContent` is present and matches the input when `sourceMap`/`declarationMap` are enabled.
+- [x] Add a `wasm/src/cli/driver_tests.rs` assertion that `sourcesContent` is present and matches the input when `sourceMap`/`declarationMap` are enabled.
 - [ ] Add a `wasm/src/source_map_tests.rs` check that transformed output still records `names` entries for identifiers.
 - [ ] Verify `sourceRoot` and `file` fields remain stable (non-empty `file`, empty `sourceRoot`) and lock with a test.
 
 ## Completed
 - [x] Lowered async ES5 computed `super[...]` calls (async emitter + ThinPrinter) and updated integration tests; `./wasm/test.sh` fails at `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`.
+- [x] Added JS + d.ts source map `file`/`sourcesContent` assertions in `wasm/src/cli/driver_tests.rs`; `./wasm/test.sh` fails at `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`.
 
 ## Ready for Merge
 No
