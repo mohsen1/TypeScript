@@ -7,12 +7,13 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- Complete: Re-added TypeScript namespaces source map test in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
+- Complete: Added async generators source map test in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (170 tests PASS).
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added async generators source map test in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (170 tests PASS).
 - [x] Added source map for class inheritance and super() calls test in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
 - [x] Added source map for conditional expressions and switch statements test in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
 - [x] Added source map for ES module exports test in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
