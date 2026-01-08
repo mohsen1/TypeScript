@@ -2175,3 +2175,74 @@ class ErrorHandler {
         output
     );
 }
+
+#[test]
+fn test_class_es5_switch_case_statement() {
+    let source = r#"
+class Router {
+    route(action: string) {
+        switch (action) {
+            case "home":
+                return "/";
+            case "about":
+                return "/about";
+            case "contact":
+                return "/contact";
+            default:
+                return "/404";
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Should emit as a function (ES5 class pattern)
+    assert!(
+        output.contains("function Router"),
+        "Expected Router constructor function: {}",
+        output
+    );
+
+    // Should have switch statement
+    assert!(
+        output.contains("switch"),
+        "Expected switch statement in output: {}",
+        output
+    );
+
+    // Should have case clauses
+    assert!(
+        output.contains("case"),
+        "Expected case clauses in output: {}",
+        output
+    );
+
+    // Should have default clause
+    assert!(
+        output.contains("default"),
+        "Expected default clause in output: {}",
+        output
+    );
+
+    // Method should be on prototype
+    assert!(
+        output.contains(".prototype.route") || output.contains("prototype[\"route\"]"),
+        "Expected route method on prototype: {}",
+        output
+    );
+}
