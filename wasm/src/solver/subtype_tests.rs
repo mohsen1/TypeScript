@@ -3173,6 +3173,16 @@ fn test_intersection_reduction_disjoint_discriminant_subtyping() {
 }
 
 #[test]
+fn test_intersection_reduction_disjoint_intrinsics() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let intersection = interner.intersection(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    assert!(checker.is_subtype_of(intersection, TypeId::NEVER));
+}
+
+#[test]
 fn test_mapped_type_over_number_keys_subtyping() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);

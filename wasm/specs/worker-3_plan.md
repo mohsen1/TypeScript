@@ -31,6 +31,7 @@ Priority: 3
 - [x] Solver unsoundness: optional property undefined toggle in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_exact_optional_property_types_toggle`.
 - [x] Solver unsoundness: split accessor variance regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_split_accessor_variance`.
 - [x] Solver unsoundness: constructor void exception regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_constructor_void_exception_subtype`.
+- [x] Solver unsoundness: intersection reduction (disjoint intrinsics) regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_intersection_reduction_disjoint_intrinsics`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
