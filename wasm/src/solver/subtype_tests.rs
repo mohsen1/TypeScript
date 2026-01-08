@@ -3496,9 +3496,19 @@ fn test_mapped_type_over_number_keys_subtyping() {
         readonly: false,
         is_method: false,
     }]);
+    let to_upper = interner.intern_string("toUpperCase");
+    let wrong_key = interner.object(vec![PropertyInfo {
+        name: to_upper,
+        type_id: TypeId::BOOLEAN,
+        write_type: TypeId::BOOLEAN,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
 
     assert!(checker.is_subtype_of(mapped, expected));
     assert!(!checker.is_subtype_of(mapped, mismatch));
+    assert!(!checker.is_subtype_of(mapped, wrong_key));
     assert!(!checker.is_subtype_of(expected, mapped));
 }
 
