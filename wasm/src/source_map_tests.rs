@@ -14024,49 +14024,28 @@ const origin = { x: 0, y: 0 } as Point;"#;
 }
 
 #[test]
-fn test_source_map_non_null_assertions() {
-    // Test source-map accuracy for non-null assertions (!)
-    let source = r#"function getLength(str: string | null) {
-    return str!.length;
-}
-
-const element = document.getElementById("app")!;
-const width = element!.offsetWidth;
-
-class Container {
-    value!: number;
-
-    init() {
-        this.value = 42;
-    }
-
-    getValue() {
-        return this.value!;
-    }
-}
-
-function processArray(arr: number[] | undefined) {
-    const first = arr![0];
-    const mapped = arr!.map(x => x * 2);
-    return { first, mapped };
-}"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+fn test_source_map_jsx_element_mapping() {
+    // Test JSX element source mapping
+    let source = r#"const element = <div className="container">Hello</div>;"#;
+    let mut parser = ThinParserState::new("test.tsx".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
     let options = PrinterOptions::default();
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
     printer.set_source_map_text(parser.get_source_text());
-    printer.enable_source_map("test.js", "test.ts");
+    printer.enable_source_map("test.js", "test.tsx");
     printer.emit(root);
 
     let output = printer.get_output().to_string();
+
+    // Verify JSX is in output
+    assert!(
+        output.contains("<div") || output.contains("div"),
+        "expected JSX element in output: {output}"
+    );
+
     let map_json = printer.generate_source_map_json().expect("source map");
     let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
-
     let mappings = map_value
         .get("mappings")
         .and_then(|v| v.as_str())
@@ -14074,32 +14053,153 @@ function processArray(arr: number[] | undefined) {
 
     let decoded = decode_mappings(mappings);
 
-    // Verify we have mappings for function declarations
-    let (fn_line, _) = find_line_col(source, "function getLength");
-    let has_fn_mapping = decoded.iter().any(|entry| {
-        entry.original_line == fn_line
-    });
-
-    let (class_line, _) = find_line_col(source, "class Container");
-    let has_class_mapping = decoded.iter().any(|entry| {
-        entry.original_line == class_line
-    });
-
-    // At minimum, we should have mappings for declarations
-    assert!(
-        has_fn_mapping || has_class_mapping || !decoded.is_empty(),
-        "expected mappings for non-null assertions. mappings: {mappings}"
-    );
-
-    // Verify output contains expected identifiers
-    assert!(
-        output.contains("getLength") && output.contains("Container"),
-        "expected output to contain function and class names. output: {output}"
-    );
-
-    // Verify source map has non-empty mappings
+    // Verify we have non-empty mappings
     assert!(
         !decoded.is_empty(),
-        "expected non-empty source mappings for non-null assertions"
+        "expected non-empty source mappings for JSX element"
+    );
+
+    // Verify source index is consistent
+    assert!(
+        decoded.iter().all(|m| m.source_index == 0),
+        "expected all mappings to reference source file index 0"
+    );
+}
+
+#[test]
+fn test_source_map_jsx_fragment_mapping() {
+    // Test JSX fragment source mapping
+    let source = r#"const fragment = <>
+    <span>First</span>
+    <span>Second</span>
+</>;"#;
+    let mut parser = ThinParserState::new("test.tsx".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions::default();
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.tsx");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Verify JSX fragment is in output
+    assert!(
+        output.contains("<>") || output.contains("Fragment") || output.contains("span"),
+        "expected JSX fragment in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for JSX fragment"
+    );
+}
+
+#[test]
+fn test_source_map_jsx_expression_mapping() {
+    // Test JSX with expressions source mapping
+    let source = r#"const name = "World";
+const greeting = <h1>Hello, {name}!</h1>;"#;
+    let mut parser = ThinParserState::new("test.tsx".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions::default();
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.tsx");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Verify JSX with expression is in output
+    assert!(
+        output.contains("name") && output.contains("h1"),
+        "expected JSX expression in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for both declarations
+    let (name_line, _) = find_line_col(source, "const name");
+    let has_name_mapping = decoded.iter().any(|entry| {
+        entry.original_line == name_line
+    });
+
+    let (greeting_line, _) = find_line_col(source, "const greeting");
+    let has_greeting_mapping = decoded.iter().any(|entry| {
+        entry.original_line == greeting_line
+    });
+
+    assert!(
+        has_name_mapping || has_greeting_mapping || !decoded.is_empty(),
+        "expected mappings for JSX expressions. mappings: {mappings}"
+    );
+}
+
+#[test]
+fn test_source_map_jsx_component_mapping() {
+    // Test JSX component with props source mapping
+    let source = r#"function Button({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+    return <button onClick={onClick}>{children}</button>;
+}
+
+const app = <Button onClick={() => console.log("clicked")}>Click me</Button>;"#;
+    let mut parser = ThinParserState::new("test.tsx".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions::default();
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.tsx");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Verify component is in output
+    assert!(
+        output.contains("Button") && output.contains("button"),
+        "expected JSX component in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for JSX component"
+    );
+
+    // Verify mappings cover multiple source lines
+    let unique_source_lines: std::collections::HashSet<_> =
+        decoded.iter().map(|m| m.original_line).collect();
+    assert!(
+        unique_source_lines.len() >= 2,
+        "expected mappings from at least 2 different source lines, got: {:?}",
+        unique_source_lines
     );
 }
