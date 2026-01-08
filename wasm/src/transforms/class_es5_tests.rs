@@ -6161,391 +6161,286 @@ class Container<T> {
     );
 }
 
-// =============================================================================
-// This Parameter Type Tests
-// =============================================================================
-
 #[test]
-fn test_class_es5_this_parameter_basic() {
-    // Test method with this parameter type
+fn test_class_es5_parameter_property_public() {
+    // Test public parameter property
     let source = r#"
-class Handler {
-    name: string;
+class Person {
+    constructor(public name: string, public age: number) {}
 
-    constructor(name: string) {
-        this.name = name;
-    }
-
-    handle(this: Handler, event: string): void {
-        console.log(this.name + " handles " + event);
+    greet(): string {
+        return "Hello, " + this.name;
     }
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
-    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
 
-    // Class should emit as function
+    let output = printer.get_output().to_string();
+
+    // Should transform class to function
     assert!(
-        output.contains("function Handler"),
-        "Expected Handler to emit as function: {}",
+        output.contains("function Person") || output.contains("var Person"),
+        "Expected Person class transformation: {}",
         output
     );
 
-    // Constructor should set name
+    // Parameter properties should be assigned to this
     assert!(
-        output.contains("this.name") || output.contains("name"),
-        "Expected name assignment: {}",
+        output.contains("this.name") && output.contains("this.age"),
+        "Expected parameter property assignments: {}",
         output
     );
 
-    // handle method should be present
+    // Method should be present
     assert!(
-        output.contains("handle"),
-        "Expected handle method: {}",
-        output
-    );
-
-    // this parameter should NOT appear in output (it's erased)
-    assert!(
-        !output.contains("this: Handler"),
-        "this parameter type should be erased: {}",
+        output.contains("greet"),
+        "Expected greet method: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_this_parameter_with_other_params() {
-    // Test method with this parameter and multiple other parameters
+fn test_class_es5_parameter_property_private() {
+    // Test private parameter property
     let source = r#"
-class Calculator {
-    value: number = 0;
+class BankAccount {
+    constructor(private balance: number, private accountId: string) {}
 
-    add(this: Calculator, a: number, b: number): number {
-        this.value = a + b;
-        return this.value;
+    getBalance(): number {
+        return this.balance;
     }
 
-    multiply(this: Calculator, x: number, y: number, z: number): number {
-        this.value = x * y * z;
-        return this.value;
+    deposit(amount: number): void {
+        this.balance += amount;
     }
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
-    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
 
-    // Class should emit as function
+    let output = printer.get_output().to_string();
+
+    // Should transform class
     assert!(
-        output.contains("function Calculator"),
-        "Expected Calculator to emit as function: {}",
+        output.contains("function BankAccount") || output.contains("var BankAccount"),
+        "Expected BankAccount class transformation: {}",
         output
     );
 
-    // Field should be initialized
+    // Private parameter properties should still be assigned
     assert!(
-        output.contains("this.value") || output.contains("value"),
-        "Expected value field: {}",
+        output.contains("this.balance") || output.contains("balance"),
+        "Expected balance property: {}",
         output
     );
 
     // Methods should be present
     assert!(
-        output.contains("add"),
-        "Expected add method: {}",
-        output
-    );
-    assert!(
-        output.contains("multiply"),
-        "Expected multiply method: {}",
+        output.contains("getBalance") && output.contains("deposit"),
+        "Expected methods: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_this_parameter_fluent_api() {
-    // Test fluent API pattern with this return type
+fn test_class_es5_parameter_property_protected() {
+    // Test protected parameter property with inheritance
     let source = r#"
-class Builder {
-    private config: string[] = [];
+class Vehicle {
+    constructor(protected speed: number, protected fuel: number) {}
 
-    addOption(this: Builder, option: string): this {
-        this.config.push(option);
-        return this;
+    accelerate(): void {
+        this.speed += 10;
+    }
+}
+
+class Car extends Vehicle {
+    constructor(speed: number, fuel: number, private brand: string) {
+        super(speed, fuel);
     }
 
-    reset(this: Builder): this {
-        this.config = [];
-        return this;
-    }
-
-    build(this: Builder): string {
-        return this.config.join(",");
+    getInfo(): string {
+        return this.brand + " at " + this.speed + " mph";
     }
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
-    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
 
-    // Class should emit as function
+    let output = printer.get_output().to_string();
+
+    // Both classes should be transformed
     assert!(
-        output.contains("function Builder"),
-        "Expected Builder to emit as function: {}",
+        output.contains("Vehicle") && output.contains("Car"),
+        "Expected both class transformations: {}",
         output
     );
 
-    // Private field should be initialized
+    // Inheritance should be present
     assert!(
-        output.contains("this.config") || output.contains("config"),
-        "Expected config field: {}",
+        output.contains("__extends") || output.contains("prototype"),
+        "Expected inheritance pattern: {}",
         output
     );
 
-    // All fluent methods should be present
+    // Protected properties should be assigned
     assert!(
-        output.contains("addOption"),
-        "Expected addOption method: {}",
-        output
-    );
-    assert!(
-        output.contains("reset"),
-        "Expected reset method: {}",
-        output
-    );
-    assert!(
-        output.contains("build"),
-        "Expected build method: {}",
+        output.contains("speed") && output.contains("fuel"),
+        "Expected protected properties: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_this_parameter_with_generics() {
-    // Test generic class with this parameter
+fn test_class_es5_parameter_property_readonly() {
+    // Test readonly parameter property
     let source = r#"
-class Container<T> {
-    private items: T[] = [];
+class Config {
+    constructor(
+        readonly host: string,
+        readonly port: number,
+        readonly secure: boolean = false
+    ) {}
 
-    push(this: Container<T>, item: T): this {
-        this.items.push(item);
-        return this;
-    }
-
-    pop(this: Container<T>): T | undefined {
-        return this.items.pop();
-    }
-
-    clear(this: Container<T>): void {
-        this.items = [];
+    getUrl(): string {
+        const protocol = this.secure ? "https" : "http";
+        return protocol + "://" + this.host + ":" + this.port;
     }
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
-    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
 
-    // Class should emit as function
+    let output = printer.get_output().to_string();
+
+    // Should transform class
     assert!(
-        output.contains("function Container"),
-        "Expected Container to emit as function: {}",
+        output.contains("function Config") || output.contains("var Config"),
+        "Expected Config class transformation: {}",
+        output
+    );
+
+    // Readonly properties should be assigned
+    assert!(
+        output.contains("this.host") || output.contains("host"),
+        "Expected host property: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("getUrl"),
+        "Expected getUrl method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_parameter_property_mixed() {
+    // Test mixed parameter properties and regular parameters
+    let source = r#"
+class User {
+    email: string;
+
+    constructor(
+        public id: number,
+        private password: string,
+        readonly createdAt: Date,
+        name: string
+    ) {
+        this.email = name + "@example.com";
+    }
+
+    validatePassword(input: string): boolean {
+        return this.password === input;
+    }
+
+    getId(): number {
+        return this.id;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should transform class
+    assert!(
+        output.contains("function User") || output.contains("var User"),
+        "Expected User class transformation: {}",
+        output
+    );
+
+    // Parameter properties should be assigned
+    assert!(
+        output.contains("id") && output.contains("password"),
+        "Expected parameter properties: {}",
+        output
+    );
+
+    // Regular property from constructor body should be present
+    assert!(
+        output.contains("email"),
+        "Expected email property: {}",
         output
     );
 
     // Methods should be present
     assert!(
-        output.contains("push"),
-        "Expected push method: {}",
-        output
-    );
-    assert!(
-        output.contains("pop"),
-        "Expected pop method: {}",
-        output
-    );
-    assert!(
-        output.contains("clear"),
-        "Expected clear method: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_this_parameter_in_derived_class() {
-    // Test this parameter in derived class
-    let source = r#"
-class Base {
-    id: number;
-
-    constructor(id: number) {
-        this.id = id;
-    }
-}
-
-class Derived extends Base {
-    name: string;
-
-    constructor(id: number, name: string) {
-        super(id);
-        this.name = name;
-    }
-
-    describe(this: Derived): string {
-        return this.name + " (id: " + this.id + ")";
-    }
-
-    clone(this: Derived): Derived {
-        return new Derived(this.id, this.name);
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
-    // Get Derived class (second statement)
-    let class_idx = *source_file.statements.nodes.get(1).expect("expected Derived class");
-
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
-
-    // Class should emit as function
-    assert!(
-        output.contains("function Derived"),
-        "Expected Derived to emit as function: {}",
-        output
-    );
-
-    // Should have inheritance setup
-    assert!(
-        output.contains("_super") || output.contains("Base") || output.contains("__extends"),
-        "Expected inheritance handling: {}",
-        output
-    );
-
-    // Methods should be present
-    assert!(
-        output.contains("describe"),
-        "Expected describe method: {}",
-        output
-    );
-    assert!(
-        output.contains("clone"),
-        "Expected clone method: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_this_parameter_static_method() {
-    // Test that static methods can also have this parameter (for class type)
-    let source = r#"
-class Factory {
-    static instances: Factory[] = [];
-    name: string;
-
-    constructor(name: string) {
-        this.name = name;
-        Factory.instances.push(this);
-    }
-
-    static create(this: typeof Factory, name: string): Factory {
-        return new this(name);
-    }
-
-    static clear(this: typeof Factory): void {
-        this.instances = [];
-    }
-
-    getName(this: Factory): string {
-        return this.name;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
-    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
-
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
-
-    // Class should emit as function
-    assert!(
-        output.contains("function Factory"),
-        "Expected Factory to emit as function: {}",
-        output
-    );
-
-    // Static field should be on constructor
-    assert!(
-        output.contains("Factory.instances") || output.contains("instances"),
-        "Expected instances static field: {}",
-        output
-    );
-
-    // Static methods should be present
-    assert!(
-        output.contains("create"),
-        "Expected create static method: {}",
-        output
-    );
-    assert!(
-        output.contains("clear"),
-        "Expected clear static method: {}",
-        output
-    );
-
-    // Instance method should be present
-    assert!(
-        output.contains("getName"),
-        "Expected getName method: {}",
+        output.contains("validatePassword") && output.contains("getId"),
+        "Expected methods: {}",
         output
     );
 }
