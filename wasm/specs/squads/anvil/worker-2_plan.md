@@ -13,6 +13,7 @@ Priority: 2
 - [ ] [EM: Add queued tasks]
 
 ## Completed
+- [x] Added CommonJS coverage asserting `__esModule` for namespace import in `thin_emitter_tests.rs`; `./wasm/test.sh test_commonjs_import_namespace` passed.
 - [x] Added CommonJS coverage asserting `__esModule` for default import in `thin_emitter_tests.rs`; `./wasm/test.sh test_commonjs_import_default` passed.
 - [x] Added CommonJS coverage asserting `__esModule` for export-star in `thin_emitter_tests.rs`; `./wasm/test.sh test_commonjs_export_star` passed.
 - [x] Added CommonJS coverage asserting `__esModule` for re-exports in `thin_emitter_tests.rs`; `./wasm/test.sh test_commonjs_reexport` passed.
