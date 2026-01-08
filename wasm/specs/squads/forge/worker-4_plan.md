@@ -30,6 +30,7 @@ Priority: 4
 - [x] Added function/rest subtyping regression for required params accepting undefined. Tests: `./wasm/test.sh`.
 - [x] Added binder coverage for namespace export merges across declarations. Tests: `./wasm/test.sh`.
 - [x] Added binder coverage for class/namespace merge exports. Tests: `./wasm/test.sh`.
+- [x] Added checker coverage for class/namespace merged value member access. Tests: `./wasm/test.sh`.
 
 ## Ready for Merge
 Yes
