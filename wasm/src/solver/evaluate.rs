@@ -229,12 +229,17 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             if let Some(type_params) = self.resolver.get_type_params(symbol) {
                 // Resolve the base type to get the body
                 if let Some(resolved) = self.resolver.resolve_ref(symbol, self.interner) {
+                    // Pre-expand type arguments that are TypeQuery or Application
+                    let expanded_args: Vec<TypeId> = app.args.iter().map(|&arg| {
+                        self.try_expand_type_arg(arg)
+                    }).collect();
+
                     // Instantiate the resolved type with the type arguments
                     let instantiated = instantiate_generic(
                         self.interner,
                         resolved,
                         &type_params,
-                        &app.args,
+                        &expanded_args,
                     );
                     // Recursively evaluate the result
                     return self.evaluate(instantiated);
@@ -244,6 +249,25 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
 
         // If we can't expand, return the original application
         self.interner.application(app.base, app.args.clone())
+    }
+
+    /// Try to expand a type argument that may be a TypeQuery or Application.
+    /// Returns the expanded type, or the original if it can't be expanded.
+    fn try_expand_type_arg(&self, arg: TypeId) -> TypeId {
+        let Some(key) = self.interner.lookup(arg) else {
+            return arg;
+        };
+        match key {
+            TypeKey::TypeQuery(sym_ref) => {
+                // Resolve the TypeQuery to get the actual type
+                self.resolver.resolve_ref(sym_ref, self.interner).unwrap_or(arg)
+            }
+            TypeKey::Application(app_id) => {
+                // Recursively evaluate the nested Application
+                self.evaluate_application(app_id)
+            }
+            _ => arg,
+        }
     }
 
     /// Evaluate a conditional type: T extends U ? X : Y
