@@ -7,7 +7,7 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- Complete: Added 12 async class method tests (basic, with return, no await, multiple awaits, static method, with parameters, body_contains_await, ignores nested async, try/catch, in loop, conditional await) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (88 tests PASS).
+- [ ] Add ES5 async tests for async arrow functions in `wasm/src/transforms/async_es5_tests.rs`. Run `./wasm/test.sh async_es5_tests`.
 
 ## Task Queue
 - [ ] (empty)
