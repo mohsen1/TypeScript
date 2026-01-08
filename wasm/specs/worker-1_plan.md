@@ -5,12 +5,12 @@ Execute the highest-impact tasks assigned by the manager across all areas (solve
 
 Status: Active
 Priority: 1
+Ready for merge: yes
 
 ## Current Assignment
 - Awaiting next assignment.
 
 ## Task Queue
-- [ ] Investigate and resolve Docker build failure in `wasm/src/cli/driver.rs` (E0515 in latest rust merge).
 - [ ] Add mixed-case exponent negative leading zeros test (`1Ee-0001`).
 - [ ] Add mixed-case exponent missing sign with leading zeros test (`1Ee01`).
 - [ ] Add mixed-case exponent trailing double-minus test (`1Ee--`).
@@ -29,6 +29,7 @@ Priority: 1
 - [ ] Add numeric separator in hex/binary name test (`0x1_0`, `0b1_0`, `0o1_0`).
 
 ## Completed
+- [x] Docker build failure in `wasm/src/cli/driver.rs` (E0515) resolved via rust merge; validated by `./wasm/test.sh test_resolve_bounds_number_index_ignores_positive_exponent_zero`.
 - [x] Conditional infer object coverage in `wasm/src/solver/evaluate.rs` with tests in `wasm/src/solver/evaluate_tests.rs`. Tests: `./wasm/test.sh test_conditional_infer_object_`.
 - [x] Prefer upper bounds when lower bounds are only `any`/`unknown`; added `test_resolve_any_lower_prefers_upper_bound`. Tests: `./wasm/test.sh test_resolve_any_lower_prefers_upper_bound`.
 - [x] Ignore circular upper bounds during inference resolution; added `test_resolve_circular_upper_bound_defaults_unknown`. Tests: `./wasm/test.sh test_resolve_circular_upper_bound_defaults_unknown`.
@@ -120,6 +121,7 @@ Priority: 1
 - [x] Number index ignores missing exponent digits; added `test_resolve_bounds_number_index_ignores_exponent_missing_digits`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_exponent_missing_digits`.
 - [x] Number index ignores missing negative exponent digits; added `test_resolve_bounds_number_index_ignores_exponent_minus_missing_digits`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_exponent_minus_missing_digits`.
 - [x] Number index ignores -0 exponent form; added `test_resolve_bounds_number_index_ignores_negative_exponent_zero`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_negative_exponent_zero`.
+- [x] Number index ignores positive exponent zero; added `test_resolve_bounds_number_index_ignores_positive_exponent_zero`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_positive_exponent_zero`.
 - [x] Number index treats negative decimal boundary as numeric; added `test_resolve_bounds_number_index_accepts_negative_decimal_boundary_name`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_accepts_negative_decimal_boundary_name`.
 - [x] Number index ignores trailing decimal name; added `test_resolve_bounds_number_index_ignores_trailing_decimal_name`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_trailing_decimal_name`.
 - [x] Number index ignores leading plus name; added `test_resolve_bounds_number_index_ignores_leading_plus_name`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_leading_plus_name`.
