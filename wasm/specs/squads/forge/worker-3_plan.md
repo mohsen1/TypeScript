@@ -25,6 +25,7 @@ Priority: 3
 - [x] Reset flow at function boundaries to avoid narrowing in closures; added CFA invalidation test. Tests: `./wasm/test.sh` (fails: `wasm/src/transforms/async_es5.rs:749` unexpected closing delimiter after sync).
 - [x] Fixed async ES5 call emission regression after sync. Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_parse_error_tolerance`).
 - [x] Added best common type array literal regression coverage. Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_parse_error_tolerance`).
+- [x] Added correlated union index-access regression coverage (cross-product). Tests: `./wasm/test.sh` (fails: `emitter_parity_tests::test_parity_commonjs_export`).
 
 ## Ready for Merge
 No
@@ -37,4 +38,4 @@ No
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/forge-3`
 - **NEVER edit**: `DIRECTOR_AGENT.md`, `SQUAD_LEAD_AGENT.md`, `MANAGER_AGENT.md`, `AGENTS.md`, `start_*.sh`
-- Latest `./wasm/test.sh` fails at `emitter_edge_case_tests::test_parse_error_tolerance` (expects "x" declaration).
+- Latest `./wasm/test.sh` fails at `emitter_parity_tests::test_parity_commonjs_export` (trailing newline mismatch).
