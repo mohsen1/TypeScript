@@ -7,13 +7,14 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- Confirm handling of `super()` ordering relative to field initializers when computed property names are present.
+- [EM: Assign next task]
 
 ## Task Queue
 - [ ] Expand integration coverage if ordering regression is found.
 
 ## Completed
 - [x] Added integration coverage for computed `super[...]` in class field arrow initializers; `./wasm/test.sh` failed at `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports` (unrelated).
+- [x] Confirmed `super()` ordering remains stable with computed field initializers via regression; `./wasm/test.sh` failed at `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports` (unrelated).
 
 ## Ready for Merge
 No
