@@ -608,3 +608,210 @@ class Foo {
         output
     );
 }
+
+#[test]
+fn test_class_es5_super_property_in_static_block() {
+    let source = r#"
+class Base {
+    static value = 1;
+}
+class Derived extends Base {
+    static {
+        console.log(super.value);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected derived class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Static block should be emitted as an IIFE after the class
+    assert!(
+        output.contains("console.log"),
+        "Expected static block content to be emitted: {}",
+        output
+    );
+
+    // Super property access should be transformed to Base.value or similar
+    assert!(
+        output.contains("Base.value") || output.contains("_super.value"),
+        "Expected super.value to be transformed: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_nested_async_arrow_in_constructor_with_field() {
+    let source = r#"
+class Foo {
+    field = 1;
+    constructor() {
+        this.handler = async () => {
+            const inner = async () => {
+                return this.field;
+            };
+            return await inner();
+        };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Field initializer should use _this
+    assert!(
+        output.contains("_this.field = 1"),
+        "Expected field initializer to use _this: {}",
+        output
+    );
+
+    // Async arrow in constructor should use __awaiter
+    assert!(
+        output.contains("__awaiter"),
+        "Expected async arrow to use __awaiter: {}",
+        output
+    );
+
+    // Nested async arrow should capture _this.field
+    assert!(
+        output.contains("_this.field") && output.matches("_this.field").count() >= 2,
+        "Expected nested async arrow to capture _this.field: {}",
+        output
+    );
+
+    // Handler assignment should use _this
+    assert!(
+        output.contains("_this.handler"),
+        "Expected handler assignment to use _this: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_computed_method_name_with_async_body() {
+    let source = r#"
+const methodName = "doWork";
+class Foo {
+    value = 42;
+    async [methodName]() {
+        await fetch();
+        return this.value;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Computed method should use bracket notation
+    assert!(
+        output.contains(".prototype[methodName]") || output.contains(".prototype[\"doWork\"]"),
+        "Expected computed method to use bracket notation: {}",
+        output
+    );
+
+    // Async body should use __awaiter
+    assert!(
+        output.contains("__awaiter"),
+        "Expected async method to use __awaiter: {}",
+        output
+    );
+
+    // Async body should use __generator
+    assert!(
+        output.contains("__generator"),
+        "Expected async method to use __generator: {}",
+        output
+    );
+
+    // this.value should be preserved or captured properly
+    assert!(
+        output.contains("this.value") || output.contains("_this.value"),
+        "Expected this.value reference: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_spread_element_in_array_literal() {
+    let source = r#"
+class Foo {
+    items = [1, 2, 3];
+
+    getAll() {
+        const extra = [4, 5];
+        return [...this.items, ...extra, 6];
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Should NOT contain spread syntax (ES5 doesn't support it)
+    assert!(
+        !output.contains("...this.items") && !output.contains("...extra"),
+        "Expected spread to be transformed, not raw spread syntax: {}",
+        output
+    );
+
+    // Should use __spreadArray or concat for ES5 spread
+    assert!(
+        output.contains("__spreadArray") || output.contains(".concat(") || output.contains("slice.call"),
+        "Expected ES5 spread transformation using __spreadArray or concat: {}",
+        output
+    );
+}

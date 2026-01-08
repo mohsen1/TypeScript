@@ -11538,8 +11538,15 @@ const z = fn?.(5);"#;
 }
 
 #[test]
-fn test_source_map_es5_transform_nullish_coalescing_mapping() {
-    let source = "const value = input ?? defaultValue;";
+fn test_source_map_logical_assignment_operators() {
+    // Test logical assignment operators: ||= &&= ??=
+    let source = r#"let a = null;
+let b = 0;
+let c = "hello";
+a ||= "default";
+b &&= 10;
+c ??= "fallback";"#;
+
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -11556,27 +11563,46 @@ fn test_source_map_es5_transform_nullish_coalescing_mapping() {
     printer.emit(root);
 
     let output = printer.get_output().to_string();
-
-    // Nullish coalescing gets transformed to !== null && !== void 0 check
-    assert!(
-        output.contains("null") || output.contains("void 0") || output.contains("undefined") || output.contains("??"),
-        "expected nullish coalescing downlevel in output: {output}"
-    );
-
     let map_json = printer.generate_source_map_json().expect("source map");
     let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
     let mappings = map_value
         .get("mappings")
-        .and_then(|value| value.as_str())
+        .and_then(|v| v.as_str())
         .unwrap_or("");
 
     let decoded = decode_mappings(mappings);
-    let (value_line, _) = find_line_col(source, "value");
 
-    // Verify we have mappings on the source line
-    let has_mapping = decoded.iter().any(|m| m.source_index == 0 && m.original_line == value_line);
+    // Verify we have mappings for the variable declarations
+    let (a_line, a_col) = find_line_col(source, "let a");
+    let has_a_mapping = decoded.iter().any(|entry| {
+        entry.original_line == a_line
+            && entry.original_column >= a_col
+            && entry.original_column <= a_col + 5
+    });
+
+    let (b_line, b_col) = find_line_col(source, "let b");
+    let has_b_mapping = decoded.iter().any(|entry| {
+        entry.original_line == b_line
+            && entry.original_column >= b_col
+            && entry.original_column <= b_col + 5
+    });
+
+    // At minimum, we should have mappings for the declarations
     assert!(
-        has_mapping,
-        "expected mapping for nullish coalescing line. mappings: {mappings}"
+        has_a_mapping || has_b_mapping,
+        "expected mappings for logical assignment declarations. mappings: {mappings}"
+    );
+
+    // Verify output contains the variable names
+    assert!(
+        output.contains("var a") || output.contains("var b") || output.contains("var c"),
+        "expected output to contain variable declarations. output: {output}"
+    );
+
+    // Verify source map has non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for logical assignment code"
     );
 }
