@@ -7,7 +7,7 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- Complete: Added 12 Promise combinator tests (Promise.all basic/with map/destructuring, Promise.race basic/with timeout, Promise.allSettled, Promise.any, Promise.resolve, chained combinators, nested Promise.all, Promise.all in try/catch, Promise.race in loop) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (62 tests PASS).
+- [ ] Add ES5 async tests for error handling patterns (try/catch/finally with async) in `wasm/src/transforms/async_es5_tests.rs`. Run `./wasm/test.sh async_es5_tests`.
 
 ## Task Queue
 - [ ] (empty)
