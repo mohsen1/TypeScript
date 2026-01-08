@@ -67,6 +67,7 @@ Priority: 4
 - [x] Add async chained method await source-map coverage. Tests: `./wasm/test.sh async_chained_method_await_mapping`
 - [x] Add class ES5 super() call source-map coverage. Tests: `./wasm/test.sh class_super_call_mapping`
 - [x] Add arrow function default param source-map coverage. Tests: `./wasm/test.sh arrow_default_param_mapping`
+- [x] Add destructuring assignment source-map coverage. Tests: `./wasm/test.sh destructuring_assignment_mapping`
 
 ## Ready for Merge
 Yes
