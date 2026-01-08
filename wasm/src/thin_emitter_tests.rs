@@ -2126,6 +2126,7 @@ fn test_commonjs_import_default() {
 
     let output = printer.get_output();
     assert!(output.contains("require(\"./module\")"), "Expected require() in CommonJS output: {}", output);
+    assert!(output.contains("__esModule"), "Expected __esModule marker in CommonJS output: {}", output);
     assert!(output.contains("var myDefault = module_1.default;"), "Expected default binding in output: {}", output);
 }
 
