@@ -7,12 +7,13 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- Complete: Added source map for nullish coalescing test in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
+- Complete: Added source map for template literals test in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added source map for template literals test in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
 - [x] Added source map for nullish coalescing test in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
 - [x] Added source map for computed property names test in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
 - [x] Added source map for private class fields test in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
