@@ -403,6 +403,13 @@ impl<'a> ClassES5Emitter<'a> {
                 self.write_line();
             } else {
                 // Non-derived class - emit private fields then instance property initializers
+                let needs_capture = self.needs_this_capture(&instance_props);
+                if needs_capture {
+                    self.write_indent();
+                    self.write("var _this = this;");
+                    self.write_line();
+                }
+
                 self.emit_private_field_initializations(false);
 
                 for &prop_idx in &instance_props {
@@ -631,17 +638,33 @@ impl<'a> ClassES5Emitter<'a> {
         let Some(body_node) = self.arena.get(body_idx) else { return };
         let Some(block) = self.arena.get_block(body_node) else { return };
 
-        // First, find and emit the super() call as _super.call(this, ...)
+        // First, locate the super() call
         let mut found_super = false;
-        for &stmt_idx in &block.statements.nodes {
+        let mut super_stmt_index = None;
+        for (index, &stmt_idx) in block.statements.nodes.iter().enumerate() {
             if self.is_super_call_statement(stmt_idx) {
-                self.emit_super_call_as_this_assignment(stmt_idx);
-                found_super = true;
+                super_stmt_index = Some(index);
                 break;
             }
         }
 
         self.emit_param_destructuring_prologue(param_transforms);
+
+        // Emit statements before super()
+        if let Some(super_idx) = super_stmt_index {
+            for &stmt_idx in &block.statements.nodes[..super_idx] {
+                self.write_indent();
+                self.emit_statement(stmt_idx);
+                self.write_line();
+            }
+        }
+
+        // Emit the transformed super() call
+        if let Some(super_idx) = super_stmt_index {
+            let stmt_idx = block.statements.nodes[super_idx];
+            self.emit_super_call_as_this_assignment(stmt_idx);
+            found_super = true;
+        }
 
         // Emit parameter properties using _this
         for &param_idx in &params.nodes {
@@ -711,16 +734,17 @@ impl<'a> ClassES5Emitter<'a> {
 
         // Emit remaining statements (after super call), transforming this to _this
         let mut past_super = false;
-        for &stmt_idx in &block.statements.nodes {
-            if !past_super && self.is_super_call_statement(stmt_idx) {
-                past_super = true;
-                continue; // Skip the super call, already emitted
+        for (index, &stmt_idx) in block.statements.nodes.iter().enumerate() {
+            if !past_super {
+                if Some(index) == super_stmt_index {
+                    past_super = true;
+                }
+                continue;
             }
-            if past_super {
-                self.write_indent();
-                self.emit_statement_with_this_transform(stmt_idx);
-                self.write_line();
-            }
+
+            self.write_indent();
+            self.emit_statement_with_this_transform(stmt_idx);
+            self.write_line();
         }
 
         // Add return _this;
