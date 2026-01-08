@@ -4033,6 +4033,96 @@ fn test_this_type_in_param_covariant() {
 }
 
 #[test]
+fn test_class_like_subtyping_this_param_covariant() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let compare = interner.intern_string("compare");
+    let id = interner.intern_string("id");
+    let extra = interner.intern_string("extra");
+
+    let this_type = interner.intern(TypeKey::ThisType);
+    let this_or_number = interner.union(vec![this_type, TypeId::NUMBER]);
+
+    let base_compare = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("other")),
+            type_id: this_or_number,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let derived_compare = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("other")),
+            type_id: this_type,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let base = interner.object(vec![
+        PropertyInfo {
+            name: id,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: compare,
+            type_id: base_compare,
+            write_type: base_compare,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let derived = interner.object(vec![
+        PropertyInfo {
+            name: id,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: extra,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: compare,
+            type_id: derived_compare,
+            write_type: derived_compare,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    assert!(checker.is_subtype_of(derived, base));
+    assert!(!checker.is_subtype_of(base, derived));
+}
+
+#[test]
 fn test_function_fixed_to_rest_subtyping() {
     use std::sync::Arc;
 
