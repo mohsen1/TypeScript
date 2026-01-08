@@ -7,12 +7,13 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- Complete: Added type assertions and const assertions source map test in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (183 tests PASS).
+- Complete: Added non-null assertions source map test in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (189 tests PASS).
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added non-null assertions source map test in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (189 tests PASS).
 - [x] Added type assertions and const assertions source map test in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (183 tests PASS).
 - [x] Added 7 nested arrow `this` capture tests for async methods in `wasm/src/transforms/class_es5_tests.rs`; ran `./wasm/test.sh class_es5_tests` (42 tests PASS).
 - [x] Added for-await-of loops source map test in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (174 tests PASS).
