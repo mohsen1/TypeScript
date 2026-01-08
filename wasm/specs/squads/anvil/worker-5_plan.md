@@ -7,7 +7,7 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- Complete: Added async for-loop declaration-list await source-map coverage in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
+- Complete: Added async for-loop update-list await source-map coverage in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
 
 ## Task Queue
 - [ ] (empty)
@@ -31,6 +31,7 @@ Priority: 5
 - [x] Added async variable-initializer await source-map coverage in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
 - [x] Added async variable-declaration-list await source-map coverage in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
 - [x] Added async for-loop declaration-list await source-map coverage in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
+- [x] Added async for-loop update-list await source-map coverage in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
 
 ## Ready for Merge
 Yes
