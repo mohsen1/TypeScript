@@ -419,6 +419,66 @@ fn test_conditional_infer_array_element_extraction() {
 }
 
 #[test]
+fn test_conditional_infer_tuple_element_extraction() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends [infer R] ? R : never, with T = [string] | [number].
+    let extends_tuple = interner.tuple(vec![TupleElement {
+        type_id: infer_r,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_tuple,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    subst.insert(
+        t_name,
+        interner.union(vec![
+            interner.tuple(vec![TupleElement {
+                type_id: TypeId::STRING,
+                name: None,
+                optional: false,
+                rest: false,
+            }]),
+            interner.tuple(vec![TupleElement {
+                type_id: TypeId::NUMBER,
+                name: None,
+                optional: false,
+                rest: false,
+            }]),
+        ]),
+    );
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    assert_eq!(result, expected);
+}
+
+#[test]
 fn test_conditional_instantiated_param_tuple_wrapper_no_distribution() {
     let interner = TypeInterner::new();
 

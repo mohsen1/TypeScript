@@ -7,7 +7,7 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- Solver hardening: add conditional infer extraction coverage for array/tuple patterns.
+- Solver hardening: add conditional infer extraction coverage for tuple patterns.
 
 ## Task Queue
 - [ ] Await next assignment.
@@ -17,6 +17,7 @@ Priority: 2
 - [x] Added nested/distributive conditional tests covering `extends` + `infer` and substituted infer during evaluation. Tests: `./wasm/test.sh test_conditional_distributive_`.
 - [x] Added infer-in-branch conditional tests (true/false) to ensure substitution holds. Tests: `./wasm/test.sh test_conditional_infer_`.
 - [x] Added infer extraction for array conditional evaluation. Tests: `./wasm/test.sh test_conditional_infer_array_element_extraction`.
+- [x] Added infer extraction for tuple conditional evaluation. Tests: `./wasm/test.sh test_conditional_infer_tuple_element_extraction`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
