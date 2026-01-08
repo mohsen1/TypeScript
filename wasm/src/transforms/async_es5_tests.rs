@@ -245,6 +245,32 @@ fn test_body_contains_await_in_array_literal() {
 }
 
 #[test]
+fn test_body_contains_await_in_array_literal_spread() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "async function foo() { const list = [...await getValues()]; }"
+            .to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&func_idx) = source_file.statements.nodes.first() {
+                if let Some(func_node) = parser.arena.get(func_idx) {
+                    if let Some(func) = parser.arena.get_function(func_node) {
+                        let emitter = AsyncES5Emitter::new(&parser.arena);
+                        assert!(
+                            emitter.body_contains_await(func.body),
+                            "Should detect await in array literal spread"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn test_body_contains_await_in_object_literal_property() {
     let mut parser = ThinParserState::new(
         "test.ts".to_string(),
@@ -288,6 +314,32 @@ fn test_body_contains_await_in_object_literal_spread() {
                         assert!(
                             emitter.body_contains_await(func.body),
                             "Should detect await in object literal spread"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn test_body_contains_await_in_object_binding_computed_property() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "async function foo() { const { [await key()]: value } = source; }"
+            .to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&func_idx) = source_file.statements.nodes.first() {
+                if let Some(func_node) = parser.arena.get(func_idx) {
+                    if let Some(func) = parser.arena.get_function(func_node) {
+                        let emitter = AsyncES5Emitter::new(&parser.arena);
+                        assert!(
+                            emitter.body_contains_await(func.body),
+                            "Should detect await in object binding computed name"
                         );
                     }
                 }
