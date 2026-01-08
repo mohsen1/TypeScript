@@ -13,6 +13,7 @@ Priority: 3
 - [ ] Coordinate with manager if unsure which unsoundness case to prioritize next.
 
 ## Completed
+- [x] Intersection reduction for disjoint primitives (TS unsoundness #21): ensure `string & number` reduces to `never`. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
 - [x] Homomorphic mapped types over string primitives (TS unsoundness #27): added string key mapping coverage. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
 - [x] `keyof` union contravariance (TS unsoundness #30): ensure only shared keys are produced. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
 - [x] Comparison operator overlap (TS unsoundness #23): added loose equality overlap coverage. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).

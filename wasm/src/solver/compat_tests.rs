@@ -2552,3 +2552,12 @@ fn test_intersection_reduction_disjoint_discriminant_assignable() {
     assert!(checker.is_assignable(intersection, TypeId::NEVER));
     assert!(checker.is_assignable(intersection, TypeId::STRING));
 }
+
+#[test]
+fn test_intersection_reduction_disjoint_primitives() {
+    let interner = TypeInterner::new();
+
+    let intersection = interner.intersection(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    assert_eq!(intersection, TypeId::NEVER);
+}
