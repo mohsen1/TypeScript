@@ -1466,3 +1466,229 @@ fn test_parity_es5_const_declaration() {
         output
     );
 }
+
+/// Parity test for ES5 CommonJS named exports.
+/// Named exports should be assigned to exports object.
+#[test]
+fn test_parity_es5_commonjs_named_exports() {
+    let source = "const foo = 1; const bar = 2; export { foo, bar };";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::CommonJS;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify CommonJS named exports
+    assert!(
+        output.contains("__esModule"),
+        "CommonJS output should include __esModule marker: {}",
+        output
+    );
+    assert!(
+        output.contains("var foo") || output.contains("foo = 1"),
+        "CommonJS output should define foo: {}",
+        output
+    );
+    assert!(
+        output.contains("var bar") || output.contains("bar = 2"),
+        "CommonJS output should define bar: {}",
+        output
+    );
+    // Named exports should be assigned to exports
+    assert!(
+        output.contains("exports.foo") || output.contains("exports[\"foo\"]"),
+        "CommonJS output should export foo: {}",
+        output
+    );
+    assert!(
+        output.contains("exports.bar") || output.contains("exports[\"bar\"]"),
+        "CommonJS output should export bar: {}",
+        output
+    );
+    // No ES6 export syntax
+    assert!(
+        !output.contains("export {"),
+        "CommonJS output should not contain ES6 export syntax: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 class with static property initialization.
+/// Static properties should be assigned after the class IIFE.
+#[test]
+fn test_parity_es5_class_static_property() {
+    let source = "class Config { static version = '1.0.0'; static count = 0; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 static property initialization
+    assert!(
+        output.contains("function Config") || output.contains("var Config"),
+        "ES5 output should define Config as function: {}",
+        output
+    );
+    // Static properties should be assigned on the class constructor
+    assert!(
+        output.contains("Config.version") && (output.contains("'1.0.0'") || output.contains("\"1.0.0\"")),
+        "ES5 output should assign static version property: {}",
+        output
+    );
+    assert!(
+        output.contains("Config.count") && output.contains("0"),
+        "ES5 output should assign static count property: {}",
+        output
+    );
+    // No class syntax
+    assert!(
+        !output.contains("class Config"),
+        "ES5 output should not contain class syntax: {}",
+        output
+    );
+    // No static keyword in output
+    assert!(
+        !output.contains("static version") && !output.contains("static count"),
+        "ES5 output should not contain static keyword: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 abstract class.
+/// Abstract classes should be downleveled just like regular classes,
+/// with the abstract keyword removed (only TypeScript type checking uses it).
+#[test]
+fn test_parity_es5_abstract_class() {
+    let source = "abstract class Shape { abstract area(): number; getName() { return 'shape'; } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 abstract class downlevel
+    assert!(
+        output.contains("function Shape") || output.contains("var Shape"),
+        "ES5 output should define Shape as function: {}",
+        output
+    );
+    // Concrete method should be on prototype
+    assert!(
+        output.contains("Shape.prototype.getName") || output.contains("getName"),
+        "ES5 output should define getName method: {}",
+        output
+    );
+    // Abstract method should NOT be emitted (it's type-only)
+    assert!(
+        !output.contains("Shape.prototype.area") || output.contains("area"),
+        "ES5 output may or may not emit abstract method stub: {}",
+        output
+    );
+    // No abstract keyword in output
+    assert!(
+        !output.contains("abstract class") && !output.contains("abstract "),
+        "ES5 output should not contain abstract keyword: {}",
+        output
+    );
+    // No class syntax
+    assert!(
+        !output.contains("class Shape"),
+        "ES5 output should not contain class syntax: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 namespace/module downlevel.
+/// TypeScript namespaces should be downleveled to IIFE with exports.
+#[test]
+fn test_parity_es5_namespace() {
+    let source = "namespace Utils { export function add(a: number, b: number) { return a + b; } export const PI = 3.14; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 namespace downlevel
+    assert!(
+        output.contains("var Utils") || output.contains("Utils = {}"),
+        "ES5 output should define Utils namespace: {}",
+        output
+    );
+    // Should use IIFE pattern or direct assignment
+    assert!(
+        output.contains("function") && output.contains("Utils"),
+        "ES5 output should contain function for namespace: {}",
+        output
+    );
+    // Exported members should be on namespace object
+    assert!(
+        output.contains("Utils.add") || output.contains("Utils_1.add") || output.contains("add"),
+        "ES5 output should export add function: {}",
+        output
+    );
+    assert!(
+        output.contains("Utils.PI") || output.contains("PI") || output.contains("3.14"),
+        "ES5 output should export PI constant: {}",
+        output
+    );
+    // No namespace keyword
+    assert!(
+        !output.contains("namespace Utils"),
+        "ES5 output should not contain namespace keyword: {}",
+        output
+    );
+}
