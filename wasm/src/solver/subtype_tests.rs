@@ -487,6 +487,38 @@ fn test_primitive_boxing_boolean_assignability() {
 }
 
 #[test]
+fn test_primitive_boxing_string_assignability() {
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let to_upper = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let string_interface = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("toUpperCase"),
+        type_id: to_upper,
+        write_type: to_upper,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let sym = SymbolRef(5);
+    env.insert(sym, string_interface);
+    let string_ref = interner.reference(sym);
+
+    let mut checker = SubtypeChecker::with_resolver(&interner, &env);
+
+    assert!(checker.is_subtype_of(TypeId::STRING, string_ref));
+    assert!(!checker.is_subtype_of(string_ref, TypeId::STRING));
+}
+
+#[test]
 fn test_weak_type_detection_requires_overlap() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
