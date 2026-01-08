@@ -219,17 +219,43 @@ impl<'a> AsyncES5Emitter<'a> {
             }
         }
 
-        // Check variable statements
-        if node.kind == syntax_kind_ext::VARIABLE_STATEMENT {
+        // Check variable statements and declaration lists
+        if node.kind == syntax_kind_ext::VARIABLE_STATEMENT
+            || node.kind == syntax_kind_ext::VARIABLE_DECLARATION_LIST
+        {
             if let Some(var_data) = self.arena.get_variable(node) {
-                for &decl_idx in &var_data.declarations.nodes {
-                    if let Some(decl_node) = self.arena.get(decl_idx) {
-                        if let Some(decl) = self.arena.get_variable_declaration(decl_node) {
-                            if self.contains_await_recursive(decl.initializer) {
-                                return true;
+                for &decl_list_idx in &var_data.declarations.nodes {
+                    let Some(decl_list_node) = self.arena.get(decl_list_idx) else {
+                        continue;
+                    };
+
+                    if let Some(decl) = self.arena.get_variable_declaration(decl_list_node) {
+                        if self.contains_await_recursive(decl.initializer) {
+                            return true;
+                        }
+                        continue;
+                    }
+
+                    if let Some(decl_list) = self.arena.get_variable(decl_list_node) {
+                        for &decl_idx in &decl_list.declarations.nodes {
+                            let Some(decl_node) = self.arena.get(decl_idx) else {
+                                continue;
+                            };
+                            if let Some(decl) = self.arena.get_variable_declaration(decl_node) {
+                                if self.contains_await_recursive(decl.initializer) {
+                                    return true;
+                                }
                             }
                         }
                     }
+                }
+            }
+        }
+
+        if node.kind == syntax_kind_ext::VARIABLE_DECLARATION {
+            if let Some(decl) = self.arena.get_variable_declaration(node) {
+                if self.contains_await_recursive(decl.initializer) {
+                    return true;
                 }
             }
         }
