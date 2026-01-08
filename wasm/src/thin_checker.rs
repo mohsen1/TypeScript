@@ -5310,7 +5310,7 @@ impl<'a> ThinCheckerState<'a> {
         use crate::checker::types::diagnostics::diagnostic_codes;
         use crate::solver::TypeFormatter;
 
-        let mut formatter = TypeFormatter::new(self.ctx.types);
+        let mut formatter = TypeFormatter::with_symbols(self.ctx.types, &self.ctx.binder.symbols);
         let index_str = formatter.format(index_type);
         let object_str = formatter.format(object_type);
         let message = format!(
@@ -6481,7 +6481,7 @@ impl<'a> ThinCheckerState<'a> {
                     ));
 
                 // Render the pending diagnostic to a TypeDiagnostic
-                let mut formatter = TypeFormatter::new(self.ctx.types);
+                let mut formatter = TypeFormatter::with_symbols(self.ctx.types, &self.ctx.binder.symbols);
                 let type_diag = formatter.render(&pending);
 
                 // Convert to checker diagnostic and add
@@ -6680,7 +6680,7 @@ impl<'a> ThinCheckerState<'a> {
             return;
         };
 
-        let mut formatter = TypeFormatter::new(self.ctx.types);
+        let mut formatter = TypeFormatter::with_symbols(self.ctx.types, &self.ctx.binder.symbols);
         let mut related = Vec::new();
         let span = crate::solver::SourceSpan::new(
             self.ctx.file_name.as_str(),
@@ -6825,7 +6825,7 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Format a type as a human-readable string using solver's TypeFormatter.
     pub fn format_type(&self, type_id: TypeId) -> String {
-        let mut formatter = crate::solver::TypeFormatter::new(self.ctx.types);
+        let mut formatter = crate::solver::TypeFormatter::with_symbols(self.ctx.types, &self.ctx.binder.symbols);
         formatter.format(type_id)
     }
 
