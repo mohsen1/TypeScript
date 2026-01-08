@@ -212,6 +212,35 @@ fn test_apparent_boolean_member_subtyping() {
 }
 
 #[test]
+fn test_apparent_symbol_member_subtyping() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let description = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+    let name = interner.intern_string("description");
+
+    let target = interner.object(vec![PropertyInfo {
+        name,
+        type_id: description,
+        write_type: description,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let mismatch = interner.object(vec![PropertyInfo {
+        name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(checker.is_subtype_of(TypeId::SYMBOL, target));
+    assert!(!checker.is_subtype_of(TypeId::SYMBOL, mismatch));
+}
+
+#[test]
 fn test_object_trifecta_subtyping() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
