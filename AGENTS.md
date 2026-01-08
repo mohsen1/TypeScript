@@ -66,17 +66,12 @@ This ensures:
 
 ## Workflow (loop)
 
-**⚠️ CRITICAL: Commit within 10 minutes. No lengthy exploration. Ship code fast.**
-
 1. **Sync first**: `git fetch origin && git merge origin/rust --no-edit`
-2. Read your plan file (30 seconds max).
-3. **Write code immediately**. Don't spend more than 5 minutes reading/exploring.
-4. Add a test. Run `./wasm/test.sh`.
-5. **Commit and push** - even partial progress is better than no commits.
-6. Mark "Ready for Merge: Yes" in your plan.
-7. Repeat.
-
-**If you've been working for 10+ minutes without a commit, STOP and commit what you have.**
+2. Read your plan file.
+3. Write code, add tests, run `./wasm/test.sh`.
+4. Commit and push to your worker branch.
+5. Mark "Ready for Merge: Yes" in your plan.
+6. Repeat.
 
 
 ## ✅ Commit Format

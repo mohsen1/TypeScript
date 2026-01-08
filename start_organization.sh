@@ -23,9 +23,9 @@ CODEX_UPDATE_CMD="${CODEX_UPDATE_CMD:-npm install -g @openai/codex}"
 DIRECTOR_IDLE_SECONDS="${DIRECTOR_IDLE_SECONDS:-600}"
 DIRECTOR_POKE="${DIRECTOR_POKE:-Check if any intervention is needed. If EMs are working, do nothing.}"
 EM_IDLE_SECONDS="${EM_IDLE_SECONDS:-90}"
-EM_POKE="${EM_POKE:-Check worker panes. If any worker has been exploring for 10+ min without commits, tell them to stop and ship code now.}"
+EM_POKE="${EM_POKE:-Check worker panes. If any worker is stuck or asking questions, unblock them with a clear directive.}"
 WORKER_IDLE_SECONDS="${WORKER_IDLE_SECONDS:-180}"
-WORKER_POKE="${WORKER_POKE:-STOP. Do not ask questions. Write code now. Commit. Push. If blocked, stash and continue.}"
+WORKER_POKE="${WORKER_POKE:-You are not blocked. Do not ask questions. Stash dirty files if needed. Write code. Commit. Push.}"
 
 # Startup timing (codex boots in ~5s)
 WORKER_START_PROMPT="${WORKER_START_PROMPT:-You are worker \$WORKER_NUM in squad \$SQUAD_NAME. Read AGENTS.md then your plan at wasm/specs/squads/\$SQUAD_NAME/worker-\${WORKER_NUM}_plan.md. Do NOT ask questions. Stash dirty files, switch to branch worker/\$SQUAD_NAME-\$WORKER_NUM, write code, commit, push. Go.}"
