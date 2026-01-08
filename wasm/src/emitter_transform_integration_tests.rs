@@ -253,6 +253,44 @@ class Derived extends Base {
 }
 
 #[test]
+fn test_two_phase_emission_es5_class_super_method_arguments() {
+    let source = r#"
+class Base { m(x) { return x; } }
+class Derived extends Base {
+    method() { return super.m(arguments[0]); }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("__extends(Derived, _super)"),
+        "ES5 output should call __extends for Derived: {}",
+        output
+    );
+    assert!(
+        output.contains("_super.prototype.m.call(this, arguments[0])"),
+        "ES5 output should lower super method call with arguments: {}",
+        output
+    );
+    assert!(
+        !output.contains("super.m"),
+        "ES5 output should not contain super method access: {}",
+        output
+    );
+}
+
+#[test]
 fn test_two_phase_emission_es6_class_no_transform() {
     // Parse source
     let source = "class Point { constructor(x, y) { this.x = x; this.y = y; } }";
