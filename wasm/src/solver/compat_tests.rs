@@ -1067,6 +1067,45 @@ fn test_explain_failure_reports_rest_mismatch() {
 }
 
 #[test]
+fn test_explain_failure_reports_rest_mismatch_source_rest() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let source = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: interner.array(TypeId::STRING),
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let target = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    assert!(matches!(
+        checker.explain_failure(source, target),
+        Some(SubtypeFailureReason::ParameterTypeMismatch { .. })
+    ));
+}
+
+#[test]
 fn test_empty_object_accepts_non_nullish() {
     let interner = TypeInterner::new();
     let mut checker = CompatChecker::new(&interner);
