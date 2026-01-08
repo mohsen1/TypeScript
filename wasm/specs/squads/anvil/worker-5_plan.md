@@ -7,12 +7,13 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- [ ] Add ES5 async tests for async with computed property names in `wasm/src/transforms/async_es5_tests.rs`. Run `./wasm/test.sh async_es5_tests`.
+- [ ] (awaiting assignment)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added 12 async computed property tests (class method basic, with return, no await, symbol, body_contains_await, body_no_await, ignores nested async, template literal, try/catch, static, expression, multiple awaits) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (196 tests PASS).
 - [x] Added 12 async decorator tests (basic, with return, no await, multiple decorators, body_contains_await, body_no_await, ignores nested async, class decorated, try/catch, static method, with params, decorator) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (184 tests PASS).
 - [x] Added 12 async private field tests (read basic, write, no await, multiple accesses, body_contains_await, body_no_await, ignores nested async, private method call, try/catch, static private field, increment, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (172 tests PASS).
 - [x] Added 12 async super call method tests (basic, with return, no await, multiple awaits, with args, body_contains_await, body_no_await, ignores nested async, assign result, try/catch, chain, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (160 tests PASS).
