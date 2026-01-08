@@ -3318,3 +3318,221 @@ fn test_async_super_method_conditional() {
         output
     );
 }
+
+// ============================================================================
+// Async with private fields tests
+// ============================================================================
+
+/// Helper to parse and emit an async method that accesses private fields
+fn parse_and_emit_async_private_field(source: &str) -> String {
+    use crate::parser::syntax_kind_ext;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &class_idx in &source_file.statements.nodes {
+                if let Some(class_node) = parser.arena.get(class_idx) {
+                    if class_node.kind == syntax_kind_ext::CLASS_DECLARATION {
+                        if let Some(class_data) = parser.arena.get_class(class_node) {
+                            // Find the first async method
+                            for &member_idx in &class_data.members.nodes {
+                                if let Some(member_node) = parser.arena.get(member_idx) {
+                                    if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
+                                        if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                            let emitter = AsyncES5Emitter::new(&parser.arena);
+                                            let has_await = emitter.body_contains_await(method_data.body);
+                                            let mut emitter = AsyncES5Emitter::new(&parser.arena);
+                                            if has_await {
+                                                return emitter.emit_generator_body_with_await(method_data.body);
+                                            } else {
+                                                return emitter.emit_simple_generator_body(method_data.body);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    String::new()
+}
+
+/// Helper to check if async method with private field access contains await
+fn private_field_method_contains_await(source: &str) -> bool {
+    use crate::parser::syntax_kind_ext;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &class_idx in &source_file.statements.nodes {
+                if let Some(class_node) = parser.arena.get(class_idx) {
+                    if class_node.kind == syntax_kind_ext::CLASS_DECLARATION {
+                        if let Some(class_data) = parser.arena.get_class(class_node) {
+                            for &member_idx in &class_data.members.nodes {
+                                if let Some(member_node) = parser.arena.get(member_idx) {
+                                    if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
+                                        if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                            let emitter = AsyncES5Emitter::new(&parser.arena);
+                                            return emitter.body_contains_await(method_data.body);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+#[test]
+fn test_async_private_field_read_basic() {
+    let output = parse_and_emit_async_private_field(
+        "class Foo { #value = 42; async bar() { const x = await Promise.resolve(this.#value); return x; } }",
+    );
+    assert!(
+        output.contains("case 1:") || output.contains("switch (_a.label)"),
+        "Async private field read should have case label or switch: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_private_field_write() {
+    let output = parse_and_emit_async_private_field(
+        "class Foo { #value = 0; async bar() { this.#value = await getValue(); } }",
+    );
+    // Emitter transforms private field access and may emit __classPrivateFieldGet
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("__classPrivateField"),
+        "Async private field write should have switch or private field helper: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_private_field_no_await() {
+    let output = parse_and_emit_async_private_field(
+        "class Foo { #value = 42; async bar() { return this.#value; } }",
+    );
+    assert!(
+        output.contains("[2 /*return*/"),
+        "Sync private field access should have return: {}",
+        output
+    );
+    assert!(
+        !output.contains("switch"),
+        "No await should skip switch: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_private_field_multiple_accesses() {
+    let output = parse_and_emit_async_private_field(
+        "class Foo { #a = 1; #b = 2; async bar() { const x = await Promise.resolve(this.#a); const y = await Promise.resolve(this.#b); return x + y; } }",
+    );
+    assert!(
+        output.contains("case 1:") && output.contains("case 2:"),
+        "Multiple async private field accesses should have multiple cases: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_private_field_body_contains_await() {
+    assert!(
+        private_field_method_contains_await(
+            "class Foo { #value = 0; async bar() { this.#value = await getValue(); } }"
+        ),
+        "Should detect await in private field assignment"
+    );
+}
+
+#[test]
+fn test_async_private_field_body_no_await() {
+    assert!(
+        !private_field_method_contains_await(
+            "class Foo { #value = 42; async bar() { return this.#value; } }"
+        ),
+        "Should not detect await when none present"
+    );
+}
+
+#[test]
+fn test_async_private_field_ignores_nested_async() {
+    assert!(
+        !private_field_method_contains_await(
+            "class Foo { #value = 0; async bar() { const inner = async () => { this.#value = await getValue(); }; return 1; } }"
+        ),
+        "Should ignore await in nested async"
+    );
+}
+
+#[test]
+fn test_async_private_method_call() {
+    // Put public method first so the helper finds it
+    let output = parse_and_emit_async_private_field(
+        "class Foo { async bar() { return await this.#privateMethod(); } async #privateMethod() { return 42; } }",
+    );
+    assert!(
+        output.contains("[4 /*yield*/") || output.contains("switch (_a.label)"),
+        "Async private method call should have yield or switch: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_private_field_in_try_catch() {
+    assert!(
+        private_field_method_contains_await(
+            "class Foo { #value = 0; async bar() { try { this.#value = await riskyGet(); } catch (e) { this.#value = 0; } } }"
+        ),
+        "Should detect await in try block with private field"
+    );
+}
+
+#[test]
+fn test_async_static_private_field() {
+    let output = parse_and_emit_async_private_field(
+        "class Foo { static #counter = 0; async bar() { const c = await Promise.resolve(Foo.#counter); return c; } }",
+    );
+    assert!(
+        output.contains("case 1:") || output.contains("[4 /*yield*/"),
+        "Async static private field access should have case or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_private_field_increment() {
+    let output = parse_and_emit_async_private_field(
+        "class Foo { #count = 0; async bar() { await delay(); this.#count++; return this.#count; } }",
+    );
+    assert!(
+        output.contains("[4 /*yield*/"),
+        "Async with private field increment should have yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_private_field_conditional() {
+    let output = parse_and_emit_async_private_field(
+        "class Foo { #value = 0; async bar(cond: boolean) { if (cond) { return await Promise.resolve(this.#value); } return 0; } }",
+    );
+    assert!(
+        output.contains("[4 /*yield*/") || output.contains("case 1:") || output.contains("switch (_a.label)"),
+        "Conditional async private field should have yield, case or switch: {}",
+        output
+    );
+}
