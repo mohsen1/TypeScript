@@ -2192,6 +2192,32 @@ fn test_commonjs_export_star_helper_ordering() {
 }
 
 #[test]
+fn test_commonjs_helpers_before_esmodule_marker() {
+    let source = r#"import * as ns from "./module"; export const x = 1;"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    let helper_pos = output
+        .find("var __createBinding")
+        .expect("Expected __createBinding helper");
+    let esmodule_pos = output
+        .find("__esModule")
+        .expect("Expected __esModule marker");
+    assert!(
+        helper_pos < esmodule_pos,
+        "Helpers should be emitted before __esModule marker"
+    );
+}
+
+#[test]
 fn test_commonjs_export_const() {
     let source = "export const x = 42;";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
