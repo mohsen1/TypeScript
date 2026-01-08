@@ -7,7 +7,7 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- Complete: Added 12 async generator function tests (basic yield, with await, yield await, multiple yields, yield in loop, body_contains_await, ignores nested async, for-await-of, try/catch, yield*, return value) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (124 tests PASS).
+- [ ] Add ES5 async tests for async IIFE patterns in `wasm/src/transforms/async_es5_tests.rs`. Run `./wasm/test.sh async_es5_tests`.
 
 ## Task Queue
 - [ ] (empty)
