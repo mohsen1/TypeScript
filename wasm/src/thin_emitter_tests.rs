@@ -1925,6 +1925,7 @@ fn test_commonjs_import_named() {
 
     let output = printer.get_output();
     assert!(output.contains("require(\"./module\")"), "Expected require() in CommonJS output: {}", output);
+    assert!(output.contains("__esModule"), "Expected __esModule marker in CommonJS output: {}", output);
     assert!(output.contains("var foo = module_1.foo;"), "Expected foo binding in output: {}", output);
     assert!(output.contains("var bar = module_1.bar;"), "Expected bar binding in output: {}", output);
 }
@@ -1970,6 +1971,37 @@ fn test_commonjs_import_side_effect() {
         "Expected side-effect require in CommonJS output: {}",
         output
     );
+    assert!(
+        output.contains("__esModule"),
+        "Expected __esModule marker in CommonJS output: {}",
+        output
+    );
+}
+
+#[test]
+fn test_commonjs_export_assignment_skips_esmodule_marker() {
+    let source = r#"import "./module"; const foo = 1; export = foo;"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("module.exports = foo"),
+        "Expected export assignment in CommonJS output: {}",
+        output
+    );
+    assert!(
+        !output.contains("__esModule"),
+        "Export assignment should suppress __esModule marker: {}",
+        output
+    );
 }
 
 #[test]
@@ -1987,10 +2019,102 @@ fn test_commonjs_import_namespace() {
 
     let output = printer.get_output();
     assert!(output.contains("require(\"./module\")"), "Expected require() in CommonJS output: {}", output);
+    assert!(output.contains("__esModule"), "Expected __esModule marker in CommonJS output: {}", output);
     assert!(
         output.contains("var ns = __importStar(module_1);"),
         "Expected namespace binding in output: {}",
         output
+    );
+}
+
+#[test]
+fn test_commonjs_type_only_namespace_import_is_erased() {
+    let source = r#"import type * as ns from "./module"; const x = 1;"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        !output.contains("require(\"./module\")"),
+        "Type-only namespace import should not emit require: {}",
+        output
+    );
+    assert!(
+        !output.contains("__importStar"),
+        "Type-only namespace import should not emit helpers: {}",
+        output
+    );
+    assert!(output.contains("const x = 1"), "Expected value statement in output: {}", output);
+}
+
+#[test]
+fn test_commonjs_import_namespace_emits_helpers() {
+    let source = r#"import * as ns from "./module";"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("var __createBinding"),
+        "Expected __createBinding helper in CommonJS output: {}",
+        output
+    );
+    assert!(
+        output.contains("var __setModuleDefault"),
+        "Expected __setModuleDefault helper in CommonJS output: {}",
+        output
+    );
+    assert!(
+        output.contains("var __importStar"),
+        "Expected __importStar helper in CommonJS output: {}",
+        output
+    );
+}
+
+#[test]
+fn test_commonjs_import_namespace_helper_ordering() {
+    let source = r#"import * as ns from "./module";"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    let create_binding_pos = output
+        .find("var __createBinding")
+        .expect("Expected __createBinding helper");
+    let set_module_default_pos = output
+        .find("var __setModuleDefault")
+        .expect("Expected __setModuleDefault helper");
+    let import_star_pos = output
+        .find("var __importStar")
+        .expect("Expected __importStar helper");
+    assert!(
+        create_binding_pos < set_module_default_pos,
+        "__createBinding should precede __setModuleDefault"
+    );
+    assert!(
+        set_module_default_pos < import_star_pos,
+        "__setModuleDefault should precede __importStar"
     );
 }
 
@@ -2009,6 +2133,7 @@ fn test_commonjs_import_default() {
 
     let output = printer.get_output();
     assert!(output.contains("require(\"./module\")"), "Expected require() in CommonJS output: {}", output);
+    assert!(output.contains("__esModule"), "Expected __esModule marker in CommonJS output: {}", output);
     assert!(output.contains("var myDefault = module_1.default;"), "Expected default binding in output: {}", output);
 }
 
@@ -2027,6 +2152,7 @@ fn test_commonjs_reexport() {
 
     let output = printer.get_output();
     assert!(output.contains("require(\"./module\")"), "Expected require() in CommonJS output: {}", output);
+    assert!(output.contains("__esModule"), "Expected __esModule marker in CommonJS output: {}", output);
     assert!(output.contains("Object.defineProperty(exports, \"foo\""), "Expected Object.defineProperty for re-export: {}", output);
 }
 
@@ -2072,7 +2198,112 @@ fn test_commonjs_export_star() {
 
     let output = printer.get_output();
     assert!(output.contains("require(\"./module\")"), "Expected require() in CommonJS output: {}", output);
+    assert!(output.contains("__esModule"), "Expected __esModule marker in CommonJS output: {}", output);
     assert!(output.contains("__exportStar("), "Expected __exportStar call in CommonJS output: {}", output);
+}
+
+#[test]
+fn test_commonjs_export_star_emits_helpers() {
+    let source = r#"export * from "./module";"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("var __createBinding"),
+        "Expected __createBinding helper in CommonJS output: {}",
+        output
+    );
+    assert!(
+        output.contains("var __exportStar"),
+        "Expected __exportStar helper in CommonJS output: {}",
+        output
+    );
+}
+
+#[test]
+fn test_commonjs_export_star_helper_ordering() {
+    let source = r#"export * from "./module";"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    let create_binding_pos = output
+        .find("var __createBinding")
+        .expect("Expected __createBinding helper");
+    let export_star_pos = output
+        .find("var __exportStar")
+        .expect("Expected __exportStar helper");
+    assert!(
+        create_binding_pos < export_star_pos,
+        "__createBinding should precede __exportStar"
+    );
+}
+
+#[test]
+fn test_commonjs_helpers_before_esmodule_marker() {
+    let source = r#"import * as ns from "./module"; export const x = 1;"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    let helper_pos = output
+        .find("var __createBinding")
+        .expect("Expected __createBinding helper");
+    let esmodule_pos = output
+        .find("__esModule")
+        .expect("Expected __esModule marker");
+    assert!(
+        helper_pos < esmodule_pos,
+        "Helpers should be emitted before __esModule marker"
+    );
+}
+
+#[test]
+fn test_commonjs_esmodule_marker_before_exports_init() {
+    let source = "export const x = 1;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    let esmodule_pos = output
+        .find("__esModule")
+        .expect("Expected __esModule marker");
+    let exports_init_pos = output
+        .find("exports.x = void 0")
+        .expect("Expected exports initialization");
+    assert!(
+        esmodule_pos < exports_init_pos,
+        "__esModule marker should precede exports initialization"
+    );
 }
 
 #[test]
@@ -2089,6 +2320,7 @@ fn test_commonjs_export_const() {
     printer.emit(root);
 
     let output = printer.get_output();
+    assert!(output.contains("__esModule"), "Expected __esModule marker in CommonJS output: {}", output);
     assert!(output.contains("const x = 42;"), "Expected 'const x = 42;' in CommonJS output: {}", output);
     assert!(output.contains("exports.x = x;"), "Expected 'exports.x = x;' in CommonJS output: {}", output);
 }
@@ -2107,6 +2339,7 @@ fn test_commonjs_export_const_destructuring() {
     printer.emit(root);
 
     let output = printer.get_output();
+    assert!(output.contains("__esModule"), "Expected __esModule marker in CommonJS output: {}", output);
     assert!(
         output.contains("exports.a = exports.c = void 0;"),
         "Expected CommonJS exports init for destructured names: {}",
@@ -2125,6 +2358,87 @@ fn test_commonjs_export_const_destructuring() {
 }
 
 #[test]
+fn test_commonjs_export_default_function() {
+    let source = "export default function foo() { return 1; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(output.contains("__esModule"), "Expected __esModule marker in CommonJS output: {}", output);
+    assert!(
+        output.contains("exports.default ="),
+        "Expected default export assignment in CommonJS output: {}",
+        output
+    );
+    assert!(
+        output.contains("function foo"),
+        "Expected default function declaration in CommonJS output: {}",
+        output
+    );
+}
+
+#[test]
+fn test_commonjs_export_default_expression() {
+    let source = "export default 1;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(output.contains("__esModule"), "Expected __esModule marker in CommonJS output: {}", output);
+    assert!(
+        output.contains("exports.default = 1;"),
+        "Expected default export assignment in CommonJS output: {}",
+        output
+    );
+    assert!(
+        !output.contains("export default"),
+        "CommonJS output should not contain ES module syntax: {}",
+        output
+    );
+}
+
+#[test]
+fn test_commonjs_export_default_arrow() {
+    let source = "export default () => 1;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(output.contains("__esModule"), "Expected __esModule marker in CommonJS output: {}", output);
+    assert!(
+        output.contains("exports.default ="),
+        "Expected default export assignment in CommonJS output: {}",
+        output
+    );
+    assert!(
+        output.contains("=>"),
+        "Expected arrow function emit in CommonJS output: {}",
+        output
+    );
+}
+
+#[test]
 fn test_commonjs_export_function() {
     let source = "export function add(a, b) { return a + b; }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -2138,6 +2452,7 @@ fn test_commonjs_export_function() {
     printer.emit(root);
 
     let output = printer.get_output();
+    assert!(output.contains("__esModule"), "Expected __esModule marker in CommonJS output: {}", output);
     assert!(output.contains("function add"), "Expected 'function add' in CommonJS output: {}", output);
     assert!(output.contains("exports.add = add;"), "Expected 'exports.add = add;' in CommonJS output: {}", output);
 }
@@ -2156,6 +2471,7 @@ fn test_commonjs_export_import_equals() {
     printer.emit(root);
 
     let output = printer.get_output();
+    assert!(output.contains("__esModule"), "Expected __esModule marker in CommonJS output: {}", output);
     assert!(
         output.contains("exports.Foo = void 0;"),
         "Expected exports preamble for import equals: {}",
@@ -2187,6 +2503,7 @@ fn test_commonjs_export_class() {
     printer.emit(root);
 
     let output = printer.get_output();
+    assert!(output.contains("__esModule"), "Expected __esModule marker in CommonJS output: {}", output);
     // ES5 emits class as IIFE, so check for var Foo
     assert!(output.contains("var Foo") || output.contains("class Foo"),
             "Expected class Foo definition in CommonJS output: {}", output);
@@ -2207,6 +2524,7 @@ fn test_commonjs_export_namespace() {
     printer.emit(root);
 
     let output = printer.get_output();
+    assert!(output.contains("__esModule"), "Expected __esModule marker in CommonJS output: {}", output);
     assert!(
         output.contains("(function (N)") || output.contains("namespace N"),
         "Expected namespace emit in CommonJS output: {}",
