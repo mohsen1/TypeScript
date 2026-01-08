@@ -11822,3 +11822,78 @@ const conditional = true ? import("./a") : import("./b");"#;
         "expected non-empty source mappings for dynamic import"
     );
 }
+
+#[test]
+fn test_source_map_rest_and_default_parameters() {
+    // Test rest parameters (...args) and default parameters (x = value)
+    let source = r#"function greet(name = "World", ...titles: string[]) {
+    return titles.join(" ") + " " + name;
+}
+
+const sum = (a: number, b = 0, ...rest: number[]) => {
+    return a + b + rest.reduce((x, y) => x + y, 0);
+};
+
+greet("Alice", "Dr.", "Prof.");
+sum(1, 2, 3, 4, 5);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the function declaration
+    let (greet_line, greet_col) = find_line_col(source, "function greet");
+    let has_greet_mapping = decoded.iter().any(|entry| {
+        entry.original_line == greet_line
+            && entry.original_column >= greet_col
+            && entry.original_column <= greet_col + 14
+    });
+
+    // Verify we have mappings for the arrow function
+    let (sum_line, sum_col) = find_line_col(source, "const sum");
+    let has_sum_mapping = decoded.iter().any(|entry| {
+        entry.original_line == sum_line
+            && entry.original_column >= sum_col
+            && entry.original_column <= sum_col + 9
+    });
+
+    // At minimum, we should have mappings for function declarations
+    assert!(
+        has_greet_mapping || has_sum_mapping,
+        "expected mappings for rest/default parameter functions. mappings: {mappings}"
+    );
+
+    // Verify output contains the function names
+    assert!(
+        output.contains("greet") && output.contains("sum"),
+        "expected output to contain function names. output: {output}"
+    );
+
+    // Verify source map has non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for rest/default parameters"
+    );
+}
