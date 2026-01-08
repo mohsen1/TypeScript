@@ -13,6 +13,7 @@ Priority: 2
 - [ ] [EM: Add queued tasks]
 
 ## Completed
+- [x] Added parity test for const declaration ES5 downlevel in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (29 tests).
 - [x] Added parity test for let in for loop ES5 downlevel in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (28 tests).
 - [x] Added parity test for async arrow function ES5 downlevel in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (27 tests).
 - [x] Added parity test for class prototype methods ES5 downlevel in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (26 tests).
