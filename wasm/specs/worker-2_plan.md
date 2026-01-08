@@ -26,6 +26,7 @@ Priority: 2
 - [x] Added constrained infer extraction test for object properties. Tests: `./wasm/test.sh test_conditional_infer_object_property_with_constraint`.
 - [x] Added nested object property infer extraction test. Tests: `./wasm/test.sh test_conditional_infer_nested_object_property_distributive`.
 - [x] Added nested object property infer extraction test with constraint. Tests: `./wasm/test.sh test_conditional_infer_nested_object_property_with_constraint`.
+- [x] Added nested object property infer extraction test with readonly. Tests: `./wasm/test.sh test_conditional_infer_nested_object_property_readonly`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
