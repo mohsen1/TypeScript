@@ -12153,3 +12153,80 @@ function* infiniteSequence() {
         unique_source_lines
     );
 }
+
+#[test]
+fn test_source_map_optional_chaining_mapping() {
+    // Test source-map accuracy for optional chaining (?.) expressions
+    let source = r#"const name = user?.profile?.name;
+const length = arr?.length;
+const result = obj?.method?.();
+const nested = a?.b?.c?.d;"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Verify variable declarations are in output
+    assert!(
+        output.contains("name") && output.contains("length") && output.contains("result"),
+        "expected variable names in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the variable declarations
+    let (name_line, _) = find_line_col(source, "const name");
+    let has_name_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == name_line
+    });
+
+    let (length_line, _) = find_line_col(source, "const length");
+    let has_length_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == length_line
+    });
+
+    let (result_line, _) = find_line_col(source, "const result");
+    let has_result_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == result_line
+    });
+
+    // We should have mappings for the optional chaining declarations
+    assert!(
+        has_name_mapping || has_length_mapping || has_result_mapping,
+        "expected mappings for optional chaining declarations. mappings: {mappings}"
+    );
+
+    // Verify non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for optional chaining code"
+    );
+
+    // Verify mappings span multiple source lines
+    let unique_source_lines: std::collections::HashSet<_> =
+        decoded.iter().map(|m| m.original_line).collect();
+    assert!(
+        unique_source_lines.len() >= 2,
+        "expected mappings from at least 2 different source lines, got: {:?}",
+        unique_source_lines
+    );
+}
