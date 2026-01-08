@@ -28,6 +28,7 @@ use crate::checker::types::diagnostics::{
 };
 use crate::checker::{CheckerContext, EnclosingClassInfo, FlowAnalyzer};
 use crate::interner::Atom;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 // =============================================================================
 // ThinCheckerState
@@ -51,6 +52,12 @@ pub const MAX_INSTANTIATION_DEPTH: u32 = 50;
 
 /// Maximum depth for call expression resolution.
 pub const MAX_CALL_DEPTH: u32 = 20;
+
+// Cross-file symbol resolution can recurse across checkers; use a thread-local guard.
+thread_local! {
+    static SHARED_SYMBOL_RESOLUTION: std::cell::RefCell<FxHashSet<SymbolId>> =
+        std::cell::RefCell::new(FxHashSet::default());
+}
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum EnumKind {
@@ -243,7 +250,7 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
-    fn resolve_identifier_symbol(&self, idx: NodeIndex) -> Option<SymbolId> {
+    pub fn resolve_identifier_symbol(&self, idx: NodeIndex) -> Option<SymbolId> {
         let node = self.ctx.arena.get(idx)?;
         let name = self.ctx.arena.get_identifier(node)?.escaped_text.as_str();
 
@@ -404,6 +411,21 @@ impl<'a> ThinCheckerState<'a> {
             // void expression
             k if k == syntax_kind_ext::VOID_EXPRESSION => TypeId::UNDEFINED,
 
+            // Type assertions (as / satisfies / <T>expr)
+            k if k == syntax_kind_ext::TYPE_ASSERTION
+                || k == syntax_kind_ext::AS_EXPRESSION
+                || k == syntax_kind_ext::SATISFIES_EXPRESSION => {
+                let Some(assertion) = self.ctx.arena.get_type_assertion(node) else {
+                    return TypeId::ANY;
+                };
+                let expr_type = self.get_type_of_node(assertion.expression);
+                let asserted_type = self.get_type_from_type_node(assertion.type_node);
+                if node.kind == syntax_kind_ext::SATISFIES_EXPRESSION {
+                    return expr_type;
+                }
+                asserted_type
+            }
+
             // Parenthesized expression - just pass through to inner expression
             k if k == syntax_kind_ext::PARENTHESIZED_EXPRESSION => {
                 if let Some(paren) = self.ctx.arena.get_parenthesized(node) {
@@ -491,6 +513,12 @@ impl<'a> ThinCheckerState<'a> {
         if let Some(name_node) = self.ctx.arena.get(type_name_idx) {
             if name_node.kind == syntax_kind_ext::QUALIFIED_NAME {
                 if has_type_args {
+                    let type_args = type_ref.type_arguments
+                        .as_ref()
+                        .map(|args| args.nodes.iter()
+                            .map(|&arg_idx| self.get_type_from_type_node(arg_idx))
+                            .collect::<Vec<_>>())
+                        .unwrap_or_default();
                     let Some(sym_id) = self.resolve_qualified_symbol(type_name_idx) else {
                         let _ = self.resolve_qualified_name(type_name_idx);
                         return TypeId::ERROR;
@@ -503,15 +531,12 @@ impl<'a> ThinCheckerState<'a> {
                     // Ensure the base type symbol is resolved first so its type params
                     // are available in the type_env for Application expansion
                     let _ = self.get_type_of_symbol(sym_id);
-                    let type_resolver = |node_idx: NodeIndex| self.resolve_type_symbol_for_lowering(node_idx);
-                    let value_resolver = |node_idx: NodeIndex| self.resolve_value_symbol_for_lowering(node_idx);
-                    let lowering = crate::solver::TypeLowering::with_resolvers(
-                        self.ctx.arena,
-                        self.ctx.types,
-                        &type_resolver,
-                        &value_resolver,
-                    );
-                    return lowering.lower_type(idx);
+                    if let Some(instantiated) = self.instantiate_type_alias(sym_id, &type_args) {
+                        return self.expand_type_alias_applications(instantiated);
+                    }
+                    let base = self.ctx.types.intern(crate::solver::TypeKey::Ref(crate::solver::SymbolRef(sym_id.0)));
+                    let applied = self.ctx.types.application(base, type_args);
+                    return self.expand_type_alias_applications(applied);
                 }
                 return self.resolve_qualified_name(type_name_idx);
             }
@@ -523,44 +548,51 @@ impl<'a> ThinCheckerState<'a> {
                 let name = ident.escaped_text.as_str();
 
                 if has_type_args {
+                    let type_args = type_ref.type_arguments
+                        .as_ref()
+                        .map(|args| args.nodes.iter()
+                            .map(|&arg_idx| self.get_type_from_type_node(arg_idx))
+                            .collect::<Vec<_>>())
+                        .unwrap_or_default();
                     let is_builtin_array = name == "Array" || name == "ReadonlyArray";
-                    if !is_builtin_array
-                        && self.lookup_type_parameter(name).is_none()
-                        && self.resolve_identifier_symbol(type_name_idx).is_none()
-                    {
+                    let type_param = self.lookup_type_parameter(name);
+                    let sym_id = self.resolve_identifier_symbol(type_name_idx);
+
+                    if is_builtin_array && type_param.is_none() && sym_id.is_none() {
+                        let elem_type = type_args.first().copied().unwrap_or(TypeId::ANY);
+                        let array_type = self.ctx.types.array(elem_type);
+                        if name == "ReadonlyArray" {
+                            return self.ctx.types.intern(crate::solver::TypeKey::ReadonlyType(array_type));
+                        }
+                        return array_type;
+                    }
+
+                    if type_param.is_none() && sym_id.is_none() {
                         self.error_cannot_find_name_at(name, type_name_idx);
                         return TypeId::ERROR;
                     }
-                    if !is_builtin_array {
-                        if let Some(sym_id) = self.resolve_identifier_symbol(type_name_idx) {
-                            if self.alias_resolves_to_value_only(sym_id) || self.symbol_is_value_only(sym_id) {
-                                self.error_value_only_type_at(name, type_name_idx);
-                                return TypeId::ERROR;
-                            }
-                            // Ensure the base type symbol is resolved first so its type params
-                            // are available in the type_env for Application expansion
-                            let _ = self.get_type_of_symbol(sym_id);
+                    if let Some(sym_id) = sym_id {
+                        if self.alias_resolves_to_value_only(sym_id) || self.symbol_is_value_only(sym_id) {
+                            self.error_value_only_type_at(name, type_name_idx);
+                            return TypeId::ERROR;
                         }
-                    }
-                    // Also ensure type arguments are resolved and in type_env
-                    // This is needed so that when we evaluate the Application, we can
-                    // resolve Ref types in the arguments
-                    if let Some(args) = &type_ref.type_arguments {
-                        for &arg_idx in &args.nodes {
-                            // Recursively get type from the arg - this will add any referenced
-                            // symbols to type_env
-                            let _ = self.get_type_from_type_node(arg_idx);
+                        // Ensure the base type symbol is resolved first so its type params
+                        // are available in the type_env for Application expansion
+                        let _ = self.get_type_of_symbol(sym_id);
+                        if let Some(instantiated) = self.instantiate_type_alias(sym_id, &type_args) {
+                            return self.expand_type_alias_applications(instantiated);
                         }
+                        let base = self.ctx.types.intern(crate::solver::TypeKey::Ref(crate::solver::SymbolRef(sym_id.0)));
+                        let applied = self.ctx.types.application(base, type_args);
+                        return self.expand_type_alias_applications(applied);
                     }
-                    let type_resolver = |node_idx: NodeIndex| self.resolve_type_symbol_for_lowering(node_idx);
-                    let value_resolver = |node_idx: NodeIndex| self.resolve_value_symbol_for_lowering(node_idx);
-                    let lowering = crate::solver::TypeLowering::with_resolvers(
-                        self.ctx.arena,
-                        self.ctx.types,
-                        &type_resolver,
-                        &value_resolver,
-                    );
-                    return lowering.lower_type(idx);
+
+                    if let Some(type_param) = type_param {
+                        let applied = self.ctx.types.application(type_param, type_args);
+                        return self.expand_type_alias_applications(applied);
+                    }
+
+                    return TypeId::ERROR;
                 }
 
                 if name == "Array" || name == "ReadonlyArray" {
@@ -624,6 +656,699 @@ impl<'a> ThinCheckerState<'a> {
             return Some(self.get_type_of_symbol(sym_id));
         }
         None
+    }
+
+    fn instantiate_type_alias(&mut self, sym_id: SymbolId, type_args: &[TypeId]) -> Option<TypeId> {
+        let symbol = self.ctx.binder.get_symbol(sym_id)?;
+        if symbol.flags & symbol_flags::TYPE_ALIAS == 0 {
+            return None;
+        }
+
+        let decl_idx = symbol.declarations.first().copied()?;
+        if let Some(arena) = self.ctx.binder.symbol_arenas.get(&sym_id) {
+            if std::ptr::eq(self.ctx.arena, arena.as_ref()) {
+                if let Some(node) = self.ctx.arena.get(decl_idx) {
+                    let type_alias = self.ctx.arena.get_type_alias(node)?;
+                    let (params, updates) = self.push_type_parameters(&type_alias.type_parameters);
+                    let alias_type = self.get_type_from_type_node(type_alias.type_node);
+                    self.pop_type_parameters(updates);
+                    return Some(crate::solver::instantiate_generic(
+                        self.ctx.types,
+                        alias_type,
+                        &params,
+                        type_args,
+                    ));
+                }
+            } else {
+                let node = arena.get(decl_idx)?;
+                let type_alias = arena.get_type_alias(node)?;
+                return self.instantiate_type_alias_from_arena(arena.as_ref(), type_alias, type_args);
+            }
+        }
+
+        if let Some(node) = self.ctx.arena.get(decl_idx) {
+            let type_alias = self.ctx.arena.get_type_alias(node)?;
+            let (params, updates) = self.push_type_parameters(&type_alias.type_parameters);
+            let alias_type = self.get_type_from_type_node(type_alias.type_node);
+            self.pop_type_parameters(updates);
+            return Some(crate::solver::instantiate_generic(
+                self.ctx.types,
+                alias_type,
+                &params,
+                type_args,
+            ));
+        }
+
+        let arena = self.ctx.binder.symbol_arenas.get(&sym_id)?;
+        let node = arena.get(decl_idx)?;
+        let type_alias = arena.get_type_alias(node)?;
+        self.instantiate_type_alias_from_arena(arena.as_ref(), type_alias, type_args)
+    }
+
+    fn instantiate_type_alias_from_arena(
+        &mut self,
+        arena: &ThinNodeArena,
+        type_alias: &crate::parser::thin_node::TypeAliasData,
+        type_args: &[TypeId],
+    ) -> Option<TypeId> {
+        let mut params = Vec::new();
+        if let Some(list) = type_alias.type_parameters.as_ref() {
+            for &param_idx in &list.nodes {
+                let Some(param_node) = arena.get(param_idx) else {
+                    continue;
+                };
+                let Some(param_data) = arena.get_type_parameter(param_node) else {
+                    continue;
+                };
+                let name = arena
+                    .get(param_data.name)
+                    .and_then(|name_node| arena.get_identifier(name_node))
+                    .map(|ident| ident.escaped_text.clone())
+                    .unwrap_or_else(|| "T".to_string());
+                let atom = self.ctx.types.intern_string(&name);
+                params.push(crate::solver::TypeParamInfo {
+                    name: atom,
+                    constraint: None,
+                    default: None,
+                });
+            }
+        }
+
+        let type_resolver = |node_idx: NodeIndex| {
+            let node = arena.get(node_idx)?;
+            let ident = arena.get_identifier(node)?;
+            self.ctx.binder.file_locals.get(ident.escaped_text.as_str()).map(|id| id.0)
+        };
+        let lowering = crate::solver::TypeLowering::with_resolvers(
+            arena,
+            self.ctx.types,
+            &type_resolver,
+            &type_resolver,
+        );
+        let alias_type = lowering.lower_type_alias_declaration(type_alias);
+        let alias_type = self.expand_alias_in_conditional_root(alias_type);
+
+        Some(crate::solver::instantiate_generic(
+            self.ctx.types,
+            alias_type,
+            &params,
+            type_args,
+        ))
+    }
+
+    fn expand_type_alias_applications(&mut self, type_id: TypeId) -> TypeId {
+        let mut cache = FxHashMap::default();
+        let mut in_progress = FxHashSet::default();
+        self.expand_type_alias_applications_inner(type_id, &mut cache, &mut in_progress)
+    }
+
+    fn expand_alias_application_shallow(&mut self, type_id: TypeId) -> TypeId {
+        let Some(crate::solver::TypeKey::Application(app_id)) = self.ctx.types.lookup(type_id)
+        else {
+            return type_id;
+        };
+        let app = self.ctx.types.type_application(app_id);
+        let Some(crate::solver::TypeKey::Ref(sym)) = self.ctx.types.lookup(app.base) else {
+            return type_id;
+        };
+        let sym_id = SymbolId(sym.0);
+        self.instantiate_type_alias(sym_id, &app.args)
+            .unwrap_or(type_id)
+    }
+
+    fn expand_alias_in_conditional_root(&mut self, type_id: TypeId) -> TypeId {
+        let Some(crate::solver::TypeKey::Conditional(cond_id)) = self.ctx.types.lookup(type_id)
+        else {
+            return type_id;
+        };
+        let cond = self.ctx.types.conditional_type(cond_id);
+        let check_type = self.expand_alias_application_shallow(cond.check_type);
+        let extends_type = self.expand_alias_application_shallow(cond.extends_type);
+        if check_type == cond.check_type && extends_type == cond.extends_type {
+            return type_id;
+        }
+        self.ctx.types.conditional(crate::solver::ConditionalType {
+            check_type,
+            extends_type,
+            true_type: cond.true_type,
+            false_type: cond.false_type,
+            is_distributive: cond.is_distributive,
+        })
+    }
+
+    fn expand_type_alias_applications_inner(
+        &mut self,
+        type_id: TypeId,
+        cache: &mut FxHashMap<TypeId, TypeId>,
+        in_progress: &mut FxHashSet<SymbolId>,
+    ) -> TypeId {
+        if let Some(&cached) = cache.get(&type_id) {
+            return cached;
+        }
+        cache.insert(type_id, type_id);
+
+        let Some(key) = self.ctx.types.lookup(type_id) else {
+            return type_id;
+        };
+
+        let expanded = match key {
+            crate::solver::TypeKey::Application(app_id) => {
+                let app = self.ctx.types.type_application(app_id);
+                let new_base = self.expand_type_alias_applications_inner(app.base, cache, in_progress);
+                let mut changed = new_base != app.base;
+                let mut new_args = Vec::with_capacity(app.args.len());
+                for &arg in &app.args {
+                    let expanded_arg = self.expand_type_alias_applications_inner(arg, cache, in_progress);
+                    if expanded_arg != arg {
+                        changed = true;
+                    }
+                    new_args.push(expanded_arg);
+                }
+
+                if let Some(crate::solver::TypeKey::Ref(sym)) = self.ctx.types.lookup(new_base) {
+                    let sym_id = SymbolId(sym.0);
+                    if !in_progress.contains(&sym_id) {
+                        if let Some(instantiated) = self.instantiate_type_alias(sym_id, &new_args) {
+                            in_progress.insert(sym_id);
+                            let expanded = self.expand_type_alias_applications_inner(
+                                instantiated,
+                                cache,
+                                in_progress,
+                            );
+                            in_progress.remove(&sym_id);
+                            return expanded;
+                        }
+                    }
+                }
+
+                if changed {
+                    self.ctx.types.application(new_base, new_args)
+                } else {
+                    type_id
+                }
+            }
+            crate::solver::TypeKey::Union(members) => {
+                let members = self.ctx.types.type_list(members);
+                let mut changed = false;
+                let mut new_members = Vec::with_capacity(members.len());
+                for &member in members.iter() {
+                    let expanded_member =
+                        self.expand_type_alias_applications_inner(member, cache, in_progress);
+                    if expanded_member != member {
+                        changed = true;
+                    }
+                    new_members.push(expanded_member);
+                }
+                if changed {
+                    self.ctx.types.union(new_members)
+                } else {
+                    type_id
+                }
+            }
+            crate::solver::TypeKey::Intersection(members) => {
+                let members = self.ctx.types.type_list(members);
+                let mut changed = false;
+                let mut new_members = Vec::with_capacity(members.len());
+                for &member in members.iter() {
+                    let expanded_member =
+                        self.expand_type_alias_applications_inner(member, cache, in_progress);
+                    if expanded_member != member {
+                        changed = true;
+                    }
+                    new_members.push(expanded_member);
+                }
+                if changed {
+                    self.ctx.types.intersection(new_members)
+                } else {
+                    type_id
+                }
+            }
+            crate::solver::TypeKey::Array(elem) => {
+                let expanded_elem = self.expand_type_alias_applications_inner(elem, cache, in_progress);
+                if expanded_elem != elem {
+                    self.ctx.types.array(expanded_elem)
+                } else {
+                    type_id
+                }
+            }
+            crate::solver::TypeKey::Tuple(elements) => {
+                let elements = self.ctx.types.tuple_list(elements);
+                let mut changed = false;
+                let mut new_elements = Vec::with_capacity(elements.len());
+                for elem in elements.iter() {
+                    let expanded_type =
+                        self.expand_type_alias_applications_inner(elem.type_id, cache, in_progress);
+                    if expanded_type != elem.type_id {
+                        changed = true;
+                    }
+                    new_elements.push(crate::solver::TupleElement {
+                        type_id: expanded_type,
+                        name: elem.name,
+                        optional: elem.optional,
+                        rest: elem.rest,
+                    });
+                }
+                if changed {
+                    self.ctx.types.tuple(new_elements)
+                } else {
+                    type_id
+                }
+            }
+            crate::solver::TypeKey::Object(shape_id) => {
+                let shape = self.ctx.types.object_shape(shape_id);
+                let mut changed = false;
+                let mut new_props = Vec::with_capacity(shape.properties.len());
+                for prop in shape.properties.iter() {
+                    let expanded_read =
+                        self.expand_type_alias_applications_inner(prop.type_id, cache, in_progress);
+                    let expanded_write =
+                        self.expand_type_alias_applications_inner(prop.write_type, cache, in_progress);
+                    if expanded_read != prop.type_id || expanded_write != prop.write_type {
+                        changed = true;
+                    }
+                    new_props.push(crate::solver::PropertyInfo {
+                        name: prop.name,
+                        type_id: expanded_read,
+                        write_type: expanded_write,
+                        optional: prop.optional,
+                        readonly: prop.readonly,
+                        is_method: prop.is_method,
+                    });
+                }
+                if changed {
+                    self.ctx.types.object(new_props)
+                } else {
+                    type_id
+                }
+            }
+            crate::solver::TypeKey::ObjectWithIndex(shape_id) => {
+                let shape = self.ctx.types.object_shape(shape_id);
+                let mut changed = false;
+                let mut new_props = Vec::with_capacity(shape.properties.len());
+                for prop in shape.properties.iter() {
+                    let expanded_read =
+                        self.expand_type_alias_applications_inner(prop.type_id, cache, in_progress);
+                    let expanded_write =
+                        self.expand_type_alias_applications_inner(prop.write_type, cache, in_progress);
+                    if expanded_read != prop.type_id || expanded_write != prop.write_type {
+                        changed = true;
+                    }
+                    new_props.push(crate::solver::PropertyInfo {
+                        name: prop.name,
+                        type_id: expanded_read,
+                        write_type: expanded_write,
+                        optional: prop.optional,
+                        readonly: prop.readonly,
+                        is_method: prop.is_method,
+                    });
+                }
+                let mut new_shape = crate::solver::ObjectShape {
+                    properties: new_props,
+                    string_index: shape.string_index.clone(),
+                    number_index: shape.number_index.clone(),
+                };
+                if let Some(index) = new_shape.string_index.as_mut() {
+                    let key_type =
+                        self.expand_type_alias_applications_inner(index.key_type, cache, in_progress);
+                    let value_type =
+                        self.expand_type_alias_applications_inner(index.value_type, cache, in_progress);
+                    if key_type != index.key_type || value_type != index.value_type {
+                        changed = true;
+                        index.key_type = key_type;
+                        index.value_type = value_type;
+                    }
+                }
+                if let Some(index) = new_shape.number_index.as_mut() {
+                    let key_type =
+                        self.expand_type_alias_applications_inner(index.key_type, cache, in_progress);
+                    let value_type =
+                        self.expand_type_alias_applications_inner(index.value_type, cache, in_progress);
+                    if key_type != index.key_type || value_type != index.value_type {
+                        changed = true;
+                        index.key_type = key_type;
+                        index.value_type = value_type;
+                    }
+                }
+                if changed {
+                    self.ctx.types.object_with_index(new_shape)
+                } else {
+                    type_id
+                }
+            }
+            crate::solver::TypeKey::Function(shape_id) => {
+                let shape = self.ctx.types.function_shape(shape_id);
+                let mut changed = false;
+                let mut new_type_params = Vec::with_capacity(shape.type_params.len());
+                for param in shape.type_params.iter() {
+                    let constraint = param.constraint.map(|ty| {
+                        self.expand_type_alias_applications_inner(ty, cache, in_progress)
+                    });
+                    let default = param.default.map(|ty| {
+                        self.expand_type_alias_applications_inner(ty, cache, in_progress)
+                    });
+                    if constraint != param.constraint || default != param.default {
+                        changed = true;
+                    }
+                    new_type_params.push(crate::solver::TypeParamInfo {
+                        name: param.name,
+                        constraint,
+                        default,
+                    });
+                }
+                let mut new_params = Vec::with_capacity(shape.params.len());
+                for param in shape.params.iter() {
+                    let expanded_type =
+                        self.expand_type_alias_applications_inner(param.type_id, cache, in_progress);
+                    if expanded_type != param.type_id {
+                        changed = true;
+                    }
+                    new_params.push(crate::solver::ParamInfo {
+                        name: param.name,
+                        type_id: expanded_type,
+                        optional: param.optional,
+                        rest: param.rest,
+                    });
+                }
+                let new_this = shape
+                    .this_type
+                    .map(|ty| self.expand_type_alias_applications_inner(ty, cache, in_progress));
+                if new_this != shape.this_type {
+                    changed = true;
+                }
+                let new_return =
+                    self.expand_type_alias_applications_inner(shape.return_type, cache, in_progress);
+                if new_return != shape.return_type {
+                    changed = true;
+                }
+                let new_predicate = shape.type_predicate.as_ref().map(|pred| {
+                    let mut updated = pred.clone();
+                    if let Some(type_id) = pred.type_id {
+                        let expanded_type =
+                            self.expand_type_alias_applications_inner(type_id, cache, in_progress);
+                        if expanded_type != type_id {
+                            updated.type_id = Some(expanded_type);
+                            changed = true;
+                        }
+                    }
+                    updated
+                });
+                if changed {
+                    self.ctx.types.function(crate::solver::FunctionShape {
+                        type_params: new_type_params,
+                        params: new_params,
+                        this_type: new_this,
+                        return_type: new_return,
+                        type_predicate: new_predicate,
+                        is_constructor: shape.is_constructor,
+                    })
+                } else {
+                    type_id
+                }
+            }
+            crate::solver::TypeKey::Callable(shape_id) => {
+                let shape = self.ctx.types.callable_shape(shape_id);
+                let mut changed = false;
+                let mut new_call_sigs = Vec::with_capacity(shape.call_signatures.len());
+                for sig in shape.call_signatures.iter() {
+                    let mut sig_changed = false;
+                    let mut new_type_params = Vec::with_capacity(sig.type_params.len());
+                    for param in sig.type_params.iter() {
+                        let constraint = param.constraint.map(|ty| {
+                            self.expand_type_alias_applications_inner(ty, cache, in_progress)
+                        });
+                        let default = param.default.map(|ty| {
+                            self.expand_type_alias_applications_inner(ty, cache, in_progress)
+                        });
+                        if constraint != param.constraint || default != param.default {
+                            sig_changed = true;
+                        }
+                        new_type_params.push(crate::solver::TypeParamInfo {
+                            name: param.name,
+                            constraint,
+                            default,
+                        });
+                    }
+                    let mut new_params = Vec::with_capacity(sig.params.len());
+                    for param in sig.params.iter() {
+                        let expanded_type =
+                            self.expand_type_alias_applications_inner(param.type_id, cache, in_progress);
+                        if expanded_type != param.type_id {
+                            sig_changed = true;
+                        }
+                        new_params.push(crate::solver::ParamInfo {
+                            name: param.name,
+                            type_id: expanded_type,
+                            optional: param.optional,
+                            rest: param.rest,
+                        });
+                    }
+                    let new_this = sig
+                        .this_type
+                        .map(|ty| self.expand_type_alias_applications_inner(ty, cache, in_progress));
+                    if new_this != sig.this_type {
+                        sig_changed = true;
+                    }
+                    let new_return =
+                        self.expand_type_alias_applications_inner(sig.return_type, cache, in_progress);
+                    if new_return != sig.return_type {
+                        sig_changed = true;
+                    }
+                    let new_predicate = sig.type_predicate.as_ref().map(|pred| {
+                        let mut updated = pred.clone();
+                        if let Some(type_id) = pred.type_id {
+                            let expanded_type =
+                                self.expand_type_alias_applications_inner(type_id, cache, in_progress);
+                            if expanded_type != type_id {
+                                updated.type_id = Some(expanded_type);
+                                sig_changed = true;
+                            }
+                        }
+                        updated
+                    });
+                    if sig_changed {
+                        changed = true;
+                    }
+                    new_call_sigs.push(crate::solver::CallSignature {
+                        type_params: new_type_params,
+                        params: new_params,
+                        this_type: new_this,
+                        return_type: new_return,
+                        type_predicate: new_predicate,
+                    });
+                }
+                let mut new_construct_sigs = Vec::with_capacity(shape.construct_signatures.len());
+                for sig in shape.construct_signatures.iter() {
+                    let mut sig_changed = false;
+                    let mut new_type_params = Vec::with_capacity(sig.type_params.len());
+                    for param in sig.type_params.iter() {
+                        let constraint = param.constraint.map(|ty| {
+                            self.expand_type_alias_applications_inner(ty, cache, in_progress)
+                        });
+                        let default = param.default.map(|ty| {
+                            self.expand_type_alias_applications_inner(ty, cache, in_progress)
+                        });
+                        if constraint != param.constraint || default != param.default {
+                            sig_changed = true;
+                        }
+                        new_type_params.push(crate::solver::TypeParamInfo {
+                            name: param.name,
+                            constraint,
+                            default,
+                        });
+                    }
+                    let mut new_params = Vec::with_capacity(sig.params.len());
+                    for param in sig.params.iter() {
+                        let expanded_type =
+                            self.expand_type_alias_applications_inner(param.type_id, cache, in_progress);
+                        if expanded_type != param.type_id {
+                            sig_changed = true;
+                        }
+                        new_params.push(crate::solver::ParamInfo {
+                            name: param.name,
+                            type_id: expanded_type,
+                            optional: param.optional,
+                            rest: param.rest,
+                        });
+                    }
+                    let new_this = sig
+                        .this_type
+                        .map(|ty| self.expand_type_alias_applications_inner(ty, cache, in_progress));
+                    if new_this != sig.this_type {
+                        sig_changed = true;
+                    }
+                    let new_return =
+                        self.expand_type_alias_applications_inner(sig.return_type, cache, in_progress);
+                    if new_return != sig.return_type {
+                        sig_changed = true;
+                    }
+                    let new_predicate = sig.type_predicate.as_ref().map(|pred| {
+                        let mut updated = pred.clone();
+                        if let Some(type_id) = pred.type_id {
+                            let expanded_type =
+                                self.expand_type_alias_applications_inner(type_id, cache, in_progress);
+                            if expanded_type != type_id {
+                                updated.type_id = Some(expanded_type);
+                                sig_changed = true;
+                            }
+                        }
+                        updated
+                    });
+                    if sig_changed {
+                        changed = true;
+                    }
+                    new_construct_sigs.push(crate::solver::CallSignature {
+                        type_params: new_type_params,
+                        params: new_params,
+                        this_type: new_this,
+                        return_type: new_return,
+                        type_predicate: new_predicate,
+                    });
+                }
+                let mut new_props = Vec::with_capacity(shape.properties.len());
+                for prop in shape.properties.iter() {
+                    let expanded_read =
+                        self.expand_type_alias_applications_inner(prop.type_id, cache, in_progress);
+                    let expanded_write =
+                        self.expand_type_alias_applications_inner(prop.write_type, cache, in_progress);
+                    if expanded_read != prop.type_id || expanded_write != prop.write_type {
+                        changed = true;
+                    }
+                    new_props.push(crate::solver::PropertyInfo {
+                        name: prop.name,
+                        type_id: expanded_read,
+                        write_type: expanded_write,
+                        optional: prop.optional,
+                        readonly: prop.readonly,
+                        is_method: prop.is_method,
+                    });
+                }
+                if changed {
+                    self.ctx.types.callable(crate::solver::CallableShape {
+                        call_signatures: new_call_sigs,
+                        construct_signatures: new_construct_sigs,
+                        properties: new_props,
+                    })
+                } else {
+                    type_id
+                }
+            }
+            crate::solver::TypeKey::Conditional(cond_id) => {
+                let cond = self.ctx.types.conditional_type(cond_id);
+                let new_check =
+                    self.expand_type_alias_applications_inner(cond.check_type, cache, in_progress);
+                let new_extends =
+                    self.expand_type_alias_applications_inner(cond.extends_type, cache, in_progress);
+                let new_true =
+                    self.expand_type_alias_applications_inner(cond.true_type, cache, in_progress);
+                let new_false =
+                    self.expand_type_alias_applications_inner(cond.false_type, cache, in_progress);
+                if new_check != cond.check_type
+                    || new_extends != cond.extends_type
+                    || new_true != cond.true_type
+                    || new_false != cond.false_type
+                {
+                    self.ctx.types.conditional(crate::solver::ConditionalType {
+                        check_type: new_check,
+                        extends_type: new_extends,
+                        true_type: new_true,
+                        false_type: new_false,
+                        is_distributive: cond.is_distributive,
+                    })
+                } else {
+                    type_id
+                }
+            }
+            crate::solver::TypeKey::Mapped(mapped_id) => {
+                let mapped = self.ctx.types.mapped_type(mapped_id);
+                let type_param = crate::solver::TypeParamInfo {
+                    name: mapped.type_param.name,
+                    constraint: mapped.type_param.constraint.map(|ty| {
+                        self.expand_type_alias_applications_inner(ty, cache, in_progress)
+                    }),
+                    default: mapped.type_param.default.map(|ty| {
+                        self.expand_type_alias_applications_inner(ty, cache, in_progress)
+                    }),
+                };
+                let new_constraint =
+                    self.expand_type_alias_applications_inner(mapped.constraint, cache, in_progress);
+                let new_name = mapped
+                    .name_type
+                    .map(|ty| self.expand_type_alias_applications_inner(ty, cache, in_progress));
+                let new_template =
+                    self.expand_type_alias_applications_inner(mapped.template, cache, in_progress);
+                if type_param.constraint != mapped.type_param.constraint
+                    || type_param.default != mapped.type_param.default
+                    || new_constraint != mapped.constraint
+                    || new_name != mapped.name_type
+                    || new_template != mapped.template
+                {
+                    self.ctx.types.mapped(crate::solver::MappedType {
+                        type_param,
+                        constraint: new_constraint,
+                        name_type: new_name,
+                        template: new_template,
+                        readonly_modifier: mapped.readonly_modifier,
+                        optional_modifier: mapped.optional_modifier,
+                    })
+                } else {
+                    type_id
+                }
+            }
+            crate::solver::TypeKey::IndexAccess(obj, idx) => {
+                let new_obj = self.expand_type_alias_applications_inner(obj, cache, in_progress);
+                let new_idx = self.expand_type_alias_applications_inner(idx, cache, in_progress);
+                if new_obj != obj || new_idx != idx {
+                    self.ctx.types.intern(crate::solver::TypeKey::IndexAccess(new_obj, new_idx))
+                } else {
+                    type_id
+                }
+            }
+            crate::solver::TypeKey::KeyOf(inner) => {
+                let new_inner = self.expand_type_alias_applications_inner(inner, cache, in_progress);
+                if new_inner != inner {
+                    self.ctx.types.intern(crate::solver::TypeKey::KeyOf(new_inner))
+                } else {
+                    type_id
+                }
+            }
+            crate::solver::TypeKey::ReadonlyType(inner) => {
+                let new_inner = self.expand_type_alias_applications_inner(inner, cache, in_progress);
+                if new_inner != inner {
+                    self.ctx.types.intern(crate::solver::TypeKey::ReadonlyType(new_inner))
+                } else {
+                    type_id
+                }
+            }
+            crate::solver::TypeKey::TemplateLiteral(spans_id) => {
+                let spans = self.ctx.types.template_list(spans_id);
+                let mut changed = false;
+                let mut new_spans = Vec::with_capacity(spans.len());
+                for span in spans.iter() {
+                    match span {
+                        crate::solver::TemplateSpan::Text(text) => {
+                            new_spans.push(crate::solver::TemplateSpan::Text(*text));
+                        }
+                        crate::solver::TemplateSpan::Type(ty) => {
+                            let new_ty =
+                                self.expand_type_alias_applications_inner(*ty, cache, in_progress);
+                            if new_ty != *ty {
+                                changed = true;
+                            }
+                            new_spans.push(crate::solver::TemplateSpan::Type(new_ty));
+                        }
+                    }
+                }
+                if changed {
+                    self.ctx.types.template_literal(new_spans)
+                } else {
+                    type_id
+                }
+            }
+            _ => type_id,
+        };
+
+        cache.insert(type_id, expanded);
+        expanded
     }
 
     fn lookup_type_parameter(&self, name: &str) -> Option<TypeId> {
@@ -967,6 +1692,7 @@ impl<'a> ThinCheckerState<'a> {
     /// Get type from a type query node (typeof X).
     /// Creates a TypeQuery type with the actual SymbolId from the binder.
     fn get_type_from_type_query(&mut self, idx: NodeIndex) -> TypeId {
+        use crate::binder::SymbolId;
         use crate::solver::{TypeKey, SymbolRef};
 
         let Some(node) = self.ctx.arena.get(idx) else {
@@ -981,8 +1707,21 @@ impl<'a> ThinCheckerState<'a> {
         let is_identifier = self.ctx.arena.get(type_query.expr_name)
             .and_then(|node| self.ctx.arena.get_identifier(node))
             .is_some();
-        let base = if let Some(sym_id) = self.resolve_value_symbol_for_lowering(type_query.expr_name) {
-            self.ctx.types.intern(TypeKey::TypeQuery(SymbolRef(sym_id)))
+        let base = if let Some(sym_id) =
+            self.resolve_value_symbol_for_lowering(type_query.expr_name)
+        {
+            let resolved = self.get_type_of_symbol(SymbolId(sym_id));
+            if let Some(args) = &type_query.type_arguments {
+                if !args.nodes.is_empty() {
+                    let type_args = args
+                        .nodes
+                        .iter()
+                        .map(|&idx| self.get_type_from_type_node(idx))
+                        .collect();
+                    return self.ctx.types.application(resolved, type_args);
+                }
+            }
+            return resolved;
         } else if self.resolve_type_symbol_for_lowering(type_query.expr_name).is_some() {
             let name = name_text.as_deref().unwrap_or("<unknown>");
             self.error_type_only_value_at(name, type_query.expr_name);
@@ -1054,7 +1793,8 @@ impl<'a> ThinCheckerState<'a> {
             &value_resolver,
         );
 
-        lowering.lower_type(idx)
+        let lowered = lowering.lower_type(idx);
+        self.expand_type_alias_applications(lowered)
     }
 
     fn get_type_from_type_node_in_type_literal(&mut self, idx: NodeIndex) -> TypeId {
@@ -2870,6 +3610,20 @@ impl<'a> ThinCheckerState<'a> {
                 self.error_type_only_value_at(name, idx);
                 return TypeId::ERROR;
             }
+
+            // For function symbols with explicit return types, get the signature type
+            // before checking the body. This prevents circular reference issues when
+            // the body references variables whose initializers refer to this function.
+            // We also cache this identifier node's type early so that other code
+            // that references the same identifier doesn't hit the resolution set check.
+            if flags & symbol_flags::FUNCTION != 0 {
+                if let Some(func_type) = self.get_function_signature_type_for_circular_ref(sym_id) {
+                    // Cache the node type early to prevent circular reference issues
+                    self.ctx.node_types.insert(idx.0, func_type);
+                    return self.apply_flow_narrowing(idx, func_type);
+                }
+            }
+
             let declared_type = self.get_type_of_symbol(sym_id);
             return self.apply_flow_narrowing(idx, declared_type);
         }
@@ -3000,30 +3754,56 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         // Check for circular reference
-        if self.ctx.symbol_resolution_set.contains(&sym_id) {
+        if self.ctx.symbol_resolution_set.contains(&sym_id)
+            || SHARED_SYMBOL_RESOLUTION.with(|set| set.borrow().contains(&sym_id))
+        {
+            // For function symbols with explicit return type, compute signature-only type
+            // This handles circular references where a variable's initializer references
+            // a function that's still being computed
+            if let Some(func_type) = self.get_function_signature_type_for_circular_ref(sym_id) {
+                return func_type;
+            }
             return TypeId::ANY;
         }
 
         // Push onto resolution stack
         self.ctx.symbol_resolution_stack.push(sym_id);
         self.ctx.symbol_resolution_set.insert(sym_id);
+        SHARED_SYMBOL_RESOLUTION.with(|set| {
+            set.borrow_mut().insert(sym_id);
+        });
 
         self.push_symbol_dependency(sym_id, true);
-        let (result, type_params) = self.compute_type_of_symbol(sym_id);
+        let result = if let Some(symbol_arena) = self.ctx.binder.symbol_arenas.get(&sym_id) {
+            if !std::ptr::eq(symbol_arena.as_ref(), self.ctx.arena) {
+                let mut checker = ThinCheckerState::new(
+                    symbol_arena.as_ref(),
+                    self.ctx.binder,
+                    self.ctx.types,
+                    self.ctx.file_name.clone(),
+                );
+                checker.compute_type_of_symbol(sym_id)
+            } else {
+                self.compute_type_of_symbol(sym_id)
+            }
+        } else {
+            self.compute_type_of_symbol(sym_id)
+        };
         self.pop_symbol_dependency();
 
         // Pop from resolution stack
         self.ctx.symbol_resolution_stack.pop();
         self.ctx.symbol_resolution_set.remove(&sym_id);
+        SHARED_SYMBOL_RESOLUTION.with(|set| {
+            set.borrow_mut().remove(&sym_id);
+        });
 
         // Cache result
         self.ctx.symbol_types.insert(sym_id, result);
 
         // Also populate the type environment for Application expansion
-        // IMPORTANT: We use the type_params returned by compute_type_of_symbol
-        // because those are the same TypeIds used when lowering the type body.
-        // Calling get_type_params_for_symbol would create fresh TypeIds that don't match.
         if result != TypeId::ANY && result != TypeId::ERROR {
+            let type_params = self.get_type_params_for_symbol(sym_id);
             let mut env = self.ctx.type_env.borrow_mut();
             if type_params.is_empty() {
                 env.insert(SymbolRef(sym_id.0), result);
@@ -3035,17 +3815,64 @@ impl<'a> ThinCheckerState<'a> {
         result
     }
 
+    /// For circular references on function symbols, compute the function type from
+    /// the signature only (without checking the body). This is safe when the function
+    /// has an explicit return type annotation.
+    fn get_function_signature_type_for_circular_ref(&mut self, sym_id: SymbolId) -> Option<TypeId> {
+        use crate::binder::symbol_flags;
+        use crate::solver::FunctionShape;
+
+        let symbol = self.ctx.binder.get_symbol(sym_id)?;
+
+        // Only handle function symbols
+        if symbol.flags & symbol_flags::FUNCTION == 0 {
+            return None;
+        }
+
+        // Find the function declaration with body and explicit return type
+        for &decl_idx in &symbol.declarations {
+            let node = self.ctx.arena.get(decl_idx)?;
+            let func = self.ctx.arena.get_function(node)?;
+
+            // Only for functions with body and explicit return type
+            if func.body.is_none() || func.type_annotation.is_none() {
+                continue;
+            }
+
+            // Build function type from signature only (no body check)
+            let (type_params, type_param_updates) = self.push_type_parameters(&func.type_parameters);
+            let (params, this_type) = self.extract_params_from_parameter_list(&func.parameters);
+            let (return_type, type_predicate) = self.return_type_and_predicate(func.type_annotation);
+            self.pop_type_parameters(type_param_updates);
+
+            let shape = FunctionShape {
+                type_params,
+                params,
+                this_type,
+                return_type,
+                type_predicate,
+                is_constructor: false,
+            };
+
+            let func_type = self.ctx.types.function(shape);
+
+            // Cache this type so subsequent lookups find it
+            self.ctx.symbol_types.insert(sym_id, func_type);
+
+            return Some(func_type);
+        }
+
+        None
+    }
+
     /// Compute type of a symbol (internal, not cached).
     ///
     /// Uses TypeLowering to bridge symbol declarations to solver types.
-    /// Returns the computed type and the type parameters used (if any).
-    /// IMPORTANT: The type params returned must be the same ones used when lowering
-    /// the type body, so that instantiation works correctly.
-    fn compute_type_of_symbol(&mut self, sym_id: SymbolId) -> (TypeId, Vec<crate::solver::TypeParamInfo>) {
+    fn compute_type_of_symbol(&mut self, sym_id: SymbolId) -> TypeId {
         use crate::solver::{TypeLowering, TypeKey, SymbolRef};
 
         let Some(symbol) = self.ctx.binder.get_symbol(sym_id) else {
-            return (TypeId::ANY, Vec::new());
+            return TypeId::ANY;
         };
 
         let flags = symbol.flags;
@@ -3056,12 +3883,12 @@ impl<'a> ThinCheckerState<'a> {
         if flags & (symbol_flags::NAMESPACE_MODULE | symbol_flags::VALUE_MODULE) != 0 {
             // Note: We use the symbol ID directly.
             // For merged declarations, this ID points to the unified symbol in the binder.
-            return (self.ctx.types.intern(TypeKey::Ref(SymbolRef(sym_id.0))), Vec::new());
+            return self.ctx.types.intern(TypeKey::Ref(SymbolRef(sym_id.0)));
         }
 
         // Enum - return a nominal reference type
         if flags & symbol_flags::ENUM != 0 {
-            return (self.ctx.types.intern(TypeKey::Ref(SymbolRef(sym_id.0))), Vec::new());
+            return self.ctx.types.intern(TypeKey::Ref(SymbolRef(sym_id.0)));
         }
 
         // Function - build function type or callable overload set
@@ -3092,17 +3919,17 @@ impl<'a> ThinCheckerState<'a> {
                     construct_signatures: Vec::new(),
                     properties: Vec::new(),
                 };
-                return (self.ctx.types.callable(shape), Vec::new());
+                return self.ctx.types.callable(shape);
             }
 
             if !value_decl.is_none() {
-                return (self.get_type_of_function(value_decl), Vec::new());
+                return self.get_type_of_function(value_decl);
             }
             if !implementation_decl.is_none() {
-                return (self.get_type_of_function(implementation_decl), Vec::new());
+                return self.get_type_of_function(implementation_decl);
             }
 
-            return (TypeId::ANY, Vec::new());
+            return TypeId::ANY;
         }
 
         // Class - return class constructor type
@@ -3115,11 +3942,11 @@ impl<'a> ThinCheckerState<'a> {
             if !decl_idx.is_none() {
                 if let Some(node) = self.ctx.arena.get(decl_idx) {
                     if let Some(class) = self.ctx.arena.get_class(node) {
-                        return (self.get_class_constructor_type(decl_idx, class), Vec::new());
+                        return self.get_class_constructor_type(decl_idx, class);
                     }
                 }
             }
-            return (TypeId::ANY, Vec::new());
+            return TypeId::ANY;
         }
 
         // Interface - return interface type with call signatures
@@ -3134,36 +3961,20 @@ impl<'a> ThinCheckerState<'a> {
                     &value_resolver,
                 );
                 let interface_type = lowering.lower_interface_declarations(&symbol.declarations);
-                // TODO: interfaces can have type parameters too - handle them properly
-                return (self.merge_interface_heritage_types(&symbol.declarations, interface_type), Vec::new());
+                return self.merge_interface_heritage_types(&symbol.declarations, interface_type);
             }
             if !value_decl.is_none() {
-                return (self.get_type_of_interface(value_decl), Vec::new());
+                return self.get_type_of_interface(value_decl);
             }
-            return (TypeId::ANY, Vec::new());
+            return TypeId::ANY;
         }
 
         // Type alias - resolve using checker's get_type_from_type_node to properly resolve symbols
         if flags & symbol_flags::TYPE_ALIAS != 0 {
-            // Get the type node from the type alias declaration
-            let decl_idx = if !value_decl.is_none() {
-                value_decl
-            } else {
-                symbol.declarations.first().copied().unwrap_or(NodeIndex::NONE)
-            };
-            if !decl_idx.is_none() {
-                if let Some(node) = self.ctx.arena.get(decl_idx) {
-                    if let Some(type_alias) = self.ctx.arena.get_type_alias(node) {
-                        let (params, updates) = self.push_type_parameters(&type_alias.type_parameters);
-                        let alias_type = self.get_type_from_type_node(type_alias.type_node);
-                        self.pop_type_parameters(updates);
-                        // Return the params that were used during lowering - this ensures
-                        // type_env gets the same TypeIds as the type body
-                        return (alias_type, params);
-                    }
-                }
+            if let Some(alias_type) = self.instantiate_type_alias(sym_id, &[]) {
+                return self.expand_type_alias_applications(alias_type);
             }
-            return (TypeId::ANY, Vec::new());
+            return TypeId::ANY;
         }
 
         // Variable - get type from annotation or infer from initializer
@@ -3173,7 +3984,7 @@ impl<'a> ThinCheckerState<'a> {
                     if let Some(var_decl) = self.ctx.arena.get_variable_declaration(node) {
                         // First try type annotation using type-node lowering (resolves through binder).
                         if !var_decl.type_annotation.is_none() {
-                            return (self.get_type_from_type_node(var_decl.type_annotation), Vec::new());
+                            return self.get_type_from_type_node(var_decl.type_annotation);
                         }
                         if !var_decl.initializer.is_none()
                             && self.is_const_variable_declaration(value_decl)
@@ -3181,17 +3992,18 @@ impl<'a> ThinCheckerState<'a> {
                             if let Some(literal_type) =
                                 self.literal_type_from_initializer(var_decl.initializer)
                             {
-                                return (literal_type, Vec::new());
+                                return literal_type;
                             }
                         }
                         // Fall back to inferring from initializer
                         if !var_decl.initializer.is_none() {
-                            return (self.get_type_of_node(var_decl.initializer), Vec::new());
+                            let init_type = self.get_type_of_node(var_decl.initializer);
+                            return init_type;
                         }
                     }
                 }
             }
-            return (TypeId::ANY, Vec::new());
+            return TypeId::ANY;
         }
 
         // Alias - resolve the aliased type (import x = ns.member or ES6 imports)
@@ -3201,25 +4013,33 @@ impl<'a> ThinCheckerState<'a> {
                     // Handle Import Equals Declaration (import x = ns.member)
                     if node.kind == syntax_kind_ext::IMPORT_EQUALS_DECLARATION {
                         if let Some(import) = self.ctx.arena.get_import_decl(node) {
+                            if let Some(spec_node) = self.ctx.arena.get(import.module_specifier) {
+                                if spec_node.kind == SyntaxKind::StringLiteral as u16
+                                    || spec_node.kind
+                                        == SyntaxKind::NoSubstitutionTemplateLiteral as u16
+                                {
+                                    return TypeId::ANY;
+                                }
+                            }
                             // module_specifier holds the reference (e.g., 'ns.member' or require("..."))
                             // Use resolve_qualified_symbol to get the target symbol directly,
                             // avoiding the value-only check that's inappropriate for import aliases.
                             // Import aliases can legitimately reference value-only namespaces.
                             if let Some(target_sym) = self.resolve_qualified_symbol(import.module_specifier) {
-                                return (self.get_type_of_symbol(target_sym), Vec::new());
+                                return self.get_type_of_symbol(target_sym);
                             }
                             // Fall back to get_type_of_node for simple identifiers
-                            return (self.get_type_of_node(import.module_specifier), Vec::new());
+                            return self.get_type_of_node(import.module_specifier);
                         }
                     }
                     // Handle ES6 named imports - these are already handled by IMPORT_DECLARATION
                     // but fall through to ANY for now as they need module resolution
                 }
             }
-            return (TypeId::ANY, Vec::new());
+            return TypeId::ANY;
         }
 
-        (TypeId::ANY, Vec::new())
+        TypeId::ANY
     }
 
     fn is_const_variable_declaration(&self, var_decl_idx: NodeIndex) -> bool {
@@ -3462,9 +4282,20 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         // Use CallEvaluator to resolve the call
-        let mut checker = CompatChecker::new(self.ctx.types);
-        let mut evaluator = CallEvaluator::new(self.ctx.types, &mut checker);
-        let result = evaluator.resolve_call(callee_type, &arg_types);
+        let needs_env = self.ctx.type_environment.borrow().is_none();
+        if needs_env {
+            let env = self.build_type_environment();
+            *self.ctx.type_environment.borrow_mut() = Some(env);
+        }
+        let result = {
+            let env_ref = std::cell::Ref::map(
+                self.ctx.type_environment.borrow(),
+                |env| env.as_ref().expect("type environment"),
+            );
+            let mut checker = CompatChecker::with_resolver(self.ctx.types, &*env_ref);
+            let mut evaluator = CallEvaluator::new(self.ctx.types, &mut checker);
+            evaluator.resolve_call(callee_type, &arg_types)
+        };
 
         match result {
             CallResult::Success(return_type) => return_type,
@@ -3832,6 +4663,10 @@ impl<'a> ThinCheckerState<'a> {
         if object_type == TypeId::ANY || object_type == TypeId::ERROR {
             return TypeId::ANY;
         }
+        let object_type = self.evaluate_type_with_env(object_type);
+        if object_type == TypeId::ANY || object_type == TypeId::ERROR {
+            return TypeId::ANY;
+        }
 
         // If it's an identifier, look up the property
         if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
@@ -3922,6 +4757,10 @@ impl<'a> ThinCheckerState<'a> {
         let object_type = self.get_type_of_node(access.expression);
 
         // Don't report errors for any/error types
+        if object_type == TypeId::ANY || object_type == TypeId::ERROR {
+            return TypeId::ANY;
+        }
+        let object_type = self.evaluate_type_with_env(object_type);
         if object_type == TypeId::ANY || object_type == TypeId::ERROR {
             return TypeId::ANY;
         }
@@ -4516,7 +5355,6 @@ impl<'a> ThinCheckerState<'a> {
     /// Get type of function declaration/expression/arrow.
     fn get_type_of_function(&mut self, idx: NodeIndex) -> TypeId {
         use crate::solver::{FunctionShape, ParamInfo};
-        use std::sync::Arc;
 
         let Some(node) = self.ctx.arena.get(idx) else {
             return TypeId::ANY;
@@ -4624,9 +5462,42 @@ impl<'a> ThinCheckerState<'a> {
                 return_type = self.infer_return_type_from_body(func.body, return_context);
             }
 
+            // For functions with explicit return type, cache the function type before checking
+            // the body. This prevents circular reference issues when the body contains code
+            // that references variables whose initializers refer back to this function.
+            let func_type = if !func.type_annotation.is_none() {
+                let shape = FunctionShape {
+                    type_params: type_params.clone(),
+                    params: params.clone(),
+                    this_type,
+                    return_type,
+                    type_predicate: type_predicate.clone(),
+                    is_constructor: false,
+                };
+                let func_type = self.ctx.types.function(shape);
+
+                // Cache the function type for this node before checking the body
+                self.ctx.node_types.insert(idx.0, func_type);
+
+                // Also cache the symbol type if this is a function declaration with a symbol
+                if let Some(sym_id) = self.ctx.binder.get_node_symbol(idx) {
+                    self.ctx.symbol_types.insert(sym_id, func_type);
+                }
+
+                Some(func_type)
+            } else {
+                None
+            };
+
             self.push_return_type(return_type);
             self.check_statement(func.body);
             self.pop_return_type();
+
+            // If we already computed the type, return it
+            if let Some(ft) = func_type {
+                self.pop_type_parameters(type_param_updates);
+                return ft;
+            }
         }
 
         // Create function type using TypeInterner
@@ -4948,6 +5819,102 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    fn evaluate_type_with_env(&mut self, type_id: TypeId) -> TypeId {
+        use crate::solver::TypeEvaluator;
+
+        if type_id.is_intrinsic() {
+            return type_id;
+        }
+
+        // Ensure all Ref symbols in Application types are resolved first
+        self.ensure_application_refs_resolved(type_id);
+
+        // Use the incrementally-populated type_env which has type params
+        // registered during type checking
+        let env = self.ctx.type_env.borrow();
+        let evaluator = TypeEvaluator::with_resolver(self.ctx.types, &*env);
+        evaluator.evaluate(type_id)
+    }
+
+    /// Ensure that any Ref symbols in Application types are resolved (populating type_env).
+    fn ensure_application_refs_resolved(&mut self, type_id: TypeId) {
+        use crate::solver::{TypeKey, SymbolRef};
+
+        if type_id.is_intrinsic() {
+            return;
+        }
+
+        let Some(key) = self.ctx.types.lookup(type_id) else {
+            return;
+        };
+
+        match key {
+            TypeKey::Application(app_id) => {
+                let app = self.ctx.types.type_application(app_id);
+                let base_type = app.base;
+                let args = app.args.clone();
+
+                // Check if base is a Ref and resolve it
+                if let Some(TypeKey::Ref(SymbolRef(sym_id))) = self.ctx.types.lookup(base_type) {
+                    let symbol_id = SymbolId(sym_id);
+                    // Check if this symbol is already in type_env
+                    let has_params = self.ctx.type_env.borrow().get_params(SymbolRef(sym_id)).is_some();
+                    if !has_params {
+                        // Resolve the symbol to populate type_env
+                        let _ = self.get_type_of_symbol(symbol_id);
+                    }
+
+                    // Also recursively check the resolved type for nested Applications
+                    let resolved = self.ctx.type_env.borrow().get(SymbolRef(sym_id));
+                    if let Some(resolved_type) = resolved {
+                        self.ensure_application_refs_resolved(resolved_type);
+                    }
+                }
+
+                // Recursively check args
+                for arg in args {
+                    self.ensure_application_refs_resolved(arg);
+                }
+            }
+            TypeKey::Union(members) | TypeKey::Intersection(members) => {
+                let members_list = self.ctx.types.type_list(members).to_vec();
+                for member in members_list {
+                    self.ensure_application_refs_resolved(member);
+                }
+            }
+            TypeKey::Function(fn_id) => {
+                let fn_shape = self.ctx.types.function_shape(fn_id);
+                // Check params
+                for param in &fn_shape.params {
+                    self.ensure_application_refs_resolved(param.type_id);
+                }
+                // Check return type
+                self.ensure_application_refs_resolved(fn_shape.return_type);
+            }
+            TypeKey::Object(obj_id) | TypeKey::ObjectWithIndex(obj_id) => {
+                let obj_shape = self.ctx.types.object_shape(obj_id);
+                // Check property types
+                for prop in &obj_shape.properties {
+                    self.ensure_application_refs_resolved(prop.type_id);
+                    if prop.write_type != prop.type_id {
+                        self.ensure_application_refs_resolved(prop.write_type);
+                    }
+                }
+            }
+            TypeKey::Array(elem_type) | TypeKey::ReadonlyType(elem_type) => {
+                self.ensure_application_refs_resolved(elem_type);
+            }
+            TypeKey::Conditional(cond_id) => {
+                let cond = self.ctx.types.conditional_type(cond_id);
+                self.ensure_application_refs_resolved(cond.check_type);
+                self.ensure_application_refs_resolved(cond.extends_type);
+                self.ensure_application_refs_resolved(cond.true_type);
+                self.ensure_application_refs_resolved(cond.false_type);
+            }
+            _ => {}
+        }
+    }
+
 
     // =========================================================================
     // Type Relations (uses solver::CompatChecker for assignability)
@@ -5044,6 +6011,13 @@ impl<'a> ThinCheckerState<'a> {
                 let mut checker = crate::solver::CompatChecker::new(self.ctx.types);
                 return Some(checker.is_assignable(source, TypeId::NUMBER));
             }
+            // String enum: only accepts the same enum type (nominal/opaque)
+            // Per TS unsoundness #34: String literals cannot be assigned to string enum types
+            if self.enum_kind(target_enum) == Some(EnumKind::String) {
+                // source_enum is None at this point (checked above)
+                // so a non-enum source cannot be assigned to a string enum
+                return Some(false);
+            }
         }
 
         None
@@ -5053,8 +6027,12 @@ impl<'a> ThinCheckerState<'a> {
     ///
     /// Uses the solver's SubtypeChecker with coinductive cycle detection.
     /// Uses the context's TypeEnvironment for resolving type references and expanding Applications.
-    pub fn is_assignable_to(&self, source: TypeId, target: TypeId) -> bool {
+    pub fn is_assignable_to(&mut self, source: TypeId, target: TypeId) -> bool {
         use crate::solver::CompatChecker;
+
+        // Ensure any cross-file Application refs are resolved (populates type_env)
+        self.ensure_application_refs_resolved(source);
+        self.ensure_application_refs_resolved(target);
 
         let env = self.ctx.type_env.borrow();
         if let Some(result) = self.enum_assignability_override(source, target, Some(&*env)) {
@@ -5139,16 +6117,16 @@ impl<'a> ThinCheckerState<'a> {
 
         let mut env = TypeEnvironment::new();
 
-        // Collect all unique symbols from node_symbols map
-        let symbols: Vec<SymbolId> = self.ctx.binder.node_symbols
-            .values()
-            .copied()
-            .collect::<std::collections::HashSet<_>>()
-            .into_iter()
-            .collect();
+        let mut symbol_set: std::collections::HashSet<SymbolId> =
+            (0..self.ctx.binder.symbols.len())
+                .map(|i| SymbolId(i as u32))
+                .collect();
+        for (_, &sym_id) in self.ctx.binder.file_locals.iter() {
+            symbol_set.insert(sym_id);
+        }
 
         // Resolve each symbol and add to the environment
-        for sym_id in symbols {
+        for sym_id in symbol_set {
             // Get the type for this symbol
             let type_id = self.get_type_of_symbol(sym_id);
             if type_id != TypeId::ANY && type_id != TypeId::ERROR {
@@ -5335,6 +6313,44 @@ impl<'a> ThinCheckerState<'a> {
                 // Type literals should use checker resolution so type parameters resolve correctly.
                 return self.get_type_from_type_literal(idx);
             }
+            if node.kind == syntax_kind_ext::CONDITIONAL_TYPE {
+                let type_resolver =
+                    |node_idx: NodeIndex| self.resolve_type_symbol_for_lowering(node_idx);
+                let value_resolver =
+                    |node_idx: NodeIndex| self.resolve_value_symbol_for_lowering(node_idx);
+                let lowering = TypeLowering::with_resolvers(
+                    self.ctx.arena,
+                    self.ctx.types,
+                    &type_resolver,
+                    &value_resolver,
+                );
+                if !self.ctx.type_parameter_scope.is_empty() {
+                    let mut params = Vec::with_capacity(self.ctx.type_parameter_scope.len());
+                    for (name, type_id) in &self.ctx.type_parameter_scope {
+                        let atom = self.ctx.types.intern_string(name);
+                        params.push((atom, *type_id));
+                    }
+                    lowering.seed_type_params(&params);
+                }
+                let lowered = lowering.lower_type(idx);
+                if let Some(crate::solver::TypeKey::Conditional(cond_id)) =
+                    self.ctx.types.lookup(lowered)
+                {
+                    let cond = self.ctx.types.conditional_type(cond_id);
+                    let check_type = self.expand_alias_application_shallow(cond.check_type);
+                    let extends_type = self.expand_alias_application_shallow(cond.extends_type);
+                    if check_type != cond.check_type || extends_type != cond.extends_type {
+                        return self.ctx.types.conditional(crate::solver::ConditionalType {
+                            check_type,
+                            extends_type,
+                            true_type: cond.true_type,
+                            false_type: cond.false_type,
+                            is_distributive: cond.is_distributive,
+                        });
+                    }
+                }
+                return lowered;
+            }
         }
 
         // Use TypeLowering which handles all type nodes
@@ -5346,12 +6362,13 @@ impl<'a> ThinCheckerState<'a> {
             &type_resolver,
             &value_resolver,
         );
-        // Pass current type param scope to TypeLowering so it can resolve type parameters
-        let params: Vec<_> = self.ctx.type_parameter_scope.iter()
-            .map(|(name, &type_id)| (self.ctx.types.intern_string(name), type_id))
-            .collect();
-        if !params.is_empty() {
-            lowering.add_external_type_params(&params);
+        if !self.ctx.type_parameter_scope.is_empty() {
+            let mut params = Vec::with_capacity(self.ctx.type_parameter_scope.len());
+            for (name, type_id) in &self.ctx.type_parameter_scope {
+                let atom = self.ctx.types.intern_string(name);
+                params.push((atom, *type_id));
+            }
+            lowering.seed_type_params(&params);
         }
         lowering.lower_type(idx)
     }
@@ -8591,6 +9608,9 @@ impl<'a> ThinCheckerState<'a> {
             return;
         };
 
+        // Push method type parameters into scope (e.g., U in transform<U>(...): Builder<U>)
+        let (_type_params, type_param_updates) = self.push_type_parameters(&method.type_parameters);
+
         // Error 1248: A class member cannot have the 'const' keyword
         if let Some(const_mod) = self.get_const_modifier(&method.modifiers) {
             self.error_at_node(
@@ -8650,6 +9670,9 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         self.pop_return_type();
+
+        // Pop method type parameters from scope
+        self.pop_type_parameters(type_param_updates);
     }
 
     /// Check a constructor declaration.

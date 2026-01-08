@@ -5939,7 +5939,7 @@ const viaAlias = Alias["value"];
     let direct_sym = binder.file_locals.get("direct").expect("direct should exist");
     let alias_sym = binder.file_locals.get("viaAlias").expect("viaAlias should exist");
 
-    // For const literals, we get literal types (e.g., literal 1 instead of number)
+    // For const literals, we get literal types
     let literal_1 = types.literal_number(1.0);
     assert_eq!(checker.get_type_of_symbol(direct_sym), literal_1);
     assert_eq!(checker.get_type_of_symbol(alias_sym), literal_1);
@@ -5980,7 +5980,7 @@ const bad = Alias.missing;
     );
 
     let ok_sym = binder.file_locals.get("ok").expect("ok should exist");
-    // For const literals, we get literal types (e.g., literal 1 instead of number)
+    // For const literals, we get literal types
     let literal_1 = types.literal_number(1.0);
     assert_eq!(checker.get_type_of_symbol(ok_sym), literal_1);
 }
@@ -6019,7 +6019,7 @@ const badValue = Outer.Inner.missing;
     );
 
     let ok_sym = binder.file_locals.get("okValue").expect("okValue should exist");
-    // For const literals, we get literal types (e.g., literal 1 instead of number)
+    // For const literals, we get literal types
     let literal_1 = types.literal_number(1.0);
     assert_eq!(checker.get_type_of_symbol(ok_sym), literal_1);
 }
@@ -6057,7 +6057,7 @@ const bad = NS.hidden;
     );
 
     let ok_sym = binder.file_locals.get("ok").expect("ok should exist");
-    // For const literals, we get literal types (e.g., literal 1 instead of number)
+    // For const literals, we get literal types
     let literal_1 = types.literal_number(1.0);
     assert_eq!(checker.get_type_of_symbol(ok_sym), literal_1);
 }
