@@ -73,6 +73,7 @@ Priority: 3
 - [x] Application type expansion in evaluate(): added TypeResolver.get_type_params(), TypeEnvironment.insert_with_params(), evaluate_application() handler, and eager base symbol resolution. test_redux_pattern_extract_state_with_infer now passes. Tests: `./wasm/test.sh -- test_redux_pattern`.
 - [x] Function Bivariance (TS unsoundness #2): added 6 tests for method/function variance. Tests cover method bivariance (wider/narrower args - expected failures until method bivariance implemented), function property contravariance (expected failure until interface extends resolved), function property covariant rejection (passes), event handler pattern (expected failure), callback bivariance (expected failure). Tests: `./wasm/test.sh -- bivariance\|contravariance`.
 - [x] Any Type (TS unsoundness #1): added 5 tests for any type behavior. Tests cover any->specific assignability, specific->any assignability, any in function calls, any propagation through operations, and any-never relationship. All pass. Tests: `./wasm/test.sh -- test_any_type\|test_specific_types_assignable_to_any`.
+- [x] Freshness/Excess Property (TS unsoundness #4): added 5 tests with proper labeling. Tests cover object literal excess property check, variable no-check (width subtyping), function argument check, return statement check, and spread behavior (expected failure until spread implemented). Tests: `./wasm/test.sh -- test_freshness`.
 
 ## Ready for Merge
 Yes
