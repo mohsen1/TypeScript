@@ -5401,7 +5401,7 @@ impl<'a> ThinCheckerState<'a> {
             .map(|(name, &type_id)| (self.ctx.types.intern_string(name), type_id))
             .collect();
         if !params.is_empty() {
-            lowering.add_external_type_params(&params);
+            lowering.seed_type_params(&params);
         }
         lowering.lower_type(idx)
     }
