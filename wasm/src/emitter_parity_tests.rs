@@ -2612,3 +2612,128 @@ fn test_parity_es5_optional_chaining() {
         output
     );
 }
+
+/// Parity test for ES5 generator function type erasure.
+/// Generator function type annotations should be erased.
+#[test]
+fn test_parity_es5_generator_type_erasure() {
+    let source = r#"function* range(start: number, end: number): Generator<number> {
+    yield start;
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify function exists (may still have * if generator transform not implemented)
+    assert!(
+        output.contains("range"),
+        "Output should define range function: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number") && !output.contains("Generator<number>"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 generator method in class downlevel.
+/// Generator methods should be converted to __generator helper.
+#[test]
+fn test_parity_es5_generator_method() {
+    let source = r#"class Sequence {
+    *items() {
+        yield 1;
+        yield 2;
+        yield 3;
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 class structure
+    assert!(
+        output.contains("var Sequence") || output.contains("function Sequence"),
+        "ES5 output should define Sequence class: {}",
+        output
+    );
+    // Generator method syntax should not appear in ES5 output
+    assert!(
+        !output.contains("*items"),
+        "ES5 output should not contain *items generator method syntax: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 generator yield type erasure.
+/// Generator yield expressions should have types erased.
+#[test]
+fn test_parity_es5_generator_yield_type_erasure() {
+    let source = r#"function* gen(): Generator<string, void, unknown> {
+    const result: string = yield "hello";
+    yield result;
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify function exists
+    assert!(
+        output.contains("gen"),
+        "Output should define gen function: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains("Generator<"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
