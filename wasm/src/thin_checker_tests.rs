@@ -4267,6 +4267,33 @@ type Alias = Merge.Extra;
 }
 
 #[test]
+fn test_checker_namespace_merges_with_class_element_access() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Foo {}
+namespace Foo {
+    export const value = 1;
+}
+const direct = Foo["value"];
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let direct_sym = binder.file_locals.get("direct").expect("direct should exist");
+    assert_eq!(checker.get_type_of_symbol(direct_sym), TypeId::NUMBER);
+}
+
+#[test]
 fn test_checker_interface_typeof_value_reference() {
     use crate::thin_parser::ThinParserState;
     use crate::solver::{TypeKey, SymbolRef};
