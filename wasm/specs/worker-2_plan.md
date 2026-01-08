@@ -11,7 +11,6 @@ Priority: 2
 
 ## Task Queue
 - [ ] Await next assignment.
-- [ ] TODO: Add non-distributive template literal infer with non-string union branch for middle+suffix patterns (e.g., T = `foo${string}bar` | number).
 - [ ] TODO: Add non-distributive template literal infer with numeric constraint to document current behavior.
 - [x] Added distributive template literal infer over template-literal union input (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_union_input_distributive`.
 - [x] Added template literal infer from `string`/`` `${string}` `` inputs (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_from_string_input`.
@@ -107,8 +106,10 @@ Priority: 2
 - [x] Added object call-signature infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_object_call_signature_distributive`.
 - [x] Added function parameter infer test with non-function union branch (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_function_param_non_function_union_branch`.
 - [x] Added non-distributive template literal infer over template literal union input (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_non_distributive_template_union_input`.
+- [x] Added non-distributive template literal infer with non-string template union branch (current behavior yields never). Tests: `./wasm/test.sh non_string_template_union_branch`.
 
 ## Notes
+- Ready for merge.
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
 - Use Docker for Rust tests (`./wasm/test.sh`), never `cargo test` directly.
 - Update this plan after each task and keep it accurate.
