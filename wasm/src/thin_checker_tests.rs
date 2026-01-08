@@ -111,6 +111,30 @@ const bad: Foo = { x: 1, y: 2 };
 }
 
 #[test]
+fn test_excess_property_allows_variable_assignment() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type Foo = { x: number };
+const obj = { x: 1, y: 2 };
+const ok: Foo = obj;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+}
+
+#[test]
 fn test_excess_property_in_call_argument() {
     use crate::thin_parser::ThinParserState;
 
