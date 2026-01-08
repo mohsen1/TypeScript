@@ -189,6 +189,50 @@ fn test_source_map_with_names() {
 }
 
 #[test]
+fn test_source_map_es5_transform_records_names() {
+    let source = "const value = 1; const other = value;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let names = map_value
+        .get("names")
+        .and_then(|value| value.as_array())
+        .expect("expected names array");
+    assert!(
+        names.iter().any(|name| name.as_str() == Some("value")),
+        "expected names to include value. names: {names:?}"
+    );
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+    let decoded = decode_mappings(mappings);
+    let value_index = names
+        .iter()
+        .position(|name| name.as_str() == Some("value"))
+        .expect("value not found in names");
+    assert!(
+        decoded.iter().any(|entry| entry.name_index == Some(value_index as u32)),
+        "expected name mapping for value. mappings: {mappings}"
+    );
+}
+
+#[test]
 fn test_inline_source_map() {
     let mut generator = SourceMapGenerator::new("output.js".to_string());
     generator.add_source("input.ts".to_string());

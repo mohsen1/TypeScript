@@ -157,6 +157,11 @@ fn compile_with_source_map_emits_map_outputs() {
         .and_then(|value| value.as_str())
         .unwrap_or("");
     assert_eq!(file_field, "index.js");
+    let source_root = map_json
+        .get("sourceRoot")
+        .and_then(|value| value.as_str())
+        .unwrap_or("__missing__");
+    assert_eq!(source_root, "");
     let sources_content = map_json
         .get("sourcesContent")
         .and_then(|value| value.as_array())
@@ -211,6 +216,11 @@ fn compile_with_declaration_map_emits_map_outputs() {
         .and_then(|value| value.as_str())
         .unwrap_or("");
     assert_eq!(file_field, "index.d.ts");
+    let source_root = map_json
+        .get("sourceRoot")
+        .and_then(|value| value.as_str())
+        .unwrap_or("__missing__");
+    assert_eq!(source_root, "");
     let sources_content = map_json
         .get("sourcesContent")
         .and_then(|value| value.as_array())
