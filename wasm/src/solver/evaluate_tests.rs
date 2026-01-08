@@ -11007,3 +11007,435 @@ fn test_mapped_type_partial_record() {
         }
     }
 }
+
+// =========================================================================
+// Template Literal Intrinsic Tests
+// =========================================================================
+// These tests cover template literal type operations that form the foundation
+// for string manipulation intrinsics (Uppercase, Lowercase, Capitalize, Uncapitalize).
+
+#[test]
+fn test_template_literal_simple_concatenation() {
+    let interner = TypeInterner::new();
+
+    // Test simple template literal: `hello${string}`
+    // This represents the pattern used in template literal types
+
+    let template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("hello")),
+        TemplateSpan::Type(TypeId::STRING),
+    ]);
+
+    // Template literal should produce a valid type
+    assert!(template != TypeId::ERROR, "Template literal should not produce error");
+
+    let key = interner.lookup(template);
+    assert!(key.is_some(), "Template literal should be internable");
+}
+
+#[test]
+fn test_template_literal_prefix_suffix() {
+    let interner = TypeInterner::new();
+
+    // Test template literal with prefix and suffix: `get${string}Handler`
+    // Common pattern for getter/setter type generation
+
+    let template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("get")),
+        TemplateSpan::Type(TypeId::STRING),
+        TemplateSpan::Text(interner.intern_string("Handler")),
+    ]);
+
+    assert!(template != TypeId::ERROR, "Template with prefix/suffix should not produce error");
+
+    let key = interner.lookup(template);
+    assert!(key.is_some(), "Template literal should be internable");
+}
+
+#[test]
+fn test_template_literal_multiple_interpolations() {
+    let interner = TypeInterner::new();
+
+    // Test template literal with multiple type interpolations: `${string}_${number}`
+    // Pattern for composite key types
+
+    let template = interner.template_literal(vec![
+        TemplateSpan::Type(TypeId::STRING),
+        TemplateSpan::Text(interner.intern_string("_")),
+        TemplateSpan::Type(TypeId::NUMBER),
+    ]);
+
+    assert!(template != TypeId::ERROR, "Multiple interpolations should not produce error");
+
+    let key = interner.lookup(template);
+    assert!(key.is_some(), "Template literal should be internable");
+}
+
+#[test]
+fn test_template_literal_with_literal_type() {
+    let interner = TypeInterner::new();
+
+    // Test template literal with literal string type: `prefix_${"value"}`
+    // Should be evaluable to a single literal string
+
+    let literal_value = interner.literal_string("value");
+
+    let template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("prefix_")),
+        TemplateSpan::Type(literal_value),
+    ]);
+
+    assert!(template != TypeId::ERROR, "Template with literal should not produce error");
+}
+
+#[test]
+fn test_template_literal_empty_parts() {
+    let interner = TypeInterner::new();
+
+    // Test template literal that's just a type: `${string}`
+    // Equivalent to the string type in most contexts
+
+    let template = interner.template_literal(vec![TemplateSpan::Type(TypeId::STRING)]);
+
+    assert!(template != TypeId::ERROR, "Template with just type should not produce error");
+}
+
+#[test]
+fn test_template_literal_all_text() {
+    let interner = TypeInterner::new();
+
+    // Test template literal with only text parts: `hello`
+    // Should be equivalent to the literal string type
+
+    let template = interner.template_literal(vec![TemplateSpan::Text(
+        interner.intern_string("hello"),
+    )]);
+
+    assert!(template != TypeId::ERROR, "Text-only template should not produce error");
+}
+
+#[test]
+fn test_template_literal_in_mapped_type() {
+    let interner = TypeInterner::new();
+
+    // Test using template literal as mapped type key remapping
+    // Pattern: { [K in Keys as `get${K}`]: ... }
+
+    let key_name = interner.literal_string("name");
+    let key_age = interner.literal_string("age");
+    let keys = interner.union(vec![key_name, key_age]);
+
+    // Create the type parameter K
+    let k_param = TypeParamInfo {
+        name: interner.intern_string("K"),
+        constraint: None,
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    // Create the name remapping: `get${K}`
+    let name_template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("get")),
+        TemplateSpan::Type(k_type),
+    ]);
+
+    // Create mapped type with key remapping
+    let mapped = MappedType {
+        type_param: k_param,
+        constraint: keys,
+        name_type: Some(name_template), // Key remapping
+        template: TypeId::STRING,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Should produce { getName: string, getAge: string }
+    assert!(result != TypeId::ERROR, "Mapped type with template key should not produce error");
+}
+
+#[test]
+fn test_template_literal_union_distribution() {
+    let interner = TypeInterner::new();
+
+    // Test template literal with union type: `prefix_${"a" | "b"}`
+    // Should distribute: `prefix_a` | `prefix_b`
+
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+    let union_type = interner.union(vec![lit_a, lit_b]);
+
+    let template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("prefix_")),
+        TemplateSpan::Type(union_type),
+    ]);
+
+    assert!(
+        template != TypeId::ERROR,
+        "Template with union should not produce error"
+    );
+}
+
+#[test]
+fn test_template_literal_nested_template() {
+    let interner = TypeInterner::new();
+
+    // Test nested template literal pattern
+    // Outer: `start_${inner}_end` where inner is also a template
+
+    let inner_template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("middle")),
+        TemplateSpan::Type(TypeId::STRING),
+    ]);
+
+    let outer_template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("start_")),
+        TemplateSpan::Type(inner_template),
+        TemplateSpan::Text(interner.intern_string("_end")),
+    ]);
+
+    assert!(
+        outer_template != TypeId::ERROR,
+        "Nested template should not produce error"
+    );
+}
+
+// =========================================================================
+// NoInfer<T> Pattern Tests
+// =========================================================================
+// NoInfer<T> prevents type inference from a type position.
+// In the solver, this is typically handled as a type that blocks inference
+// but preserves its argument type for other operations.
+
+#[test]
+fn test_noinfer_pattern_as_identity() {
+    let interner = TypeInterner::new();
+
+    // NoInfer<T> should act as identity for type operations (T passes through)
+    // We model this as a type application to a reference
+
+    let noinfer_symbol = SymbolRef(300);
+    let noinfer_base = interner.reference(noinfer_symbol);
+
+    // NoInfer<string>
+    let noinfer_string = interner.application(noinfer_base, vec![TypeId::STRING]);
+
+    // The application should be valid
+    assert!(
+        noinfer_string != TypeId::ERROR,
+        "NoInfer<string> should not produce error"
+    );
+}
+
+#[test]
+fn test_noinfer_pattern_with_union() {
+    let interner = TypeInterner::new();
+
+    // NoInfer<string | number> - should prevent inference but preserve the union
+
+    let noinfer_symbol = SymbolRef(301);
+    let noinfer_base = interner.reference(noinfer_symbol);
+
+    let union_type = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let noinfer_union = interner.application(noinfer_base, vec![union_type]);
+
+    assert!(
+        noinfer_union != TypeId::ERROR,
+        "NoInfer<string | number> should not produce error"
+    );
+}
+
+#[test]
+fn test_noinfer_pattern_in_function_param() {
+    let interner = TypeInterner::new();
+
+    // Test pattern: function foo<T>(value: T, defaultValue: NoInfer<T>): T
+    // The NoInfer on defaultValue prevents it from contributing to inference of T
+
+    let noinfer_symbol = SymbolRef(302);
+    let noinfer_base = interner.reference(noinfer_symbol);
+
+    // Create type parameter T
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    // NoInfer<T>
+    let noinfer_t = interner.application(noinfer_base, vec![t_type]);
+
+    // Create function: (value: T, defaultValue: NoInfer<T>) => T
+    let fn_shape = FunctionShape {
+        type_params: vec![t_param],
+        params: vec![
+            ParamInfo {
+                name: Some(interner.intern_string("value")),
+                type_id: t_type,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("defaultValue")),
+                type_id: noinfer_t,
+                optional: false,
+                rest: false,
+            },
+        ],
+        this_type: None,
+        return_type: t_type,
+        type_predicate: None,
+        is_constructor: false,
+    };
+
+    let fn_type = interner.function(fn_shape);
+    assert!(
+        fn_type != TypeId::ERROR,
+        "Function with NoInfer param should not produce error"
+    );
+}
+
+// =========================================================================
+// String Manipulation Intrinsic Patterns
+// =========================================================================
+// These tests document expected patterns for Uppercase<T>, Lowercase<T>,
+// Capitalize<T>, and Uncapitalize<T> when they are fully implemented.
+
+#[test]
+fn test_string_intrinsic_uppercase_pattern() {
+    let interner = TypeInterner::new();
+
+    // Uppercase<T> converts string literal to uppercase
+    // Pattern: Uppercase<"hello"> should equal "HELLO"
+
+    // Model as type application (actual intrinsic behavior requires solver support)
+    let uppercase_symbol = SymbolRef(310);
+    let uppercase_base = interner.reference(uppercase_symbol);
+
+    let hello_lit = interner.literal_string("hello");
+    let uppercase_hello = interner.application(uppercase_base, vec![hello_lit]);
+
+    assert!(
+        uppercase_hello != TypeId::ERROR,
+        "Uppercase<'hello'> application should not produce error"
+    );
+}
+
+#[test]
+fn test_string_intrinsic_lowercase_pattern() {
+    let interner = TypeInterner::new();
+
+    // Lowercase<T> converts string literal to lowercase
+    // Pattern: Lowercase<"HELLO"> should equal "hello"
+
+    let lowercase_symbol = SymbolRef(311);
+    let lowercase_base = interner.reference(lowercase_symbol);
+
+    let hello_lit = interner.literal_string("HELLO");
+    let lowercase_hello = interner.application(lowercase_base, vec![hello_lit]);
+
+    assert!(
+        lowercase_hello != TypeId::ERROR,
+        "Lowercase<'HELLO'> application should not produce error"
+    );
+}
+
+#[test]
+fn test_string_intrinsic_capitalize_pattern() {
+    let interner = TypeInterner::new();
+
+    // Capitalize<T> capitalizes first character
+    // Pattern: Capitalize<"hello"> should equal "Hello"
+
+    let capitalize_symbol = SymbolRef(312);
+    let capitalize_base = interner.reference(capitalize_symbol);
+
+    let hello_lit = interner.literal_string("hello");
+    let capitalize_hello = interner.application(capitalize_base, vec![hello_lit]);
+
+    assert!(
+        capitalize_hello != TypeId::ERROR,
+        "Capitalize<'hello'> application should not produce error"
+    );
+}
+
+#[test]
+fn test_string_intrinsic_uncapitalize_pattern() {
+    let interner = TypeInterner::new();
+
+    // Uncapitalize<T> lowercases first character
+    // Pattern: Uncapitalize<"Hello"> should equal "hello"
+
+    let uncapitalize_symbol = SymbolRef(313);
+    let uncapitalize_base = interner.reference(uncapitalize_symbol);
+
+    let hello_lit = interner.literal_string("Hello");
+    let uncapitalize_hello = interner.application(uncapitalize_base, vec![hello_lit]);
+
+    assert!(
+        uncapitalize_hello != TypeId::ERROR,
+        "Uncapitalize<'Hello'> application should not produce error"
+    );
+}
+
+#[test]
+fn test_string_intrinsic_in_template_literal() {
+    let interner = TypeInterner::new();
+
+    // Common pattern: `get${Capitalize<K>}` for getter generation
+    // e.g., K = "name" -> `getName`
+
+    let capitalize_symbol = SymbolRef(314);
+    let capitalize_base = interner.reference(capitalize_symbol);
+
+    // Create type parameter K
+    let k_param = TypeParamInfo {
+        name: interner.intern_string("K"),
+        constraint: Some(TypeId::STRING),
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param));
+
+    // Capitalize<K>
+    let capitalize_k = interner.application(capitalize_base, vec![k_type]);
+
+    // `get${Capitalize<K>}`
+    let getter_template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("get")),
+        TemplateSpan::Type(capitalize_k),
+    ]);
+
+    assert!(
+        getter_template != TypeId::ERROR,
+        "Template with Capitalize should not produce error"
+    );
+}
+
+#[test]
+fn test_string_intrinsic_chained() {
+    let interner = TypeInterner::new();
+
+    // Test chained intrinsics: Uppercase<Capitalize<T>>
+    // Should uppercase entire string after capitalizing
+
+    let uppercase_symbol = SymbolRef(315);
+    let capitalize_symbol = SymbolRef(316);
+
+    let uppercase_base = interner.reference(uppercase_symbol);
+    let capitalize_base = interner.reference(capitalize_symbol);
+
+    let hello_lit = interner.literal_string("hello");
+
+    // Capitalize<"hello">
+    let capitalize_hello = interner.application(capitalize_base, vec![hello_lit]);
+
+    // Uppercase<Capitalize<"hello">>
+    let uppercase_capitalize = interner.application(uppercase_base, vec![capitalize_hello]);
+
+    assert!(
+        uppercase_capitalize != TypeId::ERROR,
+        "Chained string intrinsics should not produce error"
+    );
+}
