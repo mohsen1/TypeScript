@@ -7,7 +7,7 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [ ] Await EM assignment.
+- [ ] Blocked: awaiting EM assignment (requested).
 
 ## Task Queue
 - [ ] [EM: Add queued tasks]
@@ -26,3 +26,6 @@ Yes - branch `worker/anvil-4` is ready for merge.
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/anvil-4`
 - **NEVER edit**: `DIRECTOR_AGENT.md`, `SQUAD_LEAD_AGENT.md`, `MANAGER_AGENT.md`, `AGENTS.md`, `start_*.sh`
+- Proposed next tasks for EM assignment:
+  - Validate ES5 class downleveling edge cases for `super()` + field initializers in `wasm/src/transforms/class_es5.rs`.
+  - Add coverage for async downlevel source-map offsets in `wasm/src/transforms/async_es5.rs`.
