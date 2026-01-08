@@ -4060,3 +4060,179 @@ fn test_parity_es5_for_of_let() {
         output
     );
 }
+
+/// Parity test for ES5 logical OR assignment (||=).
+/// x ||= y should downlevel to x || (x = y) or equivalent.
+#[test]
+fn test_parity_es5_logical_or_assignment() {
+    let source = "let x = null; x ||= 'default';";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 logical OR assignment downlevel
+    assert!(
+        output.contains("var x"),
+        "ES5 output should define x with var: {}",
+        output
+    );
+    // Should contain 'default' value
+    assert!(
+        output.contains("default") || output.contains("\"default\""),
+        "ES5 output should contain default value: {}",
+        output
+    );
+    // No ||= syntax in ES5
+    assert!(
+        !output.contains("||="),
+        "ES5 output should not contain ||= syntax: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 logical AND assignment (&&=).
+/// x &&= y should downlevel to x && (x = y) or equivalent.
+#[test]
+fn test_parity_es5_logical_and_assignment() {
+    let source = "let obj = { value: 1 }; obj.value &&= 42;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 logical AND assignment downlevel
+    assert!(
+        output.contains("var obj"),
+        "ES5 output should define obj with var: {}",
+        output
+    );
+    // Should contain 42 value
+    assert!(
+        output.contains("42"),
+        "ES5 output should contain 42: {}",
+        output
+    );
+    // No &&= syntax in ES5
+    assert!(
+        !output.contains("&&="),
+        "ES5 output should not contain &&= syntax: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 nullish coalescing assignment (??=).
+/// x ??= y should downlevel to x ?? (x = y) or null check equivalent.
+#[test]
+fn test_parity_es5_nullish_assignment_operator() {
+    let source = "let config = { timeout: undefined }; config.timeout ??= 5000;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 nullish coalescing assignment downlevel
+    assert!(
+        output.contains("var config"),
+        "ES5 output should define config with var: {}",
+        output
+    );
+    // Should contain 5000 value
+    assert!(
+        output.contains("5000"),
+        "ES5 output should contain 5000: {}",
+        output
+    );
+    // No ??= syntax in ES5
+    assert!(
+        !output.contains("??="),
+        "ES5 output should not contain ??= syntax: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 logical assignment with property access.
+/// obj.prop ||= value should downlevel correctly.
+#[test]
+fn test_parity_es5_logical_assignment_property() {
+    let source = "const settings = {}; settings.theme ||= 'dark'; settings.debug &&= false;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 logical assignment with property downlevel
+    assert!(
+        output.contains("var settings"),
+        "ES5 output should define settings with var: {}",
+        output
+    );
+    // Should contain theme and debug
+    assert!(
+        output.contains("theme") && output.contains("debug"),
+        "ES5 output should contain theme and debug: {}",
+        output
+    );
+    // No logical assignment syntax in ES5
+    assert!(
+        !output.contains("||=") && !output.contains("&&="),
+        "ES5 output should not contain logical assignment syntax: {}",
+        output
+    );
+}
