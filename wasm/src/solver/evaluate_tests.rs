@@ -12714,3 +12714,383 @@ fn test_application_non_ref_base_passthrough() {
         "Application with non-Ref base should pass through unchanged"
     );
 }
+
+/// Test Application with recursive type alias.
+///
+/// This tests the pattern: type List<T> = { value: T, next: List<T> | null }
+/// Recursive types need special handling to avoid infinite expansion.
+#[test]
+fn test_application_ref_expansion_recursive() {
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    // Define type parameter T
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param));
+
+    // Create Ref(1) for List type alias (self-reference)
+    let list_ref = interner.reference(SymbolRef(1));
+
+    // Create Application: List<T> (recursive reference in type body)
+    let list_t = interner.application(list_ref, vec![t_type]);
+
+    // next: List<T> | null
+    let next_type = interner.union(vec![list_t, TypeId::NULL]);
+
+    // Define: type List<T> = { value: T, next: List<T> | null }
+    let value_name = interner.intern_string("value");
+    let next_name = interner.intern_string("next");
+    let list_body = interner.object(vec![
+        PropertyInfo {
+            name: value_name,
+            type_id: t_type,
+            write_type: t_type,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: next_name,
+            type_id: next_type,
+            write_type: next_type,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Create Application: List<string>
+    let list_string = interner.application(list_ref, vec![TypeId::STRING]);
+
+    // Set up resolver
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(1), list_body);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(list_string);
+
+    // TODO: When Application expansion is implemented,
+    // recursive types should be handled with proper termination.
+    // Expected: { value: string, next: List<string> | null }
+    // (The inner List<string> may remain as Application to prevent infinite expansion)
+    assert_eq!(
+        result, list_string,
+        "Current behavior: Application passes through unchanged. \
+         After fix, List<string> should expand with proper recursion handling."
+    );
+}
+
+/// Test Application with intersection type argument.
+///
+/// This tests: Box<string & { length: number }>
+#[test]
+fn test_application_ref_expansion_with_intersection_arg() {
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    // Define type parameter T
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param));
+
+    // Define: type Box<T> = { value: T }
+    let value_name = interner.intern_string("value");
+    let box_body = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: t_type,
+        write_type: t_type,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Create Ref(1) for Box type alias
+    let box_ref = interner.reference(SymbolRef(1));
+
+    // Create intersection: string & { length: number }
+    let length_name = interner.intern_string("length");
+    let length_obj = interner.object(vec![PropertyInfo {
+        name: length_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let string_with_length = interner.intersection(vec![TypeId::STRING, length_obj]);
+
+    // Create Application: Box<string & { length: number }>
+    let box_intersection = interner.application(box_ref, vec![string_with_length]);
+
+    // Set up resolver
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(1), box_body);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(box_intersection);
+
+    // Expected: { value: string & { length: number } }
+    let expected = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: string_with_length,
+        write_type: string_with_length,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // TODO: When Application expansion is implemented,
+    // update assertion to: assert_eq!(result, expected);
+    assert_eq!(
+        result, box_intersection,
+        "Current behavior: Application passes through unchanged. \
+         After fix, Box<string & {{ length: number }}> should be {{ value: string & {{ length: number }} }}"
+    );
+
+    let _ = expected;
+}
+
+/// Test multi-parameter Application (Map<K, V> style).
+///
+/// This tests: type Map<K, V> = { key: K, value: V }
+#[test]
+fn test_application_ref_expansion_multi_param() {
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    // Define type parameter K
+    let k_name = interner.intern_string("K");
+    let k_param = TypeParamInfo {
+        name: k_name,
+        constraint: None,
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param));
+
+    // Define type parameter V
+    let v_name = interner.intern_string("V");
+    let v_param = TypeParamInfo {
+        name: v_name,
+        constraint: None,
+        default: None,
+    };
+    let v_type = interner.intern(TypeKey::TypeParameter(v_param));
+
+    // Define: type Map<K, V> = { key: K, value: V }
+    let key_name = interner.intern_string("key");
+    let value_name = interner.intern_string("value");
+    let map_body = interner.object(vec![
+        PropertyInfo {
+            name: key_name,
+            type_id: k_type,
+            write_type: k_type,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: value_name,
+            type_id: v_type,
+            write_type: v_type,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Create Ref(1) for Map type alias
+    let map_ref = interner.reference(SymbolRef(1));
+
+    // Create Application: Map<string, number>
+    let map_string_number = interner.application(map_ref, vec![TypeId::STRING, TypeId::NUMBER]);
+
+    // Set up resolver
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(1), map_body);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(map_string_number);
+
+    // Expected: { key: string, value: number }
+    let expected = interner.object(vec![
+        PropertyInfo {
+            name: key_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: value_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // TODO: When Application expansion is implemented,
+    // update assertion to: assert_eq!(result, expected);
+    assert_eq!(
+        result, map_string_number,
+        "Current behavior: Application passes through unchanged. \
+         After fix, Map<string, number> should be {{ key: string, value: number }}"
+    );
+
+    let _ = expected;
+}
+
+/// Test Application with conditional type body.
+///
+/// This tests: type Unwrap<T> = T extends Array<infer U> ? U : T
+/// Note: Full conditional evaluation is tested separately; this tests
+/// that Application expansion properly triggers conditional evaluation.
+#[test]
+fn test_application_ref_expansion_with_conditional_body() {
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    // Define type parameter T
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param));
+
+    // For simplicity, we'll use a basic conditional that we can verify:
+    // type IsString<T> = T extends string ? true : false
+    // (Represented as a conditional type in the body)
+
+    // Create the conditional type body:
+    // T extends string ? true : false
+    let conditional_body = interner.conditional(ConditionalType {
+        check_type: t_type,
+        extends_type: TypeId::STRING,
+        true_type: TypeId::TRUE,
+        false_type: TypeId::FALSE,
+        is_distributive: false,
+    });
+
+    // Create Ref(1) for IsString type alias
+    let is_string_ref = interner.reference(SymbolRef(1));
+
+    // Create Application: IsString<string>
+    let is_string_string = interner.application(is_string_ref, vec![TypeId::STRING]);
+
+    // Create Application: IsString<number>
+    let is_string_number = interner.application(is_string_ref, vec![TypeId::NUMBER]);
+
+    // Set up resolver
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(1), conditional_body);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+
+    let result_string = evaluator.evaluate(is_string_string);
+    let result_number = evaluator.evaluate(is_string_number);
+
+    // TODO: When Application expansion is implemented,
+    // IsString<string> should evaluate to true (TypeId::TRUE)
+    // IsString<number> should evaluate to false (TypeId::FALSE)
+    assert_eq!(
+        result_string, is_string_string,
+        "Current behavior: Application passes through unchanged. \
+         After fix, IsString<string> should evaluate to true."
+    );
+    assert_eq!(
+        result_number, is_string_number,
+        "Current behavior: Application passes through unchanged. \
+         After fix, IsString<number> should evaluate to false."
+    );
+}
+
+/// Test Application with tuple type argument.
+///
+/// This tests: Box<[string, number]>
+#[test]
+fn test_application_ref_expansion_with_tuple_arg() {
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    // Define type parameter T
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param));
+
+    // Define: type Box<T> = { value: T }
+    let value_name = interner.intern_string("value");
+    let box_body = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: t_type,
+        write_type: t_type,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Create Ref(1) for Box type alias
+    let box_ref = interner.reference(SymbolRef(1));
+
+    // Create tuple: [string, number]
+    let tuple_type = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+
+    // Create Application: Box<[string, number]>
+    let box_tuple = interner.application(box_ref, vec![tuple_type]);
+
+    // Set up resolver
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(1), box_body);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(box_tuple);
+
+    // Expected: { value: [string, number] }
+    let expected = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: tuple_type,
+        write_type: tuple_type,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // TODO: When Application expansion is implemented,
+    // update assertion to: assert_eq!(result, expected);
+    assert_eq!(
+        result, box_tuple,
+        "Current behavior: Application passes through unchanged. \
+         After fix, Box<[string, number]> should be {{ value: [string, number] }}"
+    );
+
+    let _ = expected;
+}
