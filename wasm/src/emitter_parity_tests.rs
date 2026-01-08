@@ -4803,3 +4803,229 @@ fn test_parity_es5_static_setter_typed() {
         output
     );
 }
+
+/// Parity test for ES5 static block with this reference.
+/// Static block using this should downlevel correctly.
+#[test]
+fn test_parity_es5_static_block_this_ref() {
+    let source = r#"class Registry {
+    static items: string[] = [];
+    static {
+        this.items.push("default");
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 class structure
+    assert!(
+        output.contains("var Registry") || output.contains("function Registry"),
+        "ES5 output should define Registry: {}",
+        output
+    );
+    // Static block syntax should not appear
+    assert!(
+        !output.contains("static {"),
+        "ES5 output should not contain static block syntax: {}",
+        output
+    );
+    // Type annotation should be erased
+    assert!(
+        !output.contains(": string[]"),
+        "ES5 output should erase type annotation: {}",
+        output
+    );
+    // Should have push call
+    assert!(
+        output.contains("push"),
+        "ES5 output should contain push call: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 multiple static blocks in same class.
+/// Multiple static blocks should all be downleveled.
+#[test]
+fn test_parity_es5_static_block_multiple() {
+    let source = r#"class App {
+    static name = "";
+    static {
+        App.name = "MyApp";
+    }
+    static version = "";
+    static {
+        App.version = "2.0";
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 class structure
+    assert!(
+        output.contains("var App") || output.contains("function App"),
+        "ES5 output should define App: {}",
+        output
+    );
+    // No static block syntax
+    assert!(
+        !output.contains("static {"),
+        "ES5 output should not contain static block syntax: {}",
+        output
+    );
+    // Both initializations should occur
+    assert!(
+        output.contains("MyApp") && output.contains("2.0"),
+        "ES5 output should contain both static initializations: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 static block with typed variable.
+/// Local typed variables in static block should have types erased.
+#[test]
+fn test_parity_es5_static_block_typed_var() {
+    let source = r#"class Calculator {
+    static result = 0;
+    static {
+        const multiplier: number = 10;
+        Calculator.result = 5 * multiplier;
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 class structure
+    assert!(
+        output.contains("var Calculator") || output.contains("function Calculator"),
+        "ES5 output should define Calculator: {}",
+        output
+    );
+    // No static block syntax
+    assert!(
+        !output.contains("static {"),
+        "ES5 output should not contain static block syntax: {}",
+        output
+    );
+    // Type annotation should be erased
+    assert!(
+        !output.contains(": number"),
+        "ES5 output should erase type annotation: {}",
+        output
+    );
+    // Const should be converted to var
+    assert!(
+        !output.contains("const multiplier"),
+        "ES5 output should convert const to var: {}",
+        output
+    );
+    // Value 10 should be preserved
+    assert!(
+        output.contains("10"),
+        "ES5 output should contain multiplier value: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 static block with function call.
+/// Function calls inside static block should be preserved.
+#[test]
+fn test_parity_es5_static_block_function_call() {
+    let source = r#"class Logger {
+    static initialized = false;
+    static {
+        console.log("Logger static init");
+        Logger.initialized = true;
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 class structure
+    assert!(
+        output.contains("var Logger") || output.contains("function Logger"),
+        "ES5 output should define Logger: {}",
+        output
+    );
+    // No static block syntax
+    assert!(
+        !output.contains("static {"),
+        "ES5 output should not contain static block syntax: {}",
+        output
+    );
+    // Console.log should be preserved
+    assert!(
+        output.contains("console.log"),
+        "ES5 output should contain console.log call: {}",
+        output
+    );
+    // String literal should be preserved
+    assert!(
+        output.contains("Logger static init"),
+        "ES5 output should contain log message: {}",
+        output
+    );
+}
