@@ -324,6 +324,23 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                             Some(self.interner.union(parts))
                         }
                     }
+                    Some(TypeKey::Union(members)) => {
+                        let members = self.interner.type_list(members);
+                        let mut parts = Vec::new();
+                        for &member in members.iter() {
+                            match self.interner.lookup(member) {
+                                Some(TypeKey::Array(elem)) => parts.push(elem),
+                                _ => return self.evaluate(cond.false_type),
+                            }
+                        }
+                        if parts.is_empty() {
+                            None
+                        } else if parts.len() == 1 {
+                            Some(parts[0])
+                        } else {
+                            Some(self.interner.union(parts))
+                        }
+                    }
                     _ => None,
                 };
 

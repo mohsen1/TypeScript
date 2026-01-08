@@ -16,6 +16,7 @@ Priority: 5
 ## Completed
 - [x] Implemented this-parameter bounds checking + conditional inference; added non-distributive optional tuple/property inference; updated tests (tests not run).
 - [x] Added `this`-parameter inference tests in `wasm/src/solver/infer_tests.rs` (tests not run).
+- [x] Added non-distributive union array inference for conditional types (tests not run).
 
 ## Ready for Merge
 Yes

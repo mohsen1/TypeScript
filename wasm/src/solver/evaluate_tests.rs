@@ -478,7 +478,6 @@ fn test_conditional_infer_array_element_non_distributive_union_input() {
     }));
 
     // T extends (infer R)[] ? R : never, with T = string[] | number[] (no distribution).
-    // TODO: Non-distributive inference over union array inputs yields never.
     let extends_array = interner.array(infer_r);
     let cond = ConditionalType {
         check_type: t_param,
@@ -500,8 +499,9 @@ fn test_conditional_infer_array_element_non_distributive_union_input() {
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
 
-    assert_eq!(result, TypeId::NEVER);
+    assert_eq!(result, expected);
 }
 
 #[test]
