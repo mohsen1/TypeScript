@@ -161,6 +161,48 @@ fn test_collect_export_names_with_named_exports() {
 }
 
 #[test]
+fn test_collect_export_names_ignores_type_only_specifiers() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = "type Foo = number; const foo = 1; export { foo, type Foo };";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let Some(source_file) = parser.arena.get_source_file(parser.arena.get(root).unwrap()) else {
+        panic!("Failed to get source file");
+    };
+
+    let export_names = collect_export_names(&parser.arena, &source_file.statements.nodes);
+
+    assert_eq!(
+        export_names,
+        vec!["foo"],
+        "Expected type-only specifiers to be ignored"
+    );
+}
+
+#[test]
+fn test_collect_export_names_with_multiple_named_exports() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = "const foo = 1; const bar = 2; export { foo, bar as baz };";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let Some(source_file) = parser.arena.get_source_file(parser.arena.get(root).unwrap()) else {
+        panic!("Failed to get source file");
+    };
+
+    let export_names = collect_export_names(&parser.arena, &source_file.statements.nodes);
+
+    assert_eq!(
+        export_names,
+        vec!["foo", "baz"],
+        "Expected multiple exported names"
+    );
+}
+
+#[test]
 fn test_collect_export_names_with_export_import_equals() {
     use crate::thin_parser::ThinParserState;
 
@@ -178,5 +220,85 @@ fn test_collect_export_names_with_export_import_equals() {
         export_names,
         vec!["Foo"],
         "Expected export name from export import equals"
+    );
+}
+
+#[test]
+fn test_collect_export_names_ignores_type_only_declarations() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = "export type Foo = number; export interface Bar { x: number; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let Some(source_file) = parser.arena.get_source_file(parser.arena.get(root).unwrap()) else {
+        panic!("Failed to get source file");
+    };
+
+    let export_names = collect_export_names(&parser.arena, &source_file.statements.nodes);
+
+    assert!(
+        export_names.is_empty(),
+        "Expected no runtime exports for type-only declarations"
+    );
+}
+
+#[test]
+fn test_collect_export_names_ignores_declare_exports() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = "export declare const foo: number; export declare function bar(): void;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let Some(source_file) = parser.arena.get_source_file(parser.arena.get(root).unwrap()) else {
+        panic!("Failed to get source file");
+    };
+
+    let export_names = collect_export_names(&parser.arena, &source_file.statements.nodes);
+
+    assert!(
+        export_names.is_empty(),
+        "Expected no runtime exports for declare-only exports"
+    );
+}
+
+#[test]
+fn test_collect_export_names_ignores_reexports() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = "export * from \"./foo\"; export { bar } from \"./bar\";";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let Some(source_file) = parser.arena.get_source_file(parser.arena.get(root).unwrap()) else {
+        panic!("Failed to get source file");
+    };
+
+    let export_names = collect_export_names(&parser.arena, &source_file.statements.nodes);
+
+    assert!(
+        export_names.is_empty(),
+        "Expected no runtime exports for re-exports"
+    );
+}
+
+#[test]
+fn test_collect_export_names_ignores_const_enum() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = "export const enum Foo { A }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let Some(source_file) = parser.arena.get_source_file(parser.arena.get(root).unwrap()) else {
+        panic!("Failed to get source file");
+    };
+
+    let export_names = collect_export_names(&parser.arena, &source_file.statements.nodes);
+
+    assert!(
+        export_names.is_empty(),
+        "Expected no runtime exports for const enums"
     );
 }
