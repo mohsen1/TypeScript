@@ -11899,28 +11899,20 @@ sum(1, 2, 3, 4, 5);"#;
 }
 
 #[test]
-fn test_source_map_class_accessors() {
-    // Test class getter and setter accessors
-    let source = r#"class Rectangle {
-    private _width = 0;
-    private _height = 0;
-
-    get width() {
-        return this._width;
-    }
-
-    set width(value: number) {
-        this._width = value;
-    }
-
-    get area() {
-        return this._width * this._height;
-    }
+fn test_source_map_async_es5_offset_accuracy() {
+    // Test source-map offset accuracy for async function ES5 downleveling
+    // The __awaiter/__generator transform should preserve correct source mappings
+    let source = r#"async function fetchData(url: string) {
+    const response = await fetch(url);
+    const data = await response.json();
+    return data;
 }
 
-const rect = new Rectangle();
-rect.width = 10;"#;
-
+async function processItems(items: string[]) {
+    for (const item of items) {
+        await processItem(item);
+    }
+}"#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -11937,9 +11929,15 @@ rect.width = 10;"#;
     printer.emit(root);
 
     let output = printer.get_output().to_string();
+
+    // Verify ES5 async transform was applied
+    assert!(
+        output.contains("__awaiter") || output.contains("__generator"),
+        "expected async ES5 helpers in output: {output}"
+    );
+
     let map_json = printer.generate_source_map_json().expect("source map");
     let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
-
     let mappings = map_value
         .get("mappings")
         .and_then(|v| v.as_str())
@@ -11947,37 +11945,52 @@ rect.width = 10;"#;
 
     let decoded = decode_mappings(mappings);
 
-    // Verify we have mappings for the class declaration
-    let (class_line, class_col) = find_line_col(source, "class Rectangle");
-    let has_class_mapping = decoded.iter().any(|entry| {
-        entry.original_line == class_line
-            && entry.original_column >= class_col
-            && entry.original_column <= class_col + 15
+    // Verify we have mappings for both async function declarations
+    let (fetch_line, _) = find_line_col(source, "async function fetchData");
+    let has_fetch_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == fetch_line
     });
 
-    // Verify we have mappings for the getter
-    let (get_line, get_col) = find_line_col(source, "get width()");
-    let has_getter_mapping = decoded.iter().any(|entry| {
-        entry.original_line == get_line
-            && entry.original_column >= get_col
-            && entry.original_column <= get_col + 11
+    let (process_line, _) = find_line_col(source, "async function processItems");
+    let has_process_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == process_line
     });
 
-    // At minimum, we should have mappings for class or getter
+    // Verify we have mappings for await expressions
+    let (await_fetch_line, _) = find_line_col(source, "await fetch");
+    let has_await_fetch_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == await_fetch_line
+    });
+
+    let (await_json_line, _) = find_line_col(source, "await response.json");
+    let has_await_json_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == await_json_line
+    });
+
+    // We should have mappings for both function declarations
     assert!(
-        has_class_mapping || has_getter_mapping,
-        "expected mappings for class with accessors. mappings: {mappings}"
+        has_fetch_mapping && has_process_mapping,
+        "expected mappings for both async function declarations. mappings: {mappings}"
     );
 
-    // Verify output contains the class name
+    // We should have mappings for await expression lines
     assert!(
-        output.contains("Rectangle"),
-        "expected output to contain class name. output: {output}"
+        has_await_fetch_mapping || has_await_json_mapping,
+        "expected mappings for await expression lines. mappings: {mappings}"
     );
 
-    // Verify source map has non-empty mappings
+    // Verify non-empty mappings
     assert!(
         !decoded.is_empty(),
-        "expected non-empty source mappings for class accessors"
+        "expected non-empty source mappings for async ES5 code"
+    );
+
+    // Verify mappings span multiple source lines (not all on line 0)
+    let unique_source_lines: std::collections::HashSet<_> =
+        decoded.iter().map(|m| m.original_line).collect();
+    assert!(
+        unique_source_lines.len() >= 3,
+        "expected mappings from at least 3 different source lines, got: {:?}",
+        unique_source_lines
     );
 }

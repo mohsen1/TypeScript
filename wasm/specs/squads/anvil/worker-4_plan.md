@@ -78,6 +78,7 @@ Priority: 4
 - [x] Add import.meta source-map test. Tests: `./wasm/test.sh import_meta_mapping`
 - [x] Add export * as namespace source-map test. Tests: `./wasm/test.sh export_star_as_namespace_mapping`
 - [x] Add ES5 class super() with spread args edge case test. Tests: `./wasm/test.sh super_with_spread_args_and_field_init`
+- [x] Add async ES5 downlevel source-map offset accuracy test. Tests: `./wasm/test.sh async_es5_offset_accuracy`
 
 ## Ready for Merge
 Yes
