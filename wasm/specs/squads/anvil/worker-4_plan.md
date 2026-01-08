@@ -84,6 +84,7 @@ Priority: 4
 - [x] Add logical assignment operators source-map test. Tests: `./wasm/test.sh logical_assignment_operators_mapping`
 - [x] Add class static block source-map test. Tests: `./wasm/test.sh class_static_block_mapping`
 - [x] Add BigInt literals source-map test. Tests: `./wasm/test.sh bigint_literals_mapping`
+- [x] Add exponentiation operator source-map test. Tests: `./wasm/test.sh exponentiation_operator_mapping`
 
 ## Ready for Merge
 Yes
