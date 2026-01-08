@@ -73,6 +73,7 @@ pub struct TypeInstantiator<'a> {
     visiting: FxHashMap<TypeId, TypeId>,
     /// Type parameter names that are shadowed in the current scope.
     shadowed: Vec<Atom>,
+    substitute_infer: bool,
 }
 
 impl<'a> TypeInstantiator<'a> {
@@ -83,6 +84,7 @@ impl<'a> TypeInstantiator<'a> {
             substitution,
             visiting: FxHashMap::default(),
             shadowed: Vec::new(),
+            substitute_infer: false,
         }
     }
 
@@ -458,8 +460,13 @@ impl<'a> TypeInstantiator<'a> {
                 self.interner.template_literal(instantiated)
             }
 
-            // Infer: keep as-is (these are only resolved in conditional type checking)
+            // Infer: keep as-is unless explicitly substituting inference variables
             TypeKey::Infer(info) => {
+                if self.substitute_infer && !self.is_shadowed(info.name) {
+                    if let Some(substituted) = self.substitution.get(info.name) {
+                        return substituted;
+                    }
+                }
                 self.interner.intern(TypeKey::Infer(info.clone()))
             }
         }
@@ -476,6 +483,20 @@ pub fn instantiate_type(
         return type_id;
     }
     let mut instantiator = TypeInstantiator::new(interner, substitution);
+    instantiator.instantiate(type_id)
+}
+
+/// Convenience function for instantiating a type while substituting infer variables.
+pub fn instantiate_type_with_infer(
+    interner: &dyn TypeDatabase,
+    type_id: TypeId,
+    substitution: &TypeSubstitution,
+) -> TypeId {
+    if substitution.is_empty() {
+        return type_id;
+    }
+    let mut instantiator = TypeInstantiator::new(interner, substitution);
+    instantiator.substitute_infer = true;
     instantiator.instantiate(type_id)
 }
 

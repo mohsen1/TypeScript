@@ -7,13 +7,14 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- Solver hardening: stress test conditional type evaluation in `wasm/src/solver/evaluate.rs`. Added distributive conditional test covering branch substitution; fix evaluation/instantiation mismatch.
+- Await next assignment.
 
 ## Task Queue
-- [ ] If conditionals already pass, add coverage for nested/distributive conditionals with `extends` and `infer` positions.
+- [ ] Await next assignment.
 
 ## Completed
 - [x] Fixed distributive conditional instantiation to evaluate branches per union member. Tests: `./wasm/test.sh test_conditional_instantiated_param_distributes_branch_substitution`.
+- [x] Added nested/distributive conditional tests covering `extends` + `infer` and substituted infer during evaluation. Tests: `./wasm/test.sh test_conditional_distributive_`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.

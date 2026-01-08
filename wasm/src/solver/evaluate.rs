@@ -16,7 +16,11 @@ use crate::solver::types::*;
 use crate::solver::{apparent_primitive_members, ApparentMemberKind, TypeDatabase};
 use crate::solver::infer::InferenceContext;
 use crate::solver::subtype::{SubtypeChecker, TypeResolver, NoopResolver};
-use crate::solver::instantiate::{TypeSubstitution, instantiate_type};
+use crate::solver::instantiate::{
+    TypeSubstitution,
+    instantiate_type,
+    instantiate_type_with_infer,
+};
 use rustc_hash::FxHashSet;
 
 #[cfg(test)]
@@ -233,6 +237,51 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     cond.false_type,
                 );
             }
+        }
+
+        if let Some(TypeKey::Infer(info)) = self.interner.lookup(extends_type) {
+            if matches!(
+                self.interner.lookup(check_type),
+                Some(TypeKey::TypeParameter(_)) | Some(TypeKey::Infer(_))
+            ) {
+                return self.interner.conditional(cond.clone());
+            }
+
+            let mut subst = TypeSubstitution::new();
+            subst.insert(info.name, check_type);
+
+            if check_type == TypeId::ANY {
+                let true_eval = self.evaluate(instantiate_type_with_infer(
+                    self.interner,
+                    cond.true_type,
+                    &subst,
+                ));
+                let false_eval = self.evaluate(instantiate_type_with_infer(
+                    self.interner,
+                    cond.false_type,
+                    &subst,
+                ));
+                return self.interner.union2(true_eval, false_eval);
+            }
+
+            if let Some(constraint) = info.constraint {
+                let mut checker = SubtypeChecker::with_resolver(self.interner, self.resolver);
+                if !checker.is_subtype_of(check_type, constraint) {
+                    let false_inst = instantiate_type_with_infer(
+                        self.interner,
+                        cond.false_type,
+                        &subst,
+                    );
+                    return self.evaluate(false_inst);
+                }
+            }
+
+            let true_inst = instantiate_type_with_infer(
+                self.interner,
+                cond.true_type,
+                &subst,
+            );
+            return self.evaluate(true_inst);
         }
 
         // Step 2: Check for naked type parameter (defer)
