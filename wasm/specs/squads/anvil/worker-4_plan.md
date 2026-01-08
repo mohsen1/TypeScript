@@ -30,6 +30,7 @@ Priority: 4
 - [x] Add async await detection for call arguments. Tests: `./wasm/test.sh body_contains_await_in_call_argument`
 - [x] Add async await detection for call expression callee. Tests: `./wasm/test.sh body_contains_await_in_call_expression_callee`
 - [x] Add async await detection for binary expressions. Tests: `./wasm/test.sh body_contains_await_in_binary_expression`
+- [x] Add async await detection for conditional expressions. Tests: `./wasm/test.sh body_contains_await_in_conditional_expression`
 - [x] Add async await detection for unary expressions. Tests: `./wasm/test.sh body_contains_await_in_unary_expression`
 - [x] Add async await detection for object literals. Tests: `./wasm/test.sh body_contains_await_in_object_literal`
 - [x] Add async await detection for array literals. Tests: `./wasm/test.sh body_contains_await_in_array_literal`
