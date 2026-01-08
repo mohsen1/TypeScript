@@ -62,6 +62,8 @@ Priority: 3
 - [x] Added CommonJS export-name test for array destructuring holes; `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 - [x] Extended helpers_tests.rs with tests for remaining helpers (decorate, param, metadata, generator, values, read, spread_array, import_default, import_star, export_star, make_template_object, class_private_field_get/set/in, create_binding) plus helper ordering test; `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 - [x] Added end-to-end emit tests for generic library patterns (Redux-style, Lodash-style utility types, generic classes with constraints) verifying type annotation stripping and correct JS output; `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
+- [x] Added end-to-end CLI tests for multi-file projects with imports (models/utils/services structure, default+named imports, type-only imports, source maps, declarations); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
+- [x] Added comprehensive --declaration flag CLI tests (true/false/absent, interfaces, types, classes with methods, declarationDir); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 
 ## Ready for Merge
 Yes
