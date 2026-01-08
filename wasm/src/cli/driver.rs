@@ -1445,8 +1445,12 @@ fn default_types_versions_compiler_version() -> SemVer {
     *DEFAULT.get_or_init(|| {
         let version = serde_json::from_str::<serde_json::Value>(include_str!("../../../package.json"))
             .ok()
-            .and_then(|value| value.get("version").and_then(|value| value.as_str()))
-            .and_then(parse_semver);
+            .and_then(|value| {
+                value
+                    .get("version")
+                    .and_then(|value| value.as_str())
+                    .and_then(parse_semver)
+            });
         version.unwrap_or(TYPES_VERSIONS_COMPILER_VERSION_FALLBACK)
     })
 }
