@@ -1212,6 +1212,101 @@ fn test_source_map_es5_transform_async_try_catch_nested_arrow_mapping() {
 }
 
 #[test]
+fn test_source_map_es5_transform_async_object_literal_arrow_mapping() {
+    let source = "const obj = { run: async () => { await foo(); return this.x; } };";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    assert!(
+        output.contains("__awaiter(") && output.contains("__generator("),
+        "expected async downlevel output, got: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+    let targets = [
+        ("foo()", &["foo"][..]),
+        ("this.x", &["this", "_this"][..]),
+    ];
+    let mut mapped = false;
+
+    for (needle, prefixes) in targets {
+        let (target_line, target_col) = find_line_col(source, needle);
+        let direct_mapping = decoded.iter().find(|entry| {
+            entry.original_line == target_line
+                && entry.original_column == target_col
+        });
+
+        if let Some(mapping) = direct_mapping {
+            if mapping.source_index == 0 {
+                let output_line_text = output
+                    .lines()
+                    .nth(mapping.generated_line as usize);
+                let output_slice = output_line_text
+                    .and_then(|line| line.get(mapping.generated_column as usize..));
+                if let Some(output_slice) = output_slice {
+                    if prefixes.iter().any(|prefix| output_slice.starts_with(prefix)) {
+                        mapped = true;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    if !mapped {
+        let (func_line, _) = find_line_col(source, "const obj");
+        let (output_line, output_col) = if output.contains("obj = {") {
+            find_line_col(&output, "obj = {")
+        } else if output.contains("obj =") {
+            find_line_col(&output, "obj =")
+        } else {
+            find_line_col(&output, "obj")
+        };
+        let mapping = decoded
+            .iter()
+            .filter(|entry| {
+                entry.generated_line < output_line
+                    || (entry.generated_line == output_line
+                        && entry.generated_column <= output_col)
+            })
+            .max_by_key(|entry| (entry.generated_line, entry.generated_column))
+            .unwrap_or_else(|| {
+                panic!(
+                    "expected mapping at or before object output. mappings: {mappings} output: {output}"
+                )
+            });
+
+        assert_eq!(mapping.source_index, 0);
+        assert!(
+            mapping.original_line <= func_line,
+            "expected mapping before or on object line. mapping line: {} object line: {}",
+            mapping.original_line,
+            func_line
+        );
+    }
+}
+
+#[test]
 fn test_source_map_es5_transform_class_extends_mapping() {
     let source = "class Base { base = 1; }\nclass Derived extends Base { value = 2; }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
