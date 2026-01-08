@@ -7,16 +7,12 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [x] Fix compat regression `solver::compat::tests::test_explain_failure_reports_rest_mismatch` in `wasm/src/solver/compat.rs`; adjust diagnostics in `wasm/src/solver/compat_tests.rs` if needed; run `./wasm/test.sh`.
+- [ ] Investigate and fix `test_check_redux_lodash_style_generics` failure (6 diagnostics instead of 0). Run the test with verbose output to see which lines produce diagnostics. Focus on mapped type + conditional infer interactions (`StateFromReducers`, `ActionFromReducers`).
 
 ## Task Queue
-- [x] Reproduce the rest-parameter mismatch failure and confirm expected `SubtypeFailureReason`.
-- [x] Ensure rest-parameter assignability still matches `tsc` for both `unknown[]` and `number[]` cases.
+- [ ] Ensure rest-parameter assignability still matches `tsc` for both `unknown[]` and `number[]` cases.
 
 ## Completed
-- [x] Added strict-mode assignability comparison for rest unknown[] vs number[]; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
-- [x] Rest-parameter assignability parity checks for unknown[] vs number[]; restored AsyncES5Emitter setter to unblock builds; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
-- [x] Added rest number[] assignability guard test; ran `./wasm/test.sh` (fails: missing `AsyncES5Emitter::set_use_this_capture` in `es5_helpers.rs` and `class_es5.rs`).
 - [x] Refactored compat subtype configuration and tightened rest mismatch diagnostics assertions; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Added rest-parameter explain_failure coverage for source rest mismatches; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Implemented template-literal infer matching (including union-aware bindings) and updated conditional template inference tests. Ran `./wasm/test.sh` (fails: solver::compat::tests::test_explain_failure_reports_rest_mismatch).
