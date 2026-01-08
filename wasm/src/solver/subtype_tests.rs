@@ -3436,6 +3436,39 @@ fn test_keyof_intersection_contravariant() {
 }
 
 #[test]
+fn test_keyof_intersection_union_of_keys() {
+    use crate::solver::evaluate_keyof;
+
+    let interner = TypeInterner::new();
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![obj_a, obj_b]);
+    let result = evaluate_keyof(&interner, intersection);
+    let expected = interner.union(vec![
+        interner.literal_string("a"),
+        interner.literal_string("b"),
+    ]);
+
+    assert_eq!(result, expected);
+}
+
+#[test]
 fn test_keyof_union_disjoint_object_keys_is_never() {
     use crate::solver::evaluate_keyof;
 
