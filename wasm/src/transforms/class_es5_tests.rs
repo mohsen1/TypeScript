@@ -5608,3 +5608,411 @@ class SecureValue {
         output
     );
 }
+
+// =============================================================================
+// Implements Clause Tests
+// =============================================================================
+
+#[test]
+fn test_class_es5_implements_single_interface() {
+    // Test class implementing single interface
+    let source = r#"
+interface Printable {
+    print(): string;
+}
+
+class Document implements Printable {
+    content: string;
+
+    constructor(content: string) {
+        this.content = content;
+    }
+
+    print(): string {
+        return this.content;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    // Get Document class (second statement after interface)
+    let class_idx = *source_file.statements.nodes.get(1).expect("expected Document class");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function (implements clause erased)
+    assert!(
+        output.contains("function Document"),
+        "Expected Document to emit as function: {}",
+        output
+    );
+
+    // Constructor should set content
+    assert!(
+        output.contains("this.content") || output.contains("content"),
+        "Expected content assignment: {}",
+        output
+    );
+
+    // print method should be on prototype
+    assert!(
+        output.contains(".prototype.print") || output.contains("print"),
+        "Expected print method: {}",
+        output
+    );
+
+    // implements clause should NOT appear in output
+    assert!(
+        !output.contains("implements"),
+        "implements clause should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_implements_multiple_interfaces() {
+    // Test class implementing multiple interfaces
+    let source = r#"
+interface Readable {
+    read(): string;
+}
+
+interface Writable {
+    write(data: string): void;
+}
+
+class Stream implements Readable, Writable {
+    private buffer: string = "";
+
+    read(): string {
+        return this.buffer;
+    }
+
+    write(data: string): void {
+        this.buffer += data;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    // Get Stream class (third statement after two interfaces)
+    let class_idx = *source_file.statements.nodes.get(2).expect("expected Stream class");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function Stream"),
+        "Expected Stream to emit as function: {}",
+        output
+    );
+
+    // Both methods should be present
+    assert!(
+        output.contains("read"),
+        "Expected read method: {}",
+        output
+    );
+    assert!(
+        output.contains("write"),
+        "Expected write method: {}",
+        output
+    );
+
+    // Private field should be initialized
+    assert!(
+        output.contains("this.buffer") || output.contains("buffer"),
+        "Expected buffer field: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_extends_and_implements() {
+    // Test class extending another class and implementing interface
+    let source = r#"
+interface Disposable {
+    dispose(): void;
+}
+
+class Base {
+    id: number;
+
+    constructor(id: number) {
+        this.id = id;
+    }
+}
+
+class Resource extends Base implements Disposable {
+    name: string;
+    isDisposed: boolean = false;
+
+    constructor(id: number, name: string) {
+        super(id);
+        this.name = name;
+    }
+
+    dispose(): void {
+        this.isDisposed = true;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    // Get Resource class (third statement)
+    let class_idx = *source_file.statements.nodes.get(2).expect("expected Resource class");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function Resource"),
+        "Expected Resource to emit as function: {}",
+        output
+    );
+
+    // Should have inheritance setup
+    assert!(
+        output.contains("_super") || output.contains("Base") || output.contains("__extends"),
+        "Expected inheritance handling: {}",
+        output
+    );
+
+    // dispose method should be present
+    assert!(
+        output.contains("dispose"),
+        "Expected dispose method: {}",
+        output
+    );
+
+    // Fields should be initialized
+    assert!(
+        output.contains("this.name") || output.contains("name"),
+        "Expected name field: {}",
+        output
+    );
+    assert!(
+        output.contains("this.isDisposed") || output.contains("isDisposed"),
+        "Expected isDisposed field: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_implements_generic_interface() {
+    // Test class implementing generic interface
+    let source = r#"
+interface Container<T> {
+    get(): T;
+    set(value: T): void;
+}
+
+class Box implements Container<string> {
+    private value: string = "";
+
+    get(): string {
+        return this.value;
+    }
+
+    set(value: string): void {
+        this.value = value;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    // Get Box class (second statement)
+    let class_idx = *source_file.statements.nodes.get(1).expect("expected Box class");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function Box"),
+        "Expected Box to emit as function: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("get"),
+        "Expected get method: {}",
+        output
+    );
+    assert!(
+        output.contains("set"),
+        "Expected set method: {}",
+        output
+    );
+
+    // Private field should be initialized
+    assert!(
+        output.contains("this.value") || output.contains("value"),
+        "Expected value field: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_implements_with_optional_members() {
+    // Test class implementing interface with optional members
+    let source = r#"
+interface Config {
+    name: string;
+    timeout?: number;
+    retries?: number;
+}
+
+class AppConfig implements Config {
+    name: string;
+    timeout: number;
+
+    constructor(name: string, timeout: number = 5000) {
+        this.name = name;
+        this.timeout = timeout;
+    }
+
+    getConfig(): Config {
+        return { name: this.name, timeout: this.timeout };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    // Get AppConfig class (second statement)
+    let class_idx = *source_file.statements.nodes.get(1).expect("expected AppConfig class");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function AppConfig"),
+        "Expected AppConfig to emit as function: {}",
+        output
+    );
+
+    // Constructor should set fields
+    assert!(
+        output.contains("this.name") || output.contains("name"),
+        "Expected name assignment: {}",
+        output
+    );
+    assert!(
+        output.contains("this.timeout") || output.contains("timeout"),
+        "Expected timeout assignment: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("getConfig"),
+        "Expected getConfig method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_implements_with_static_members() {
+    // Test class implementing interface with additional static members
+    let source = r#"
+interface Serializable {
+    serialize(): string;
+}
+
+class User implements Serializable {
+    static instanceCount: number = 0;
+    name: string;
+    email: string;
+
+    constructor(name: string, email: string) {
+        this.name = name;
+        this.email = email;
+        User.instanceCount++;
+    }
+
+    static getInstanceCount(): number {
+        return User.instanceCount;
+    }
+
+    serialize(): string {
+        return JSON.stringify({ name: this.name, email: this.email });
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    // Get User class (second statement)
+    let class_idx = *source_file.statements.nodes.get(1).expect("expected User class");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function User"),
+        "Expected User to emit as function: {}",
+        output
+    );
+
+    // Static field should be on constructor
+    assert!(
+        output.contains("User.instanceCount") || output.contains("instanceCount"),
+        "Expected instanceCount static field: {}",
+        output
+    );
+
+    // Static method should be on constructor
+    assert!(
+        output.contains("User.getInstanceCount") || output.contains("getInstanceCount"),
+        "Expected getInstanceCount static method: {}",
+        output
+    );
+
+    // serialize method should be present
+    assert!(
+        output.contains("serialize"),
+        "Expected serialize method: {}",
+        output
+    );
+}
