@@ -3121,6 +3121,44 @@ fn test_conditional_infer_tuple_rest_distributive() {
 }
 
 #[test]
+fn test_conditional_infer_union_true_branch_distributive() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends string ? R | number : never, with T = string | boolean.
+    // Infer appears only in the true branch; ensure it is preserved.
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: TypeId::STRING,
+        true_type: interner.union(vec![infer_r, TypeId::NUMBER]),
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, interner.union(vec![TypeId::STRING, TypeId::BOOLEAN]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, interner.union(vec![infer_r, TypeId::NUMBER]));
+}
+
+#[test]
 fn test_conditional_infer_readonly_array_element_extraction() {
     let interner = TypeInterner::new();
 
