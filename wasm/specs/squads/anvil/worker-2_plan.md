@@ -13,6 +13,7 @@ Priority: 2
 - [ ] [EM: Add queued tasks]
 
 ## Completed
+- [x] Added parity test for function param type erasure in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (39 tests).
 - [x] Added parity test for type alias erasure in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (38 tests).
 - [x] Added parity test for interface erasure in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (37 tests).
 - [x] Added parity test for type-only import erasure in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (36 tests).
