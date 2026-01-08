@@ -15,6 +15,7 @@ Priority: 5
 - [ ] [EM: Add queued tasks]
 
 ## Completed
+- [x] Implemented intersection object inference for conditional `infer` patterns; updated expectation to string; `./wasm/test.sh` failed with async ES5 transform parse error (`async_es5.rs:749`).
 - [x] Enabled non-distributive readonly array/tuple inference over union inputs and updated tests in `wasm/src/solver/evaluate_tests.rs`; `./wasm/test.sh` failed: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`.
 - [x] Implemented conditional infer constraint filtering + optional tuple/property inference; updated tuple optional expectations and added `this`-parameter tests; `./wasm/test.sh` failed: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`.
 - [x] Fixed FunctionId typo in `wasm/src/solver/evaluate.rs`; `./wasm/test.sh` failed: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`.
