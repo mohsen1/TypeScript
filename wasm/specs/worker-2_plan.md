@@ -14,7 +14,7 @@ Priority: 2
 - [ ] TODO: Add non-distributive template literal infer over template-literal union input (e.g., T = `foo${string}` | `bar${string}`).
 - [ ] TODO: Add non-distributive template literal infer with non-string union branch for middle+suffix patterns (e.g., T = `foo${string}bar` | number).
 - [ ] TODO: Add non-distributive template literal infer with numeric constraint to document current behavior.
-- [ ] TODO: Add distributive template literal infer over template-literal union input; expected `string` for matching branch (non-matching -> `never`).
+- [x] Added distributive template literal infer over template-literal union input (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_union_input_distributive`.
 - [ ] TODO: Add template literal infer from `string` or `` `${string}` `` input (e.g., T extends `${infer R}`) expected `string`.
 - [ ] TODO: Add tuple rest inference test (e.g., T extends [infer H, ...infer R] ? R : never) with T = [string, number] | [boolean], expected `[number] | []`.
 - [ ] TODO: Add object call-signature infer test (e.g., T extends { (x: infer R): void } ? R : never) expected union of parameter types.
@@ -106,9 +106,9 @@ Priority: 2
 - [x] Added non-distributive template literal constrained two-infer test with non-matching union branch (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_two_infers_with_constraint_non_distributive_non_matching_union_branch`.
 - [x] Added non-distributive template literal prefix infer test with non-string union branch (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_with_prefix_non_distributive_non_string_union_branch`.
 - [x] Added non-distributive template literal suffix infer test with non-string union branch (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_with_suffix_non_distributive_non_string_union_branch`.
+- [x] Added non-distributive template literal middle infer test with non-string union branch (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_with_middle_non_distributive_non_string_union_branch`.
 
 ## Notes
-- Blocker: Docker tests fail with E0515 in `wasm/src/cli/driver.rs` after merging `origin/rust`; waiting on fix.
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
 - Use Docker for Rust tests (`./wasm/test.sh`), never `cargo test` directly.
 - Update this plan after each task and keep it accurate.
