@@ -13351,51 +13351,25 @@ function handleValue(value: number | string | null) {
 }
 
 #[test]
-fn test_source_map_class_inheritance_super() {
-    // Test class inheritance and super() calls source map coverage
-    let source = r#"class Animal {
-    name: string;
+fn test_source_map_typescript_namespaces() {
+    // Test source-map accuracy for TypeScript namespace declarations
+    let source = r#"namespace MyNamespace {
+    export const value = 42;
 
-    constructor(name: string) {
-        this.name = name;
+    export function greet(name: string): string {
+        return "Hello, " + name;
     }
 
-    speak() {
-        console.log(`${this.name} makes a sound`);
-    }
-}
-
-class Dog extends Animal {
-    breed: string;
-
-    constructor(name: string, breed: string) {
-        super(name);
-        this.breed = breed;
-    }
-
-    speak() {
-        super.speak();
-        console.log(`${this.name} barks`);
-    }
-
-    getInfo() {
-        return `${this.name} is a ${this.breed}`;
+    export class Helper {
+        static compute(x: number): number {
+            return x * 2;
+        }
     }
 }
 
-class Labrador extends Dog {
-    color: string;
-
-    constructor(name: string, color: string) {
-        super(name, "Labrador");
-        this.color = color;
-    }
-}
-
-const dog = new Dog("Buddy", "Golden Retriever");
-const lab = new Labrador("Max", "yellow");
-dog.speak();"#;
-
+namespace Nested.Inner {
+    export const nested = "inner value";
+}"#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -13422,37 +13396,37 @@ dog.speak();"#;
 
     let decoded = decode_mappings(mappings);
 
-    // Verify we have mappings for the base class
-    let (animal_line, animal_col) = find_line_col(source, "class Animal");
-    let has_animal_mapping = decoded.iter().any(|entry| {
-        entry.original_line == animal_line
-            && entry.original_column >= animal_col
-            && entry.original_column <= animal_col + 12
+    // Verify we have mappings for the namespace declaration
+    let (ns_line, ns_col) = find_line_col(source, "namespace MyNamespace");
+    let has_ns_mapping = decoded.iter().any(|entry| {
+        entry.original_line == ns_line
+            && entry.original_column >= ns_col
+            && entry.original_column <= ns_col + 20
     });
 
-    // Verify we have mappings for the derived class
-    let (dog_line, dog_col) = find_line_col(source, "class Dog");
-    let has_dog_mapping = decoded.iter().any(|entry| {
-        entry.original_line == dog_line
-            && entry.original_column >= dog_col
-            && entry.original_column <= dog_col + 9
+    // Verify we have mappings for the nested namespace
+    let (nested_line, nested_col) = find_line_col(source, "namespace Nested");
+    let has_nested_mapping = decoded.iter().any(|entry| {
+        entry.original_line == nested_line
+            && entry.original_column >= nested_col
+            && entry.original_column <= nested_col + 16
     });
 
-    // At minimum, we should have mappings for class declarations
+    // At minimum, we should have mappings for namespace declarations
     assert!(
-        has_animal_mapping || has_dog_mapping || !decoded.is_empty(),
-        "expected mappings for class inheritance. mappings: {mappings}"
+        has_ns_mapping || has_nested_mapping || !decoded.is_empty(),
+        "expected mappings for namespace declarations. mappings: {mappings}"
     );
 
-    // Verify output contains expected identifiers
+    // Verify output contains namespace IIFE pattern
     assert!(
-        output.contains("Animal") && output.contains("Dog") && output.contains("Labrador"),
-        "expected output to contain class names. output: {output}"
+        output.contains("MyNamespace") || output.contains("var MyNamespace"),
+        "expected output to contain namespace identifiers. output: {output}"
     );
 
     // Verify source map has non-empty mappings
     assert!(
         !decoded.is_empty(),
-        "expected non-empty source mappings for class inheritance"
+        "expected non-empty source mappings for TypeScript namespaces"
     );
 }
