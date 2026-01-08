@@ -969,3 +969,53 @@ fn test_parity_es5_method_shorthand() {
         output
     );
 }
+
+/// Parity test for ES5 default parameters.
+/// Default parameters should be downleveled to undefined checks.
+#[test]
+fn test_parity_es5_default_parameters() {
+    let source = "function greet(name = 'World') { return 'Hello, ' + name; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 default parameter downlevel
+    assert!(
+        output.contains("function greet"),
+        "ES5 output should define greet function: {}",
+        output
+    );
+    // Default parameter should be converted to undefined check
+    // tsc outputs: if (name === void 0) { name = 'World'; }
+    assert!(
+        output.contains("void 0") || output.contains("undefined"),
+        "ES5 output should check for undefined: {}",
+        output
+    );
+    assert!(
+        output.contains("World"),
+        "ES5 output should contain default value: {}",
+        output
+    );
+    // No default parameter syntax in function signature
+    assert!(
+        !output.contains("name = 'World')") && !output.contains("name='World')"),
+        "ES5 output should not contain default parameter syntax: {}",
+        output
+    );
+}
