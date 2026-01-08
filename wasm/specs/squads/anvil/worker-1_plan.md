@@ -1,17 +1,25 @@
 # Worker 1 Plan
 
+## ⛔ OPERATION CRUCIBLE - BUG FIXES ONLY
+
+**Per wasm/README.md Project Direction: Emitter is 80% complete. MAINTENANCE MODE.**
+
+- ⛔ NO new ES5 tests
+- ⛔ NO new transforms
+- ✅ Bug fixes ONLY
+
 ## Mission
-Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transforms, cli, lsp).
+Execute bug fix tasks for the Anvil squad.
 
 Status: Active
 Priority: 1
-Blocked: Awaiting next EM-Anvil assignment.
+Mode: **BUG FIXES ONLY**
 
 ## Current Assignment
-- [ ] Add ES5 class tests for this parameter types in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
+- [ ] Fix blocking ES5 regression: async computed `super["m"]` emits `void 0["m"]`. File: `transforms/async_es5.rs`
 
-## Task Queue
-- [ ] (empty)
+## Task Queue (BUG FIXES ONLY)
+- [ ] Fix nested arrow `this` capture edge cases in `transforms/class_es5.rs`
 
 ## Completed
 - [x] Added ES5 tests for index signatures (6 tests): string key, number key, with properties, readonly, with inheritance, with static members. Ran `./wasm/test.sh class_es5_tests` (all 113 pass).

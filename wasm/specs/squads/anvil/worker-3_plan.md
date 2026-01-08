@@ -1,16 +1,27 @@
 # Worker 3 Plan
 
+## 🔥 CRUCIBLE - TEST PORTING (REASSIGNED)
+
+**Per wasm/README.md Project Direction: Reassigned from Anvil to Crucible test porting.**
+
+- ⛔ NO more emitter work
+- ⛔ NO more source map tests
+- ✅ Port solver tests from official TypeScript repo ONLY
+
 ## Mission
-Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transforms, cli, lsp).
+Port conditional type tests from official TypeScript repo into `tests/cases/`.
 
 Status: Active
 Priority: 3
+Mode: **CRUCIBLE - TEST PORTING**
 
 ## Current Assignment
-- [ ] Add source map tests for nullish coalescing transforms in `wasm/src/source_map_tests.rs`. Run `./wasm/test.sh source_map`.
+- [ ] Port `conditionalTypes1.ts` and `conditionalTypes2.ts` from `microsoft/TypeScript/tests/cases/conformance/types/conditional/`
 
 ## Task Queue
-- [ ] (empty)
+- [ ] Port `inferTypes1.ts` - infer keyword tests
+- [ ] Port `inferTypes2.ts` - advanced infer patterns
+- [ ] Target: 15-20 conditional type tests this week
 
 ## Completed
 - [x] Added optional chaining transform source map tests (property access, method call, element access, nested, with nullish coalescing, in function, with method chain, delete, call expression, combined); `./wasm/test.sh source_map` passes.
