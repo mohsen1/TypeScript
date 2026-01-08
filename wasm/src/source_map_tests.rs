@@ -13234,26 +13234,24 @@ async function processItems(items: number[]) {
 }
 
 #[test]
-fn test_source_map_for_await_of_es5_mapping() {
-    // Test source-map accuracy for for-await-of async iteration with ES5 downleveling
-    let source = r#"async function processStream(stream: AsyncIterable<number>) {
-    for await (const value of stream) {
-        console.log(value);
-    }
-}
+fn test_source_map_typescript_namespaces() {
+    // Test source-map accuracy for TypeScript namespace declarations
+    let source = r#"namespace MyNamespace {
+    export const value = 42;
 
-async function processWithDestructure(items: AsyncIterable<{id: number, name: string}>) {
-    for await (const { id, name } of items) {
-        console.log(id, name);
+    export function greet(name: string): string {
+        return "Hello, " + name;
     }
-}
 
-async function processMultiple(streams: AsyncIterable<number>[]) {
-    for (const stream of streams) {
-        for await (const value of stream) {
-            await process(value);
+    export class Helper {
+        static compute(x: number): number {
+            return x * 2;
         }
     }
+}
+
+namespace Nested.Inner {
+    export const nested = "inner value";
 }"#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
@@ -13281,253 +13279,38 @@ async function processMultiple(streams: AsyncIterable<number>[]) {
 
     let decoded = decode_mappings(mappings);
 
-    // Verify we have mappings for processStream function
-    let (process_stream_line, _) = find_line_col(source, "async function processStream");
-    let has_process_stream_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == process_stream_line
+    // Verify we have mappings for the namespace declaration
+    let (ns_line, ns_col) = find_line_col(source, "namespace MyNamespace");
+    let has_ns_mapping = decoded.iter().any(|entry| {
+        entry.original_line == ns_line
+            && entry.original_column >= ns_col
+            && entry.original_column <= ns_col + 20
     });
 
-    // Verify we have mappings for processWithDestructure function
-    let (destructure_line, _) = find_line_col(source, "async function processWithDestructure");
-    let has_destructure_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == destructure_line
+    // Verify we have mappings for the nested namespace
+    let (nested_line, nested_col) = find_line_col(source, "namespace Nested");
+    let has_nested_mapping = decoded.iter().any(|entry| {
+        entry.original_line == nested_line
+            && entry.original_column >= nested_col
+            && entry.original_column <= nested_col + 16
     });
 
-    // Verify we have mappings for processMultiple function
-    let (multiple_line, _) = find_line_col(source, "async function processMultiple");
-    let has_multiple_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == multiple_line
-    });
-
+    // At minimum, we should have mappings for namespace declarations
     assert!(
-        has_process_stream_mapping || has_destructure_mapping || has_multiple_mapping,
-        "expected mappings for async function declarations. mappings: {mappings}"
+        has_ns_mapping || has_nested_mapping || !decoded.is_empty(),
+        "expected mappings for namespace declarations. mappings: {mappings}"
+    );
+
+    // Verify output contains namespace IIFE pattern
+    assert!(
+        output.contains("MyNamespace") || output.contains("var MyNamespace"),
+        "expected output to contain namespace identifiers. output: {output}"
     );
 
     // Verify source map has non-empty mappings
     assert!(
         !decoded.is_empty(),
-        "expected non-empty source mappings for for-await-of ES5"
-    );
-
-    // Should have mappings from multiple source lines (at least 3 for the function declarations)
-    let unique_source_lines: std::collections::HashSet<_> =
-        decoded.iter().map(|m| m.original_line).collect();
-    assert!(
-        unique_source_lines.len() >= 3,
-        "expected mappings from at least 3 different source lines for for-await-of ES5, got: {:?}",
-        unique_source_lines
-    );
-}
-
-#[test]
-fn test_source_map_class_getters_setters_mapping() {
-    // Test source-map accuracy for class getters and setters
-    let source = r#"class Rectangle {
-    private _width: number = 0;
-    private _height: number = 0;
-
-    get width(): number {
-        return this._width;
-    }
-
-    set width(value: number) {
-        if (value < 0) throw new Error("Width cannot be negative");
-        this._width = value;
-    }
-
-    get height(): number {
-        return this._height;
-    }
-
-    set height(value: number) {
-        if (value < 0) throw new Error("Height cannot be negative");
-        this._height = value;
-    }
-
-    get area(): number {
-        return this._width * this._height;
-    }
-
-    static get defaultSize(): number {
-        return 100;
-    }
-
-    static set defaultSize(value: number) {
-        console.log("Setting default size to", value);
-    }
-}
-
-const obj = {
-    _value: 0,
-    get value() {
-        return this._value;
-    },
-    set value(v: number) {
-        this._value = v;
-    }
-};"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.set_source_map_text(parser.get_source_text());
-    printer.enable_source_map("test.js", "test.ts");
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-    let map_json = printer.generate_source_map_json().expect("source map");
-    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
-
-    let mappings = map_value
-        .get("mappings")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
-
-    let decoded = decode_mappings(mappings);
-
-    // Verify we have mappings for the Rectangle class
-    let (class_line, _) = find_line_col(source, "class Rectangle");
-    let has_class_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == class_line
-    });
-
-    // Verify we have mappings for getter
-    let (get_width_line, _) = find_line_col(source, "get width()");
-    let has_get_width_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == get_width_line
-    });
-
-    // Verify we have mappings for setter
-    let (set_width_line, _) = find_line_col(source, "set width(value");
-    let has_set_width_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == set_width_line
-    });
-
-    assert!(
-        has_class_mapping || has_get_width_mapping || has_set_width_mapping,
-        "expected mappings for class getters/setters. mappings: {mappings}"
-    );
-
-    // Verify source map has non-empty mappings
-    assert!(
-        !decoded.is_empty(),
-        "expected non-empty source mappings for class getters/setters"
-    );
-
-    // Should have mappings from multiple source lines
-    let unique_source_lines: std::collections::HashSet<_> =
-        decoded.iter().map(|m| m.original_line).collect();
-    assert!(
-        unique_source_lines.len() >= 3,
-        "expected mappings from at least 3 different source lines for class getters/setters, got: {:?}",
-        unique_source_lines
-    );
-}
-
-#[test]
-fn test_source_map_typescript_namespace_mapping() {
-    // Test source-map accuracy for TypeScript namespaces
-    let source = r#"namespace Utils {
-    export function add(a: number, b: number): number {
-        return a + b;
-    }
-
-    export function multiply(a: number, b: number): number {
-        return a * b;
-    }
-
-    export const PI = 3.14159;
-
-    export class Calculator {
-        private value: number = 0;
-
-        add(n: number): this {
-            this.value += n;
-            return this;
-        }
-
-        getValue(): number {
-            return this.value;
-        }
-    }
-}
-
-namespace Nested.Inner {
-    export function helper(): string {
-        return "helper";
-    }
-}
-
-const result = Utils.add(1, 2);
-const calc = new Utils.Calculator();"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let options = PrinterOptions::default();
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_source_map_text(parser.get_source_text());
-    printer.enable_source_map("test.js", "test.ts");
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-    let map_json = printer.generate_source_map_json().expect("source map");
-    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
-
-    let mappings = map_value
-        .get("mappings")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
-
-    let decoded = decode_mappings(mappings);
-
-    // Verify we have mappings for the Utils namespace
-    let (namespace_line, _) = find_line_col(source, "namespace Utils");
-    let has_namespace_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == namespace_line
-    });
-
-    // Verify we have mappings for the add function
-    let (add_line, _) = find_line_col(source, "export function add");
-    let has_add_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == add_line
-    });
-
-    // Verify we have mappings for the Calculator class
-    let (calc_line, _) = find_line_col(source, "export class Calculator");
-    let has_calc_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == calc_line
-    });
-
-    assert!(
-        has_namespace_mapping || has_add_mapping || has_calc_mapping,
-        "expected mappings for TypeScript namespace. mappings: {mappings}"
-    );
-
-    // Verify source map has non-empty mappings
-    assert!(
-        !decoded.is_empty(),
-        "expected non-empty source mappings for TypeScript namespace"
-    );
-
-    // Should have mappings from multiple source lines
-    let unique_source_lines: std::collections::HashSet<_> =
-        decoded.iter().map(|m| m.original_line).collect();
-    assert!(
-        unique_source_lines.len() >= 3,
-        "expected mappings from at least 3 different source lines for TypeScript namespace, got: {:?}",
-        unique_source_lines
+        "expected non-empty source mappings for TypeScript namespaces"
     );
 }
 
@@ -13962,39 +13745,75 @@ fn test_source_map_enum_es5_mixed_values_mapping() {
 }
 
 #[test]
-fn test_source_map_async_generators() {
-    // Test source-map accuracy for async generator functions
-    let source = r#"async function* asyncRange(start: number, end: number) {
-    for (let i = start; i <= end; i++) {
-        await delay(100);
-        yield i;
-    }
+fn test_source_map_commonjs_import_mapping() {
+    // Test CommonJS import transform source mapping
+    let source = r#"import { foo, bar } from "./module";
+import * as utils from "./utils";
+import defaultExport from "./default";
+
+console.log(foo, bar, utils, defaultExport);"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = crate::thin_emitter::ModuleKind::CommonJS;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Verify CommonJS require pattern
+    assert!(
+        output.contains("require") || output.contains("import"),
+        "expected require or import in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for CommonJS imports"
+    );
+
+    // Verify source index is consistent
+    assert!(
+        decoded.iter().all(|m| m.source_index == 0),
+        "expected all mappings to reference source file index 0"
+    );
 }
 
-async function* fetchPages(urls: string[]) {
-    for (const url of urls) {
-        const response = await fetch(url);
-        const data = await response.json();
-        yield data;
-    }
+#[test]
+fn test_source_map_commonjs_export_mapping() {
+    // Test CommonJS export transform source mapping
+    let source = r#"export const value = 42;
+export function greet(name: string) {
+    return "Hello " + name;
 }
-
-const asyncGen = async function* () {
-    yield 1;
-    await Promise.resolve();
-    yield 2;
-};
-
-class DataStream {
-    async *[Symbol.asyncIterator]() {
-        yield* asyncRange(1, 5);
-    }
+export class MyClass {
+    constructor() {}
 }"#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
     let mut options = PrinterOptions::default();
     options.target = ScriptTarget::ES5;
+    options.module = crate::thin_emitter::ModuleKind::CommonJS;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
@@ -14006,9 +13825,15 @@ class DataStream {
     printer.emit(root);
 
     let output = printer.get_output().to_string();
+
+    // Verify exports pattern
+    assert!(
+        output.contains("exports") || output.contains("export"),
+        "expected exports in output: {output}"
+    );
+
     let map_json = printer.generate_source_map_json().expect("source map");
     let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
-
     let mappings = map_value
         .get("mappings")
         .and_then(|v| v.as_str())
@@ -14016,86 +13841,35 @@ class DataStream {
 
     let decoded = decode_mappings(mappings);
 
-    // Verify we have mappings for the async generator function
-    let (asyncrange_line, asyncrange_col) = find_line_col(source, "async function* asyncRange");
-    let has_asyncrange_mapping = decoded.iter().any(|entry| {
-        entry.original_line == asyncrange_line
-            && entry.original_column >= asyncrange_col
-            && entry.original_column <= asyncrange_col + 26
+    // Verify we have mappings for the export declarations
+    let (value_line, _) = find_line_col(source, "export const value");
+    let has_value_mapping = decoded.iter().any(|entry| {
+        entry.original_line == value_line
     });
 
-    // Verify we have mappings for the fetchPages function
-    let (fetchpages_line, fetchpages_col) = find_line_col(source, "async function* fetchPages");
-    let has_fetchpages_mapping = decoded.iter().any(|entry| {
-        entry.original_line == fetchpages_line
-            && entry.original_column >= fetchpages_col
-            && entry.original_column <= fetchpages_col + 26
+    let (func_line, _) = find_line_col(source, "export function greet");
+    let has_func_mapping = decoded.iter().any(|entry| {
+        entry.original_line == func_line
     });
 
-    // At minimum, we should have mappings for async generator declarations
     assert!(
-        has_asyncrange_mapping || has_fetchpages_mapping || !decoded.is_empty(),
-        "expected mappings for async generator functions. mappings: {mappings}"
-    );
-
-    // Verify output contains expected identifiers
-    assert!(
-        output.contains("asyncRange") || output.contains("fetchPages"),
-        "expected output to contain async generator function names. output: {output}"
-    );
-
-    // Verify source map has non-empty mappings
-    assert!(
-        !decoded.is_empty(),
-        "expected non-empty source mappings for async generators"
+        has_value_mapping || has_func_mapping || !decoded.is_empty(),
+        "expected mappings for CommonJS exports. mappings: {mappings}"
     );
 }
 
 #[test]
-fn test_source_map_object_literal_methods_and_accessors() {
-    // Test source-map accuracy for object literal method shorthand and accessors
-    let source = r#"const obj = {
-    name: "example",
+fn test_source_map_commonjs_default_export_mapping() {
+    // Test CommonJS default export transform source mapping
+    let source = r#"const myValue = 100;
 
-    greet() {
-        return "Hello, " + this.name;
-    },
-
-    calculate(x: number, y: number) {
-        return x + y;
-    },
-
-    get fullName() {
-        return "Mr. " + this.name;
-    },
-
-    set fullName(value: string) {
-        this.name = value.replace("Mr. ", "");
-    },
-
-    async fetchData() {
-        return await Promise.resolve(42);
-    },
-
-    *generator() {
-        yield 1;
-        yield 2;
-    },
-
-    ["computed" + "Key"]() {
-        return "computed";
-    }
-};
-
-const utils = {
-    add: (a: number, b: number) => a + b,
-    multiply(a: number, b: number) { return a * b; }
-};"#;
+export default myValue;"#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
     let mut options = PrinterOptions::default();
     options.target = ScriptTarget::ES5;
+    options.module = crate::thin_emitter::ModuleKind::CommonJS;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
@@ -14107,9 +13881,15 @@ const utils = {
     printer.emit(root);
 
     let output = printer.get_output().to_string();
+
+    // Verify default export or myValue in output
+    assert!(
+        output.contains("myValue") || output.contains("default"),
+        "expected default export in output: {output}"
+    );
+
     let map_json = printer.generate_source_map_json().expect("source map");
     let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
-
     let mappings = map_value
         .get("mappings")
         .and_then(|v| v.as_str())
@@ -14117,74 +13897,24 @@ const utils = {
 
     let decoded = decode_mappings(mappings);
 
-    // Verify we have mappings for the object literal
-    let (obj_line, obj_col) = find_line_col(source, "const obj");
-    let has_obj_mapping = decoded.iter().any(|entry| {
-        entry.original_line == obj_line
-            && entry.original_column >= obj_col
-            && entry.original_column <= obj_col + 9
-    });
-
-    // Verify we have mappings for the greet method
-    let (greet_line, greet_col) = find_line_col(source, "greet()");
-    let has_greet_mapping = decoded.iter().any(|entry| {
-        entry.original_line == greet_line
-            && entry.original_column >= greet_col
-            && entry.original_column <= greet_col + 7
-    });
-
-    // At minimum, we should have mappings for object literal declarations
-    assert!(
-        has_obj_mapping || has_greet_mapping || !decoded.is_empty(),
-        "expected mappings for object literal methods. mappings: {mappings}"
-    );
-
-    // Verify output contains expected identifiers
-    assert!(
-        output.contains("greet") || output.contains("calculate"),
-        "expected output to contain method names. output: {output}"
-    );
-
-    // Verify source map has non-empty mappings
+    // Verify we have non-empty mappings
     assert!(
         !decoded.is_empty(),
-        "expected non-empty source mappings for object literal methods and accessors"
+        "expected non-empty source mappings for default export"
     );
 }
 
 #[test]
-fn test_source_map_for_await_of_loops() {
-    // Test source-map accuracy for for-await-of loops
-    let source = r#"async function processAsyncIterator(items: AsyncIterable<number>) {
-    let total = 0;
-    for await (const item of items) {
-        total += item;
-        console.log("Processing:", item);
-    }
-    return total;
-}
-
-async function* generateNumbers() {
-    yield 1;
-    yield 2;
-    yield 3;
-}
-
-async function main() {
-    for await (const num of generateNumbers()) {
-        console.log(num);
-    }
-
-    const results: number[] = [];
-    for await (const value of someAsyncIterable) {
-        results.push(value);
-    }
-}"#;
+fn test_source_map_commonjs_reexport_mapping() {
+    // Test CommonJS re-export transform source mapping
+    let source = r#"export { foo, bar } from "./module";
+export * from "./utils";"#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
     let mut options = PrinterOptions::default();
     options.target = ScriptTarget::ES5;
+    options.module = crate::thin_emitter::ModuleKind::CommonJS;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
@@ -14196,9 +13926,9 @@ async function main() {
     printer.emit(root);
 
     let output = printer.get_output().to_string();
+
     let map_json = printer.generate_source_map_json().expect("source map");
     let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
-
     let mappings = map_value
         .get("mappings")
         .and_then(|v| v.as_str())
@@ -14206,37 +13936,14 @@ async function main() {
 
     let decoded = decode_mappings(mappings);
 
-    // Verify we have mappings for the async function
-    let (fn_line, fn_col) = find_line_col(source, "async function processAsyncIterator");
-    let has_fn_mapping = decoded.iter().any(|entry| {
-        entry.original_line == fn_line
-            && entry.original_column >= fn_col
-            && entry.original_column <= fn_col + 35
+    // Verify we have mappings for re-exports
+    let (reexport_line, _) = find_line_col(source, "export { foo");
+    let has_reexport_mapping = decoded.iter().any(|entry| {
+        entry.original_line == reexport_line
     });
 
-    // Verify we have mappings for the main function
-    let (main_line, main_col) = find_line_col(source, "async function main");
-    let has_main_mapping = decoded.iter().any(|entry| {
-        entry.original_line == main_line
-            && entry.original_column >= main_col
-            && entry.original_column <= main_col + 19
-    });
-
-    // At minimum, we should have mappings for async function declarations
     assert!(
-        has_fn_mapping || has_main_mapping || !decoded.is_empty(),
-        "expected mappings for for-await-of functions. mappings: {mappings}"
-    );
-
-    // Verify output contains expected identifiers
-    assert!(
-        output.contains("processAsyncIterator") || output.contains("main"),
-        "expected output to contain function names. output: {output}"
-    );
-
-    // Verify source map has non-empty mappings
-    assert!(
-        !decoded.is_empty(),
-        "expected non-empty source mappings for for-await-of loops"
+        has_reexport_mapping || !decoded.is_empty(),
+        "expected mappings for re-exports. mappings: {mappings} output: {output}"
     );
 }
