@@ -7,12 +7,13 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- [ ] Add ES5 async iterator tests for `for-await-of` with destructuring patterns in `wasm/src/transforms/async_es5_tests.rs`. Run `./wasm/test.sh async_es5_tests`.
+- Complete: Added 6 for-await-of destructuring pattern tests (array, object, nested, defaults, rest element, computed property) in `wasm/src/transforms/async_es5_tests.rs`; also added try/catch/finally await detection in `wasm/src/transforms/async_es5.rs`; ran `./wasm/test.sh async_es5_tests` (20 tests PASS).
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added 6 for-await-of destructuring pattern tests (array, object, nested, defaults, rest element, computed property) in `wasm/src/transforms/async_es5_tests.rs`; also added try/catch/finally await detection in `wasm/src/transforms/async_es5.rs`; ran `./wasm/test.sh async_es5_tests` (20 tests PASS).
 - [x] Added 3 private class feature tests (private method in async, static private method, private accessors) in `wasm/src/transforms/class_es5_tests.rs`; ran `./wasm/test.sh class_es5_tests` (54 tests PASS).
 - [x] Added non-null assertions source map test in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (189 tests PASS).
 - [x] Added type assertions and const assertions source map test in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (183 tests PASS).
