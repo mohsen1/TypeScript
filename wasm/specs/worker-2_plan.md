@@ -109,7 +109,6 @@ Priority: 2
 - [x] Added object call-signature infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_object_call_signature_distributive`.
 
 ## Notes
-- Ready for merge.
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
 - Use Docker for Rust tests (`./wasm/test.sh`), never `cargo test` directly.
 - Update this plan after each task and keep it accurate.
