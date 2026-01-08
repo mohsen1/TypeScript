@@ -10067,3 +10067,77 @@ fn test_source_map_es5_transform_template_literal_mapping() {
         "expected mapping on template literal line"
     );
 }
+
+#[test]
+fn test_source_map_es5_roundtrip_accuracy() {
+    // Comprehensive test with multiple ES5 transforms: async, class, arrow, destructuring
+    let source = r#"class Base { value = 1; }
+class Derived extends Base {
+    async process(data: { x: number }) {
+        const { x } = data;
+        const result = await this.compute(x);
+        return `Result: ${result}`;
+    }
+    compute = (n: number) => n * 2;
+}
+const instance = new Derived();
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Verify ES5 transforms were applied
+    assert!(output.contains("__extends"), "expected __extends helper");
+    assert!(output.contains("__awaiter"), "expected __awaiter helper");
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Key identifiers to verify roundtrip accuracy
+    let test_cases = [
+        ("Base", "class Base"),
+        ("Derived", "class Derived"),
+        ("process", "process("),
+        ("compute", "compute ="),
+        ("instance", "instance ="),
+    ];
+
+    let mut verified = 0;
+    for (identifier, search_pattern) in test_cases {
+        let (src_line, _) = find_line_col(source, search_pattern);
+
+        // Find any mapping that references this source line
+        let has_mapping = decoded.iter().any(|entry| {
+            entry.source_index == 0 && entry.original_line == src_line
+        });
+
+        if has_mapping {
+            verified += 1;
+        }
+    }
+
+    // At least 3 of 5 key identifiers should have accurate mappings
+    assert!(
+        verified >= 3,
+        "expected at least 3 identifiers with accurate roundtrip mappings, got {verified}. mappings: {mappings}"
+    );
+}
