@@ -2134,3 +2134,265 @@ fn test_async_arrow_conditional_expression() {
         output
     );
 }
+
+// =============================================================================
+// Async method expression tests (methods in object literals)
+// =============================================================================
+
+/// Helper to parse an async method in an object literal and emit its body
+fn parse_and_emit_async_method_expr(source: &str) -> String {
+    use crate::parser::syntax_kind_ext;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&stmt_idx) = source_file.statements.nodes.first() {
+                if let Some(stmt_node) = parser.arena.get(stmt_idx) {
+                    // Variable statement -> declaration list -> declaration -> initializer (object literal)
+                    if stmt_node.kind == syntax_kind_ext::VARIABLE_STATEMENT {
+                        if let Some(var_stmt) = parser.arena.get_variable(stmt_node) {
+                            if let Some(&decl_list_idx) = var_stmt.declarations.nodes.first() {
+                                if let Some(decl_list_node) = parser.arena.get(decl_list_idx) {
+                                    if let Some(decl_list) = parser.arena.get_variable(decl_list_node) {
+                                        if let Some(&decl_idx) = decl_list.declarations.nodes.first() {
+                                            if let Some(decl_node) = parser.arena.get(decl_idx) {
+                                                if let Some(var_decl) = parser.arena.get_variable_declaration(decl_node) {
+                                                    if let Some(init_node) = parser.arena.get(var_decl.initializer) {
+                                                        if init_node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION {
+                                                            if let Some(obj_lit) = parser.arena.get_literal_expr(init_node) {
+                                                                // Find the first method declaration
+                                                                for &elem_idx in &obj_lit.elements.nodes {
+                                                                    if let Some(elem_node) = parser.arena.get(elem_idx) {
+                                                                        if elem_node.kind == syntax_kind_ext::METHOD_DECLARATION {
+                                                                            if let Some(method_data) = parser.arena.get_method_decl(elem_node) {
+                                                                                let emitter = AsyncES5Emitter::new(&parser.arena);
+                                                                                let has_await = emitter.body_contains_await(method_data.body);
+                                                                                let mut emitter = AsyncES5Emitter::new(&parser.arena);
+                                                                                if has_await {
+                                                                                    return emitter.emit_generator_body_with_await(method_data.body);
+                                                                                } else {
+                                                                                    return emitter.emit_simple_generator_body(method_data.body);
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    String::new()
+}
+
+/// Helper to check if async method expression body contains await
+fn method_expr_body_contains_await(source: &str) -> bool {
+    use crate::parser::syntax_kind_ext;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&stmt_idx) = source_file.statements.nodes.first() {
+                if let Some(stmt_node) = parser.arena.get(stmt_idx) {
+                    if stmt_node.kind == syntax_kind_ext::VARIABLE_STATEMENT {
+                        if let Some(var_stmt) = parser.arena.get_variable(stmt_node) {
+                            if let Some(&decl_list_idx) = var_stmt.declarations.nodes.first() {
+                                if let Some(decl_list_node) = parser.arena.get(decl_list_idx) {
+                                    if let Some(decl_list) = parser.arena.get_variable(decl_list_node) {
+                                        if let Some(&decl_idx) = decl_list.declarations.nodes.first() {
+                                            if let Some(decl_node) = parser.arena.get(decl_idx) {
+                                                if let Some(var_decl) = parser.arena.get_variable_declaration(decl_node) {
+                                                    if let Some(init_node) = parser.arena.get(var_decl.initializer) {
+                                                        if init_node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION {
+                                                            if let Some(obj_lit) = parser.arena.get_literal_expr(init_node) {
+                                                                for &elem_idx in &obj_lit.elements.nodes {
+                                                                    if let Some(elem_node) = parser.arena.get(elem_idx) {
+                                                                        if elem_node.kind == syntax_kind_ext::METHOD_DECLARATION {
+                                                                            if let Some(method_data) = parser.arena.get_method_decl(elem_node) {
+                                                                                let emitter = AsyncES5Emitter::new(&parser.arena);
+                                                                                return emitter.body_contains_await(method_data.body);
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+#[test]
+fn test_async_method_expr_basic() {
+    let output = parse_and_emit_async_method_expr(
+        "const obj = { async fetch() { await getData(); } };",
+    );
+    assert!(
+        output.contains("switch (_a.label)"),
+        "Async method expression should have switch: {}",
+        output
+    );
+    assert!(
+        output.contains("[4 /*yield*/"),
+        "Async method expression should have yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_method_expr_with_return() {
+    let output = parse_and_emit_async_method_expr(
+        "const api = { async get() { return await request(); } };",
+    );
+    assert!(
+        output.contains("return [4 /*yield*/, request()]"),
+        "Method should yield request(): {}",
+        output
+    );
+    assert!(
+        output.contains("return [2 /*return*/, _a.sent()]"),
+        "Method should return _a.sent(): {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_method_expr_no_await() {
+    let output = parse_and_emit_async_method_expr(
+        "const obj = { async simple() { return 42; } };",
+    );
+    assert!(
+        output.contains("[2 /*return*/, 42]"),
+        "Simple async method should return 42: {}",
+        output
+    );
+    assert!(
+        !output.contains("switch"),
+        "No await should skip switch emission: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_method_expr_multiple_awaits() {
+    let output = parse_and_emit_async_method_expr(
+        "const service = { async process() { const a = await first(); const b = await second(); return a + b; } };",
+    );
+    assert!(
+        output.contains("case 1:") && output.contains("case 2:"),
+        "Multiple awaits should have case labels: {}",
+        output
+    );
+    assert!(
+        output.contains("a = _a.sent()"),
+        "Should assign first await: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_method_expr_with_parameters() {
+    let output = parse_and_emit_async_method_expr(
+        "const api = { async post(url, data) { return await fetch(url, data); } };",
+    );
+    assert!(
+        output.contains("return [4 /*yield*/, fetch(url, data)]"),
+        "Method should yield fetch with params: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_method_expr_body_contains_await() {
+    assert!(
+        method_expr_body_contains_await("const obj = { async foo() { await x; } };"),
+        "Should detect await in async method expression"
+    );
+}
+
+#[test]
+fn test_async_method_expr_body_no_await() {
+    assert!(
+        !method_expr_body_contains_await("const obj = { async foo() { return 1; } };"),
+        "Should not detect await when none present"
+    );
+}
+
+#[test]
+fn test_async_method_expr_ignores_nested_async() {
+    assert!(
+        !method_expr_body_contains_await(
+            "const obj = { async foo() { const inner = async () => { await x; }; return 1; } };"
+        ),
+        "Should ignore await in nested async arrow"
+    );
+}
+
+#[test]
+fn test_async_method_expr_shorthand_syntax() {
+    let output = parse_and_emit_async_method_expr(
+        "const handlers = { async onClick() { await handleClick(); } };",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Shorthand async method should have generator: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_method_expr_with_try_catch() {
+    assert!(
+        method_expr_body_contains_await(
+            "const safe = { async call() { try { return await risky(); } catch (e) { return null; } } };"
+        ),
+        "Should detect await in try block"
+    );
+}
+
+#[test]
+fn test_async_method_expr_in_loop() {
+    assert!(
+        method_expr_body_contains_await(
+            "const batch = { async processAll(items) { for (const item of items) { await process(item); } } };"
+        ),
+        "Should detect await in for-of loop"
+    );
+}
+
+#[test]
+fn test_async_method_expr_conditional() {
+    let output = parse_and_emit_async_method_expr(
+        "const cache = { async get(key) { return cached ? cached : await fetch(key); } };",
+    );
+    assert!(
+        output.contains("switch (_a.label)"),
+        "Conditional await should emit switch: {}",
+        output
+    );
+}
