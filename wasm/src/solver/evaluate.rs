@@ -243,6 +243,12 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             // Try to get the type parameters for this symbol
             let type_params = self.resolver.get_type_params(symbol);
             let resolved = self.resolver.resolve_ref(symbol, self.interner);
+            if type_params.is_none() {
+                eprintln!("[DEBUG evaluate_application] Ref({}) has no type_params in env", symbol.0);
+            }
+            if resolved.is_none() {
+                eprintln!("[DEBUG evaluate_application] Ref({}) could not be resolved", symbol.0);
+            }
 
             if let Some(type_params) = type_params {
                 // Resolve the base type to get the body

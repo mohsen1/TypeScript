@@ -5838,8 +5838,11 @@ impl<'a> ThinCheckerState<'a> {
         match key {
             TypeKey::Application(app_id) => {
                 let app = self.ctx.types.type_application(app_id);
+                let base_type = app.base;
+                let args = app.args.clone();
+
                 // Check if base is a Ref and resolve it
-                if let Some(TypeKey::Ref(SymbolRef(sym_id))) = self.ctx.types.lookup(app.base) {
+                if let Some(TypeKey::Ref(SymbolRef(sym_id))) = self.ctx.types.lookup(base_type) {
                     let symbol_id = SymbolId(sym_id);
                     // Check if this symbol is already in type_env
                     let has_params = self.ctx.type_env.borrow().get_params(SymbolRef(sym_id)).is_some();
@@ -5847,9 +5850,19 @@ impl<'a> ThinCheckerState<'a> {
                         // Resolve the symbol to populate type_env
                         let _ = self.get_type_of_symbol(symbol_id);
                     }
+
+                    // Also recursively check the resolved type for nested Applications
+                    let resolved = self.ctx.type_env.borrow().get(SymbolRef(sym_id));
+                    if let Some(resolved_type) = resolved {
+                        let resolved_key = self.ctx.types.lookup(resolved_type);
+                        eprintln!("[DEBUG ensure_app] Resolved Ref({}) to {:?} ({:?})", sym_id, resolved_type, resolved_key);
+                        self.ensure_application_refs_resolved(resolved_type);
+                    } else {
+                        eprintln!("[DEBUG ensure_app] Ref({}) has no resolved type in env", sym_id);
+                    }
                 }
+
                 // Recursively check args
-                let args = app.args.clone();
                 for arg in args {
                     self.ensure_application_refs_resolved(arg);
                 }
@@ -5859,6 +5872,35 @@ impl<'a> ThinCheckerState<'a> {
                 for member in members_list {
                     self.ensure_application_refs_resolved(member);
                 }
+            }
+            TypeKey::Function(fn_id) => {
+                let fn_shape = self.ctx.types.function_shape(fn_id);
+                // Check params
+                for param in &fn_shape.params {
+                    self.ensure_application_refs_resolved(param.type_id);
+                }
+                // Check return type
+                self.ensure_application_refs_resolved(fn_shape.return_type);
+            }
+            TypeKey::Object(obj_id) | TypeKey::ObjectWithIndex(obj_id) => {
+                let obj_shape = self.ctx.types.object_shape(obj_id);
+                // Check property types
+                for prop in &obj_shape.properties {
+                    self.ensure_application_refs_resolved(prop.type_id);
+                    if prop.write_type != prop.type_id {
+                        self.ensure_application_refs_resolved(prop.write_type);
+                    }
+                }
+            }
+            TypeKey::Array(elem_type) | TypeKey::ReadonlyType(elem_type) => {
+                self.ensure_application_refs_resolved(elem_type);
+            }
+            TypeKey::Conditional(cond_id) => {
+                let cond = self.ctx.types.conditional_type(cond_id);
+                self.ensure_application_refs_resolved(cond.check_type);
+                self.ensure_application_refs_resolved(cond.extends_type);
+                self.ensure_application_refs_resolved(cond.true_type);
+                self.ensure_application_refs_resolved(cond.false_type);
             }
             _ => {}
         }
@@ -5969,8 +6011,15 @@ impl<'a> ThinCheckerState<'a> {
     ///
     /// Uses the solver's SubtypeChecker with coinductive cycle detection.
     /// Uses the context's TypeEnvironment for resolving type references and expanding Applications.
-    pub fn is_assignable_to(&self, source: TypeId, target: TypeId) -> bool {
+    pub fn is_assignable_to(&mut self, source: TypeId, target: TypeId) -> bool {
         use crate::solver::CompatChecker;
+
+        // Ensure any cross-file Application refs are resolved (populates type_env)
+        let src_key = self.ctx.types.lookup(source);
+        let tgt_key = self.ctx.types.lookup(target);
+        eprintln!("[DEBUG is_assignable_to] source={:?} ({:?}), target={:?} ({:?})", source, src_key, target, tgt_key);
+        self.ensure_application_refs_resolved(source);
+        self.ensure_application_refs_resolved(target);
 
         let env = self.ctx.type_env.borrow();
         if let Some(result) = self.enum_assignability_override(source, target, Some(&*env)) {
