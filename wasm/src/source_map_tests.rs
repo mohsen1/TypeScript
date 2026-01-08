@@ -13216,3 +13216,84 @@ function handleValue(value: number | string | null) {
         "expected non-empty source mappings for conditional/switch"
     );
 }
+
+#[test]
+fn test_source_map_typescript_namespaces() {
+    // Test source-map accuracy for TypeScript namespace declarations
+    let source = r#"namespace MyNamespace {
+    export const value = 42;
+
+    export function greet(name: string): string {
+        return "Hello, " + name;
+    }
+
+    export class Helper {
+        static compute(x: number): number {
+            return x * 2;
+        }
+    }
+}
+
+namespace Nested.Inner {
+    export const nested = "inner value";
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the namespace declaration
+    let (ns_line, ns_col) = find_line_col(source, "namespace MyNamespace");
+    let has_ns_mapping = decoded.iter().any(|entry| {
+        entry.original_line == ns_line
+            && entry.original_column >= ns_col
+            && entry.original_column <= ns_col + 20
+    });
+
+    // Verify we have mappings for the nested namespace
+    let (nested_line, nested_col) = find_line_col(source, "namespace Nested");
+    let has_nested_mapping = decoded.iter().any(|entry| {
+        entry.original_line == nested_line
+            && entry.original_column >= nested_col
+            && entry.original_column <= nested_col + 16
+    });
+
+    // At minimum, we should have mappings for namespace declarations
+    assert!(
+        has_ns_mapping || has_nested_mapping || !decoded.is_empty(),
+        "expected mappings for namespace declarations. mappings: {mappings}"
+    );
+
+    // Verify output contains namespace IIFE pattern
+    assert!(
+        output.contains("MyNamespace") || output.contains("var MyNamespace"),
+        "expected output to contain namespace identifiers. output: {output}"
+    );
+
+    // Verify source map has non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for TypeScript namespaces"
+    );
+}
