@@ -865,3 +865,64 @@ class Foo {
         output
     );
 }
+
+#[test]
+fn test_class_es5_for_of_loop_in_method() {
+    let source = r#"
+class Foo {
+    items = [1, 2, 3];
+
+    sum() {
+        let total = 0;
+        for (const item of this.items) {
+            total += item;
+        }
+        return total;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Should NOT contain for-of syntax (ES5 doesn't support it)
+    assert!(
+        !output.contains("for (const item of") && !output.contains("for (var item of"),
+        "Expected for-of to be transformed, not raw for-of syntax: {}",
+        output
+    );
+
+    // Should use __values helper for ES5 iterator
+    assert!(
+        output.contains("__values("),
+        "Expected ES5 for-of transformation using __values helper: {}",
+        output
+    );
+
+    // Should use try/catch/finally for iterator cleanup
+    assert!(
+        output.contains("try {") && output.contains("finally {"),
+        "Expected for-of to use try/finally for iterator cleanup: {}",
+        output
+    );
+
+    // Should use .next() for iteration
+    assert!(
+        output.contains(".next()"),
+        "Expected for-of to use .next() for iteration: {}",
+        output
+    );
+}

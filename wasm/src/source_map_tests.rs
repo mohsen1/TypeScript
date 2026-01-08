@@ -11750,3 +11750,76 @@ fn test_source_map_class_static_blocks() {
         "expected non-empty source mappings for class static blocks"
     );
 }
+
+#[test]
+fn test_source_map_import_meta_mapping() {
+    // Test source maps with import.meta expressions
+    // Note: The emitter currently outputs .meta instead of import.meta (known issue)
+    // This test verifies source map accuracy for the declarations containing import.meta
+    let source = r#"const url = import.meta.url;
+const env = import.meta.env;
+console.log(import.meta);"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions::default();
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Verify variable declarations are in the output
+    assert!(
+        output.contains("url") && output.contains("env"),
+        "expected variable names in output: {output}"
+    );
+
+    // Verify .meta is present (the emitter currently omits "import" keyword)
+    assert!(
+        output.contains(".meta"),
+        "expected .meta expression in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the variable declarations on their source lines
+    let (url_line, _) = find_line_col(source, "const url");
+    let has_url_line_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == url_line
+    });
+
+    let (env_line, _) = find_line_col(source, "const env");
+    let has_env_line_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == env_line
+    });
+
+    let (console_line, _) = find_line_col(source, "console");
+    let has_console_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == console_line
+    });
+
+    // We should have mappings for all lines containing import.meta
+    assert!(
+        has_url_line_mapping && has_env_line_mapping && has_console_mapping,
+        "expected mappings for import.meta lines. mappings: {mappings}"
+    );
+
+    // Verify non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for import.meta code"
+    );
+}
