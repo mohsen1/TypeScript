@@ -13,6 +13,7 @@ Priority: 2
 - [ ] [EM: Add queued tasks]
 
 ## Completed
+- [x] Added parity test for type-only import erasure in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (36 tests).
 - [x] Added parity test for string enum ES5 downlevel in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (35 tests).
 - [x] Added parity test for enum ES5 downlevel in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (34 tests).
 - [x] Added parity test for namespace ES5 downlevel in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (33 tests).
