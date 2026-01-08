@@ -28,6 +28,7 @@ use crate::solver::{
 };
 use crate::solver::diagnostics::PendingDiagnostic;
 use crate::solver::infer::InferenceContext;
+use crate::solver::evaluate::evaluate_type;
 use crate::solver::instantiate::{TypeSubstitution, instantiate_type};
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -1694,6 +1695,21 @@ impl<'a> PropertyAccessEvaluator<'a> {
             TypeKey::Tuple(_) => {
                 let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
                 self.resolve_array_property(obj_type, prop_name, prop_atom)
+            }
+
+            // Application: evaluate the generic type and resolve property on the result
+            TypeKey::Application(_) => {
+                let evaluated = evaluate_type(self.interner, obj_type);
+                if evaluated != obj_type {
+                    // Successfully evaluated - resolve property on the concrete type
+                    self.resolve_property_access_inner(evaluated, prop_name, prop_atom)
+                } else {
+                    // Evaluation didn't change the type - property not found
+                    PropertyAccessResult::PropertyNotFound {
+                        type_id: obj_type,
+                        property_name: prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name)),
+                    }
+                }
             }
 
             _ => PropertyAccessResult::PropertyNotFound {
