@@ -29,7 +29,7 @@ WORKER_POKE="${WORKER_POKE:-You are not blocked. Do not ask questions. Stash dir
 
 # Startup timing (codex boots in ~5s)
 WORKER_START_PROMPT="${WORKER_START_PROMPT:-You are worker \$WORKER_NUM in squad \$SQUAD_NAME. Read AGENTS.md then your plan at wasm/specs/squads/\$SQUAD_NAME/worker-\${WORKER_NUM}_plan.md. Do NOT ask questions. Stash dirty files, switch to branch worker/\$SQUAD_NAME-\$WORKER_NUM, write code, commit, push. Go.}"
-EM_START_PROMPT="${EM_START_PROMPT:-Read SQUAD_LEAD_AGENT.md. Check worker panes for idle workers. Ensure workers are committing code, not just exploring.}"
+EM_START_PROMPT="${EM_START_PROMPT:-You are an Engineering Manager. Do NOT read AGENTS.md (that is for workers). Read SQUAD_LEAD_AGENT.md for your instructions. Your job: manage workers via tmux, merge branches, update plans. Do NOT write code.}"
 DIRECTOR_START_PROMPT="${DIRECTOR_START_PROMPT:-Read DIRECTOR_AGENT.md. Be hands-off. Only intervene if EMs need help.}"
 START_PAUSE="${START_PAUSE:-10}"
 SEND_ENTER_PAUSE="${SEND_ENTER_PAUSE:-1}"
