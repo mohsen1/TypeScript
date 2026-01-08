@@ -20,12 +20,14 @@ Your branch is: `worker/$SQUAD_NAME-$WORKER_NUM` (e.g., `worker/forge-1`)
 
 ## Squad Structure
 
-| Squad | Focus Areas |
-|-------|-------------|
+| Squad | Primary Focus |
+|-------|---------------|
 | **Forge** | Type system: `solver/`, `checker/`, `binder/`, `types/` |
 | **Anvil** | Output: `thin_emitter/`, `transforms/`, `cli/`, `lsp/` |
 
 Each squad has 1 EM (Engineering Manager) + 5 Workers.
+
+**Cross-squad work is OK.** Compiler work often requires touching multiple subsystems. If fixing a bug or implementing a feature requires changes outside your squad's primary focus, go ahead and make them. The squad structure is for organizing work, not restricting it.
 
 ## Worker Plans
 
