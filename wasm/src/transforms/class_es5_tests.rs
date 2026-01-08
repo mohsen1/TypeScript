@@ -552,3 +552,53 @@ class Derived extends Base {
         output
     );
 }
+
+#[test]
+fn test_class_es5_derived_constructor_orders_private_and_props() {
+    let source = r#"
+class Base {}
+class Derived extends Base {
+    #count = this.value;
+    y = 1;
+    constructor() {
+        super();
+        post();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected derived class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    let private_pos = output
+        .find("__classPrivateFieldSet(_this, _Derived_count, _this.value")
+        .expect("expected private field initializer");
+    let prop_pos = output
+        .find("_this.y = 1")
+        .expect("expected instance property initializer");
+    let post_pos = output.find("post()").expect("expected post() call");
+
+    assert!(
+        private_pos < prop_pos,
+        "Expected private field init before instance prop: {}",
+        output
+    );
+    assert!(
+        prop_pos < post_pos,
+        "Expected post() after instance prop: {}",
+        output
+    );
+}
