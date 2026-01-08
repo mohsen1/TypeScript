@@ -15,7 +15,25 @@ import type {
   PokeMessages,
   StartupPrompts,
   TimingConfig,
+  SquadConfig,
+  MutablePartial,
 } from '../types.js';
+
+/**
+ * Default squad configuration - two squads with 5 workers each
+ */
+const DEFAULT_SQUADS: readonly SquadConfig[] = [
+  {
+    name: 'forge',
+    workerCount: 5,
+    focusAreas: ['solver/', 'checker/', 'binder/', 'types/'],
+  },
+  {
+    name: 'anvil',
+    workerCount: 5,
+    focusAreas: ['thin_emitter/', 'transforms/', 'cli/', 'lsp/'],
+  },
+];
 
 export interface ConfigInput {
   agentType?: AgentType;
@@ -23,7 +41,8 @@ export interface ConfigInput {
   worktreeBase?: string;
   stateFile?: string;
   session?: string;
-  overrides?: Partial<OrchestratorConfig>;
+  squads?: SquadConfig[];
+  overrides?: MutablePartial<OrchestratorConfig>;
 }
 
 const DEFAULT_SESSION = 'zang-org';
@@ -145,6 +164,8 @@ export function createConfig(input: ConfigInput = {}): OrchestratorConfig {
   const stateFile = input.stateFile ?? join(homedir(), '.zang-org-state.json');
   const session = input.session ?? DEFAULT_SESSION;
 
+  const squads = input.squads ?? [...DEFAULT_SQUADS];
+
   const baseConfig: OrchestratorConfig = {
     session,
     agentType,
@@ -162,6 +183,7 @@ export function createConfig(input: ConfigInput = {}): OrchestratorConfig {
     rootDir,
     worktreeBase,
     stateFile,
+    squads,
   };
 
   // Apply overrides
@@ -177,7 +199,7 @@ export function createConfig(input: ConfigInput = {}): OrchestratorConfig {
  */
 function mergeConfig(
   base: OrchestratorConfig,
-  overrides: Partial<OrchestratorConfig>
+  overrides: MutablePartial<OrchestratorConfig>
 ): OrchestratorConfig {
   return {
     ...base,
@@ -198,16 +220,18 @@ function mergeConfig(
       ...base.timing,
       ...overrides.timing,
     },
+    // Squads are replaced entirely if provided in overrides (filter out undefined)
+    squads: (overrides.squads?.filter((s): s is SquadConfig => s !== undefined) ?? base.squads) as readonly SquadConfig[],
   };
 }
 
 /**
  * Read configuration from environment variables
  */
-export function configFromEnv(): Partial<OrchestratorConfig> {
+export function configFromEnv(): MutablePartial<OrchestratorConfig> {
   const env = process.env;
 
-  const partial: Partial<OrchestratorConfig> = {};
+  const partial: MutablePartial<OrchestratorConfig> = {};
 
   if (env['SESSION']) partial.session = env['SESSION'];
   if (env['AUTO_FETCH'] === '0') partial.autoFetch = false;
@@ -216,7 +240,7 @@ export function configFromEnv(): Partial<OrchestratorConfig> {
   if (env['AUTO_ATTACH'] === '0') partial.autoAttach = false;
   if (env['AGENT_AUTO_UPDATE'] === '0') partial.agentAutoUpdate = false;
 
-  const idleThresholds: Partial<IdleThresholds> = {};
+  const idleThresholds: MutablePartial<IdleThresholds> = {};
   if (env['DIRECTOR_IDLE_SECONDS']) {
     idleThresholds.director = parseInt(env['DIRECTOR_IDLE_SECONDS'], 10);
   }
@@ -230,7 +254,7 @@ export function configFromEnv(): Partial<OrchestratorConfig> {
     partial.idleThresholds = idleThresholds as IdleThresholds;
   }
 
-  const pokeMessages: Partial<PokeMessages> = {};
+  const pokeMessages: MutablePartial<PokeMessages> = {};
   if (env['DIRECTOR_POKE']) pokeMessages.director = env['DIRECTOR_POKE'];
   if (env['EM_POKE']) pokeMessages.em = env['EM_POKE'];
   if (env['WORKER_POKE']) pokeMessages.worker = env['WORKER_POKE'];
@@ -238,7 +262,7 @@ export function configFromEnv(): Partial<OrchestratorConfig> {
     partial.pokeMessages = pokeMessages as PokeMessages;
   }
 
-  const timing: Partial<TimingConfig> = {};
+  const timing: MutablePartial<TimingConfig> = {};
   if (env['START_PAUSE']) timing.startPause = parseInt(env['START_PAUSE'], 10);
   if (env['SEND_ENTER_PAUSE']) {
     timing.sendEnterPause = parseInt(env['SEND_ENTER_PAUSE'], 10);
