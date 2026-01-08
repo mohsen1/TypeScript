@@ -46,6 +46,7 @@ impl<'a> ThinPrinter<'a> {
                 self.write(";");
             }
         }
+        self.write_line();
     }
 
     pub(super) fn emit_commonjs_default_export_expr(&mut self, node: &ThinNode, idx: NodeIndex) {

@@ -110,6 +110,7 @@ pub struct AsyncES5Emitter<'a> {
     column: u32,
     state: AsyncTransformState,
     this_capture_depth: u32,
+    use_this_capture: bool,
 }
 
 impl<'a> AsyncES5Emitter<'a> {
@@ -125,6 +126,7 @@ impl<'a> AsyncES5Emitter<'a> {
             column: 0,
             state: AsyncTransformState::new(),
             this_capture_depth: 0,
+            use_this_capture: false,
         }
     }
 
@@ -135,6 +137,10 @@ impl<'a> AsyncES5Emitter<'a> {
     pub fn set_source_map_context(&mut self, source_text: &'a str, source_index: u32) {
         self.source_text = Some(source_text);
         self.source_index = source_index;
+    }
+
+    pub fn set_use_this_capture(&mut self, use_this_capture: bool) {
+        self.use_this_capture = use_this_capture;
     }
 
     pub fn take_mappings(&mut self) -> Vec<Mapping> {
@@ -162,6 +168,14 @@ impl<'a> AsyncES5Emitter<'a> {
             original_column: source_pos.column,
             name_index: None,
         });
+    }
+
+    fn this_expr(&self) -> &'static str {
+        if self.this_capture_depth > 0 || self.use_this_capture {
+            "_this"
+        } else {
+            "this"
+        }
     }
 
     /// Check if a function body contains any await expressions
@@ -362,6 +376,9 @@ impl<'a> AsyncES5Emitter<'a> {
                 // For non-trivial blocks, emit newlines
                 self.write_line();
                 self.increase_indent();
+                for &stmt_idx in &block.statements.nodes {
+                    self.emit_async_statement(stmt_idx);
+                }
                 self.write_indent();
                 self.write("return [2 /*return*/];");
                 self.write_line();
@@ -706,11 +723,7 @@ impl<'a> AsyncES5Emitter<'a> {
             }
             k if k == SyntaxKind::ThisKeyword as u16 => {
                 self.record_mapping(node);
-                if self.this_capture_depth > 0 {
-                    self.write("_this");
-                } else {
-                    self.write("this");
-                }
+                self.write(self.this_expr());
             }
             k if k == syntax_kind_ext::CALL_EXPRESSION => {
                 if let Some(call) = self.arena.get_call_expr(node) {
@@ -723,18 +736,6 @@ impl<'a> AsyncES5Emitter<'a> {
                         self.write("(");
                         if let Some(args) = &call.arguments {
                             let mut first = true;
-                            for &arg_idx in &args.nodes {
-                                if !first {
-                                    self.write(", ");
-                                }
-                                first = false;
-                                self.emit_expression(arg_idx);
-                            }
-                        }
-                        self.write(")");
-                    }
-                }
-            }
                             for &arg_idx in &args.nodes {
                                 if !first {
                                     self.write(", ");
@@ -984,11 +985,7 @@ impl<'a> AsyncES5Emitter<'a> {
         self.write("_super.prototype.");
         self.emit_expression(access.name_or_argument);
         self.write(".call(");
-        if self.this_capture_depth > 0 {
-            self.write("_this");
-        } else {
-            self.write("this");
-        }
+        self.write(self.this_expr());
 
         if let Some(arg_list) = args {
             for &arg_idx in &arg_list.nodes {
@@ -998,7 +995,6 @@ impl<'a> AsyncES5Emitter<'a> {
         }
         self.write(")");
     }
-
     fn emit_super_element_call(&mut self, callee_idx: NodeIndex, args: &Option<NodeList>) {
         let Some(callee_node) = self.arena.get(callee_idx) else {
             return;
@@ -1010,11 +1006,7 @@ impl<'a> AsyncES5Emitter<'a> {
         self.write("_super.prototype[");
         self.emit_expression(access.name_or_argument);
         self.write("].call(");
-        if self.this_capture_depth > 0 {
-            self.write("_this");
-        } else {
-            self.write("this");
-        }
+        self.write(self.this_expr());
 
         if let Some(arg_list) = args {
             for &arg_idx in &arg_list.nodes {
@@ -1035,11 +1027,7 @@ impl<'a> AsyncES5Emitter<'a> {
         };
 
         let captures_this = contains_this_reference(self.arena, arrow_idx);
-        let parent_this_expr = if self.this_capture_depth > 0 {
-            "_this"
-        } else {
-            "this"
-        };
+        let parent_this_expr = self.this_expr();
 
         if captures_this {
             self.write("(function (_this) { return ");

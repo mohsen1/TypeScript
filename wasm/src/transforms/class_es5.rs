@@ -87,6 +87,8 @@ pub struct ClassES5Emitter<'a> {
     use_this_capture: bool,
     /// Whether a `_this` capture is available in the current scope
     this_capture_available: bool,
+    /// Whether to suppress arrow-function this capture (static fields).
+    suppress_this_capture: bool,
     /// Counter for temporary variables (_a, _b, _c, etc.)
     temp_var_counter: u32,
     /// Private fields for the current class
@@ -108,6 +110,7 @@ impl<'a> ClassES5Emitter<'a> {
             column: 0,
             use_this_capture: false,
             this_capture_available: false,
+            suppress_this_capture: false,
             temp_var_counter: 0,
             private_fields: Vec::new(),
             class_name: String::new(),
@@ -1255,7 +1258,10 @@ impl<'a> ClassES5Emitter<'a> {
                 self.write(".");
                 self.write_identifier_text(prop_data.name);
                 self.write(" = ");
+                let prev_suppress = self.suppress_this_capture;
+                self.suppress_this_capture = true;
                 self.emit_expression(prop_data.initializer);
+                self.suppress_this_capture = prev_suppress;
                 self.write(";");
                 self.write_line();
             }
@@ -1425,6 +1431,7 @@ impl<'a> ClassES5Emitter<'a> {
 
         let mut async_emitter = AsyncES5Emitter::new(self.arena);
         async_emitter.set_indent_level(self.indent_level + 1);
+        async_emitter.set_use_this_capture(this_expr != "this");
 
         let generator_body = if async_emitter.body_contains_await(func.body) {
             async_emitter.emit_generator_body_with_await(func.body)
@@ -2950,7 +2957,8 @@ impl<'a> ClassES5Emitter<'a> {
             k if k == syntax_kind_ext::ARROW_FUNCTION => {
                 // Transform arrow to function expression
                 if let Some(func) = self.arena.get_function(expr_node) {
-                    let captures_this = contains_this_reference(self.arena, expr_idx);
+                    let captures_this = !self.suppress_this_capture
+                        && contains_this_reference(self.arena, expr_idx);
                     let has_outer_capture = self.use_this_capture || self.this_capture_available;
                     let use_iife = captures_this && !has_outer_capture;
                     let prev_capture = self.use_this_capture;
