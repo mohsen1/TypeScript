@@ -8,12 +8,14 @@ Priority: 1
 Blocked: Awaiting next EM-Anvil assignment.
 
 ## Current Assignment
-- [ ] Add ES5 class tests for async static field initializers with complex expressions in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
+- [ ] Add ES5 class tests for generator methods with decorators in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added additional ES5 coverage tests (6 tests): multiple private fields, mixed static/instance async, property initializers with method calls, labeled statements, new.target meta property, fluent method (this type). Ran `./wasm/test.sh class_es5_tests` (all 75 pass).
+- [x] Added async static field initializer ES5 tests (8 tests): await chain, conditional, try/catch, Promise.all, loop/await, object destructuring, nested async calls, switch/case. Ran `./wasm/test.sh class_es5_tests` (all 69 pass). Also fixed duplicate test names in source_map_tests.rs from merge.
 - [x] Fixed private field access in async methods (was emitting `this.void 0` instead of `__classPrivateFieldGet`); added `class_name` tracking to AsyncES5Emitter; added 2 tests. Ran `./wasm/test.sh emitter_transform_integration_tests` (all 124 pass).
 - [x] Added static async arrow field tests (3 tests for static field with async arrow: basic, integration, nested arrow). Verified correct __awaiter usage and this preservation. Ran `./wasm/test.sh emitter_transform_integration_tests` (all 123 pass).
 - [x] Fixed ES5 computed property field initializers (previously silently skipped `[key] = value` in all constructor paths); added `emit_property_receiver_and_name` helper; added 3 regression tests; ran `./wasm/test.sh class_es5_tests` (all 13 pass). Pre-existing failures: `parallel::tests::test_check_redux_lodash_style_generics` (Forge domain).
@@ -62,6 +64,14 @@ Blocked: Awaiting next EM-Anvil assignment.
 - [x] Added generator method ES5 test; verifies generator methods are placed on prototype. Ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Added try/catch/finally ES5 test; verifies error handling blocks are preserved in class methods. Ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Added switch/case ES5 test; verifies switch statements with case/default clauses are preserved. Ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
+- [x] Added while/do-while loops ES5 test; verifies while and do-while loops are preserved in class methods. Ran `./wasm/test.sh class_es5_tests` (all 54 pass).
+- [x] Added ternary expression ES5 test; verifies conditional expressions with nested ternary operators are preserved. Ran `./wasm/test.sh class_es5_tests` (all 54 pass).
+- [x] Added for-in loop ES5 test; verifies for-in loops over object properties are preserved. Ran `./wasm/test.sh class_es5_tests` (all 57 pass).
+- [x] Added typeof/instanceof ES5 test; verifies typeof and instanceof operators are preserved. Ran `./wasm/test.sh class_es5_tests` (all 57 pass).
+- [x] Added logical operators ES5 test; verifies &&, ||, ! operators are preserved in class methods. Ran `./wasm/test.sh class_es5_tests` (all 57 pass).
+- [x] Added bitwise operators ES5 test; verifies &, |, ^, ~, <<, >> operators are preserved. Ran `./wasm/test.sh class_es5_tests` (all 60 pass).
+- [x] Added assignment operators ES5 test; verifies +=, -=, *= compound assignment operators. Ran `./wasm/test.sh class_es5_tests` (all 60 pass).
+- [x] Added prefix/postfix operators ES5 test; verifies ++x, x++, --x, x-- increment/decrement. Ran `./wasm/test.sh class_es5_tests` (all 60 pass).
 
 ## Ready for Merge
 Yes
