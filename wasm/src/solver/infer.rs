@@ -285,6 +285,202 @@ impl<'a> InferenceContext<'a> {
         false
     }
 
+    fn type_param_names_for_root(&mut self, root: InferenceVar) -> Vec<Atom> {
+        self.type_params
+            .iter()
+            .filter_map(|(name, var)| {
+                if self.table.find(*var) == root {
+                    Some(*name)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    fn upper_bound_cycles_param(&mut self, bound: TypeId, targets: &[Atom]) -> bool {
+        let mut params = FxHashSet::default();
+        let mut visited = FxHashSet::default();
+        self.collect_type_params(bound, &mut params, &mut visited);
+
+        for name in params {
+            let mut seen = FxHashSet::default();
+            if self.param_depends_on_targets(name, targets, &mut seen) {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    fn collect_type_params(
+        &self,
+        ty: TypeId,
+        params: &mut FxHashSet<Atom>,
+        visited: &mut FxHashSet<TypeId>,
+    ) {
+        if !visited.insert(ty) {
+            return;
+        }
+        let Some(key) = self.interner.lookup(ty) else {
+            return;
+        };
+
+        match key {
+            TypeKey::TypeParameter(info) | TypeKey::Infer(info) => {
+                params.insert(info.name);
+            }
+            TypeKey::Array(elem) => {
+                self.collect_type_params(elem, params, visited);
+            }
+            TypeKey::Tuple(elements) => {
+                let elements = self.interner.tuple_list(elements);
+                for element in elements.iter() {
+                    self.collect_type_params(element.type_id, params, visited);
+                }
+            }
+            TypeKey::Union(members) | TypeKey::Intersection(members) => {
+                let members = self.interner.type_list(members);
+                for &member in members.iter() {
+                    self.collect_type_params(member, params, visited);
+                }
+            }
+            TypeKey::Object(shape_id) => {
+                let shape = self.interner.object_shape(shape_id);
+                for prop in shape.properties.iter() {
+                    self.collect_type_params(prop.type_id, params, visited);
+                }
+            }
+            TypeKey::ObjectWithIndex(shape_id) => {
+                let shape = self.interner.object_shape(shape_id);
+                for prop in shape.properties.iter() {
+                    self.collect_type_params(prop.type_id, params, visited);
+                }
+                if let Some(index) = shape.string_index.as_ref() {
+                    self.collect_type_params(index.key_type, params, visited);
+                    self.collect_type_params(index.value_type, params, visited);
+                }
+                if let Some(index) = shape.number_index.as_ref() {
+                    self.collect_type_params(index.key_type, params, visited);
+                    self.collect_type_params(index.value_type, params, visited);
+                }
+            }
+            TypeKey::Application(app_id) => {
+                let app = self.interner.type_application(app_id);
+                self.collect_type_params(app.base, params, visited);
+                for &arg in app.args.iter() {
+                    self.collect_type_params(arg, params, visited);
+                }
+            }
+            TypeKey::Function(shape_id) => {
+                let shape = self.interner.function_shape(shape_id);
+                for param in shape.params.iter() {
+                    self.collect_type_params(param.type_id, params, visited);
+                }
+                if let Some(this_type) = shape.this_type {
+                    self.collect_type_params(this_type, params, visited);
+                }
+                self.collect_type_params(shape.return_type, params, visited);
+            }
+            TypeKey::Callable(shape_id) => {
+                let shape = self.interner.callable_shape(shape_id);
+                for sig in shape.call_signatures.iter() {
+                    for param in sig.params.iter() {
+                        self.collect_type_params(param.type_id, params, visited);
+                    }
+                    if let Some(this_type) = sig.this_type {
+                        self.collect_type_params(this_type, params, visited);
+                    }
+                    self.collect_type_params(sig.return_type, params, visited);
+                }
+                for sig in shape.construct_signatures.iter() {
+                    for param in sig.params.iter() {
+                        self.collect_type_params(param.type_id, params, visited);
+                    }
+                    if let Some(this_type) = sig.this_type {
+                        self.collect_type_params(this_type, params, visited);
+                    }
+                    self.collect_type_params(sig.return_type, params, visited);
+                }
+                for prop in shape.properties.iter() {
+                    self.collect_type_params(prop.type_id, params, visited);
+                }
+            }
+            TypeKey::Conditional(cond_id) => {
+                let cond = self.interner.conditional_type(cond_id);
+                self.collect_type_params(cond.check_type, params, visited);
+                self.collect_type_params(cond.extends_type, params, visited);
+                self.collect_type_params(cond.true_type, params, visited);
+                self.collect_type_params(cond.false_type, params, visited);
+            }
+            TypeKey::Mapped(mapped_id) => {
+                let mapped = self.interner.mapped_type(mapped_id);
+                self.collect_type_params(mapped.constraint, params, visited);
+                if let Some(name_type) = mapped.name_type {
+                    self.collect_type_params(name_type, params, visited);
+                }
+                self.collect_type_params(mapped.template, params, visited);
+            }
+            TypeKey::IndexAccess(obj, idx) => {
+                self.collect_type_params(obj, params, visited);
+                self.collect_type_params(idx, params, visited);
+            }
+            TypeKey::KeyOf(operand) | TypeKey::ReadonlyType(operand) => {
+                self.collect_type_params(operand, params, visited);
+            }
+            TypeKey::TemplateLiteral(spans) => {
+                let spans = self.interner.template_list(spans);
+                for span in spans.iter() {
+                    if let TemplateSpan::Type(inner) = span {
+                        self.collect_type_params(*inner, params, visited);
+                    }
+                }
+            }
+            TypeKey::Intrinsic(_)
+            | TypeKey::Literal(_)
+            | TypeKey::Ref(_)
+            | TypeKey::TypeQuery(_)
+            | TypeKey::UniqueSymbol(_)
+            | TypeKey::ThisType
+            | TypeKey::Error => {}
+        }
+    }
+
+    fn param_depends_on_targets(
+        &mut self,
+        name: Atom,
+        targets: &[Atom],
+        visited: &mut FxHashSet<Atom>,
+    ) -> bool {
+        if targets.iter().any(|target| *target == name) {
+            return true;
+        }
+        if !visited.insert(name) {
+            return false;
+        }
+        let Some(var) = self.find_type_param(name) else {
+            return false;
+        };
+        let root = self.table.find(var);
+        let upper_bounds = self.constraints[root.0 as usize].upper_bounds.clone();
+
+        for bound in upper_bounds {
+            for target in targets {
+                let mut seen = FxHashSet::default();
+                if self.type_contains_param(bound, *target, &mut seen) {
+                    return true;
+                }
+            }
+            if let Some(TypeKey::TypeParameter(info)) = self.interner.lookup(bound) {
+                if self.param_depends_on_targets(info.name, targets, visited) {
+                    return true;
+                }
+            }
+        }
+
+        false
+    }
+
     fn type_contains_param(&self, ty: TypeId, target: Atom, visited: &mut FxHashSet<TypeId>) -> bool {
         if !visited.insert(ty) {
             return false;
@@ -551,17 +747,31 @@ impl<'a> InferenceContext<'a> {
     fn compute_constraint_result(&mut self, var: InferenceVar) -> (InferenceVar, TypeId, Vec<TypeId>) {
         let root = self.table.find(var);
         let constraints = self.constraints[root.0 as usize].clone();
-        let upper_bounds = constraints.upper_bounds.clone();
+        let target_names = self.type_param_names_for_root(root);
+        let mut upper_bounds = Vec::new();
+        for bound in constraints.upper_bounds {
+            if !self.occurs_in(root, bound) {
+                if !target_names.is_empty() && self.upper_bound_cycles_param(bound, &target_names) {
+                    continue;
+                }
+                upper_bounds.push(bound);
+            }
+        }
+        let mut lower_bounds = constraints.lower_bounds;
 
-        let result = if !constraints.lower_bounds.is_empty() {
+        if !upper_bounds.is_empty() {
+            lower_bounds.retain(|ty| !matches!(*ty, TypeId::ANY | TypeId::UNKNOWN | TypeId::ERROR));
+        }
+
+        let result = if !lower_bounds.is_empty() {
             // Best common type: union of all lower bounds
-            self.best_common_type(&constraints.lower_bounds)
-        } else if !constraints.upper_bounds.is_empty() {
+            self.best_common_type(&lower_bounds)
+        } else if !upper_bounds.is_empty() {
             // No lower bounds, use intersection of upper bounds
-            if constraints.upper_bounds.len() == 1 {
-                constraints.upper_bounds[0]
+            if upper_bounds.len() == 1 {
+                upper_bounds[0]
             } else {
-                self.interner.intersection(constraints.upper_bounds)
+                self.interner.intersection(upper_bounds.clone())
             }
         } else {
             // No constraints at all - return unknown

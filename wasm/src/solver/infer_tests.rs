@@ -184,6 +184,23 @@ fn test_constraint_merge_on_unify() {
 // =============================================================================
 
 #[test]
+fn test_resolve_unified_vars_merged_constraints() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var_a = ctx.fresh_var();
+    let var_b = ctx.fresh_var();
+    let hello = interner.literal_string("hello");
+
+    ctx.add_lower_bound(var_a, hello);
+    ctx.add_upper_bound(var_b, TypeId::STRING);
+    ctx.unify_vars(var_a, var_b).unwrap();
+
+    let result = ctx.resolve_with_constraints(var_a).unwrap();
+    assert_eq!(result, hello);
+}
+
+#[test]
 fn test_resolve_single_lower_bound() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);
@@ -221,6 +238,22 @@ fn test_resolve_multiple_lower_bounds_union() {
 }
 
 #[test]
+fn test_resolve_lower_bounds_ignores_never() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var = ctx.fresh_type_param(t_name);
+    let hello = interner.literal_string("hello");
+
+    ctx.add_lower_bound(var, TypeId::NEVER);
+    ctx.add_lower_bound(var, hello);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, hello);
+}
+
+#[test]
 fn test_resolve_upper_bound_only() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);
@@ -233,6 +266,289 @@ fn test_resolve_upper_bound_only() {
     // No lower bounds - should default to upper bound
     let result = ctx.resolve_with_constraints(var).unwrap();
     assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_resolve_any_lower_prefers_upper_bound() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+
+    ctx.add_lower_bound(var, TypeId::ANY);
+    ctx.add_upper_bound(var, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_resolve_unknown_lower_prefers_upper_bound() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+
+    ctx.add_lower_bound(var, TypeId::UNKNOWN);
+    ctx.add_upper_bound(var, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_resolve_error_lower_prefers_upper_bound() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+
+    ctx.add_lower_bound(var, TypeId::ERROR);
+    ctx.add_upper_bound(var, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_resolve_error_lower_with_literal_prefers_literal() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let hello = interner.literal_string("hello");
+
+    ctx.add_lower_bound(var, TypeId::ERROR);
+    ctx.add_lower_bound(var, hello);
+    ctx.add_upper_bound(var, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, hello);
+}
+
+#[test]
+fn test_resolve_contextual_ignores_any_lower_with_literal() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let hello = interner.literal_string("hello");
+
+    ctx.add_lower_bound(var, TypeId::ANY);
+    ctx.add_lower_bound(var, hello);
+    ctx.add_upper_bound(var, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, hello);
+}
+
+#[test]
+fn test_resolve_circular_upper_bound_defaults_unknown() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var = ctx.fresh_type_param(t_name);
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let name_next = interner.intern_string("next");
+    let upper = interner.object(vec![PropertyInfo {
+        name: name_next,
+        type_id: t_type,
+        write_type: t_type,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    ctx.add_upper_bound(var, upper);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, TypeId::UNKNOWN);
+}
+
+#[test]
+fn test_resolve_self_upper_bound_with_concrete() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var = ctx.fresh_type_param(t_name);
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    ctx.add_upper_bound(var, t_type);
+    ctx.add_upper_bound(var, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_resolve_mutual_circular_upper_bounds_unknown() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let u_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: u_name,
+        constraint: None,
+        default: None,
+    }));
+
+    ctx.add_upper_bound(var_t, u_type);
+    ctx.add_upper_bound(var_u, t_type);
+
+    let result_t = ctx.resolve_with_constraints(var_t).unwrap();
+    let result_u = ctx.resolve_with_constraints(var_u).unwrap();
+
+    assert_eq!(result_t, TypeId::UNKNOWN);
+    assert_eq!(result_u, TypeId::UNKNOWN);
+}
+
+#[test]
+fn test_resolve_mutual_circular_upper_bounds_with_concrete() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let u_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: u_name,
+        constraint: None,
+        default: None,
+    }));
+
+    ctx.add_upper_bound(var_t, u_type);
+    ctx.add_upper_bound(var_u, t_type);
+    ctx.add_upper_bound(var_t, TypeId::STRING);
+
+    let result_t = ctx.resolve_with_constraints(var_t).unwrap();
+    let result_u = ctx.resolve_with_constraints(var_u).unwrap();
+
+    assert_eq!(result_t, TypeId::STRING);
+    assert_eq!(result_u, TypeId::UNKNOWN);
+}
+
+#[test]
+fn test_resolve_self_recursive_object_bounds_two_params_unknown() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let u_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: u_name,
+        constraint: None,
+        default: None,
+    }));
+    let name_next = interner.intern_string("next");
+
+    let upper_t = interner.object(vec![PropertyInfo {
+        name: name_next,
+        type_id: t_type,
+        write_type: t_type,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let upper_u = interner.object(vec![PropertyInfo {
+        name: name_next,
+        type_id: u_type,
+        write_type: u_type,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    ctx.add_upper_bound(var_t, upper_t);
+    ctx.add_upper_bound(var_u, upper_u);
+
+    let result_t = ctx.resolve_with_constraints(var_t).unwrap();
+    let result_u = ctx.resolve_with_constraints(var_u).unwrap();
+
+    assert_eq!(result_t, TypeId::UNKNOWN);
+    assert_eq!(result_u, TypeId::UNKNOWN);
+}
+
+#[test]
+fn test_resolve_mutual_recursive_object_bounds_unknown() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let u_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: u_name,
+        constraint: None,
+        default: None,
+    }));
+    let name_next = interner.intern_string("next");
+
+    let upper_t = interner.object(vec![PropertyInfo {
+        name: name_next,
+        type_id: u_type,
+        write_type: u_type,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let upper_u = interner.object(vec![PropertyInfo {
+        name: name_next,
+        type_id: t_type,
+        write_type: t_type,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    ctx.add_upper_bound(var_t, upper_t);
+    ctx.add_upper_bound(var_u, upper_u);
+
+    let result_t = ctx.resolve_with_constraints(var_t).unwrap();
+    let result_u = ctx.resolve_with_constraints(var_u).unwrap();
+
+    assert_eq!(result_t, TypeId::UNKNOWN);
+    assert_eq!(result_u, TypeId::UNKNOWN);
 }
 
 #[test]
@@ -350,6 +666,28 @@ fn test_resolve_bounds_object_subtype() {
 }
 
 #[test]
+fn test_resolve_bounds_union_lower_vs_string_upper() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let lower = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    ctx.add_lower_bound(var, lower);
+    ctx.add_upper_bound(var, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var);
+    assert!(matches!(
+        result,
+        Err(InferenceError::BoundsViolation {
+            lower: actual_lower,
+            upper: actual_upper,
+            ..
+        }) if actual_lower == lower && actual_upper == TypeId::STRING
+    ));
+}
+
+#[test]
 fn test_resolve_bounds_object_readonly_property_mismatch() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);
@@ -414,6 +752,31 @@ fn test_resolve_bounds_object_readonly_property_ok() {
         readonly: false,
         is_method: false,
     }]);
+
+    ctx.add_lower_bound(var, lower);
+    ctx.add_upper_bound(var, upper);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower);
+}
+
+#[test]
+fn test_resolve_bounds_object_readonly_property_missing_ok() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name_a = interner.intern_string("a");
+
+    let upper = interner.object(vec![PropertyInfo {
+        name: name_a,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: true,
+        readonly: true,
+        is_method: false,
+    }]);
+    let lower = interner.object(Vec::new());
 
     ctx.add_lower_bound(var, lower);
     ctx.add_upper_bound(var, upper);
@@ -637,6 +1000,29 @@ fn test_resolve_bounds_object_keyword_upper_allows_array() {
 }
 
 #[test]
+fn test_resolve_bounds_object_keyword_rejects_string() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let lower = TypeId::STRING;
+    let upper = TypeId::OBJECT;
+
+    ctx.add_lower_bound(var, lower);
+    ctx.add_upper_bound(var, upper);
+
+    let result = ctx.resolve_with_constraints(var);
+    assert!(matches!(
+        result,
+        Err(InferenceError::BoundsViolation {
+            lower: actual_lower,
+            upper: actual_upper,
+            ..
+        }) if actual_lower == lower && actual_upper == upper
+    ));
+}
+
+#[test]
 fn test_resolve_bounds_object_with_index_subtype() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);
@@ -676,6 +1062,47 @@ fn test_resolve_bounds_object_with_index_subtype() {
 
     let result = ctx.resolve_with_constraints(var).unwrap();
     assert_eq!(result, lower);
+}
+
+#[test]
+fn test_resolve_bounds_string_index_property_mismatch() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name_a = interner.intern_string("a");
+
+    let upper = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    let lower = interner.object(vec![PropertyInfo {
+        name: name_a,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    ctx.add_lower_bound(var, lower);
+    ctx.add_upper_bound(var, upper);
+
+    let result = ctx.resolve_with_constraints(var);
+    assert!(matches!(
+        result,
+        Err(InferenceError::BoundsViolation {
+            lower: actual_lower,
+            upper: actual_upper,
+            ..
+        }) if actual_lower == lower && actual_upper == upper
+    ));
 }
 
 #[test]
@@ -878,6 +1305,122 @@ fn test_resolve_bounds_number_index_numeric_property_mismatch() {
 }
 
 #[test]
+fn test_resolve_bounds_number_index_readonly_property_mismatch() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name_zero = interner.intern_string("0");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object(vec![PropertyInfo {
+        name: name_zero,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var);
+    assert!(matches!(
+        result,
+        Err(InferenceError::BoundsViolation {
+            lower: actual_lower,
+            upper: actual_upper,
+            ..
+        }) if actual_lower == lower_type && actual_upper == upper_type
+    ));
+}
+
+#[test]
+fn test_resolve_bounds_number_index_readonly_signature_mismatch() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: true,
+        }),
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var);
+    assert!(matches!(
+        result,
+        Err(InferenceError::BoundsViolation {
+            lower: actual_lower,
+            upper: actual_upper,
+            ..
+        }) if actual_lower == lower_type && actual_upper == upper_type
+    ));
+}
+
+#[test]
+fn test_resolve_bounds_number_index_readonly_signature_allows_mutable_source() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: true,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
 fn test_resolve_bounds_number_index_ignores_non_canonical_numeric_name() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);
@@ -958,6 +1501,1982 @@ fn test_resolve_bounds_number_index_accepts_exponent_name() {
             ..
         }) if actual_lower == lower_type && actual_upper == upper_type
     ));
+}
+
+#[test]
+fn test_resolve_bounds_number_index_accepts_infinity_name() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("Infinity");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var);
+    assert!(matches!(
+        result,
+        Err(InferenceError::BoundsViolation {
+            lower: actual_lower,
+            upper: actual_upper,
+            ..
+        }) if actual_lower == lower_type && actual_upper == upper_type
+    ));
+}
+
+#[test]
+fn test_resolve_bounds_number_index_accepts_nan_name() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("NaN");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var);
+    assert!(matches!(
+        result,
+        Err(InferenceError::BoundsViolation {
+            lower: actual_lower,
+            upper: actual_upper,
+            ..
+        }) if actual_lower == lower_type && actual_upper == upper_type
+    ));
+}
+
+#[test]
+fn test_resolve_bounds_number_index_accepts_negative_infinity_name() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("-Infinity");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var);
+    assert!(matches!(
+        result,
+        Err(InferenceError::BoundsViolation {
+            lower: actual_lower,
+            upper: actual_upper,
+            ..
+        }) if actual_lower == lower_type && actual_upper == upper_type
+    ));
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_negative_zero_name() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("-0");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_negative_zero_property() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("-0");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object(vec![PropertyInfo {
+        name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_accepts_decimal_boundary_name() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("0.000001");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var);
+    assert!(matches!(
+        result,
+        Err(InferenceError::BoundsViolation {
+            lower: actual_lower,
+            upper: actual_upper,
+            ..
+        }) if actual_lower == lower_type && actual_upper == upper_type
+    ));
+}
+
+#[test]
+fn test_resolve_bounds_number_index_accepts_exponent_boundary_name() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("1e+21");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var);
+    assert!(matches!(
+        result,
+        Err(InferenceError::BoundsViolation {
+            lower: actual_lower,
+            upper: actual_upper,
+            ..
+        }) if actual_lower == lower_type && actual_upper == upper_type
+    ));
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_non_canonical_exponent_name() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("1e+021");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_uppercase_exponent_name() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("1E+21");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_uppercase_exponent_missing_sign() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("1E21");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_uppercase_exponent_leading_zeros() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("1E+0001");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_uppercase_exponent_leading_zeros_without_sign() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("1E0001");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_uppercase_exponent_negative_leading_zeros() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("1E-0001");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_mixed_case_exponent() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("1eE1");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_mixed_case_exponent_with_sign() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("1Ee+1");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_mixed_case_exponent_missing_digits() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("1eE");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_uppercase_exponent_missing_sign_with_leading_zero() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("1E01");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_mixed_case_exponent_double_sign() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("1eE++1");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_uppercase_exponent_with_lowercase_e() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("1eE+1");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_mixed_case_exponent_double_minus() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("1Ee--1");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_mixed_case_exponent_plus_minus() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("1Ee+-1");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_mixed_case_exponent_minus_plus() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("1Ee-+1");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_mixed_case_exponent_trailing_sign() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("1Ee+");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_mixed_case_exponent_trailing_minus() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("1Ee-");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_mixed_case_exponent_leading_zeros() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("1Ee+0001");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_uppercase_exponent_missing_digits() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("1E+");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_uppercase_exponent_minus_missing_digits() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("1E-");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_uppercase_exponent_double_sign() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("1E++1");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_uppercase_exponent_double_minus() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("1E--1");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_exponent_leading_zeros_negative() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("1e-0001");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_exponent_leading_zeros_positive() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("1e+0001");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_exponent_leading_zeros_without_sign() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("1e0001");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_missing_exponent_sign() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("1e21");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_leading_zero_decimal_name() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("01.0");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_hex_name() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("0x1");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_binary_name() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("0b1");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_octal_name() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("0o7");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_exponent_leading_zero_mantissa() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("01e+1");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_leading_dot_decimal_name() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string(".5");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_multiple_leading_zeros() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("00");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_negative_hex_name() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("-0x1");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_negative_binary_name() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("-0b1");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_negative_octal_name() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("-0o7");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_exponent_double_sign() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("1e++1");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_exponent_double_minus() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("1e--1");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_exponent_missing_digits() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("1e+");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_exponent_minus_missing_digits() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("1e-");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_negative_exponent_zero() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("-0e+0");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_accepts_negative_decimal_boundary_name() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("-0.000001");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var);
+    assert!(matches!(
+        result,
+        Err(InferenceError::BoundsViolation {
+            lower: actual_lower,
+            upper: actual_upper,
+            ..
+        }) if actual_lower == lower_type && actual_upper == upper_type
+    ));
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_trailing_decimal_name() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("1.");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
+}
+
+#[test]
+fn test_resolve_bounds_number_index_ignores_leading_plus_name() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("+1");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_type);
 }
 
 #[test]
@@ -1082,6 +3601,102 @@ fn test_resolve_bounds_function_subtype() {
         type_predicate: None,
         is_constructor: false,
     });
+
+    ctx.add_lower_bound(var, lower);
+    ctx.add_upper_bound(var, upper);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower);
+}
+
+#[test]
+fn test_resolve_bounds_optional_property_compatible() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name_a = interner.intern_string("a");
+
+    let upper = interner.object(vec![PropertyInfo {
+        name: name_a,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+    let lower = interner.object(vec![PropertyInfo {
+        name: name_a,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    ctx.add_lower_bound(var, lower);
+    ctx.add_upper_bound(var, upper);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower);
+}
+
+#[test]
+fn test_resolve_bounds_optional_property_mismatch() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name_a = interner.intern_string("a");
+
+    let upper = interner.object(vec![PropertyInfo {
+        name: name_a,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let lower = interner.object(vec![PropertyInfo {
+        name: name_a,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    ctx.add_lower_bound(var, lower);
+    ctx.add_upper_bound(var, upper);
+
+    let result = ctx.resolve_with_constraints(var);
+    assert!(matches!(
+        result,
+        Err(InferenceError::BoundsViolation {
+            lower: actual_lower,
+            upper: actual_upper,
+            ..
+        }) if actual_lower == lower && actual_upper == upper
+    ));
+}
+
+#[test]
+fn test_resolve_bounds_optional_property_missing_ok() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name_a = interner.intern_string("a");
+
+    let upper = interner.object(vec![PropertyInfo {
+        name: name_a,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+    let lower = interner.object(Vec::new());
 
     ctx.add_lower_bound(var, lower);
     ctx.add_upper_bound(var, upper);
@@ -1274,6 +3889,21 @@ fn test_resolve_bounds_conflict() {
 }
 
 #[test]
+fn test_resolve_bounds_duplicate_upper_bounds_no_intersection() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var = ctx.fresh_type_param(t_name);
+
+    ctx.add_upper_bound(var, TypeId::STRING);
+    ctx.add_upper_bound(var, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
 fn test_resolve_no_constraints() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);
@@ -1373,4 +4003,36 @@ fn test_resolve_all_with_constraints() {
     assert_eq!(results.len(), 2);
     assert_eq!(results[0], (t_name, hello));
     assert_eq!(results[1], (u_name, forty_two));
+}
+
+#[test]
+fn test_resolve_all_with_circular_extends_unknown() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let u_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: u_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // Simulate: <T extends U, U extends T>
+    ctx.add_upper_bound(var_t, u_type);
+    ctx.add_upper_bound(var_u, t_type);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+
+    assert_eq!(results.len(), 2);
+    assert_eq!(results[0], (t_name, TypeId::UNKNOWN));
+    assert_eq!(results[1], (u_name, TypeId::UNKNOWN));
 }
