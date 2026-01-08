@@ -13,6 +13,7 @@ Priority: 4
 - [ ] Stand by for next emitter fidelity task.
 
 ## Completed
+- [x] ES5 derived field arrow handles super + this; test `./wasm/test.sh derived_field_arrow_super_and_this`.
 - [x] ES5 ctor arrow lowers super call with lexical this; test `./wasm/test.sh ctor_arrow_super_call`.
 - [x] ES5 derived field arrow lowers super call with lexical this; test `./wasm/test.sh derived_field_arrow_super_call`.
 - [x] ES5 static field arrow does not capture instance this; test `./wasm/test.sh class_static_field_no_this_capture`.
