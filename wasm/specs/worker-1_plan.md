@@ -23,6 +23,7 @@ Priority: 1
 - [x] Contextual literal selection over `any`; added `test_apply_contextual_any_uses_literal_context`. Tests: `./wasm/test.sh test_apply_contextual_any_uses_literal_context`.
 - [x] Union context preserves literal expressions; added `test_apply_contextual_union_preserves_literal`. Tests: `./wasm/test.sh test_apply_contextual_union_preserves_literal`.
 - [x] Contextual union keeps inferred literal for generic call; added `test_contextual_generic_call_union_preserves_literal`. Tests: `./wasm/test.sh test_contextual_generic_call_union_preserves_literal`.
+- [x] Contextual union keeps inferred literal for generic return; added `test_contextual_generic_return_union_preserves_literal`. Tests: `./wasm/test.sh test_contextual_generic_return_union_preserves_literal`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.

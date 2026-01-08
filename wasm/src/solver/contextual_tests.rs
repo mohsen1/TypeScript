@@ -1,5 +1,5 @@
 use super::*;
-use crate::solver::{CompatChecker, infer_generic_function};
+use crate::solver::{CompatChecker, InferenceContext, infer_generic_function};
 use std::sync::Arc;
 
 #[test]
@@ -425,6 +425,35 @@ fn test_contextual_generic_call_union_preserves_literal() {
     let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
 
     let result = apply_contextual_type(&interner, inferred, Some(union));
+    assert_eq!(result, literal);
+}
+
+#[test]
+fn test_contextual_generic_return_union_preserves_literal() {
+    let interner = TypeInterner::new();
+    let t_name = interner.intern_string("T");
+    let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    // Expected: () => string | number
+    let expected_fn = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: Vec::new(),
+        this_type: None,
+        return_type: union,
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let ctx = ContextualTypeContext::with_expected(&interner, expected_fn);
+    let return_ctx = ctx.for_return();
+
+    // Simulate generic return inference: T inferred from returning a literal.
+    let mut infer_ctx = InferenceContext::new(&interner);
+    let var_t = infer_ctx.fresh_type_param(t_name);
+    let literal = interner.literal_string("ready");
+    infer_ctx.add_lower_bound(var_t, literal);
+    let inferred = infer_ctx.resolve_with_constraints(var_t).unwrap();
+
+    let result = apply_contextual_type(&interner, inferred, return_ctx.expected());
     assert_eq!(result, literal);
 }
 
