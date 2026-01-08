@@ -7,10 +7,10 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [EM: Assign next task]
+- [ ] Add ES5 emitter parity tests for `class { static { } }` static blocks in `wasm/src/emitter_parity_tests.rs`. Run `./wasm/test.sh emitter_parity`.
 
 ## Task Queue
-- [ ] [EM: Add queued tasks]
+- [ ] (empty)
 
 ## Completed
 - [x] Added parity test for function param type erasure in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (39 tests).
