@@ -47,6 +47,14 @@ fn test_emit_import_star_helpers() {
 }
 
 #[test]
+fn test_emit_import_default_helper() {
+    let mut helpers = HelpersNeeded::default();
+    helpers.import_default = true;
+    let output = emit_helpers(&helpers);
+    assert!(output.contains("__importDefault"));
+}
+
+#[test]
 fn test_emit_create_binding_helper() {
     let mut helpers = HelpersNeeded::default();
     helpers.create_binding = true;
