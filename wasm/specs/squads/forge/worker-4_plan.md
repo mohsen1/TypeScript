@@ -7,7 +7,7 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [x] Add solver tests for Record<K, V> pattern. **Done:** Added 6 tests. Exclude<T, U> already covered by existing tests.
+- [x] Add solver tests for NoInfer<T> and template literal intrinsics (Capitalize, Uncapitalize, Uppercase, Lowercase). **Done:** Added 18 tests covering template literal operations, NoInfer patterns, and string manipulation intrinsic patterns.
 
 ## Task Queue
 (empty - awaiting next assignment)
@@ -77,6 +77,17 @@ Priority: 4
 - [x] Added solver coverage for Record with index signature (string key). Tests: `./wasm/test.sh`.
 - [x] Added solver coverage for Readonly Record combination. Tests: `./wasm/test.sh`.
 - [x] Added solver coverage for Partial Record combination. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for template literal simple concatenation. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for template literal prefix/suffix patterns. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for template literal in mapped type key remapping. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for template literal union distribution. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for NoInfer<T> identity pattern. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for NoInfer<T> in function params. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for Uppercase<T> intrinsic pattern. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for Lowercase<T> intrinsic pattern. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for Capitalize<T> intrinsic pattern. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for Uncapitalize<T> intrinsic pattern. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for chained string intrinsics. Tests: `./wasm/test.sh`.
 
 ## Ready for Merge
 Yes
