@@ -241,6 +241,36 @@ fn test_weak_type_detection_requires_overlap() {
 }
 
 #[test]
+fn test_split_accessor_variance() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let name = interner.intern_string("x");
+    let wide_write = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    let wide_accessor = interner.object(vec![PropertyInfo {
+        name,
+        type_id: TypeId::STRING,
+        write_type: wide_write,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let narrow_accessor = interner.object(vec![PropertyInfo {
+        name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(checker.is_subtype_of(wide_accessor, narrow_accessor));
+    assert!(!checker.is_subtype_of(narrow_accessor, wide_accessor));
+}
+
+#[test]
 fn test_exact_optional_property_types_toggle() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
