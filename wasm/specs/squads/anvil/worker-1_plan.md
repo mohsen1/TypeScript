@@ -7,7 +7,7 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-- Complete: Added static method ES5 test; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` - pre-existing Forge domain failure).
+- Complete: Added computed property in object literal ES5 test; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` - pre-existing Forge domain failure).
 
 ## Task Queue
 - [x] Inspect `wasm/src/emitter_edge_case_tests.rs` to capture the failing case and expected output.
@@ -54,6 +54,7 @@ Priority: 1
 - [x] Added getter/setter ES5 accessors test; verifies `get count()` and `set count(value)` use Object.defineProperty. Ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Added arrow function this binding ES5 test; verifies arrow functions use `_this` capture and `function` keyword. Ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Added static method ES5 test; verifies static methods/properties are on constructor function, not prototype. Ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
+- [x] Added computed property in object literal ES5 test; verifies `{ [key]: value }` uses bracket notation assignment. Ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 
 ## Ready for Merge
 Yes
