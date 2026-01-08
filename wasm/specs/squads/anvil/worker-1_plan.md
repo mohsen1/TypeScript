@@ -22,6 +22,7 @@ Priority: 1
 - [x] Allowed ES6 `class C` in export assignment edge-case test; ran `./wasm/test.sh emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`.
 - [x] Ensured synthesized derived constructors use `_this` in field/private initializers; added tests; ran `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_parse_error_tolerance`).
 - [x] Fixed parse-error recovery for const initializers; ran `./wasm/test.sh` (fails: `emitter_parity_tests::test_parity_commonjs_export`).
+- [x] Fixed ES5 async generator emission for non-await blocks, aligned super calls with `_this`, and suppressed static-field `this` capture; ran `./wasm/test.sh` (fails: `solver::compat::tests::test_explain_failure_reports_rest_mismatch`).
 
 ## Ready for Merge
 Yes
