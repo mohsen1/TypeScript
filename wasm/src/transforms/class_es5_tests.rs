@@ -2381,3 +2381,127 @@ class IterableCollection<T> {
         output
     );
 }
+
+#[test]
+fn test_class_es5_nested_class() {
+    // Test class containing a nested/inner class as a static property
+    let source = r#"
+class Container {
+    static Item = class {
+        constructor(public name: string) {}
+        describe() {
+            return "Item: " + this.name;
+        }
+    };
+
+    items: InstanceType<typeof Container.Item>[] = [];
+
+    addItem(name: string) {
+        this.items.push(new Container.Item(name));
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Container should emit as function
+    assert!(
+        output.contains("function Container"),
+        "Expected Container class to emit as function: {}",
+        output
+    );
+
+    // Static Item property should be assigned
+    assert!(
+        output.contains("Container.Item"),
+        "Expected static Item class expression: {}",
+        output
+    );
+
+    // addItem method should be on prototype
+    assert!(
+        output.contains(".prototype.addItem") || output.contains("prototype[\"addItem\"]"),
+        "Expected addItem method on prototype: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_generator_methods() {
+    // Test class with generator methods
+    let source = r#"
+class Range {
+    constructor(public start: number, public end: number) {}
+
+    *[Symbol.iterator]() {
+        for (let i = this.start; i <= this.end; i++) {
+            yield i;
+        }
+    }
+
+    *reverse() {
+        for (let i = this.end; i >= this.start; i--) {
+            yield i;
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function Range"),
+        "Expected Range class to emit as function: {}",
+        output
+    );
+
+    // Parameter properties should be initialized
+    assert!(
+        output.contains("this.start") && output.contains("this.end"),
+        "Expected parameter properties to be initialized: {}",
+        output
+    );
+
+    // Generator methods are assigned to prototype (yield would need additional generator transform)
+    assert!(
+        output.contains("[Symbol.iterator]") || output.contains("Symbol.iterator"),
+        "Expected Symbol.iterator generator method: {}",
+        output
+    );
+
+    // reverse method should be on prototype
+    assert!(
+        output.contains(".prototype.reverse") || output.contains("prototype[\"reverse\"]"),
+        "Expected reverse method on prototype: {}",
+        output
+    );
+}

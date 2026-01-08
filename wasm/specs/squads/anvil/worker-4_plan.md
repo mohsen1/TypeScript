@@ -100,6 +100,8 @@ Priority: 4
 - [x] Add ES5 class with index signature test. Tests: `./wasm/test.sh class_with_index_signature`
 - [x] Add ES5 class expression test. Tests: `./wasm/test.sh class_expression`
 - [x] Add ES5 Symbol-keyed methods test. Tests: `./wasm/test.sh symbol_keyed_methods`
+- [x] Add ES5 nested class test. Tests: `./wasm/test.sh nested_class`
+- [x] Add ES5 generator methods test. Tests: `./wasm/test.sh generator_methods`
 
 ## Ready for Merge
 Yes
