@@ -514,6 +514,48 @@ em_cmd="$(build_cmd "$AGENT_CMD $AGENT_ARGS")"
 worker_cmd="$(build_cmd "$AGENT_CMD $AGENT_ARGS")"
 
 # =============================================================================
+# Resume prompt generator
+# =============================================================================
+get_resume_context() {
+  local pane_key="$1"
+  if [ "$RESUME_MODE" = "1" ] && [ -f "$STATE_FILE" ]; then
+    # Extract context for this pane from state file
+    local context=$(python3 -c "
+import json
+import sys
+try:
+    with open('$STATE_FILE', 'r') as f:
+        state = json.load(f)
+    pane_data = state.get('panes', {}).get('$pane_key', {})
+    context = pane_data.get('context', '')
+    # Get last 50 lines of context
+    lines = context.strip().split('\n')[-50:]
+    print('\n'.join(lines))
+except Exception as e:
+    print('')
+" 2>/dev/null || echo "")
+    echo "$context"
+  fi
+}
+
+get_resume_prompt() {
+  local pane_key="$1"
+  local role="$2"
+  local context=$(get_resume_context "$pane_key")
+
+  if [ -n "$context" ]; then
+    # Create a resume prompt with context
+    cat << EOF
+RESUMING SESSION - Here's what was happening before the session ended:
+---
+$context
+---
+Continue where you left off. Check your current git status and plan file, then resume your work.
+EOF
+  fi
+}
+
+# =============================================================================
 # Create tmux session if not exists
 # =============================================================================
 if tmux has-session -t "$SESSION" 2>/dev/null; then
@@ -551,17 +593,50 @@ tmux select-pane -t "$SESSION:director.2" -T "em-anvil" 2>/dev/null || true
 sleep "$START_PAUSE"
 
 # Send start prompts to Director and EMs
-tmux send-keys -t "$SESSION:director.0" "$DIRECTOR_START_PROMPT"
-sleep "$SEND_ENTER_PAUSE"
-tmux send-keys -t "$SESSION:director.0" C-m
+if [ "$RESUME_MODE" = "1" ]; then
+  # Resume mode: send context from saved state
+  echo "Sending resume prompts to Director and EMs..."
 
-tmux send-keys -t "$SESSION:director.1" "$EM_START_PROMPT"
-sleep "$SEND_ENTER_PAUSE"
-tmux send-keys -t "$SESSION:director.1" C-m
+  resume_prompt=$(get_resume_prompt "director_0" "director")
+  if [ -n "$resume_prompt" ]; then
+    tmux send-keys -t "$SESSION:director.0" "$resume_prompt"
+  else
+    tmux send-keys -t "$SESSION:director.0" "$DIRECTOR_START_PROMPT"
+  fi
+  sleep "$SEND_ENTER_PAUSE"
+  tmux send-keys -t "$SESSION:director.0" C-m
 
-tmux send-keys -t "$SESSION:director.2" "$EM_START_PROMPT"
-sleep "$SEND_ENTER_PAUSE"
-tmux send-keys -t "$SESSION:director.2" C-m
+  resume_prompt=$(get_resume_prompt "director_1" "em")
+  if [ -n "$resume_prompt" ]; then
+    tmux send-keys -t "$SESSION:director.1" "$resume_prompt"
+  else
+    tmux send-keys -t "$SESSION:director.1" "$EM_START_PROMPT"
+  fi
+  sleep "$SEND_ENTER_PAUSE"
+  tmux send-keys -t "$SESSION:director.1" C-m
+
+  resume_prompt=$(get_resume_prompt "director_2" "em")
+  if [ -n "$resume_prompt" ]; then
+    tmux send-keys -t "$SESSION:director.2" "$resume_prompt"
+  else
+    tmux send-keys -t "$SESSION:director.2" "$EM_START_PROMPT"
+  fi
+  sleep "$SEND_ENTER_PAUSE"
+  tmux send-keys -t "$SESSION:director.2" C-m
+else
+  # Normal mode: send standard start prompts
+  tmux send-keys -t "$SESSION:director.0" "$DIRECTOR_START_PROMPT"
+  sleep "$SEND_ENTER_PAUSE"
+  tmux send-keys -t "$SESSION:director.0" C-m
+
+  tmux send-keys -t "$SESSION:director.1" "$EM_START_PROMPT"
+  sleep "$SEND_ENTER_PAUSE"
+  tmux send-keys -t "$SESSION:director.1" C-m
+
+  tmux send-keys -t "$SESSION:director.2" "$EM_START_PROMPT"
+  sleep "$SEND_ENTER_PAUSE"
+  tmux send-keys -t "$SESSION:director.2" C-m
+fi
 
 # =============================================================================
 # Helper: Setup squad window (5 workers only, EM is in director window)
@@ -617,7 +692,17 @@ setup_squad_window() {
   # Send start prompts to workers (staggered)
   for pane in 0 1 2 3 4; do
     sleep "$STAGGER_PAUSE"
-    tmux send-keys -t "$SESSION:$window.$pane" "$WORKER_START_PROMPT"
+    local pane_key="${squad}_${pane}"
+    if [ "$RESUME_MODE" = "1" ]; then
+      resume_prompt=$(get_resume_prompt "$pane_key" "worker")
+      if [ -n "$resume_prompt" ]; then
+        tmux send-keys -t "$SESSION:$window.$pane" "$resume_prompt"
+      else
+        tmux send-keys -t "$SESSION:$window.$pane" "$WORKER_START_PROMPT"
+      fi
+    else
+      tmux send-keys -t "$SESSION:$window.$pane" "$WORKER_START_PROMPT"
+    fi
     sleep "$SEND_ENTER_PAUSE"
     tmux send-keys -t "$SESSION:$window.$pane" C-m
   done
@@ -829,9 +914,15 @@ echo "  tmux select-window -t $SESSION:forge"
 echo "  tmux select-window -t $SESSION:anvil"
 echo ""
 echo "Attach: tmux attach -t $SESSION"
-echo "Kill:   $0 --kill"
+echo "Kill:   $0 --kill   (saves state for resume)"
+echo "Resume: $0 --resume (continue where you left off)"
 echo "Fresh:  $0 --fresh  (reset all branches to origin/rust)"
 echo "Codex:  $0 --codex  (use OpenAI Codex instead of Claude)"
+if [ "$RESUME_MODE" = "1" ]; then
+  echo ""
+  echo "*** RESUMED from saved state ***"
+  echo "State file: $STATE_FILE"
+fi
 echo "=============================================="
 
 # =============================================================================
