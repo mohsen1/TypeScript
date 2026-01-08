@@ -128,7 +128,15 @@ Added 5 tests in `evaluate_tests.rs`:
 - [x] Updated non-distributive union object inference expectation (tests not run).
 
 ## Ready for Merge
-No
+**NO - BLOCKED**
+
+Worker 5's latest commit (42517ba642) cannot be merged into squad/forge due to:
+1. Calls `with_type_param_bindings` method on `TypeLowering` which does not exist
+2. This method needs to be implemented in `wasm/src/solver/lower.rs` first
+
+**Action Required**: Worker 5 must either:
+- Implement the missing `with_type_param_bindings` method
+- Or refactor the code to not depend on this unimplemented method
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize solver correctness (inference/conditional/subtype) before new features.

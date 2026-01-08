@@ -83,7 +83,7 @@ Per Project Direction: **Autocratic Scheduling + Bisect-on-Merge**
   - Symbols resolving to TypeId(4) (any) instead of actual types
 - Worker Assignments:
   - W1: (idle)
-  - W2: BLOCKED - must restore Ref/TypeQuery handling in evaluate.rs
+  - W2: BLOCKED - changes remove Ref/TypeQuery handling in evaluate.rs (regression)
   - W3: (merged docs update)
-  - W4: (merged namespace fix) - now investigating type param registration
-  - W5: (idle)
+  - W4: (merged namespace fix)
+  - W5: BLOCKED - commit calls unimplemented `with_type_param_bindings` method
