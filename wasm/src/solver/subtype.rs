@@ -127,6 +127,8 @@ pub struct SubtypeChecker<'a, R: TypeResolver = NoopResolver> {
     /// Whether rest parameters of any/unknown should be treated as bivariant.
     /// See https://github.com/microsoft/TypeScript/issues/20007.
     pub allow_bivariant_rest: bool,
+    /// Whether required parameter count mismatches are allowed for bivariant methods.
+    pub allow_bivariant_param_count: bool,
     /// Whether optional properties are exact (exclude implicit `undefined`).
     /// Default: false (legacy TS behavior).
     pub exact_optional_property_types: bool,
@@ -152,6 +154,7 @@ impl<'a> SubtypeChecker<'a, NoopResolver> {
             strict_function_types: true, // Default to strict (sound) behavior
             allow_void_return: false,
             allow_bivariant_rest: false,
+            allow_bivariant_param_count: false,
             exact_optional_property_types: false,
             strict_null_checks: true,
             no_unchecked_indexed_access: false,
@@ -171,6 +174,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             strict_function_types: true,
             allow_void_return: false,
             allow_bivariant_rest: false,
+            allow_bivariant_param_count: false,
             exact_optional_property_types: false,
             strict_null_checks: true,
             no_unchecked_indexed_access: false,
@@ -1646,6 +1650,19 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         params.iter().filter(|param| !param.optional && !param.rest).count()
     }
 
+    fn extra_required_accepts_undefined(
+        &mut self,
+        params: &[ParamInfo],
+        from_index: usize,
+        required_count: usize,
+    ) -> bool {
+        params
+            .iter()
+            .take(required_count)
+            .skip(from_index)
+            .all(|param| self.check_subtype(TypeId::UNDEFINED, param.type_id).is_true())
+    }
+
     /// Check return type compatibility with void special-casing.
     fn check_return_compat(&mut self, source_return: TypeId, target_return: TypeId) -> SubtypeResult {
         if self.allow_void_return && target_return == TypeId::VOID {
@@ -1665,8 +1682,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             return self.check_subtype(source, target);
         }
         let prev = self.strict_function_types;
+        let prev_param_count = self.allow_bivariant_param_count;
         self.strict_function_types = false;
+        self.allow_bivariant_param_count = true;
         let result = self.check_subtype(source, target);
+        self.allow_bivariant_param_count = prev_param_count;
         self.strict_function_types = prev;
         result
     }
@@ -1681,8 +1701,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             return self.explain_failure(source, target);
         }
         let prev = self.strict_function_types;
+        let prev_param_count = self.allow_bivariant_param_count;
         self.strict_function_types = false;
+        self.allow_bivariant_param_count = true;
         let result = self.explain_failure(source, target);
+        self.allow_bivariant_param_count = prev_param_count;
         self.strict_function_types = prev;
         result
     }
@@ -1737,7 +1760,14 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
         let source_required = self.required_param_count(&source.params);
         let target_required = self.required_param_count(&target.params);
-        if !rest_is_top && source_required > target_required {
+        let extra_required_ok = target_has_rest
+            && source_required > target_required
+            && self.extra_required_accepts_undefined(&source.params, target_required, source_required);
+        if !self.allow_bivariant_param_count
+            && !rest_is_top
+            && source_required > target_required
+            && (!target_has_rest || !extra_required_ok)
+        {
             return SubtypeResult::False;
         }
 
@@ -1916,7 +1946,14 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
         let source_required = self.required_param_count(&source.params);
         let target_required = self.required_param_count(&target.params);
-        if !rest_is_top && source_required > target_required {
+        let extra_required_ok = target_has_rest
+            && source_required > target_required
+            && self.extra_required_accepts_undefined(&source.params, target_required, source_required);
+        if !self.allow_bivariant_param_count
+            && !rest_is_top
+            && source_required > target_required
+            && (!target_has_rest || !extra_required_ok)
+        {
             return SubtypeResult::False;
         }
 
@@ -2002,7 +2039,14 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
         let source_required = self.required_param_count(&source.params);
         let target_required = self.required_param_count(&target.params);
-        if !rest_is_top && source_required > target_required {
+        let extra_required_ok = target_has_rest
+            && source_required > target_required
+            && self.extra_required_accepts_undefined(&source.params, target_required, source_required);
+        if !self.allow_bivariant_param_count
+            && !rest_is_top
+            && source_required > target_required
+            && (!target_has_rest || !extra_required_ok)
+        {
             return SubtypeResult::False;
         }
 
@@ -2088,7 +2132,14 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
         let source_required = self.required_param_count(&source.params);
         let target_required = self.required_param_count(&target.params);
-        if !rest_is_top && source_required > target_required {
+        let extra_required_ok = target_has_rest
+            && source_required > target_required
+            && self.extra_required_accepts_undefined(&source.params, target_required, source_required);
+        if !self.allow_bivariant_param_count
+            && !rest_is_top
+            && source_required > target_required
+            && (!target_has_rest || !extra_required_ok)
+        {
             return SubtypeResult::False;
         }
 
@@ -2807,7 +2858,13 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             && matches!(rest_elem_type, Some(TypeId::ANY | TypeId::UNKNOWN));
         let source_required = self.required_param_count(&source.params);
         let target_required = self.required_param_count(&target.params);
-        let too_many_params = !rest_is_top && source_required > target_required;
+        let extra_required_ok = target_has_rest
+            && source_required > target_required
+            && self.extra_required_accepts_undefined(&source.params, target_required, source_required);
+        let too_many_params = !self.allow_bivariant_param_count
+            && !rest_is_top
+            && source_required > target_required
+            && (!target_has_rest || !extra_required_ok);
         if !target_has_rest && too_many_params {
             return Some(SubtypeFailureReason::TooManyParameters {
                 source_count: source_required,

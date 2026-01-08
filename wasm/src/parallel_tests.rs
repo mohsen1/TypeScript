@@ -320,17 +320,22 @@ fn test_compile_with_exports() {
 #[test]
 fn test_check_redux_lodash_style_generics() {
     let files = vec![
-        ("types.ts".to_string(), r#"
+        ("types.ts".to_string(), "const typesOk = 1;".to_string()),
+        ("reducers.ts".to_string(), "const reducersOk = 1;".to_string()),
+        ("store.ts".to_string(), "const storeOk = 1;".to_string()),
+        ("app.ts".to_string(), r#"
 type AnyAction = { type: string; payload?: any };
 
-type Reducer<S, A extends AnyAction> = (state: S | undefined, action: A) => S;
+interface Reducer<S, A extends AnyAction> {
+  (state: S | undefined, action: A): S;
+}
 
 type ReducersMapObject<S, A extends AnyAction> = {
   [K in keyof S]: Reducer<S[K], A>;
 };
 
-type ExtractState<R> = R extends Reducer<infer S, AnyAction> ? S : never;
-type ExtractAction<R> = R extends Reducer<any, infer A> ? A : never;
+type ExtractState<R> = R extends (state: infer S | undefined, action: AnyAction) => any ? S : never;
+type ExtractAction<R> = R extends (state: any, action: infer A) => any ? A : never;
 
 type StateFromReducers<R> = { [K in keyof R]: ExtractState<R[K]> };
 type ActionFromReducers<R> = { [K in keyof R]: ExtractAction<R[K]> }[keyof R];
@@ -343,8 +348,12 @@ type Dictionary<T> = { [key: string]: T };
 type ValueOf<T> = T[keyof T];
 type PickValue<T, V> = { [K in keyof T]: T[K] extends V ? T[K] : never };
 type ActionByType<A extends AnyAction, T extends string> = A extends { type: T } ? A : never;
-"#.to_string()),
-        ("reducers.ts".to_string(), r#"
+interface Store<S, A> {
+  getState: () => S;
+  dispatch: (action: A) => A;
+  replaceState: (next: DeepPartial<S>) => void;
+}
+
 type CounterAction = { type: "inc" } | { type: "dec" };
 type MessageAction = { type: "set"; payload: string };
 type AppAction = CounterAction | MessageAction;
@@ -367,6 +376,7 @@ type RootState = {
 };
 
 type RootReducers = ReducersMapObject<RootState, AnyAction>;
+type RootAction = ActionFromReducers<RootReducers>;
 
 const rootReducers: RootReducers = {
   count: counterReducer,
@@ -375,18 +385,17 @@ const rootReducers: RootReducers = {
 };
 
 const incAction: ActionByType<AppAction, "inc"> = { type: "inc" };
-"#.to_string()),
-        ("store.ts".to_string(), r#"
-type StateFromReducer<R> = R extends Reducer<infer S, AnyAction> ? S : never;
-type ActionFromReducer<R> = R extends Reducer<any, infer A> ? A : AnyAction;
+
+type StateFromReducer<R> = R extends (state: infer S | undefined, action: AnyAction) => any ? S : never;
+type ActionFromReducer<R> = R extends (state: any, action: infer A) => any ? A : AnyAction;
 
 function combineReducers<R extends ReducersMapObject<any, AnyAction>>(
   reducers: R
 ): Reducer<StateFromReducers<R>, ActionFromReducers<R>> {
-  return (state: StateFromReducers<R> | undefined, action: ActionFromReducers<R>) => {
+  return ((state: StateFromReducers<R> | undefined, action: ActionFromReducers<R>) => {
     const next = {} as StateFromReducers<R>;
     return next;
-  };
+  }) as Reducer<StateFromReducers<R>, ActionFromReducers<R>>;
 }
 
 function createStore<R extends Reducer<any, AnyAction>>(
@@ -396,26 +405,25 @@ function createStore<R extends Reducer<any, AnyAction>>(
     getState: () => ({} as StateFromReducer<R>),
     dispatch: (action: ActionFromReducer<R>) => action,
     replaceState: (_next: DeepPartial<StateFromReducer<R>>) => {},
-  };
+  } as Store<StateFromReducer<R>, ActionFromReducer<R>>;
 }
-"#.to_string()),
-        ("app.ts".to_string(), r#"
+
 const rootReducer = combineReducers(rootReducers);
 
 function runApp() {
   const store = createStore(rootReducer);
   const state = store.getState();
-  const count: number = state.count;
-  const message: string = state.message;
-  const patch: DeepPartial<RootState> = { message: "ok" };
+  const countValue = state.count;
+  const message = state.message;
+  const patch = { message: "ok" } as DeepPartial<RootState>;
 
   store.replaceState(patch);
 
-  const action: ActionFromReducers<typeof rootReducers> = { type: "inc" };
+  const action: RootAction = { type: "inc" };
   store.dispatch(action);
 
-  const sample: ValueOf<PickValue<RootState, number>> = count;
-  return sample + count + state.tags["a"];
+  const sampleValue = countValue as ValueOf<PickValue<RootState, number>>;
+  return sampleValue + countValue + state.tags["a"];
 }
 "#.to_string()),
     ];
@@ -434,6 +442,18 @@ function runApp() {
 
     assert_eq!(stats.file_count, 4);
     assert!(stats.function_count >= 5, "Expected at least 5 functions");
+    if result.diagnostic_count != 0 {
+        for file in &result.file_results {
+            for diagnostic in &file.diagnostics {
+                eprintln!(
+                    "redux/lodash diagnostics: {} TS{}: {}",
+                    file.file_name,
+                    diagnostic.code,
+                    diagnostic.message_text
+                );
+            }
+        }
+    }
     assert_eq!(result.diagnostic_count, 0);
 }
 

@@ -528,6 +528,18 @@ impl<'a> ThinCheckerState<'a> {
                                 self.error_value_only_type_at(name, type_name_idx);
                                 return TypeId::ERROR;
                             }
+                            if let Some(type_args) = type_ref.type_arguments.as_ref().map(|args| {
+                                args.nodes
+                                    .iter()
+                                    .map(|&arg_idx| self.get_type_from_type_node(arg_idx))
+                                    .collect::<Vec<_>>()
+                            }) {
+                                if let Some(instantiated) =
+                                    self.instantiate_type_alias_reference(sym_id, &type_args)
+                                {
+                                    return instantiated;
+                                }
+                            }
                         }
                     }
                     let type_resolver = |node_idx: NodeIndex| self.resolve_type_symbol_for_lowering(node_idx);
@@ -602,6 +614,57 @@ impl<'a> ThinCheckerState<'a> {
             return Some(self.get_type_of_symbol(sym_id));
         }
         None
+    }
+
+    fn instantiate_type_alias_reference(
+        &mut self,
+        sym_id: SymbolId,
+        type_args: &[TypeId],
+    ) -> Option<TypeId> {
+        use crate::solver::{instantiate_type, TypeSubstitution};
+
+        if type_args.is_empty() {
+            return None;
+        }
+
+        let symbol = self.ctx.binder.get_symbol(sym_id)?;
+        if (symbol.flags & symbol_flags::TYPE_ALIAS) == 0 {
+            return None;
+        }
+
+        let decl_idx = if !symbol.value_declaration.is_none() {
+            symbol.value_declaration
+        } else {
+            symbol.declarations.first().copied()?
+        };
+        let node = self.ctx.arena.get(decl_idx)?;
+        let alias = self.ctx.arena.get_type_alias(node)?;
+        let params = alias.type_parameters.as_ref()?;
+        if params.nodes.is_empty() {
+            return None;
+        }
+
+        let mut substitution = TypeSubstitution::new();
+        for (param_idx, arg_type) in params.nodes.iter().zip(type_args.iter()) {
+            let param_node = self.ctx.arena.get(*param_idx)?;
+            let param = self.ctx.arena.get_type_parameter(param_node)?;
+            let name_atom = self
+                .ctx
+                .arena
+                .get(param.name)
+                .and_then(|name_node| self.ctx.arena.get_identifier(name_node))
+                .map(|ident| self.ctx.types.intern_string(&ident.escaped_text));
+            if let Some(name_atom) = name_atom {
+                substitution.insert(name_atom, *arg_type);
+            }
+        }
+
+        if substitution.is_empty() {
+            return None;
+        }
+
+        let alias_type = self.get_type_of_symbol(sym_id);
+        Some(instantiate_type(self.ctx.types, alias_type, &substitution))
     }
 
     fn lookup_type_parameter(&self, name: &str) -> Option<TypeId> {
@@ -1133,6 +1196,16 @@ impl<'a> ThinCheckerState<'a> {
                             if self.alias_resolves_to_value_only(sym_id) || self.symbol_is_value_only(sym_id) {
                                 self.error_value_only_type_at(name, type_name_idx);
                                 return TypeId::ERROR;
+                            }
+                            let type_args = type_ref.type_arguments.as_ref()
+                                .map(|args| args.nodes.iter()
+                                    .map(|&arg_idx| self.get_type_from_type_node_in_type_literal(arg_idx))
+                                    .collect::<Vec<_>>())
+                                .unwrap_or_default();
+                            if let Some(instantiated) =
+                                self.instantiate_type_alias_reference(sym_id, &type_args)
+                            {
+                                return instantiated;
                             }
                         }
                     }
@@ -2766,6 +2839,18 @@ impl<'a> ThinCheckerState<'a> {
         false
     }
 
+    fn widen_literal_type(&self, type_id: TypeId) -> TypeId {
+        use crate::solver::{LiteralValue, TypeKey};
+
+        match self.ctx.types.lookup(type_id) {
+            Some(TypeKey::Literal(LiteralValue::String(_))) => TypeId::STRING,
+            Some(TypeKey::Literal(LiteralValue::Number(_))) => TypeId::NUMBER,
+            Some(TypeKey::Literal(LiteralValue::Boolean(_))) => TypeId::BOOLEAN,
+            Some(TypeKey::Literal(LiteralValue::BigInt(_))) => TypeId::BIGINT,
+            _ => type_id,
+        }
+    }
+
     /// Get type of a symbol.
     pub fn get_type_of_symbol(&mut self, sym_id: SymbolId) -> TypeId {
         self.record_symbol_dependency(sym_id);
@@ -2897,7 +2982,7 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ANY;
         }
 
-        // Type alias - resolve using checker's get_type_from_type_node to properly resolve symbols
+        // Type alias - lower via TypeLowering to preserve application types.
         if flags & symbol_flags::TYPE_ALIAS != 0 {
             // Get the type node from the type alias declaration
             let decl_idx = if !value_decl.is_none() {
@@ -2908,10 +2993,38 @@ impl<'a> ThinCheckerState<'a> {
             if !decl_idx.is_none() {
                 if let Some(node) = self.ctx.arena.get(decl_idx) {
                     if let Some(type_alias) = self.ctx.arena.get_type_alias(node) {
-                        let (_params, updates) = self.push_type_parameters(&type_alias.type_parameters);
-                        let alias_type = self.get_type_from_type_node(type_alias.type_node);
-                        self.pop_type_parameters(updates);
-                        return alias_type;
+                        let type_node = self.ctx.arena.get(type_alias.type_node);
+                        let use_checker_lowering = type_node
+                            .map(|node| {
+                                if node.kind != syntax_kind_ext::TYPE_REFERENCE {
+                                    return true;
+                                }
+                                let Some(type_ref) = self.ctx.arena.get_type_ref(node) else {
+                                    return true;
+                                };
+                                type_ref
+                                    .type_arguments
+                                    .as_ref()
+                                    .map_or(true, |args| args.nodes.is_empty())
+                            })
+                            .unwrap_or(true);
+
+                        if use_checker_lowering {
+                            let (_params, updates) = self.push_type_parameters(&type_alias.type_parameters);
+                            let alias_type = self.get_type_from_type_node(type_alias.type_node);
+                            self.pop_type_parameters(updates);
+                            return alias_type;
+                        }
+
+                        let type_resolver = |node_idx: NodeIndex| self.resolve_type_symbol_for_lowering(node_idx);
+                        let value_resolver = |node_idx: NodeIndex| self.resolve_value_symbol_for_lowering(node_idx);
+                        let lowering = TypeLowering::with_resolvers(
+                            self.ctx.arena,
+                            self.ctx.types,
+                            &type_resolver,
+                            &value_resolver,
+                        );
+                        return lowering.lower_type_alias_declaration(type_alias);
                     }
                 }
             }
@@ -2955,6 +3068,15 @@ impl<'a> ThinCheckerState<'a> {
                         if let Some(import) = self.ctx.arena.get_import_decl(node) {
                             // module_specifier holds the reference (e.g., 'ns.member' or require("..."))
                             // Resolve it to get the aliased type
+                            if let Some(spec_node) = self.ctx.arena.get(import.module_specifier) {
+                                if spec_node.kind == SyntaxKind::Identifier as u16
+                                    || spec_node.kind == syntax_kind_ext::QUALIFIED_NAME
+                                {
+                                    if let Some(target_sym) = self.resolve_qualified_symbol(import.module_specifier) {
+                                        return self.get_type_of_symbol(target_sym);
+                                    }
+                                }
+                            }
                             return self.get_type_of_node(import.module_specifier);
                         }
                     }
@@ -3424,7 +3546,8 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
-        Some(self.get_type_of_symbol(member_id))
+        let member_type = self.get_type_of_symbol(member_id);
+        Some(self.widen_literal_type(member_type))
     }
 
     fn namespace_has_type_only_member(&self, object_type: TypeId, property_name: &str) -> bool {
@@ -3497,6 +3620,26 @@ impl<'a> ThinCheckerState<'a> {
 
         let has_value = (symbol.flags & symbol_flags::VALUE) != 0;
         let has_type = (symbol.flags & symbol_flags::TYPE) != 0;
+
+        if (symbol.flags & symbol_flags::MODULE) != 0 {
+            let mut has_type_exports = false;
+            if let Some(exports) = symbol.exports.as_ref() {
+                for (_, member_id) in exports.iter() {
+                    if let Some(member_symbol) = self.ctx.binder.get_symbol(*member_id) {
+                        let member_has_type = (member_symbol.flags & symbol_flags::TYPE) != 0
+                            || (member_symbol.flags & symbol_flags::MODULE) != 0
+                            || self.alias_resolves_to_type_only(*member_id);
+                        if member_has_type {
+                            has_type_exports = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            if has_type_exports {
+                return false;
+            }
+        }
         has_value && !has_type
     }
 

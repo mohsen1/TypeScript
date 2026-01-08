@@ -1043,6 +1043,65 @@ impl<'a> ThinPrinter<'a> {
         false
     }
 
+    pub(super) fn collect_module_dependencies(&self, statements: &[NodeIndex]) -> Vec<String> {
+        let mut deps = Vec::new();
+        for &stmt_idx in statements {
+            let Some(node) = self.arena.get(stmt_idx) else {
+                continue;
+            };
+
+            if node.kind == syntax_kind_ext::IMPORT_DECLARATION
+                || node.kind == syntax_kind_ext::IMPORT_EQUALS_DECLARATION
+            {
+                if let Some(import_decl) = self.arena.get_import_decl(node) {
+                    if !self.import_decl_has_runtime_value(import_decl) {
+                        continue;
+                    }
+                    if let Some(text) =
+                        self.get_module_specifier_text(import_decl.module_specifier)
+                    {
+                        if !deps.contains(&text) {
+                            deps.push(text);
+                        }
+                    }
+                }
+                continue;
+            }
+
+            if node.kind == syntax_kind_ext::EXPORT_DECLARATION {
+                if let Some(export_decl) = self.arena.get_export_decl(node) {
+                    if !self.export_decl_has_runtime_value(export_decl) {
+                        continue;
+                    }
+                    if let Some(text) =
+                        self.get_module_specifier_text(export_decl.module_specifier)
+                    {
+                        if !deps.contains(&text) {
+                            deps.push(text);
+                        }
+                    }
+                }
+            }
+        }
+
+        deps
+    }
+
+    fn get_module_specifier_text(&self, specifier: NodeIndex) -> Option<String> {
+        if specifier.is_none() {
+            return None;
+        }
+
+        let Some(node) = self.arena.get(specifier) else {
+            return None;
+        };
+        let Some(literal) = self.arena.get_literal(node) else {
+            return None;
+        };
+
+        Some(literal.text.clone())
+    }
+
     pub(super) fn import_decl_has_runtime_value(
         &self,
         import_decl: &crate::parser::thin_node::ImportDeclData,
