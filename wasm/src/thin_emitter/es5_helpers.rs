@@ -517,12 +517,12 @@ impl<'a> ThinPrinter<'a> {
         let mut async_emitter = crate::transforms::async_es5::AsyncES5Emitter::new(self.arena);
         // Transform emitter handles its own indentation inside __awaiter
         async_emitter.set_indent_level(self.writer.indent_level() + 1);
-        async_emitter.set_lexical_this(this_expr != "this");
         if let Some(text) = self.source_text_for_map() {
             if self.writer.has_source_map() {
                 async_emitter.set_source_map_context(text, self.writer.current_source_index());
             }
         }
+        async_emitter.set_use_this_capture(this_expr != "this");
 
         let generator_body = if async_emitter.body_contains_await(body) {
             async_emitter.emit_generator_body_with_await(body)
