@@ -1364,6 +1364,10 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         self.are_parameters_compatible(source_type, target_type)
     }
 
+    fn required_param_count(&self, params: &[ParamInfo]) -> usize {
+        params.iter().filter(|param| !param.optional && !param.rest).count()
+    }
+
     /// Check return type compatibility with void special-casing.
     fn check_return_compat(&mut self, source_return: TypeId, target_return: TypeId) -> SubtypeResult {
         if self.allow_void_return && target_return == TypeId::VOID {
@@ -1442,6 +1446,12 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             return SubtypeResult::False;
         }
 
+        let source_required = self.required_param_count(&source.params);
+        let target_required = self.required_param_count(&target.params);
+        if source_required > target_required {
+            return SubtypeResult::False;
+        }
+
         // Check if target has a rest parameter
         let target_has_rest = target.params.last().map_or(false, |p| p.rest);
         let source_has_rest = source.params.last().map_or(false, |p| p.rest);
@@ -1449,11 +1459,6 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         // Count non-rest parameters
         let target_fixed_count = if target_has_rest { target.params.len().saturating_sub(1) } else { target.params.len() };
         let source_fixed_count = if source_has_rest { source.params.len().saturating_sub(1) } else { source.params.len() };
-
-        // If target doesn't have a rest parameter, source can't have more params than target
-        if !target_has_rest && source.params.len() > target.params.len() {
-            return SubtypeResult::False;
-        }
 
         // Compare fixed parameters
         let fixed_compare_count = std::cmp::min(source_fixed_count, target_fixed_count);
@@ -1602,6 +1607,12 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             return SubtypeResult::False;
         }
 
+        let source_required = self.required_param_count(&source.params);
+        let target_required = self.required_param_count(&target.params);
+        if source_required > target_required {
+            return SubtypeResult::False;
+        }
+
         // Check if target has a rest parameter
         let target_has_rest = target.params.last().map_or(false, |p| p.rest);
         let source_has_rest = source.params.last().map_or(false, |p| p.rest);
@@ -1609,11 +1620,6 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         // Count non-rest parameters
         let target_fixed_count = if target_has_rest { target.params.len().saturating_sub(1) } else { target.params.len() };
         let source_fixed_count = if source_has_rest { source.params.len().saturating_sub(1) } else { source.params.len() };
-
-        // If target doesn't have a rest parameter, source can't have more params than target
-        if !target_has_rest && source.params.len() > target.params.len() {
-            return SubtypeResult::False;
-        }
 
         // Compare fixed parameters
         let fixed_compare_count = std::cmp::min(source_fixed_count, target_fixed_count);
@@ -1670,6 +1676,12 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             return SubtypeResult::False;
         }
 
+        let source_required = self.required_param_count(&source.params);
+        let target_required = self.required_param_count(&target.params);
+        if source_required > target_required {
+            return SubtypeResult::False;
+        }
+
         // Check if target has a rest parameter
         let target_has_rest = target.params.last().map_or(false, |p| p.rest);
         let source_has_rest = source.params.last().map_or(false, |p| p.rest);
@@ -1677,11 +1689,6 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         // Count non-rest parameters
         let target_fixed_count = if target_has_rest { target.params.len().saturating_sub(1) } else { target.params.len() };
         let source_fixed_count = if source_has_rest { source.params.len().saturating_sub(1) } else { source.params.len() };
-
-        // If target doesn't have a rest parameter, source can't have more params than target
-        if !target_has_rest && source.params.len() > target.params.len() {
-            return SubtypeResult::False;
-        }
 
         // Compare fixed parameters
         let fixed_compare_count = std::cmp::min(source_fixed_count, target_fixed_count);
@@ -1738,6 +1745,12 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             return SubtypeResult::False;
         }
 
+        let source_required = self.required_param_count(&source.params);
+        let target_required = self.required_param_count(&target.params);
+        if source_required > target_required {
+            return SubtypeResult::False;
+        }
+
         // Check if target has a rest parameter
         let target_has_rest = target.params.last().map_or(false, |p| p.rest);
         let source_has_rest = source.params.last().map_or(false, |p| p.rest);
@@ -1745,11 +1758,6 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         // Count non-rest parameters
         let target_fixed_count = if target_has_rest { target.params.len().saturating_sub(1) } else { target.params.len() };
         let source_fixed_count = if source_has_rest { source.params.len().saturating_sub(1) } else { source.params.len() };
-
-        // If target doesn't have a rest parameter, source can't have more params than target
-        if !target_has_rest && source.params.len() > target.params.len() {
-            return SubtypeResult::False;
-        }
 
         // Compare fixed parameters
         let fixed_compare_count = std::cmp::min(source_fixed_count, target_fixed_count);
@@ -2423,15 +2431,17 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
         // Check parameter count
         let target_has_rest = target.params.last().map_or(false, |p| p.rest);
-        let source_has_rest = source.params.last().map_or(false, |p| p.rest);
-        if source.params.len() > target.params.len() && !target_has_rest {
+        let source_required = self.required_param_count(&source.params);
+        let target_required = self.required_param_count(&target.params);
+        if source_required > target_required {
             return Some(SubtypeFailureReason::TooManyParameters {
-                source_count: source.params.len(),
-                target_count: target.params.len(),
+                source_count: source_required,
+                target_count: target_required,
             });
         }
 
         // Check parameter types
+        let source_has_rest = source.params.last().map_or(false, |p| p.rest);
         let target_fixed_count = if target_has_rest {
             target.params.len().saturating_sub(1)
         } else {
