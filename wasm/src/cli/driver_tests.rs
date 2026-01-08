@@ -5063,3 +5063,127 @@ export function wrap(inner: string, outer: string): string {
     let js = std::fs::read_to_string(base.join("dist/src/nested.js")).expect("read js");
     assert!(!js.is_empty(), "JS output should not be empty");
 }
+
+// =============================================================================
+// E2E: Destructuring Assignment Compilation
+// =============================================================================
+
+#[test]
+fn compile_object_destructuring() {
+    // Test object destructuring compilation
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/extract.ts"),
+        r#"
+interface Point {
+    x: number;
+    y: number;
+}
+
+export function getX(point: Point): number {
+    const { x } = point;
+    return x;
+}
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+
+    let js = std::fs::read_to_string(base.join("dist/src/extract.js")).expect("read js");
+    assert!(!js.is_empty(), "JS output should not be empty");
+}
+
+#[test]
+fn compile_array_destructuring() {
+    // Test array destructuring compilation
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/arrays.ts"),
+        r#"
+export function getFirst(arr: number[]): number {
+    const [first] = arr;
+    return first;
+}
+
+export function getSecond(arr: number[]): number {
+    const [, second] = arr;
+    return second;
+}
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+
+    let js = std::fs::read_to_string(base.join("dist/src/arrays.js")).expect("read js");
+    assert!(!js.is_empty(), "JS output should not be empty");
+}
+
+#[test]
+fn compile_destructuring_with_defaults() {
+    // Test destructuring with default values
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/defaults.ts"),
+        r#"
+interface Config {
+    host: string;
+    port: number;
+}
+
+export function getPort(config: Config): number {
+    const { port = 3000 } = config;
+    return port;
+}
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+
+    let js = std::fs::read_to_string(base.join("dist/src/defaults.js")).expect("read js");
+    assert!(!js.is_empty(), "JS output should not be empty");
+}
