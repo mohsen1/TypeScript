@@ -3943,6 +3943,50 @@ const sum = Merge.a + Merge.b;
 }
 
 #[test]
+fn test_checker_namespace_merges_across_decls_type_access() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::TypeKey;
+
+    let source = r#"
+namespace Merge {
+    export interface A { x: number; }
+}
+namespace Merge {
+    export interface B { y: number; }
+}
+type Alias = Merge.A;
+const value: Merge.B = { y: 1 };
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let alias_sym = binder.file_locals.get("Alias").expect("Alias should exist");
+    let alias_type = checker.get_type_of_symbol(alias_sym);
+    let alias_key = types.lookup(alias_type).expect("Alias type should exist");
+    match alias_key {
+        TypeKey::Object(shape_id) => {
+            let shape = types.object_shape(shape_id);
+            let prop = shape
+                .properties
+                .iter()
+                .find(|prop| types.resolve_atom(prop.name) == "x")
+                .expect("Expected property x");
+            assert_eq!(prop.type_id, TypeId::NUMBER);
+        }
+        _ => panic!("Expected Alias to resolve to Object type, got {:?}", alias_key),
+    }
+}
+
+#[test]
 fn test_checker_namespace_merges_with_function_value_exports() {
     use crate::thin_parser::ThinParserState;
 

@@ -47,6 +47,7 @@ Priority: 4
 - [x] Added checker coverage for enum/namespace merged type member access reverse order. Tests: `./wasm/test.sh`.
 - [x] Added checker coverage for function/namespace merged type member access reverse order. Tests: `./wasm/test.sh`.
 - [x] Added checker coverage for namespace merge across declarations with value access. Tests: `./wasm/test.sh`.
+- [x] Added checker coverage for namespace merge across declarations with type access. Tests: `./wasm/test.sh`.
 
 ## Ready for Merge
 Yes
