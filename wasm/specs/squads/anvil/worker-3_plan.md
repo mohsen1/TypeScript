@@ -77,6 +77,7 @@ Priority: 3
 - [x] Added destructuring assignment compilation E2E tests (object, array, defaults); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 - [x] Added optional chaining and nullish coalescing E2E tests (property access, method calls, defaults); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 - [x] Added class features compilation E2E tests (inheritance, static members, accessors); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
+- [x] Added computed properties and ES6 syntax E2E tests (computed props, for...of, shorthand methods); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 
 ## Ready for Merge
 Yes
