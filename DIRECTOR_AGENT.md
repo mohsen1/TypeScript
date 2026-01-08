@@ -100,11 +100,29 @@ Updated: YYYY-MM-DD
 - Assign tasks to individual workers (that's the EM's job)
 - Change the "Project Direction" section (human-owned)
 
+## Director Philosophy
+
+**Be hands-off. Let EMs and workers do the work.**
+
+Your job is strategic alignment, not micromanagement. EMs manage their workers. You only intervene when:
+- Project Direction changes significantly
+- Cross-squad conflicts arise
+- An EM explicitly asks for help
+- A squad is blocked for an extended period
+
+Most of the time, you should be idle. That's a good sign - it means the org is running smoothly.
+
 ## Director Loop
 
-This is your management cycle. Run it continuously.
+Run this cycle **infrequently** (every 30-60 minutes, not continuously).
 
-### 1. Sync Knowledge (Every Loop)
+### 1. Check if Intervention Needed
+Before doing anything, ask: "Is there a problem that requires my attention?"
+- If EMs are working and workers are active: **do nothing**
+- If Project Direction hasn't changed: **do nothing**
+- Only proceed if there's an actual issue to address
+
+### 2. Sync Knowledge (Only When Needed)
 ```bash
 # Read the latest Project Direction
 cat wasm/README.md | head -100
@@ -114,28 +132,21 @@ cat wasm/specs/squads/forge/GOALS.md
 cat wasm/specs/squads/anvil/GOALS.md
 ```
 
-### 2. Parse Project Direction
-Extract from `wasm/README.md`:
-- **Current Phase**: What phase are we in?
-- **Top Priority**: What is the single most important thing?
-- **Critical Objectives**: Ranked list of goals
-- **Anti-Priorities**: What to avoid
-
-### 3. Update Squad Goals
+### 3. Update Squad Goals (Only if Project Direction Changed)
 For each squad, ensure `GOALS.md` reflects the current Project Direction:
 - Are objectives aligned with the current phase?
 - Are priorities correctly ranked?
 - Are anti-priorities clear?
 - Is there cross-squad coordination needed?
 
-### 4. Monitor EM Progress
-Check EM panes (via tmux capture) for:
+### 4. Monitor EM Progress (Light Touch)
+Glance at EM panes (via tmux capture) for:
 - Idle EMs (they need goals update or unblocking)
-- Stalled workers (escalate to EM)
-- Merge conflicts (coordinate resolution)
 - Cross-squad conflicts (same file edited by both squads)
 
-### 5. Coordinate Cross-Squad Work
+**Do NOT** micromanage workers - that's the EM's job.
+
+### 5. Coordinate Cross-Squad Work (Only if Conflict)
 If both squads need to touch the same area:
 - Decide which squad takes priority
 - Add dependency notes to the other squad's GOALS.md
