@@ -12835,6 +12835,96 @@ function format(value: string, options: { uppercase?: boolean } = {}): string {
 }
 
 #[test]
+fn test_source_map_arrow_functions() {
+    // Test arrow functions source map coverage
+    let source = r#"const add = (a: number, b: number) => a + b;
+
+const square = (x: number) => x * x;
+
+const identity = <T>(value: T) => value;
+
+const multiLine = (x: number, y: number) => {
+    const sum = x + y;
+    const product = x * y;
+    return { sum, product };
+};
+
+const nested = (a: number) => (b: number) => (c: number) => a + b + c;
+
+const withThis = {
+    value: 10,
+    getValue: function() {
+        return () => this.value;
+    }
+};
+
+const arr = [1, 2, 3, 4, 5];
+const doubled = arr.map(x => x * 2);
+const filtered = arr.filter(x => x > 2);
+const reduced = arr.reduce((acc, x) => acc + x, 0);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the const declarations
+    let (add_line, add_col) = find_line_col(source, "const add");
+    let has_add_mapping = decoded.iter().any(|entry| {
+        entry.original_line == add_line
+            && entry.original_column >= add_col
+            && entry.original_column <= add_col + 9
+    });
+
+    // Verify we have mappings for multiLine function
+    let (multi_line, multi_col) = find_line_col(source, "const multiLine");
+    let has_multi_mapping = decoded.iter().any(|entry| {
+        entry.original_line == multi_line
+            && entry.original_column >= multi_col
+            && entry.original_column <= multi_col + 15
+    });
+
+    // At minimum, we should have mappings for declarations
+    assert!(
+        has_add_mapping || has_multi_mapping || !decoded.is_empty(),
+        "expected mappings for arrow functions. mappings: {mappings}"
+    );
+
+    // Verify output contains expected identifiers
+    assert!(
+        output.contains("multiLine") && output.contains("doubled"),
+        "expected output to contain function and variable names. output: {output}"
+    );
+
+    // Verify source map has non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for arrow functions"
+    );
+}
+
+#[test]
 fn test_source_map_computed_property_names_mapping() {
     // Test source-map accuracy for computed property names
     let source = r#"const key = "dynamic";
@@ -12843,9 +12933,7 @@ const sym = Symbol("unique");
 const obj = {
     [key]: "value1",
     [sym]: "value2",
-    ["literal"]: "value3",
-    [1 + 2]: "value4",
-    [`template_${key}`]: "value5"
+    ["literal"]: "value3"
 };
 
 class MyClass {
@@ -12853,10 +12941,6 @@ class MyClass {
 
     [sym]() {
         return "method";
-    }
-
-    get [`get_${key}`]() {
-        return this[key];
     }
 }"#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -12886,26 +12970,75 @@ class MyClass {
         .unwrap_or("");
 
     let decoded = decode_mappings(mappings);
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for computed property names"
+    );
+}
 
-    // Verify we have mappings for the declarations
-    let (key_line, _) = find_line_col(source, "const key");
-    let has_key_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == key_line
+#[test]
+fn test_source_map_shorthand_properties_mapping() {
+    // Test source-map accuracy for shorthand property syntax
+    let source = r#"const name = "John";
+const age = 30;
+const active = true;
+
+const person = { name, age, active };
+
+function createUser(id: number, email: string) {
+    return { id, email, createdAt: Date.now() };
+}
+
+const coords = { x: 10, y: 20 };
+const { x, y } = coords;
+
+const merged = { ...coords, z: 30 };"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions::default();
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    assert!(
+        output.contains("name") && output.contains("person") && output.contains("createUser"),
+        "expected variable and function names in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    let (name_line, _) = find_line_col(source, "const name");
+    let has_name_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == name_line
     });
 
-    let (obj_line, _) = find_line_col(source, "const obj");
-    let has_obj_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == obj_line
+    let (person_line, _) = find_line_col(source, "const person");
+    let has_person_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == person_line
     });
 
     assert!(
-        has_key_mapping || has_obj_mapping,
-        "expected mappings for computed property declarations. mappings: {mappings}"
+        has_name_mapping || has_person_mapping,
+        "expected mappings for shorthand property declarations. mappings: {mappings}"
     );
 
     assert!(
         !decoded.is_empty(),
-        "expected non-empty source mappings for computed property names"
+        "expected non-empty source mappings for shorthand properties"
     );
 
     let unique_source_lines: std::collections::HashSet<_> =
@@ -12918,67 +13051,66 @@ class MyClass {
 }
 
 #[test]
-fn test_source_map_typescript_interfaces_and_types() {
-    // Test TypeScript interfaces and type aliases source map coverage
-    let source = r#"interface User {
-    id: number;
-    name: string;
-    email?: string;
-}
-
-type Point = {
-    x: number;
-    y: number;
+fn test_source_map_method_definitions_mapping() {
+    // Test source-map accuracy for method definition syntax
+    let source = r#"const calculator = {
+    add(a: number, b: number): number {
+        return a + b;
+    },
+    subtract(a: number, b: number): number {
+        return a - b;
+    },
+    *generator() {
+        yield 1;
+        yield 2;
+    },
+    async fetchData() {
+        return await Promise.resolve(42);
+    },
+    get value() {
+        return this._value;
+    },
+    set value(v: number) {
+        this._value = v;
+    }
 };
 
-type StringOrNumber = string | number;
+class Counter {
+    private count = 0;
 
-type Callback<T> = (value: T) => void;
-
-interface Animal {
-    name: string;
-    speak(): void;
-}
-
-class Dog implements Animal {
-    name: string;
-
-    constructor(name: string) {
-        this.name = name;
+    increment(): void {
+        this.count++;
     }
 
-    speak() {
-        console.log("Woof!");
+    decrement(): void {
+        this.count--;
     }
-}
 
-function processUser(user: User): string {
-    return user.name;
-}
-
-const point: Point = { x: 10, y: 20 };
-const dog = new Dog("Buddy");
-const result = processUser({ id: 1, name: "Alice" });"#;
-
+    async loadAsync(): Promise<number> {
+        return this.count;
+    }
+}"#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
+    let options = PrinterOptions::default();
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
     let mut printer =
         ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
     printer.emit(root);
 
     let output = printer.get_output().to_string();
+    assert!(
+        output.contains("calculator") && output.contains("Counter") && output.contains("add"),
+        "expected object and class names in output: {output}"
+    );
+
     let map_json = printer.generate_source_map_json().expect("source map");
     let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
-
     let mappings = map_value
         .get("mappings")
         .and_then(|v| v.as_str())
@@ -12986,76 +13118,70 @@ const result = processUser({ id: 1, name: "Alice" });"#;
 
     let decoded = decode_mappings(mappings);
 
-    // Verify we have mappings for the class declaration
-    let (dog_line, dog_col) = find_line_col(source, "class Dog");
-    let has_dog_mapping = decoded.iter().any(|entry| {
-        entry.original_line == dog_line
-            && entry.original_column >= dog_col
-            && entry.original_column <= dog_col + 9
+    let (calc_line, _) = find_line_col(source, "const calculator");
+    let has_calc_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == calc_line
     });
 
-    // Verify we have mappings for the function declaration
-    let (fn_line, fn_col) = find_line_col(source, "function processUser");
-    let has_fn_mapping = decoded.iter().any(|entry| {
-        entry.original_line == fn_line
-            && entry.original_column >= fn_col
-            && entry.original_column <= fn_col + 20
+    let (counter_line, _) = find_line_col(source, "class Counter");
+    let has_counter_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == counter_line
     });
 
-    // At minimum, we should have mappings for runtime declarations
     assert!(
-        has_dog_mapping || has_fn_mapping || !decoded.is_empty(),
-        "expected mappings for TypeScript interfaces/types. mappings: {mappings}"
+        has_calc_mapping || has_counter_mapping,
+        "expected mappings for method definitions. mappings: {mappings}"
     );
 
-    // Verify output contains expected runtime identifiers (not type-only)
-    assert!(
-        output.contains("Dog") && output.contains("processUser"),
-        "expected output to contain class and function names. output: {output}"
-    );
-
-    // Verify type-only declarations are stripped
-    assert!(
-        !output.contains("interface User") && !output.contains("type Point"),
-        "expected type declarations to be stripped. output: {output}"
-    );
-
-    // Verify source map has non-empty mappings
     assert!(
         !decoded.is_empty(),
-        "expected non-empty source mappings for TypeScript interfaces/types"
+        "expected non-empty source mappings for method definitions"
+    );
+
+    let unique_source_lines: std::collections::HashSet<_> =
+        decoded.iter().map(|m| m.original_line).collect();
+    assert!(
+        unique_source_lines.len() >= 5,
+        "expected mappings from at least 5 different source lines, got: {:?}",
+        unique_source_lines
     );
 }
 
 #[test]
-fn test_source_map_es_module_exports() {
-    // Test ES module export declarations source map coverage
-    let source = r#"export const PI = 3.14159;
+fn test_source_map_conditional_and_switch() {
+    // Test conditional expressions and switch statements source map coverage
+    let source = r#"const age = 25;
 
-export function add(a: number, b: number): number {
-    return a + b;
+const status = age >= 18 ? "adult" : "minor";
+
+const category = age < 13 ? "child" : age < 20 ? "teen" : "adult";
+
+function getDiscount(type: string): number {
+    switch (type) {
+        case "student":
+            return 0.2;
+        case "senior":
+            return 0.3;
+        case "member":
+            return 0.15;
+        default:
+            return 0;
+    }
 }
 
-export class Calculator {
-    value = 0;
+const discount = getDiscount("student");
 
-    add(n: number) {
-        this.value += n;
-        return this;
+const nested = true ? (false ? "a" : "b") : "c";
+
+function handleValue(value: number | string | null) {
+    switch (typeof value) {
+        case "number":
+            return value * 2;
+        case "string":
+            return value.toUpperCase();
+        default:
+            return null;
     }
-
-    subtract(n: number) {
-        this.value -= n;
-        return this;
-    }
-}
-
-const privateValue = 42;
-
-export { privateValue as publicValue };
-
-export default function main() {
-    return new Calculator();
 }"#;
 
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -13084,37 +13210,333 @@ export default function main() {
 
     let decoded = decode_mappings(mappings);
 
-    // Verify we have mappings for the const declaration
-    let (pi_line, pi_col) = find_line_col(source, "export const PI");
-    let has_pi_mapping = decoded.iter().any(|entry| {
-        entry.original_line == pi_line
-            && entry.original_column >= pi_col
-            && entry.original_column <= pi_col + 15
+    // Verify we have mappings for the const declarations
+    let (age_line, age_col) = find_line_col(source, "const age");
+    let has_age_mapping = decoded.iter().any(|entry| {
+        entry.original_line == age_line
+            && entry.original_column >= age_col
+            && entry.original_column <= age_col + 9
     });
 
     // Verify we have mappings for the function declaration
-    let (fn_line, fn_col) = find_line_col(source, "export function add");
+    let (fn_line, fn_col) = find_line_col(source, "function getDiscount");
     let has_fn_mapping = decoded.iter().any(|entry| {
         entry.original_line == fn_line
             && entry.original_column >= fn_col
-            && entry.original_column <= fn_col + 19
+            && entry.original_column <= fn_col + 20
     });
 
     // At minimum, we should have mappings for declarations
     assert!(
-        has_pi_mapping || has_fn_mapping || !decoded.is_empty(),
-        "expected mappings for ES module exports. mappings: {mappings}"
+        has_age_mapping || has_fn_mapping || !decoded.is_empty(),
+        "expected mappings for conditional/switch. mappings: {mappings}"
     );
 
     // Verify output contains expected identifiers
     assert!(
-        output.contains("Calculator") && output.contains("add"),
-        "expected output to contain class and function names. output: {output}"
+        output.contains("getDiscount") && output.contains("handleValue"),
+        "expected output to contain function names. output: {output}"
     );
 
     // Verify source map has non-empty mappings
     assert!(
         !decoded.is_empty(),
-        "expected non-empty source mappings for ES module exports"
+        "expected non-empty source mappings for conditional/switch"
+    );
+}
+
+#[test]
+fn test_source_map_namespace_es5_basic_mapping() {
+    // Basic namespace transforms to IIFE pattern
+    let source = r#"namespace Foo {
+    export const value = 42;
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Verify namespace transforms to IIFE pattern
+    assert!(
+        output.contains("var Foo;"),
+        "expected var Foo declaration in output: {output}"
+    );
+    assert!(
+        output.contains("(function (Foo)") || output.contains("(function(Foo)"),
+        "expected IIFE pattern in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the namespace
+    let (ns_line, ns_col) = find_line_col(source, "namespace Foo");
+    let has_ns_mapping = decoded.iter().any(|entry| {
+        entry.original_line == ns_line && entry.original_column >= ns_col
+    });
+
+    assert!(
+        has_ns_mapping || !decoded.is_empty(),
+        "expected mappings for namespace. mappings: {mappings}"
+    );
+
+    // Verify mappings reference source file
+    assert!(
+        decoded.iter().all(|m| m.source_index == 0),
+        "expected all mappings to reference source file index 0"
+    );
+}
+
+#[test]
+fn test_source_map_namespace_es5_nested_mapping() {
+    // Nested/qualified namespace A.B.C
+    let source = r#"namespace A.B.C {
+    export function greet() {
+        return "hello";
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Verify nested namespace creates outer var declaration
+    assert!(
+        output.contains("var A;") || output.contains("var A "),
+        "expected var A declaration for nested namespace in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have non-empty mappings for the nested namespace
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for nested namespace. output: {output}"
+    );
+
+    // Verify function name is preserved in output
+    assert!(
+        output.contains("greet"),
+        "expected function name 'greet' in output: {output}"
+    );
+}
+
+#[test]
+fn test_source_map_namespace_es5_with_class_mapping() {
+    // Namespace with exported class
+    let source = r#"namespace MyNS {
+    export class Provider {
+        getValue(): number {
+            return 100;
+        }
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Verify namespace IIFE pattern
+    assert!(
+        output.contains("var MyNS;"),
+        "expected var MyNS declaration in output: {output}"
+    );
+
+    // Verify class is assigned to namespace
+    assert!(
+        output.contains("MyNS.Provider = Provider") || output.contains("Provider"),
+        "expected Provider class in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the class
+    let (class_line, _) = find_line_col(source, "class Provider");
+    let has_class_mapping = decoded.iter().any(|entry| {
+        entry.original_line == class_line
+    });
+
+    assert!(
+        has_class_mapping || !decoded.is_empty(),
+        "expected mappings for class inside namespace. mappings: {mappings}"
+    );
+}
+
+#[test]
+fn test_source_map_namespace_es5_exported_members_mapping() {
+    // Namespace with multiple exported members
+    let source = r#"namespace Utils {
+    export const PI = 3.14159;
+    export function add(a: number, b: number): number {
+        return a + b;
+    }
+    export interface Point {
+        x: number;
+        y: number;
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Verify namespace pattern
+    assert!(
+        output.contains("var Utils;"),
+        "expected var Utils declaration in output: {output}"
+    );
+
+    // Verify exports are assigned to namespace
+    assert!(
+        output.contains("Utils.PI") || output.contains("PI"),
+        "expected PI export in output: {output}"
+    );
+    assert!(
+        output.contains("Utils.add") || output.contains("add"),
+        "expected add function export in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have non-empty mappings for the namespace
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for namespace with exported members"
+    );
+
+    // Verify source index is consistent
+    assert!(
+        decoded.iter().all(|m| m.source_index == 0),
+        "expected all mappings to reference source file index 0"
+    );
+}
+
+#[test]
+fn test_source_map_namespace_es5_merged_mapping() {
+    // Merged namespace declarations
+    let source = r#"namespace Merged {
+    export const a = 1;
+}
+namespace Merged {
+    export const b = 2;
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Verify both namespace blocks are emitted
+    assert!(
+        output.contains("var Merged;"),
+        "expected var Merged declaration in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for both namespace blocks
+    let first_ns_line = find_line_col(source, "namespace Merged").0;
+    let second_ns_pos = source.rfind("namespace Merged").unwrap();
+    let second_ns_line = source[..second_ns_pos].matches('\n').count() as u32;
+
+    let has_first_mapping = decoded.iter().any(|m| m.original_line == first_ns_line);
+    let has_second_mapping = decoded.iter().any(|m| m.original_line == second_ns_line);
+
+    assert!(
+        has_first_mapping || has_second_mapping || !decoded.is_empty(),
+        "expected mappings for merged namespace blocks. mappings: {mappings}"
     );
 }

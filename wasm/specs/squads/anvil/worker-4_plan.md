@@ -88,6 +88,8 @@ Priority: 4
 - [x] Add rest/spread source-map test. Tests: `./wasm/test.sh rest_spread_mapping`
 - [x] Add default parameters source-map test. Tests: `./wasm/test.sh default_parameters_mapping`
 - [x] Add computed property names source-map test. Tests: `./wasm/test.sh computed_property_names_mapping`
+- [x] Add shorthand properties source-map test. Tests: `./wasm/test.sh shorthand_properties_mapping`
+- [x] Add method definitions source-map test. Tests: `./wasm/test.sh method_definitions_mapping`
 
 ## Ready for Merge
 Yes
