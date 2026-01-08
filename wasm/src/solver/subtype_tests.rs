@@ -108,6 +108,52 @@ fn test_template_literal_subtyping_to_string() {
 }
 
 #[test]
+fn test_template_literal_apparent_member_subtyping() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let red = interner.literal_string("red");
+    let blue = interner.literal_string("blue");
+    let colors = interner.union(vec![red, blue]);
+    let template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("color-")),
+        TemplateSpan::Type(colors),
+    ]);
+
+    let method = |return_type| {
+        interner.function(FunctionShape {
+            params: Vec::new(),
+            this_type: None,
+            return_type,
+            type_params: Vec::new(),
+            type_predicate: None,
+            is_constructor: false,
+        })
+    };
+
+    let to_upper = interner.intern_string("toUpperCase");
+    let target = interner.object(vec![PropertyInfo {
+        name: to_upper,
+        type_id: method(TypeId::STRING),
+        write_type: method(TypeId::STRING),
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+    let mismatch = interner.object(vec![PropertyInfo {
+        name: to_upper,
+        type_id: method(TypeId::NUMBER),
+        write_type: method(TypeId::NUMBER),
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    assert!(checker.is_subtype_of(template, target));
+    assert!(!checker.is_subtype_of(template, mismatch));
+}
+
+#[test]
 fn test_apparent_number_member_subtyping() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
@@ -185,6 +231,61 @@ fn test_apparent_string_member_subtyping() {
         readonly: false,
         is_method: true,
     }]);
+
+    assert!(checker.is_subtype_of(TypeId::STRING, target));
+    assert!(!checker.is_subtype_of(TypeId::STRING, mismatch));
+}
+
+#[test]
+fn test_apparent_string_length_subtyping() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let length = interner.intern_string("length");
+    let target = interner.object(vec![PropertyInfo {
+        name: length,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let mismatch = interner.object(vec![PropertyInfo {
+        name: length,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(checker.is_subtype_of(TypeId::STRING, target));
+    assert!(!checker.is_subtype_of(TypeId::STRING, mismatch));
+}
+
+#[test]
+fn test_apparent_string_number_index_subtyping() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let target = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+    });
+    let mismatch = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
 
     assert!(checker.is_subtype_of(TypeId::STRING, target));
     assert!(!checker.is_subtype_of(TypeId::STRING, mismatch));
@@ -405,6 +506,42 @@ fn test_object_trifecta_object_interface_accepts_primitives() {
     assert!(checker.is_subtype_of(TypeId::NUMBER, object_ref));
     assert!(checker.is_subtype_of(TypeId::STRING, empty_object));
     assert!(!checker.is_subtype_of(TypeId::STRING, TypeId::OBJECT));
+}
+
+#[test]
+fn test_object_trifecta_nullish_rejection() {
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let to_string = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let object_interface = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("toString"),
+        type_id: to_string,
+        write_type: to_string,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+    let sym = SymbolRef(99);
+    env.insert(sym, object_interface);
+    let object_ref = interner.reference(sym);
+
+    let mut checker = SubtypeChecker::with_resolver(&interner, &env);
+    let empty_object = interner.object(Vec::new());
+
+    assert!(!checker.is_subtype_of(TypeId::NULL, TypeId::OBJECT));
+    assert!(!checker.is_subtype_of(TypeId::UNDEFINED, TypeId::OBJECT));
+    assert!(!checker.is_subtype_of(TypeId::NULL, empty_object));
+    assert!(!checker.is_subtype_of(TypeId::UNDEFINED, empty_object));
+    assert!(!checker.is_subtype_of(TypeId::NULL, object_ref));
+    assert!(!checker.is_subtype_of(TypeId::UNDEFINED, object_ref));
 }
 
 #[test]
@@ -1921,6 +2058,42 @@ fn test_number_and_string_index_signatures() {
 
     // This should SUCCEED - "0" satisfies number index, both satisfy string index
     assert!(checker.is_subtype_of(source, target));
+}
+
+#[test]
+fn test_index_signature_consistency_number_vs_string_index() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let source = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let target = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    assert!(!checker.is_subtype_of(source, target));
 }
 
 #[test]
@@ -4177,6 +4350,100 @@ fn test_mapped_type_over_string_keys_subtyping() {
     assert!(checker.is_subtype_of(mapped, expected));
     assert!(!checker.is_subtype_of(mapped, mismatch));
     assert!(!checker.is_subtype_of(expected, mapped));
+}
+
+#[test]
+fn test_mapped_type_over_string_keys_number_index_subtyping() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let constraint = interner.intern(TypeKey::KeyOf(TypeId::STRING));
+    let mapped = interner.mapped(MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint,
+        name_type: None,
+        template: TypeId::BOOLEAN,
+        readonly_modifier: None,
+        optional_modifier: None,
+    });
+
+    let number_index = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::BOOLEAN,
+            readonly: false,
+        }),
+    });
+    let mismatch = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+    });
+
+    assert!(checker.is_subtype_of(mapped, number_index));
+    assert!(!checker.is_subtype_of(mapped, mismatch));
+}
+
+#[test]
+fn test_mapped_type_over_string_keys_key_remap_omit_length() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let constraint = interner.intern(TypeKey::KeyOf(TypeId::STRING));
+    let key_param = TypeParamInfo {
+        name: interner.intern_string("K"),
+        constraint: None,
+        default: None,
+    };
+    let key_param_id = interner.intern(TypeKey::TypeParameter(key_param.clone()));
+    let length_key = interner.literal_string("length");
+    let name_type = interner.conditional(ConditionalType {
+        check_type: key_param_id,
+        extends_type: length_key,
+        true_type: TypeId::NEVER,
+        false_type: key_param_id,
+        is_distributive: true,
+    });
+    let mapped = interner.mapped(MappedType {
+        type_param: key_param,
+        constraint,
+        name_type: Some(name_type),
+        template: TypeId::BOOLEAN,
+        readonly_modifier: None,
+        optional_modifier: None,
+    });
+
+    let to_upper = interner.intern_string("toUpperCase");
+    let expected = interner.object(vec![PropertyInfo {
+        name: to_upper,
+        type_id: TypeId::BOOLEAN,
+        write_type: TypeId::BOOLEAN,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let length = interner.intern_string("length");
+    let requires_length = interner.object(vec![PropertyInfo {
+        name: length,
+        type_id: TypeId::BOOLEAN,
+        write_type: TypeId::BOOLEAN,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(checker.is_subtype_of(mapped, expected));
+    assert!(!checker.is_subtype_of(mapped, requires_length));
 }
 
 #[test]
