@@ -926,3 +926,48 @@ class Foo {
         output
     );
 }
+
+#[test]
+fn test_class_es5_symbol_iterator_method() {
+    let source = r#"
+class Foo {
+    items = [1, 2, 3];
+
+    *[Symbol.iterator]() {
+        for (const item of this.items) {
+            yield item;
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Should emit Symbol.iterator as computed property name
+    assert!(
+        output.contains("[Symbol.iterator]"),
+        "Expected Symbol.iterator to be preserved as computed property: {}",
+        output
+    );
+
+    // Should emit on prototype since it's an instance method
+    assert!(
+        output.contains(".prototype[Symbol.iterator]"),
+        "Expected Symbol.iterator method to be on prototype: {}",
+        output
+    );
+}
