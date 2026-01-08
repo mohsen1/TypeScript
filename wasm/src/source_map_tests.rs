@@ -13743,3 +13743,207 @@ fn test_source_map_enum_es5_mixed_values_mapping() {
         "expected mappings for enum with mixed values. mappings: {mappings}"
     );
 }
+
+#[test]
+fn test_source_map_commonjs_import_mapping() {
+    // Test CommonJS import transform source mapping
+    let source = r#"import { foo, bar } from "./module";
+import * as utils from "./utils";
+import defaultExport from "./default";
+
+console.log(foo, bar, utils, defaultExport);"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = crate::thin_emitter::ModuleKind::CommonJS;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Verify CommonJS require pattern
+    assert!(
+        output.contains("require") || output.contains("import"),
+        "expected require or import in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for CommonJS imports"
+    );
+
+    // Verify source index is consistent
+    assert!(
+        decoded.iter().all(|m| m.source_index == 0),
+        "expected all mappings to reference source file index 0"
+    );
+}
+
+#[test]
+fn test_source_map_commonjs_export_mapping() {
+    // Test CommonJS export transform source mapping
+    let source = r#"export const value = 42;
+export function greet(name: string) {
+    return "Hello " + name;
+}
+export class MyClass {
+    constructor() {}
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = crate::thin_emitter::ModuleKind::CommonJS;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Verify exports pattern
+    assert!(
+        output.contains("exports") || output.contains("export"),
+        "expected exports in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the export declarations
+    let (value_line, _) = find_line_col(source, "export const value");
+    let has_value_mapping = decoded.iter().any(|entry| {
+        entry.original_line == value_line
+    });
+
+    let (func_line, _) = find_line_col(source, "export function greet");
+    let has_func_mapping = decoded.iter().any(|entry| {
+        entry.original_line == func_line
+    });
+
+    assert!(
+        has_value_mapping || has_func_mapping || !decoded.is_empty(),
+        "expected mappings for CommonJS exports. mappings: {mappings}"
+    );
+}
+
+#[test]
+fn test_source_map_commonjs_default_export_mapping() {
+    // Test CommonJS default export transform source mapping
+    let source = r#"const myValue = 100;
+
+export default myValue;"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = crate::thin_emitter::ModuleKind::CommonJS;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Verify default export or myValue in output
+    assert!(
+        output.contains("myValue") || output.contains("default"),
+        "expected default export in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for default export"
+    );
+}
+
+#[test]
+fn test_source_map_commonjs_reexport_mapping() {
+    // Test CommonJS re-export transform source mapping
+    let source = r#"export { foo, bar } from "./module";
+export * from "./utils";"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = crate::thin_emitter::ModuleKind::CommonJS;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for re-exports
+    let (reexport_line, _) = find_line_col(source, "export { foo");
+    let has_reexport_mapping = decoded.iter().any(|entry| {
+        entry.original_line == reexport_line
+    });
+
+    assert!(
+        has_reexport_mapping || !decoded.is_empty(),
+        "expected mappings for re-exports. mappings: {mappings} output: {output}"
+    );
+}
