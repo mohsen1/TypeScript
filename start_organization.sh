@@ -35,7 +35,7 @@ START_PAUSE="${START_PAUSE:-10}"
 SEND_ENTER_PAUSE="${SEND_ENTER_PAUSE:-1}"
 STAGGER_PAUSE="${STAGGER_PAUSE:-2}"
 
-AUTO_MONITOR="${AUTO_MONITOR:-0}"
+AUTO_MONITOR="${AUTO_MONITOR:-1}"
 AUTO_ATTACH="${AUTO_ATTACH:-1}"
 
 # =============================================================================
