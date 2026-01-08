@@ -39,6 +39,43 @@ fn test_class_es5_emits_param_and_static_properties() {
 }
 
 #[test]
+fn test_class_es5_static_field_arrow_keeps_this() {
+    let source = "class Foo { static field = () => this.value; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    assert!(
+        output.contains("Foo.field = function"),
+        "Expected static field initializer to emit a function expression: {}",
+        output
+    );
+    assert!(
+        output.contains("return this.value;"),
+        "Expected static field arrow to preserve `this`: {}",
+        output
+    );
+    assert!(
+        !output.contains("_this"),
+        "Did not expect static field arrow to capture `_this`: {}",
+        output
+    );
+}
+
+#[test]
 fn test_class_es5_async_method_emits_awaiter() {
     let source = "class Foo { async bar() { await baz(); return 1; } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -373,6 +410,201 @@ class Derived extends Base {
     assert!(
         output.contains("__classPrivateFieldSet(_this, _Derived_count, _this.value"),
         "Expected private field initializer to use _this in derived class: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_computed_property_field_initializer_emitted() {
+    let source = r#"
+const key = "z";
+class Foo {
+    [key] = 42;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    assert!(
+        output.contains("this[key] = 42"),
+        "Expected computed property initializer to be emitted: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_derived_computed_property_field_initializer_emitted() {
+    let source = r#"
+const key = "z";
+class Base {}
+class Derived extends Base {
+    [key] = 42;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(2)
+        .expect("expected derived class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    assert!(
+        output.contains("_this[key] = 42"),
+        "Expected computed property initializer with _this in derived class: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_derived_with_explicit_ctor_computed_property_field() {
+    let source = r#"
+const key = "z";
+class Base {}
+class Derived extends Base {
+    [key] = 42;
+    constructor() {
+        super();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(2)
+        .expect("expected derived class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    assert!(
+        output.contains("_this[key] = 42"),
+        "Expected computed property initializer with _this in derived class with explicit ctor: {}",
+        output
+    );
+
+    // Verify ordering: super() should come before property initializer
+    let super_pos = output.find("_super.call(this").expect("expected super call");
+    let init_pos = output.find("_this[key] = 42").expect("expected initializer");
+    assert!(
+        super_pos < init_pos,
+        "Expected super call before computed property initializer: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_static_field_async_arrow() {
+    let source = "class Foo { static handler = async () => { await fetch(); return this.value; }; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Should emit __awaiter for async
+    assert!(
+        output.contains("__awaiter"),
+        "Expected static async arrow to use __awaiter: {}",
+        output
+    );
+
+    // Should preserve `this` (not capture to _this) for static field
+    assert!(
+        output.contains("this.value"),
+        "Expected static async arrow to preserve `this`: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_private_field_access_in_async_method() {
+    let source = r#"
+class Foo {
+    #value = 1;
+    async getValue() {
+        await fetch();
+        return this.#value;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Should emit __awaiter for async method
+    assert!(
+        output.contains("__awaiter"),
+        "Expected async method to use __awaiter: {}",
+        output
+    );
+
+    // Should emit __classPrivateFieldGet for private field access
+    assert!(
+        output.contains("__classPrivateFieldGet"),
+        "Expected private field access to use __classPrivateFieldGet: {}",
+        output
+    );
+
+    // Should emit WeakMap for private field storage
+    assert!(
+        output.contains("_Foo_value"),
+        "Expected private field WeakMap name: {}",
         output
     );
 }
