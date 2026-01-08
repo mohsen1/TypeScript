@@ -264,6 +264,19 @@ impl<'a> TypeLowering<'a> {
         None
     }
 
+    /// Import type parameter bindings from an external scope (e.g., checker's type parameter scope).
+    /// This allows TypeLowering to access type parameters that were defined outside of it.
+    pub fn import_type_params<'b, I>(&self, bindings: I)
+    where
+        I: Iterator<Item = (&'b String, &'b TypeId)>,
+    {
+        self.push_type_param_scope();
+        for (name, &type_id) in bindings {
+            let atom = self.interner.intern_string(name);
+            self.add_type_param_binding(atom, type_id);
+        }
+    }
+
     /// Lower a type node to a TypeId.
     /// This is the main entry point for type synthesis.
     pub fn lower_type(&self, node_idx: NodeIndex) -> TypeId {

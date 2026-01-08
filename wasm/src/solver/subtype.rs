@@ -12,6 +12,7 @@
 use std::collections::HashSet;
 use crate::interner::Atom;
 use crate::solver::infer::InferenceContext;
+use crate::solver::instantiate::{TypeSubstitution, instantiate_type};
 use crate::solver::types::*;
 use crate::solver::{apparent_primitive_members, ApparentMemberKind, AssignabilityChecker, TypeDatabase};
 
@@ -584,6 +585,29 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 }
             }
 
+            // Source is Application, target is structural - try to expand and compare
+            (TypeKey::Application(_), _) => {
+                if let Some(expanded) = self.try_expand_application(source) {
+                    self.check_subtype(expanded, target)
+                } else {
+                    // Can't expand - assume not a subtype
+                    SubtypeResult::False
+                }
+            }
+
+            // Target is Application, source is structural - try to expand and compare
+            (_, TypeKey::Application(_)) => {
+                eprintln!("[DEBUG] check_subtype: target is Application {:?}", target);
+                if let Some(expanded) = self.try_expand_application(target) {
+                    eprintln!("[DEBUG] check_subtype: expanded target to {:?}", expanded);
+                    self.check_subtype(source, expanded)
+                } else {
+                    eprintln!("[DEBUG] check_subtype: failed to expand target Application");
+                    // Can't expand - assume not a subtype
+                    SubtypeResult::False
+                }
+            }
+
             // Reference types - try to resolve and compare structurally
             (TypeKey::Ref(s_sym), TypeKey::Ref(t_sym)) => {
                 // Same symbol reference - trivially equal
@@ -833,6 +857,145 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 }
             }
             _ => false,
+        }
+    }
+
+    /// Try to expand an Application type to its underlying structural type.
+    /// For Application(Ref(sym), [arg1, arg2, ...]), resolves the Ref and
+    /// substitutes type parameters with the type arguments.
+    fn try_expand_application(&mut self, app_type_id: TypeId) -> Option<TypeId> {
+        let app_key = self.interner.lookup(app_type_id)?;
+        let TypeKey::Application(app_id) = app_key else {
+            return None;
+        };
+        let app = self.interner.type_application(app_id);
+
+        // Check if base is a Ref
+        let base_key = self.interner.lookup(app.base)?;
+        let TypeKey::Ref(sym_ref) = base_key else {
+            eprintln!("[DEBUG] try_expand_application: base is not Ref, it's {:?}", base_key);
+            // Base is not a Ref, can't expand
+            return None;
+        };
+
+        eprintln!("[DEBUG] try_expand_application: base is Ref({}) with {} args", sym_ref.0, app.args.len());
+
+        // Resolve the Ref to get the underlying type
+        let resolved = self.resolver.resolve_ref(sym_ref, self.interner);
+        eprintln!("[DEBUG] try_expand_application: resolve_ref returned {:?}", resolved);
+        let resolved = resolved?;
+
+        // First, try to get type parameters from the resolver (if implemented)
+        if let Some(type_params) = self.resolver.get_type_params(sym_ref) {
+            if !type_params.is_empty() && type_params.len() == app.args.len() {
+                // Build substitution: map type param names to type arguments
+                // Pre-expand args that are TypeQuery or Application types
+                let mut substitution = TypeSubstitution::new();
+                for (param, &arg) in type_params.iter().zip(app.args.iter()) {
+                    let expanded_arg = self.try_expand_type_arg(arg).unwrap_or(arg);
+                    substitution.insert(param.name, expanded_arg);
+                }
+                return Some(instantiate_type(self.interner, resolved, &substitution));
+            }
+        }
+
+        // Fallback: extract type parameters from the resolved type itself
+        // by scanning for TypeParameter types in declaration order
+        let type_params = self.extract_type_params_from_type(resolved);
+        if type_params.is_empty() || type_params.len() != app.args.len() {
+            // No type params or mismatch - just return resolved without substitution
+            return Some(resolved);
+        }
+
+        // Build substitution: map type param names to type arguments
+        // Pre-expand args that are TypeQuery or Application types
+        let mut substitution = TypeSubstitution::new();
+        for (param_name, &arg) in type_params.iter().zip(app.args.iter()) {
+            let expanded_arg = self.try_expand_type_arg(arg).unwrap_or(arg);
+            substitution.insert(*param_name, expanded_arg);
+        }
+
+        // Instantiate the resolved type with the substitution
+        Some(instantiate_type(self.interner, resolved, &substitution))
+    }
+
+    /// Try to expand a type argument that is a TypeQuery or Application.
+    /// Returns the expanded type or None if no expansion needed/possible.
+    fn try_expand_type_arg(&mut self, arg: TypeId) -> Option<TypeId> {
+        let key = self.interner.lookup(arg)?;
+        match key {
+            TypeKey::TypeQuery(sym_ref) => {
+                // Resolve typeof expression to its actual type
+                self.resolver.resolve_ref(sym_ref, self.interner)
+            }
+            TypeKey::Application(_) => {
+                // Recursively expand nested Application
+                self.try_expand_application(arg)
+            }
+            _ => None,
+        }
+    }
+
+    /// Extract type parameter names from a type in first-occurrence order.
+    /// This is used as a fallback when the resolver doesn't provide type params.
+    fn extract_type_params_from_type(&self, type_id: TypeId) -> Vec<Atom> {
+        let mut params = Vec::new();
+        let mut visited = HashSet::new();
+        self.collect_type_params(type_id, &mut params, &mut visited);
+        params
+    }
+
+    fn collect_type_params(&self, type_id: TypeId, params: &mut Vec<Atom>, visited: &mut HashSet<TypeId>) {
+        if !visited.insert(type_id) {
+            return;
+        }
+
+        let Some(key) = self.interner.lookup(type_id) else {
+            return;
+        };
+
+        match key {
+            TypeKey::TypeParameter(info) => {
+                if !params.contains(&info.name) {
+                    params.push(info.name);
+                }
+            }
+            TypeKey::Function(fn_id) => {
+                let fn_shape = self.interner.function_shape(fn_id);
+                // Collect from type params first (in declaration order)
+                for param in &fn_shape.type_params {
+                    if !params.contains(&param.name) {
+                        params.push(param.name);
+                    }
+                }
+                // Then collect from params and return type (for nested type params)
+                for param in &fn_shape.params {
+                    self.collect_type_params(param.type_id, params, visited);
+                }
+                self.collect_type_params(fn_shape.return_type, params, visited);
+            }
+            TypeKey::Object(shape_id) => {
+                let shape = self.interner.object_shape(shape_id);
+                for prop in &shape.properties {
+                    self.collect_type_params(prop.type_id, params, visited);
+                }
+            }
+            TypeKey::Union(list_id) | TypeKey::Intersection(list_id) => {
+                let types = self.interner.type_list(list_id);
+                for &t in &*types {
+                    self.collect_type_params(t, params, visited);
+                }
+            }
+            TypeKey::Array(elem) => {
+                self.collect_type_params(elem, params, visited);
+            }
+            TypeKey::Tuple(tuple_id) => {
+                let elements = self.interner.tuple_list(tuple_id);
+                for elem in &*elements {
+                    self.collect_type_params(elem.type_id, params, visited);
+                }
+            }
+            _ => {}
         }
     }
 
