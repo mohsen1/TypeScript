@@ -476,7 +476,15 @@ impl<'a> TypeFormatter<'a> {
                 self.format_callable(shape.as_ref())
             }
             TypeKey::TypeParameter(info) => self.atom(info.name).to_string(),
-            TypeKey::Ref(sym) => format!("Ref({})", sym.0),
+            TypeKey::Ref(sym) => {
+                // Try to look up the symbol name
+                if let Some(arena) = self.symbol_arena {
+                    if let Some(symbol) = arena.get(SymbolId(sym.0)) {
+                        return symbol.escaped_name.to_string();
+                    }
+                }
+                format!("Ref({})", sym.0)
+            }
             TypeKey::Application(app) => {
                 let app = self.interner.type_application(*app);
                 let args: Vec<String> = app.args.iter()
@@ -499,10 +507,32 @@ impl<'a> TypeFormatter<'a> {
                 let spans = self.interner.template_list(*spans);
                 self.format_template_literal(spans.as_ref())
             }
-            TypeKey::TypeQuery(sym) => format!("typeof Ref({})", sym.0),
+            TypeKey::TypeQuery(sym) => {
+                let name = if let Some(arena) = self.symbol_arena {
+                    if let Some(symbol) = arena.get(SymbolId(sym.0)) {
+                        symbol.escaped_name.to_string()
+                    } else {
+                        format!("Ref({})", sym.0)
+                    }
+                } else {
+                    format!("Ref({})", sym.0)
+                };
+                format!("typeof {}", name)
+            }
             TypeKey::KeyOf(operand) => format!("keyof {}", self.format(*operand)),
             TypeKey::ReadonlyType(inner) => format!("readonly {}", self.format(*inner)),
-            TypeKey::UniqueSymbol(sym) => format!("unique symbol ({})", sym.0),
+            TypeKey::UniqueSymbol(sym) => {
+                let name = if let Some(arena) = self.symbol_arena {
+                    if let Some(symbol) = arena.get(SymbolId(sym.0)) {
+                        symbol.escaped_name.to_string()
+                    } else {
+                        format!("symbol({})", sym.0)
+                    }
+                } else {
+                    format!("symbol({})", sym.0)
+                };
+                format!("unique symbol {}", name)
+            }
             TypeKey::Infer(info) => format!("infer {}", self.atom(info.name)),
             TypeKey::ThisType => "this".to_string(),
             TypeKey::Error => "error".to_string(),
