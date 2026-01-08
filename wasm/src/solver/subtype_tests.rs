@@ -3496,6 +3496,41 @@ fn test_keyof_union_index_signature_contravariant() {
 }
 
 #[test]
+fn test_keyof_union_string_index_and_literal_narrows() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let string_index = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+    let key_a = interner.intern_string("a");
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: key_a,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let union = interner.union(vec![string_index, obj_a]);
+    let keyof_union = interner.intern(TypeKey::KeyOf(union));
+    let key_a_literal = interner.literal_string("a");
+
+    assert!(checker.is_subtype_of(keyof_union, key_a_literal));
+    assert!(checker.is_subtype_of(keyof_union, TypeId::STRING));
+    assert!(!checker.is_subtype_of(keyof_union, TypeId::NUMBER));
+    assert!(checker.is_subtype_of(key_a_literal, keyof_union));
+    assert!(!checker.is_subtype_of(TypeId::STRING, keyof_union));
+}
+
+#[test]
 fn test_keyof_union_overlapping_keys_is_common() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
