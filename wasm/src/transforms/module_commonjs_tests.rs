@@ -161,6 +161,27 @@ fn test_collect_export_names_with_default_export_class_and_named_export() {
 }
 
 #[test]
+fn test_collect_export_names_with_exported_namespace() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = "export namespace Foo { export const bar = 1; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let Some(source_file) = parser.arena.get_source_file(parser.arena.get(root).unwrap()) else {
+        panic!("Failed to get source file");
+    };
+
+    let export_names = collect_export_names(&parser.arena, &source_file.statements.nodes);
+
+    assert_eq!(
+        export_names,
+        vec!["Foo"],
+        "Expected exported namespace name"
+    );
+}
+
+#[test]
 fn test_collect_export_names_with_named_exports() {
     use crate::thin_parser::ThinParserState;
 
