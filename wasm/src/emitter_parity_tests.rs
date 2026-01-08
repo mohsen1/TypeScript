@@ -2225,3 +2225,79 @@ fn test_parity_es5_static_block_multi_stmt() {
         output
     );
 }
+
+/// Parity test for ES5 object spread downlevel.
+/// Object spread should be converted to Object.assign or helper.
+#[test]
+fn test_parity_es5_object_spread() {
+    let source = "const merged = { ...obj1, ...obj2, extra: true };";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify variable declaration
+    assert!(
+        output.contains("var merged") || output.contains("merged"),
+        "ES5 output should define merged: {}",
+        output
+    );
+    // Spread syntax should not appear in ES5 output
+    assert!(
+        !output.contains("...obj1") && !output.contains("...obj2"),
+        "ES5 output should not contain spread syntax: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 array spread downlevel.
+/// Array spread should be converted to concat or helper.
+#[test]
+fn test_parity_es5_array_spread() {
+    let source = "const combined = [...arr1, ...arr2, 42];";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify variable declaration
+    assert!(
+        output.contains("var combined") || output.contains("combined"),
+        "ES5 output should define combined: {}",
+        output
+    );
+    // Spread syntax should not appear in ES5 output
+    assert!(
+        !output.contains("...arr1") && !output.contains("...arr2"),
+        "ES5 output should not contain spread syntax: {}",
+        output
+    );
+}
