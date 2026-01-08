@@ -2201,6 +2201,99 @@ fn test_this_parameter_variance() {
     assert!(checker.is_subtype_of(union_this_fn, string_this_fn));
     assert!(!checker.is_subtype_of(string_this_fn, union_this_fn));
 }
+
+#[test]
+fn test_this_parameter_method_property_bivariant() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+    let method_name = interner.intern_string("m");
+
+    let wide_this = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let wide_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: Some(wide_this),
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let narrow_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: Some(TypeId::STRING),
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let wide_obj = interner.object(vec![PropertyInfo {
+        name: method_name,
+        type_id: wide_method,
+        write_type: wide_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+    let narrow_obj = interner.object(vec![PropertyInfo {
+        name: method_name,
+        type_id: narrow_method,
+        write_type: narrow_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    assert!(checker.is_subtype_of(wide_obj, narrow_obj));
+    assert!(checker.is_subtype_of(narrow_obj, wide_obj));
+}
+
+#[test]
+fn test_this_parameter_function_property_contravariant() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+    let func_name = interner.intern_string("f");
+
+    let wide_this = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let wide_func = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: Some(wide_this),
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let narrow_func = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: Some(TypeId::STRING),
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let wide_obj = interner.object(vec![PropertyInfo {
+        name: func_name,
+        type_id: wide_func,
+        write_type: wide_func,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let narrow_obj = interner.object(vec![PropertyInfo {
+        name: func_name,
+        type_id: narrow_func,
+        write_type: narrow_func,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(checker.is_subtype_of(wide_obj, narrow_obj));
+    assert!(!checker.is_subtype_of(narrow_obj, wide_obj));
+}
+
 #[test]
 fn test_function_fixed_to_rest_subtyping() {
     use std::sync::Arc;
