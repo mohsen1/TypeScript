@@ -11675,3 +11675,78 @@ const sum = small + large;"#;
         "expected non-empty source mappings for BigInt code"
     );
 }
+
+#[test]
+fn test_source_map_class_static_blocks() {
+    // Test class static blocks (ES2022)
+    let source = r#"class Counter {
+    static count = 0;
+    static {
+        Counter.count = 10;
+        console.log("initialized");
+    }
+    static {
+        Counter.count += 5;
+    }
+}"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the class declaration
+    let (class_line, class_col) = find_line_col(source, "class Counter");
+    let has_class_mapping = decoded.iter().any(|entry| {
+        entry.original_line == class_line
+            && entry.original_column >= class_col
+            && entry.original_column <= class_col + 13
+    });
+
+    // Verify we have mappings for the static property
+    let (count_line, count_col) = find_line_col(source, "static count");
+    let has_count_mapping = decoded.iter().any(|entry| {
+        entry.original_line == count_line
+            && entry.original_column >= count_col
+            && entry.original_column <= count_col + 12
+    });
+
+    // At minimum, we should have mappings for the class or static property
+    assert!(
+        has_class_mapping || has_count_mapping,
+        "expected mappings for class with static blocks. mappings: {mappings}"
+    );
+
+    // Verify output contains the class name
+    assert!(
+        output.contains("Counter"),
+        "expected output to contain class name. output: {output}"
+    );
+
+    // Verify source map has non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for class static blocks"
+    );
+}
