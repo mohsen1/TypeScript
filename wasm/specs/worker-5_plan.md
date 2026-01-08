@@ -185,6 +185,8 @@ Priority: 5
       Tests: `./wasm/test.sh test_source_map_es5_transform_async_unary_negative_mapping`.
 - [x] Added ES5 async unary bitwise-not await source map mapping test in `wasm/src/source_map_tests.rs`.
       Tests: `./wasm/test.sh test_source_map_es5_transform_async_unary_bitwise_not_mapping`.
+- [x] Added ES5 async unary void await source map mapping test in `wasm/src/source_map_tests.rs`.
+      Tests: `./wasm/test.sh test_source_map_es5_transform_async_unary_void_mapping`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
