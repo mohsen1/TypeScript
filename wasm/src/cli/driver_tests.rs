@@ -2217,3 +2217,428 @@ fn invalidate_paths_with_dependents_symbols_handles_star_reexports() {
     assert_eq!(cache.node_cache_len(&canonical_index).unwrap_or(1), 0);
     assert!(cache.symbol_cache_len(&canonical_util).is_none());
 }
+
+#[test]
+fn compile_multi_file_project_with_imports() {
+    // End-to-end test for a multi-file project with various import patterns
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    // Create tsconfig.json with CommonJS module for testable require() output
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "rootDir": "src",
+            "module": "commonjs",
+            "declaration": true,
+            "sourceMap": true
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    // src/models/user.ts - basic model with interface and class
+    write_file(
+        &base.join("src/models/user.ts"),
+        r#"
+export interface User {
+    id: number;
+    name: string;
+    email: string;
+}
+
+export class UserImpl implements User {
+    id: number;
+    name: string;
+    email: string;
+
+    constructor(id: number, name: string, email: string) {
+        this.id = id;
+        this.name = name;
+        this.email = email;
+    }
+
+    getDisplayName(): string {
+        return this.name + " <" + this.email + ">";
+    }
+}
+
+export type UserId = number;
+"#,
+    );
+
+    // src/utils/helpers.ts - utility functions
+    write_file(
+        &base.join("src/utils/helpers.ts"),
+        r#"
+export function formatName(first: string, last: string): string {
+    return first + " " + last;
+}
+
+export function validateEmail(email: string): boolean {
+    return email.indexOf("@") >= 0;
+}
+
+export const DEFAULT_PAGE_SIZE = 20;
+"#,
+    );
+
+    // src/services/user-service.ts - service using models and utils
+    write_file(
+        &base.join("src/services/user-service.ts"),
+        r#"
+import { User, UserImpl, UserId } from '../models/user';
+import { formatName, validateEmail } from '../utils/helpers';
+
+export class UserService {
+    private users: User[] = [];
+
+    createUser(id: UserId, firstName: string, lastName: string, email: string): User | null {
+        if (!validateEmail(email)) {
+            return null;
+        }
+        const name = formatName(firstName, lastName);
+        const user = new UserImpl(id, name, email);
+        this.users.push(user);
+        return user;
+    }
+
+    getUserCount(): number {
+        return this.users.length;
+    }
+}
+"#,
+    );
+
+    // src/index.ts - main entry point re-exporting everything
+    write_file(
+        &base.join("src/index.ts"),
+        r#"
+// Re-export models
+export { User, UserImpl, UserId } from './models/user';
+
+// Re-export utilities
+export { formatName, validateEmail, DEFAULT_PAGE_SIZE } from './utils/helpers';
+
+// Re-export services
+export { UserService } from './services/user-service';
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    // Verify no diagnostics
+    assert!(
+        result.diagnostics.is_empty(),
+        "Expected no diagnostics, got: {:?}",
+        result.diagnostics
+    );
+
+    // Verify all output files exist
+    assert!(
+        base.join("dist/models/user.js").is_file(),
+        "models/user.js should exist"
+    );
+    assert!(
+        base.join("dist/models/user.d.ts").is_file(),
+        "models/user.d.ts should exist"
+    );
+    assert!(
+        base.join("dist/models/user.js.map").is_file(),
+        "models/user.js.map should exist"
+    );
+
+    assert!(
+        base.join("dist/utils/helpers.js").is_file(),
+        "utils/helpers.js should exist"
+    );
+    assert!(
+        base.join("dist/utils/helpers.d.ts").is_file(),
+        "utils/helpers.d.ts should exist"
+    );
+
+    assert!(
+        base.join("dist/services/user-service.js").is_file(),
+        "services/user-service.js should exist"
+    );
+    assert!(
+        base.join("dist/services/user-service.d.ts").is_file(),
+        "services/user-service.d.ts should exist"
+    );
+
+    assert!(
+        base.join("dist/index.js").is_file(),
+        "index.js should exist"
+    );
+    assert!(
+        base.join("dist/index.d.ts").is_file(),
+        "index.d.ts should exist"
+    );
+
+    // Verify user-service.js has correct CommonJS require statements
+    let service_js =
+        std::fs::read_to_string(base.join("dist/services/user-service.js")).expect("read service js");
+    assert!(
+        service_js.contains("require(") || service_js.contains("import"),
+        "Service JS should have require or import statements: {}",
+        service_js
+    );
+    assert!(
+        service_js.contains("../models/user") || service_js.contains("./models/user"),
+        "Service JS should reference models/user: {}",
+        service_js
+    );
+    assert!(
+        service_js.contains("../utils/helpers") || service_js.contains("./utils/helpers"),
+        "Service JS should reference utils/helpers: {}",
+        service_js
+    );
+
+    // Verify index.js has re-exports (CommonJS uses Object.defineProperty pattern)
+    let index_js = std::fs::read_to_string(base.join("dist/index.js")).expect("read index js");
+    assert!(
+        index_js.contains("exports") && (index_js.contains("require(") || index_js.contains("Object.defineProperty")),
+        "Index JS should have CommonJS exports: {}",
+        index_js
+    );
+
+    // Verify declaration file for index has proper re-exports
+    let index_dts = std::fs::read_to_string(base.join("dist/index.d.ts")).expect("read index d.ts");
+    assert!(
+        index_dts.contains("User") && index_dts.contains("UserService"),
+        "Index d.ts should export User and UserService: {}",
+        index_dts
+    );
+
+    // Verify source map for user-service has correct sources
+    let service_map_contents =
+        std::fs::read_to_string(base.join("dist/services/user-service.js.map"))
+            .expect("read service map");
+    let service_map: Value =
+        serde_json::from_str(&service_map_contents).expect("parse service map json");
+    let sources = service_map
+        .get("sources")
+        .and_then(|v| v.as_array())
+        .expect("sources array");
+    assert!(
+        !sources.is_empty(),
+        "Source map should have sources"
+    );
+    let sources_content = service_map
+        .get("sourcesContent")
+        .and_then(|v| v.as_array());
+    assert!(
+        sources_content.is_some(),
+        "Source map should have sourcesContent"
+    );
+}
+
+#[test]
+fn compile_multi_file_project_with_default_and_named_imports() {
+    // Test default and named import styles
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "rootDir": "src",
+            "module": "commonjs",
+            "esModuleInterop": true,
+            "declaration": true
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    // src/constants.ts - default export
+    write_file(
+        &base.join("src/constants.ts"),
+        r#"
+const CONFIG = {
+    apiUrl: "https://api.example.com",
+    timeout: 5000
+};
+
+export default CONFIG;
+export const VERSION = "1.0.0";
+"#,
+    );
+
+    // src/math.ts - multiple named exports
+    write_file(
+        &base.join("src/math.ts"),
+        r#"
+export function add(a: number, b: number): number {
+    return a + b;
+}
+
+export function multiply(a: number, b: number): number {
+    return a * b;
+}
+
+export const PI = 3.14159;
+"#,
+    );
+
+    // src/app.ts - uses default and named imports
+    write_file(
+        &base.join("src/app.ts"),
+        r#"
+// Default import
+import CONFIG from './constants';
+// Named import alongside default
+import { VERSION } from './constants';
+// Named imports with alias
+import { add as addNumbers, multiply, PI } from './math';
+
+export function runApp(): string {
+    const sum = addNumbers(1, 2);
+    const product = multiply(3, 4);
+    const circumference = 2 * PI * 10;
+    const url = CONFIG.apiUrl;
+
+    return url + " v" + VERSION + " sum=" + sum + " product=" + product + " circ=" + circumference;
+}
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(
+        result.diagnostics.is_empty(),
+        "Expected no diagnostics, got: {:?}",
+        result.diagnostics
+    );
+
+    // Verify all files compiled
+    assert!(base.join("dist/constants.js").is_file());
+    assert!(base.join("dist/math.js").is_file());
+    assert!(base.join("dist/app.js").is_file());
+    assert!(base.join("dist/app.d.ts").is_file());
+
+    // Verify app.js has the necessary require statements
+    let app_js = std::fs::read_to_string(base.join("dist/app.js")).expect("read app js");
+    assert!(
+        app_js.contains("./constants") || app_js.contains("constants"),
+        "App JS should reference constants: {}",
+        app_js
+    );
+    assert!(
+        app_js.contains("./math") || app_js.contains("math"),
+        "App JS should reference math: {}",
+        app_js
+    );
+
+    // Verify declaration file has correct exports
+    let app_dts = std::fs::read_to_string(base.join("dist/app.d.ts")).expect("read app d.ts");
+    assert!(
+        app_dts.contains("runApp"),
+        "App d.ts should export runApp: {}",
+        app_dts
+    );
+}
+
+#[test]
+fn compile_multi_file_project_with_type_imports() {
+    // Test type-only imports compile correctly
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "module": "commonjs",
+            "declaration": true
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    // src/types.ts - shared types
+    write_file(
+        &base.join("src/types.ts"),
+        r#"
+export interface Logger {
+    log(msg: string): void;
+}
+
+export type LogLevel = "debug" | "info" | "error";
+"#,
+    );
+
+    // src/logger.ts - uses types (type-only import)
+    write_file(
+        &base.join("src/logger.ts"),
+        r#"
+import type { Logger, LogLevel } from './types';
+
+export class ConsoleLogger implements Logger {
+    private level: LogLevel;
+
+    constructor(level: LogLevel) {
+        this.level = level;
+    }
+
+    log(msg: string): void {
+        // log implementation
+    }
+
+    getLevel(): LogLevel {
+        return this.level;
+    }
+}
+
+export function createLogger(level: LogLevel): Logger {
+    return new ConsoleLogger(level);
+}
+"#,
+    );
+
+    // src/index.ts - re-exports everything
+    write_file(
+        &base.join("src/index.ts"),
+        r#"
+export type { Logger, LogLevel } from './types';
+export { ConsoleLogger, createLogger } from './logger';
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(
+        result.diagnostics.is_empty(),
+        "Type imports should compile without errors: {:?}",
+        result.diagnostics
+    );
+
+    assert!(base.join("dist/src/types.js").is_file());
+    assert!(base.join("dist/src/logger.js").is_file());
+    assert!(base.join("dist/src/index.js").is_file());
+    assert!(base.join("dist/src/index.d.ts").is_file());
+
+    // Verify declaration file has type exports
+    let index_dts = std::fs::read_to_string(base.join("dist/src/index.d.ts")).expect("read index d.ts");
+    assert!(
+        index_dts.contains("Logger") && index_dts.contains("LogLevel"),
+        "Index d.ts should have type exports for Logger and LogLevel: {}",
+        index_dts
+    );
+
+    // Verify logger.js has the class implementation
+    let logger_js = std::fs::read_to_string(base.join("dist/src/logger.js")).expect("read logger js");
+    assert!(
+        logger_js.contains("ConsoleLogger") && logger_js.contains("createLogger"),
+        "Logger JS should have class and function exports: {}",
+        logger_js
+    );
+}
