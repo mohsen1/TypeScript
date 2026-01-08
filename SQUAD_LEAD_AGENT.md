@@ -235,9 +235,16 @@ tmux send-keys -t zang-org:<squad>.<pane> C-m
 
 ## Communication via Tmux
 
+### Cancel Worker's Current Operation
+If a worker is stuck in a long operation or going down the wrong path, you can cancel it:
+```bash
+tmux send-keys -t zang-org:<squad>.<pane> Escape
+```
+This sends Escape to the worker's codex session, which cancels the current generation/operation.
+
 ### Send Message to Worker
 ```bash
-# First cancel any running generation
+# Cancel any running generation first (optional, if they seem stuck)
 tmux send-keys -t zang-org:<squad>.<pane> Escape
 sleep 1
 
