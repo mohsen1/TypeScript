@@ -4337,6 +4337,45 @@ interface Bar {
 }
 
 #[test]
+fn test_checker_typeof_namespace_alias_member() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::{TypeKey, SymbolRef};
+
+    let source = r#"
+namespace Ns {
+    export const value = 1;
+}
+import Alias = Ns;
+type T = typeof Alias.value;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let ns_sym = binder.file_locals.get("Ns").expect("Ns should exist");
+    let value_sym = binder.get_symbol(ns_sym)
+        .and_then(|symbol| symbol.exports.as_ref())
+        .and_then(|exports| exports.get("value"))
+        .expect("Ns.value should exist");
+
+    let t_sym = binder.file_locals.get("T").expect("T should exist");
+    let t_type = checker.get_type_of_symbol(t_sym);
+    let t_key = types.lookup(t_type).expect("T type should exist");
+    match t_key {
+        TypeKey::TypeQuery(SymbolRef(sym_id)) => assert_eq!(sym_id, value_sym.0),
+        other => panic!("Expected T to be typeof Alias.value, got {:?}", other),
+    }
+}
+
+#[test]
 fn test_checker_typeof_with_type_arguments() {
     use crate::thin_parser::ThinParserState;
     use crate::solver::{TypeKey, SymbolRef};
