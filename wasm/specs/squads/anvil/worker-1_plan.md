@@ -7,7 +7,7 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-- Ensure derived synthesized constructors use `_this` capture in field/private initializers.
+- [EM: Assign next task]
 
 ## Task Queue
 - [x] Audit computed `super[...]` lowering paths in `wasm/src/transforms/class_es5.rs` for nested arrows.
