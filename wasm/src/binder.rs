@@ -126,6 +126,10 @@ pub struct Symbol {
     pub is_exported: bool,
     /// Whether this symbol is type-only (e.g., `import type`).
     pub is_type_only: bool,
+    /// File index for cross-file resolution (set during multi-file merge)
+    /// This indicates which file's arena contains this symbol's declarations.
+    /// Value of u32::MAX means single-file mode (use current arena).
+    pub decl_file_idx: u32,
 }
 
 impl Symbol {
@@ -142,6 +146,7 @@ impl Symbol {
             members: None,
             is_exported: false,
             is_type_only: false,
+            decl_file_idx: u32::MAX,
         }
     }
 
@@ -321,6 +326,16 @@ impl SymbolArena {
     pub fn alloc(&mut self, flags: u32, name: String) -> SymbolId {
         let id = SymbolId(self.base_offset + self.symbols.len() as u32);
         self.symbols.push(Symbol::new(id, flags, name));
+        id
+    }
+
+    /// Allocate a new symbol by cloning from an existing one, with a new ID.
+    /// This copies all symbol data including declarations, exports, members, etc.
+    pub fn alloc_from(&mut self, source: &Symbol) -> SymbolId {
+        let id = SymbolId(self.base_offset + self.symbols.len() as u32);
+        let mut cloned = source.clone();
+        cloned.id = id;
+        self.symbols.push(cloned);
         id
     }
 

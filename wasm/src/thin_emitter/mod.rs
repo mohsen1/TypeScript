@@ -1001,6 +1001,25 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
+        if let Some(source) = self.arena.get_source_file(node) {
+            if self.transforms.is_empty() {
+                let format = match self.ctx.options.module {
+                    ModuleKind::AMD => Some(crate::transform_context::ModuleFormat::AMD),
+                    ModuleKind::UMD => Some(crate::transform_context::ModuleFormat::UMD),
+                    ModuleKind::System => Some(crate::transform_context::ModuleFormat::System),
+                    _ => None,
+                };
+                if let Some(format) = format {
+                    if self.file_is_module(&source.statements) {
+                        let dependencies =
+                            self.collect_module_dependencies(&source.statements.nodes);
+                        self.emit_module_wrapper(&format, &dependencies, node, source);
+                        return;
+                    }
+                }
+            }
+        }
+
         self.emit_node(node, idx);
     }
 
