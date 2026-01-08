@@ -7,12 +7,13 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] Add decorator source map tests in `wasm/src/source_map_tests.rs`. Run `./wasm/test.sh source_map`.
+- [ ] (awaiting assignment)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added decorator source map tests (with arguments, with expression, composition, static method, static property, getter, setter, metadata, inheritance, combined advanced); `./wasm/test.sh source_map` passes.
 - [x] Added private fields source map tests (basic, initialized, constructor, private method, access, assignment, static field, static method, inheritance, combined); `./wasm/test.sh source_map` passes.
 - [x] Added dynamic import source map tests (basic, variable path, then chain, await, in function, destructuring, conditional, template path, catch, combined); `./wasm/test.sh source_map` passes.
 - [x] Added BigInt literal source map tests (basic, with variables, arithmetic, comparison, constructor, in function, large numbers, negative, in array/object, combined); `./wasm/test.sh source_map` passes.
