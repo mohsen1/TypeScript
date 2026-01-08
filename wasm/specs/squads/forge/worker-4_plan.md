@@ -8,6 +8,9 @@ Priority: 4
 
 ## Current Assignment
 - [x] End-to-end validation: add a larger redux/lodash-style generic library regression in `wasm/src/parallel_tests.rs` (or `wasm/src/thin_checker_tests.rs`) and fix the first panic or mismatch in `wasm/src/checker/mod.rs` or `wasm/src/solver/mod.rs`; run `./wasm/test.sh`.
+- [x] Add union normalization assertions for `unknown` handling and nested union flattening in `wasm/src/thin_checker_tests.rs`; run `./wasm/test.sh`.
+- [x] Add intersection flatten/dedup regression in `wasm/src/solver/intern_tests.rs`; run `./wasm/test.sh`.
+- [x] Add union/intersection precedence regression for `any` vs `unknown` in `wasm/src/solver/intern_tests.rs`; run `./wasm/test.sh`.
 
 ## Task Queue
 - [x] Add a multi-file generic library test case with mapped/conditional types and assert no panics + expected diagnostics.
@@ -19,9 +22,12 @@ Priority: 4
 - [x] Added multi-file generic regression across two files. Tests: `./wasm/test.sh test_multi_file_generic_library_snippet_compiles_and_checks`.
 - [x] Synced with `origin/rust`; `FunctionId` build error not reproducible in `wasm/src/solver/evaluate.rs`. Tests: `./wasm/test.sh` (fails on existing `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
 - [x] Added redux/lodash-style mapped/conditional regression in `wasm/src/parallel_tests.rs`. Tests: `./wasm/test.sh` (fails: `src/transforms/async_es5.rs` unexpected closing delimiter).
+- [x] Added union normalization coverage for `unknown` and nested unions. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` diagnostic count 6 vs 0).
+- [x] Added intersection flatten/dedup coverage. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` diagnostic count 6 vs 0).
+- [x] Added `any` vs `unknown` precedence coverage for unions/intersections. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` diagnostic count 6 vs 0).
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize solver correctness (inference/conditional/subtype) before new features.
