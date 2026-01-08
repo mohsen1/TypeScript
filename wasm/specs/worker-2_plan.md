@@ -73,6 +73,7 @@ Priority: 2
 - [x] Added non-distributive function return infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_function_return_non_distributive_union_input`.
 - [x] Added template literal prefix infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_with_prefix_distributive`.
 - [x] Added template literal suffix infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_with_suffix_distributive`.
+- [x] Added function rest parameter infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_function_rest_param_distributive`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
