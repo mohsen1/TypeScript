@@ -1742,3 +1742,53 @@ fn test_parity_es5_enum() {
         output
     );
 }
+
+/// Parity test for ES5 string enum downlevel.
+/// String enums should be downleveled without reverse mapping.
+#[test]
+fn test_parity_es5_string_enum() {
+    let source = r#"enum Direction { Up = "UP", Down = "DOWN", Left = "LEFT", Right = "RIGHT" }"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 string enum downlevel
+    assert!(
+        output.contains("var Direction") || output.contains("Direction = {}"),
+        "ES5 output should define Direction enum: {}",
+        output
+    );
+    // Enum members should have string values
+    assert!(
+        output.contains("UP") && output.contains("DOWN") && output.contains("LEFT") && output.contains("RIGHT"),
+        "ES5 output should contain all string enum values: {}",
+        output
+    );
+    // Member names should be present
+    assert!(
+        output.contains("Up") && output.contains("Down"),
+        "ES5 output should contain enum member names: {}",
+        output
+    );
+    // No enum keyword
+    assert!(
+        !output.contains("enum Direction"),
+        "ES5 output should not contain enum keyword: {}",
+        output
+    );
+}
