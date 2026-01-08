@@ -3,19 +3,22 @@
 ## Mission
 Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transforms, cli, lsp).
 
+## ⚠️ OPERATION CRUCIBLE - BUG FIXES ONLY
+
+**Emitter is in MAINTENANCE MODE. No new transforms or features.**
+
 Status: Active
 Priority: 2
+Mode: **BUG FIXES ONLY**
 
 ## Current Assignment
-- [ ] Add ES5 emitter parity tests for nullish coalescing in `wasm/src/emitter_parity_tests.rs`. Run `./wasm/test.sh emitter_parity`.
+- [ ] Fix critical source map bug: verify source maps attach correctly in debuggers for async ES5 transforms.
 
-## Task Queue
-- [ ] (empty)
+## Task Queue (BUG FIXES ONLY)
+- [ ] Fix any blocking source map validation issues
+- [ ] ⛔ NO NEW TRANSFORMS - rejected per Operation Crucible
 
 ## Completed
-- [x] Added ES5 optional chaining parity tests (method call, element access, with nullish, call) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (76 tests).
-- [x] Added ES5 destructuring parity tests (array, object, nested, defaults, rest) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (72 tests).
-- [x] Added ES5 spread operator parity tests (call spread, new spread, rest params, mixed array spread) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (67 tests).
 - [x] Added ES5 decorator parity tests (class, method, property, parameter) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (63 tests).
 - [x] Added ES5 async generator parity tests (type erasure, method, await+yield) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (59 tests).
 - [x] Added ES5 generator function parity tests (type erasure, method, yield type erasure) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (56 tests).

@@ -1,16 +1,28 @@
 # Worker 4 Plan
 
+## 🔥 CRUCIBLE TASK - TEST PORTING
+
+**Reassigned from Anvil emitter work to Crucible test porting.**
+
 ## Mission
-Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transforms, cli, lsp).
+Port mapped type tests from the official TypeScript repo into `tests/cases/`.
 
 Status: Active
 Priority: 4
+Mode: **CRUCIBLE - TEST PORTING**
 
 ## Current Assignment
-- [ ] Add ES5 class tests for class expressions in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
+- [ ] Port 15-20 mapped type tests from official TypeScript repo (`tests/cases/conformance/types/mapped/`) into `tests/cases/`.
 
 ## Task Queue
-- [ ] (empty)
+- [ ] Port `mappedTypes1.ts` - basic mapped type tests
+- [ ] Port `mappedTypes2.ts` - mapped type modifiers
+- [ ] Port `mappedTypeConstraints.ts` - constraint handling
+- [ ] Port `keyRemappingKeyof.ts` - key remapping tests
+- [ ] Target: 50 total solver test cases this week (shared with workers 3, 5)
+
+## Goal
+Give Forge workers failing tests to triangulate correct behavior for the Redux blocker.
 
 ## Completed
 - [x] Add ES5 super with conditional field init test. Tests: `./wasm/test.sh super_with_conditional_field`

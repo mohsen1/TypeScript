@@ -3,19 +3,22 @@
 ## Mission
 Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transforms, cli, lsp).
 
+## ⚠️ OPERATION CRUCIBLE - BUG FIXES ONLY
+
+**Emitter is in MAINTENANCE MODE. No new transforms or features.**
+
 Status: Active
 Priority: 1
-Blocked: Awaiting next EM-Anvil assignment.
+Mode: **BUG FIXES ONLY**
 
 ## Current Assignment
-- [ ] Add ES5 class tests for mixin patterns in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
+- [ ] Fix blocking ES5 regression: async computed `super["m"]` emits `void 0["m"]`. See `transforms/async_es5.rs`.
 
-## Task Queue
-- [ ] (empty)
+## Task Queue (BUG FIXES ONLY)
+- [ ] Fix nested arrow `this` capture edge cases
+- [ ] ⛔ NO NEW TRANSFORMS - rejected per Operation Crucible
 
 ## Completed
-- [x] Added ES5 tests for abstract classes (6 tests): basic abstract class, abstract class with implemented methods, abstract class with abstract property, concrete extends abstract, abstract class with static members, abstract class with constructor. Ran `./wasm/test.sh class_es5_tests` (all 104 pass).
-- [x] Added ES5 tests for static blocks (6 tests): basic static block, static block with static methods, static block with private access, multiple static blocks, static block with try/catch, static block with super property access. Ran `./wasm/test.sh class_es5_tests` (all 98 pass).
 - [x] Added ES5 tests for computed properties and Symbol-keyed members (6 tests): computed property method, computed property accessor, Symbol.toStringTag, Symbol.hasInstance, multiple computed properties, computed static property. Ran `./wasm/test.sh class_es5_tests` (all 93 pass).
 - [x] Added ES5 tests for private methods (6 tests): instance private method, static private method, private method calling private method, private async method, private generator method, private method with private field. Ran `./wasm/test.sh class_es5_tests` (all 90 pass).
 - [x] Added ES5 tests for accessor decorators (6 tests): getter with decorator, setter with decorator, getter/setter pair with decorators, static getter with decorator, accessor with multiple decorators, accessor in derived class. Ran `./wasm/test.sh class_es5_tests` (all 84 pass).

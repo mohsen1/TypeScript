@@ -5912,9 +5912,12 @@ const viaAlias = Alias.value;
     let top_sym = binder.file_locals.get("topValue").expect("topValue should exist");
     let alias_sym = binder.file_locals.get("viaAlias").expect("viaAlias should exist");
 
-    assert_eq!(checker.get_type_of_symbol(direct_sym), TypeId::NUMBER);
-    assert_eq!(checker.get_type_of_symbol(top_sym), TypeId::NUMBER);
-    assert_eq!(checker.get_type_of_symbol(alias_sym), TypeId::NUMBER);
+    // For const literals, we get literal types (e.g., literal 2 instead of number)
+    let literal_2 = types.literal_number(2.0);
+    let literal_1 = types.literal_number(1.0);
+    assert_eq!(checker.get_type_of_symbol(direct_sym), literal_2);
+    assert_eq!(checker.get_type_of_symbol(top_sym), literal_1);
+    assert_eq!(checker.get_type_of_symbol(alias_sym), literal_2);
 }
 
 #[test]
@@ -5944,8 +5947,10 @@ const viaAlias = Alias["value"];
     let direct_sym = binder.file_locals.get("direct").expect("direct should exist");
     let alias_sym = binder.file_locals.get("viaAlias").expect("viaAlias should exist");
 
-    assert_eq!(checker.get_type_of_symbol(direct_sym), TypeId::NUMBER);
-    assert_eq!(checker.get_type_of_symbol(alias_sym), TypeId::NUMBER);
+    // For const literals, we get literal types (e.g., literal 1 instead of number)
+    let literal_1 = types.literal_number(1.0);
+    assert_eq!(checker.get_type_of_symbol(direct_sym), literal_1);
+    assert_eq!(checker.get_type_of_symbol(alias_sym), literal_1);
 }
 
 #[test]
@@ -5983,7 +5988,9 @@ const bad = Alias.missing;
     );
 
     let ok_sym = binder.file_locals.get("ok").expect("ok should exist");
-    assert_eq!(checker.get_type_of_symbol(ok_sym), TypeId::NUMBER);
+    // For const literals, we get literal types (e.g., literal 1 instead of number)
+    let literal_1 = types.literal_number(1.0);
+    assert_eq!(checker.get_type_of_symbol(ok_sym), literal_1);
 }
 
 #[test]
@@ -6020,7 +6027,9 @@ const badValue = Outer.Inner.missing;
     );
 
     let ok_sym = binder.file_locals.get("okValue").expect("okValue should exist");
-    assert_eq!(checker.get_type_of_symbol(ok_sym), TypeId::NUMBER);
+    // For const literals, we get literal types (e.g., literal 1 instead of number)
+    let literal_1 = types.literal_number(1.0);
+    assert_eq!(checker.get_type_of_symbol(ok_sym), literal_1);
 }
 
 #[test]
@@ -6056,7 +6065,9 @@ const bad = NS.hidden;
     );
 
     let ok_sym = binder.file_locals.get("ok").expect("ok should exist");
-    assert_eq!(checker.get_type_of_symbol(ok_sym), TypeId::NUMBER);
+    // For const literals, we get literal types (e.g., literal 1 instead of number)
+    let literal_1 = types.literal_number(1.0);
+    assert_eq!(checker.get_type_of_symbol(ok_sym), literal_1);
 }
 
 #[test]

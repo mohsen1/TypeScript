@@ -4,64 +4,73 @@ Updated: 2026-01-08
 
 Priority: 2
 
+## ⚠️ OPERATION CRUCIBLE - TACTICAL SHIFT
+
+**Emitter is 80% complete. MAINTENANCE MODE activated.**
+
+- **Squad reduced to 2 workers** (workers 1-2)
+- **Bug fixes ONLY** - critical source map bugs and blocking ES5 regressions
+- **⛔ NO NEW TRANSFORMS** - stop feature work
+- Workers 3-5 reassigned to **Crucible Tasks** (test porting)
+
 ## Current Milestone
 Phase 8 - Conformance, Convergence, and Hardening: Output fidelity across the integrated pipeline, driven by conformance tests.
 
 ## Project Direction Alignment
-- Strategic shift: integration and correctness across the pipeline; conformance tests drive work.
-- Top priority: Emitter is the utility bottleneck; fix ES5 downleveling and source-map fidelity before new features.
+- Emitter is 80% complete - stop adding new features
+- Bug fixes only: `super["m"]` in async, nested arrow `this` capture
+- ⚠️ Anti-pattern: Do NOT use regex substitutions for code transforms. Always operate on AST.
 
-## Focus Areas (Director can reassign)
-- `wasm/src/thin_emitter/` - JavaScript emission
-- `wasm/src/transforms/` - ES5 downleveling, source maps
-- `wasm/src/cli/` - Command-line interface
-- `wasm/src/lsp/` - Language Server Protocol
+## Focus Areas (MAINTENANCE ONLY)
+- `wasm/src/thin_emitter/` - Critical bug fixes only
+- `wasm/src/transforms/` - Blocking ES5 regressions only
 
 ## Objectives (Ranked)
 
-1. **ES5 Downleveling Correctness**
-   - Context: Emitter fidelity is the utility bottleneck per Project Direction
-   - Success Criteria: Match `tsc` for `super()` in derived classes with field initializers, nested arrow/async `this` capture, and computed `super[...]` cases
+1. **Critical Bug Fixes Only**
+   - Context: Emitter is in maintenance mode per Operation Crucible
+   - Success Criteria: Fix blocking ES5 regressions (`super["m"]` in async, nested arrow `this` capture)
    - Key Files: `transforms/class_es5.rs`, `transforms/async_es5.rs`
-   - Estimated Complexity: High
+   - ⛔ NO NEW FEATURES
 
-2. **Source Map Validation**
-   - Context: Source maps must be valid and usable by debuggers
-   - Success Criteria: Generated source maps validate and attach correctly in debuggers, including async ES5 mappings
+2. **Source Map Bug Fixes**
+   - Context: Only fix bugs that block debugger attachment
+   - Success Criteria: Source maps validate and attach correctly
    - Key Files: `thin_emitter/source_writer.rs`, `thin_emitter/source_map.rs`
-   - Estimated Complexity: Medium
+   - ⛔ NO NEW MAPPINGS
 
-3. **End-to-End Conformance Validation**
-   - Context: Stop adding AST nodes; compile real code end-to-end
-   - Success Criteria: Compile a non-trivial generic library (e.g., redux/lodash types) without panics, advance conformance pass rate, and track JS parity deltas
-   - Key Files: `cli/driver.rs`, `thin_emitter/mod.rs`
-   - Estimated Complexity: Medium
-
-## Anti-Priorities
-- New LSP features (Semantic Tokens, Code Actions)
-- CLI argument parsing or fancy terminal output
-- Performance micro-optimizations (unless regression)
-- New AST nodes or isolated features outside emitter correctness
+## Anti-Priorities (ENFORCED)
+- ⛔ **New Emitter transforms** - we have enough
+- ⛔ **New test coverage** - workers 3-5 reassigned to Crucible
+- New LSP features
+- CLI argument parsing
+- Performance micro-optimizations
 
 ## Cross-Squad Dependencies
-- Forge squad owns type checking; emitter may expose Forge bugs; coordinate on shared conformance regressions
+- Forge squad owns type checking; coordinate on shared conformance regressions
 
 ## Notes to EM
-- Re-anchor worker tasks to conformance-driven integration; avoid feature work that does not close emitter fidelity gaps.
+- **Only 2 workers active** (workers 1-2)
+- Workers 3-5 are now on Crucible Tasks (test porting) - see their plans
+- Bug fixes only - reject any PR that adds new transforms
 - Read `wasm/specs/WASM_ARCHITECTURE.md` for architecture
 - Use Docker for tests: `./wasm/test.sh`
-- Focus on regression tests to guard against breakage
+
+## Management Strategy
+Per Project Direction: **Autocratic Scheduling + Bisect-on-Merge**
+- PRs that regress ANY existing baseline are auto-rejected
+- Zero-Idle: If a high-priority task is blocked, swarm it
 
 ## Squad Status
-- Last EM Report: 2026-01-08 - All workers assigned and active
-- Workers Active: 5/5
-- Branches Pending Merge: None (all merged to squad/anvil)
-- Current Focus: ES5 downleveling tests and source-map fidelity
-- Direction: Conformance-first integration; emitter fidelity before feature work
+- Last EM Report: 2026-01-08 - Operation Crucible activated
+- Workers Active: 2/5 (workers 1-2 on bug fixes)
+- Workers Reassigned: 3/5 (workers 3-5 on Crucible test porting)
+- Current Focus: Critical bug fixes only
+- Direction: MAINTENANCE MODE - no new transforms
 - Blockers: None
 - Worker Assignments:
-  - W1: ES5 class tests for async static field initializers
-  - W2: ES5 emitter parity tests for static blocks
-  - W3: Decorator transform source map tests
-  - W4: ES5 class tests for parameter/property decorators
-  - W5: ES5 async iterator tests for for-await-of with destructuring
+  - W1: Bug fixes - blocking ES5 regressions
+  - W2: Bug fixes - critical source map issues
+  - W3: **CRUCIBLE** - Port conditional type tests from official TS repo
+  - W4: **CRUCIBLE** - Port mapped type tests from official TS repo
+  - W5: **CRUCIBLE** - Port conditional/mapped type tests from official TS repo
