@@ -5,7 +5,7 @@ Updated: 2026-01-08
 Priority: 1
 
 ## Current Milestone
-Phase 8 - Conformance, Convergence, and Hardening: Type-system correctness in the integrated pipeline.
+Phase 8 - Conformance, Convergence, and Hardening: solver correctness in the integrated pipeline, driven by conformance tests.
 
 ## Project Direction Alignment
 - Strategic shift: integration and correctness across the pipeline; conformance tests drive work.
@@ -21,7 +21,7 @@ Phase 8 - Conformance, Convergence, and Hardening: Type-system correctness in th
 
 1. **Generic Inference Hardening**
    - Context: Solver is the correctness bottleneck per Project Direction
-   - Success Criteria: Inference from usage and context-sensitive typing match `tsc`, including circular constraints in `extends` clauses
+   - Success Criteria: Inference from usage and context-sensitive typing match `tsc`, including circular constraints in `extends` clauses; redux/lodash-type suites compile without panics
    - Key Files: `solver/infer.rs`, `solver/infer_tests.rs`
    - Estimated Complexity: High
 
@@ -50,7 +50,7 @@ Phase 8 - Conformance, Convergence, and Hardening: Type-system correctness in th
 - New AST nodes or isolated features outside solver correctness
 
 ## Cross-Squad Dependencies
-- Anvil squad may find Forge bugs via emitter tests; coordinate on fixes
+- Anvil squad conformance/emitter runs may surface solver bugs; coordinate on failure triage and ownership
 
 ## Notes to EM
 - Re-anchor worker tasks to conformance-driven integration; avoid feature work that does not close solver correctness gaps.
@@ -59,9 +59,9 @@ Phase 8 - Conformance, Convergence, and Hardening: Type-system correctness in th
 - Use Docker for tests: `./wasm/test.sh`
 
 ## Squad Status
-- Last EM Report: Not yet started
-- Workers Active: 0/5
-- Branches Pending Merge: None
-- Current Focus: Awaiting EM assignment
+- Last EM Report: 2026-01-08
+- Workers Active: 5/5
+- Branches Pending Merge: worker/forge-1 (blocked by management-file edits)
+- Current Focus: conditional type evaluation (function + template literal inference), subtype `this` variance, end-to-end generic regressions, optional/variadic tuple inference
 - Direction: Conformance-first integration; solver correctness before feature work
-- Blockers: None
+- Blockers: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports` failure; worker/forge-1 contains management-file edits

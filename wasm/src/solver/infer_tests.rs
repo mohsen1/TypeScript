@@ -1,5 +1,5 @@
 use super::*;
-use crate::solver::{AssignabilityChecker, CompatChecker};
+use crate::solver::{AssignabilityChecker, CompatChecker, infer_generic_function};
 
 #[test]
 fn test_inference_basic() {
@@ -475,7 +475,7 @@ fn test_resolve_mutual_circular_upper_bounds_with_concrete() {
     let result_u = ctx.resolve_with_constraints(var_u).unwrap();
 
     assert_eq!(result_t, TypeId::STRING);
-    assert_eq!(result_u, TypeId::UNKNOWN);
+    assert_eq!(result_u, TypeId::STRING);
 }
 
 #[test]
@@ -1006,6 +1006,89 @@ fn test_resolve_bounds_with_assignability_bivariant_function_property() {
         })
         .unwrap();
     assert_eq!(result, lower);
+}
+
+#[test]
+fn test_resolve_bounds_function_param_contravariance_extends() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+
+    let narrow_param = ParamInfo {
+        name: Some(interner.intern_string("x")),
+        type_id: TypeId::STRING,
+        optional: false,
+        rest: false,
+    };
+    let wide_param = ParamInfo {
+        name: Some(interner.intern_string("x")),
+        type_id: interner.union(vec![TypeId::STRING, TypeId::NUMBER]),
+        optional: false,
+        rest: false,
+    };
+
+    let lower_fn = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: vec![wide_param],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let upper_fn = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: vec![narrow_param],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Contextual signature provides a narrow parameter type constraint.
+    ctx.add_lower_bound(var, lower_fn);
+    ctx.add_upper_bound(var, upper_fn);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_fn);
+}
+
+#[test]
+fn test_resolve_bounds_function_return_covariance_extends() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+
+    let param = ParamInfo {
+        name: Some(interner.intern_string("x")),
+        type_id: TypeId::STRING,
+        optional: false,
+        rest: false,
+    };
+
+    let lower_fn = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: vec![param.clone()],
+        this_type: None,
+        return_type: interner.literal_string("ok"),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let upper_fn = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: vec![param],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    ctx.add_lower_bound(var, lower_fn);
+    ctx.add_upper_bound(var, upper_fn);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower_fn);
 }
 
 #[test]
@@ -4015,6 +4098,176 @@ fn test_resolve_bounds_function_subtype() {
 }
 
 #[test]
+fn test_resolve_bounds_function_this_parameter_mismatch() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+
+    let lower = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: Vec::new(),
+        this_type: Some(TypeId::NUMBER),
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let upper = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: Vec::new(),
+        this_type: Some(TypeId::STRING),
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    ctx.add_lower_bound(var, lower);
+    ctx.add_upper_bound(var, upper);
+
+    let result = ctx.resolve_with_constraints(var);
+    assert!(matches!(
+        result,
+        Err(InferenceError::BoundsViolation {
+            lower: actual_lower,
+            upper: actual_upper,
+            ..
+        }) if actual_lower == lower && actual_upper == upper
+    ));
+}
+
+#[test]
+fn test_resolve_bounds_function_this_parameter_optional_target() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+
+    let lower = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: Vec::new(),
+        this_type: Some(TypeId::NUMBER),
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let upper = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    ctx.add_lower_bound(var, lower);
+    ctx.add_upper_bound(var, upper);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower);
+}
+
+#[test]
+fn test_resolve_bounds_function_this_parameter_any_upper_bound() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+
+    let lower = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: Vec::new(),
+        this_type: Some(TypeId::NUMBER),
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let upper = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: Vec::new(),
+        this_type: Some(TypeId::ANY),
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    ctx.add_lower_bound(var, lower);
+    ctx.add_upper_bound(var, upper);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower);
+}
+
+#[test]
+fn test_resolve_bounds_function_this_parameter_contravariant() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+
+    let lower_this = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let lower = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: Vec::new(),
+        this_type: Some(lower_this),
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let upper = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: Vec::new(),
+        this_type: Some(TypeId::STRING),
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    ctx.add_lower_bound(var, lower);
+    ctx.add_upper_bound(var, upper);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower);
+}
+
+#[test]
+fn test_resolve_bounds_callable_this_parameter_contravariant() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+
+    let lower_this = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let lower = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+            type_params: Vec::new(),
+            params: Vec::new(),
+            this_type: Some(lower_this),
+            return_type: TypeId::VOID,
+            type_predicate: None,
+        }],
+        construct_signatures: Vec::new(),
+        properties: Vec::new(),
+    });
+    let upper = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+            type_params: Vec::new(),
+            params: Vec::new(),
+            this_type: Some(TypeId::STRING),
+            return_type: TypeId::VOID,
+            type_predicate: None,
+        }],
+        construct_signatures: Vec::new(),
+        properties: Vec::new(),
+    });
+
+    ctx.add_lower_bound(var, lower);
+    ctx.add_upper_bound(var, upper);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower);
+}
+
+#[test]
 fn test_resolve_bounds_optional_property_compatible() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);
@@ -4318,6 +4571,142 @@ fn test_resolve_no_constraints() {
     // No constraints at all
     let result = ctx.resolve_with_constraints(var).unwrap();
     assert_eq!(result, TypeId::UNKNOWN);
+}
+
+#[test]
+fn test_infer_union_target_with_placeholder_member() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let param_type = interner.union(vec![t_type, TypeId::STRING]);
+
+    let func = FunctionShape {
+        type_params: vec![TypeParamInfo {
+            name: t_name,
+            constraint: None,
+            default: None,
+        }],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: param_type,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: t_type,
+        type_predicate: None,
+        is_constructor: false,
+    };
+
+    let result = infer_generic_function(&interner, &mut checker, &func, &[TypeId::NUMBER]);
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_resolve_circular_extends_with_concrete_bound() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let u_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: u_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // Simulate: <T extends U, U extends T, U extends string>
+    ctx.add_upper_bound(var_t, u_type);
+    ctx.add_upper_bound(var_u, t_type);
+    ctx.add_upper_bound(var_u, TypeId::STRING);
+
+    let result_t = ctx.resolve_with_constraints(var_t).unwrap();
+    let result_u = ctx.resolve_with_constraints(var_u).unwrap();
+
+    assert_eq!(result_t, TypeId::STRING);
+    assert_eq!(result_u, TypeId::STRING);
+}
+
+#[test]
+fn test_resolve_circular_extends_bound_order() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let u_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: u_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // Same cycle, but add concrete bound before the cyclic one.
+    ctx.add_upper_bound(var_t, TypeId::STRING);
+    ctx.add_upper_bound(var_t, u_type);
+    ctx.add_upper_bound(var_u, t_type);
+
+    let result_t = ctx.resolve_with_constraints(var_t).unwrap();
+    let result_u = ctx.resolve_with_constraints(var_u).unwrap();
+
+    assert_eq!(result_t, TypeId::STRING);
+    assert_eq!(result_u, TypeId::STRING);
+}
+
+#[test]
+fn test_resolve_usage_based_inference_from_bound_param() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let u_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: u_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // Simulate: <T extends U, U extends T> with usage-based lower bound on U.
+    ctx.add_upper_bound(var_t, u_type);
+    ctx.add_upper_bound(var_u, t_type);
+
+    let hello = interner.literal_string("hello");
+    ctx.add_lower_bound(var_u, hello);
+
+    let result_t = ctx.resolve_with_constraints(var_t).unwrap();
+    let result_u = ctx.resolve_with_constraints(var_u).unwrap();
+
+    assert_eq!(result_t, hello);
+    assert_eq!(result_u, hello);
 }
 
 // =============================================================================

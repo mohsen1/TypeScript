@@ -903,7 +903,7 @@ impl ThinParserState {
     /// Parse async function declaration
     fn parse_async_function_declaration(&mut self) -> NodeIndex {
         self.parse_expected(SyntaxKind::AsyncKeyword);
-        self.parse_function_declaration_with_async(true)
+        self.parse_function_declaration_with_async(true, None)
     }
 
     /// Parse a block statement
@@ -1072,11 +1072,15 @@ impl ThinParserState {
 
     /// Parse function declaration (optionally async)
     fn parse_function_declaration(&mut self) -> NodeIndex {
-        self.parse_function_declaration_with_async(false)
+        self.parse_function_declaration_with_async(false, None)
     }
 
     /// Parse function declaration with async modifier already consumed
-    fn parse_function_declaration_with_async(&mut self, is_async: bool) -> NodeIndex {
+    fn parse_function_declaration_with_async(
+        &mut self,
+        is_async: bool,
+        modifiers: Option<NodeList>,
+    ) -> NodeIndex {
         let start_pos = self.token_pos();
 
         // Check for async modifier if not already parsed
@@ -1128,7 +1132,7 @@ impl ThinParserState {
             start_pos,
             end_pos,
             FunctionData {
-                modifiers: None,
+                modifiers,
                 is_async,
                 asterisk_token,
                 name,
@@ -3023,7 +3027,10 @@ impl ThinParserState {
 
         // Parse the inner declaration based on what follows 'declare'
         match self.token() {
-            SyntaxKind::FunctionKeyword => self.parse_function_declaration(),
+            SyntaxKind::FunctionKeyword => {
+                let modifiers = Some(self.make_node_list(vec![declare_modifier]));
+                self.parse_function_declaration_with_async(false, modifiers)
+            }
             SyntaxKind::ClassKeyword => self.parse_declare_class(start_pos, declare_modifier),
             SyntaxKind::AbstractKeyword => {
                 // declare abstract class

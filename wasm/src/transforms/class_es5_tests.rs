@@ -173,6 +173,103 @@ class Derived extends Base {
 }
 
 #[test]
+fn test_class_es5_computed_super_in_field_arrow_uses_this_capture() {
+    let source = r#"
+        const key = "m";
+        class Base { [key]() {} }
+        class Derived extends Base {
+            field = () => super[key]();
+            constructor() { super(); }
+        }
+    "#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(2)
+        .expect("expected derived class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    assert!(
+        output.contains("_super.prototype[key].call(_this)"),
+        "Expected computed super call to bind _this: {}",
+        output
+    );
+    assert!(
+        !output.contains("super["),
+        "Expected computed super to be lowered in ES5 output: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_computed_field_does_not_change_super_ordering() {
+    let source = r#"
+        const key = "z";
+        class Base {}
+        class Derived extends Base {
+            [key] = prepField();
+            y = 1;
+            constructor() {
+                prep();
+                super();
+                post();
+            }
+        }
+    "#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(2)
+        .expect("expected derived class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    let prep_pos = output.find("prep()").expect("expected prep() call");
+    let super_pos = output
+        .find("_super.call(this")
+        .expect("expected super call assignment");
+    let init_pos = output
+        .find("_this.y = 1")
+        .expect("expected instance property initializer");
+    let post_pos = output.find("post()").expect("expected post() call");
+
+    assert!(
+        prep_pos < super_pos,
+        "Expected prep() before super call: {}",
+        output
+    );
+    assert!(
+        super_pos < init_pos,
+        "Expected property initializer after super call: {}",
+        output
+    );
+    assert!(
+        init_pos < post_pos,
+        "Expected post() after property initializer: {}",
+        output
+    );
+}
+
+#[test]
 fn test_class_es5_synthesized_ctor_captures_this_in_field_initializers() {
     let source = r#"
 class Base { m() { return 1; } }

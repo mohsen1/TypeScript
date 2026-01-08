@@ -7599,6 +7599,10 @@ impl<'a> ThinCheckerState<'a> {
             if node.kind == syntax_kind_ext::FUNCTION_DECLARATION {
                 if let Some(func) = self.ctx.arena.get_function(node) {
                     if func.body.is_none() {
+                        if self.has_declare_modifier(&func.modifiers) {
+                            i += 1;
+                            continue;
+                        }
                         // Function overload signature - check for implementation
                         let func_name = self.get_function_name_from_node(stmt_idx);
                         if let Some(name) = func_name {
