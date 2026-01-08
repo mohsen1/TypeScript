@@ -13,6 +13,7 @@ Priority: 4
 - [ ] Stand by for next emitter fidelity task.
 
 ## Completed
+- [x] ES5 derived default ctor arrow field capture; test `./wasm/test.sh derived_default_arrow_field_capture`.
 - [x] ES5 class field nested arrow this capture emits constructor _this; test `./wasm/test.sh class_field_nested_arrow_this_capture`.
 - [x] ES5 class method nested arrow captures `this` + arguments; test `./wasm/test.sh class_method_nested_arrow_arguments`.
 - [x] ES5 async nested arrow super call lowered; test `./wasm/test.sh async_super_nested_arrow`.

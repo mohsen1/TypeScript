@@ -602,6 +602,49 @@ class Derived extends Base {
 }
 
 #[test]
+fn test_two_phase_emission_es5_class_derived_default_arrow_field_capture() {
+    let source = r#"
+class Base {}
+class Derived extends Base {
+    field = () => this.x;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("var _this = _super !== null && _super.apply(this, arguments) || this;"),
+        "ES5 output should capture this for derived default ctor: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.field = function"),
+        "ES5 output should emit arrow field initializer: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.x"),
+        "ES5 output should capture this inside arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel arrow: {}",
+        output
+    );
+}
+
+#[test]
 fn test_two_phase_emission_es5_class_field_nested_arrow_this_capture() {
     let source = r#"
 class Foo {
