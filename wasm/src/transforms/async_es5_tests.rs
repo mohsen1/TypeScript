@@ -2842,3 +2842,245 @@ fn test_async_iife_multiple_awaits() {
         output
     );
 }
+
+// =============================================================================
+// Async callback pattern tests
+// =============================================================================
+
+/// Helper to parse an async callback (async function passed as argument) and emit its body
+fn parse_and_emit_async_callback(source: &str) -> String {
+    use crate::parser::syntax_kind_ext;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&stmt_idx) = source_file.statements.nodes.first() {
+                if let Some(stmt_node) = parser.arena.get(stmt_idx) {
+                    // ExpressionStatement -> CallExpression -> arguments[0] (async function)
+                    if stmt_node.kind == syntax_kind_ext::EXPRESSION_STATEMENT {
+                        if let Some(expr_stmt) = parser.arena.get_expression_statement(stmt_node) {
+                            if let Some(call_node) = parser.arena.get(expr_stmt.expression) {
+                                if call_node.kind == syntax_kind_ext::CALL_EXPRESSION {
+                                    if let Some(call_data) = parser.arena.get_call_expr(call_node) {
+                                        if let Some(args) = &call_data.arguments {
+                                            if let Some(&arg_idx) = args.nodes.first() {
+                                                if let Some(arg_node) = parser.arena.get(arg_idx) {
+                                                    if arg_node.kind == syntax_kind_ext::ARROW_FUNCTION
+                                                        || arg_node.kind == syntax_kind_ext::FUNCTION_EXPRESSION
+                                                    {
+                                                        if let Some(func) = parser.arena.get_function(arg_node) {
+                                                            let emitter = AsyncES5Emitter::new(&parser.arena);
+                                                            let has_await = emitter.body_contains_await(func.body);
+                                                            let mut emitter = AsyncES5Emitter::new(&parser.arena);
+                                                            if has_await {
+                                                                return emitter.emit_generator_body_with_await(func.body);
+                                                            } else {
+                                                                return emitter.emit_simple_generator_body(func.body);
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    String::new()
+}
+
+/// Helper to check if async callback body contains await
+fn callback_body_contains_await(source: &str) -> bool {
+    use crate::parser::syntax_kind_ext;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&stmt_idx) = source_file.statements.nodes.first() {
+                if let Some(stmt_node) = parser.arena.get(stmt_idx) {
+                    if stmt_node.kind == syntax_kind_ext::EXPRESSION_STATEMENT {
+                        if let Some(expr_stmt) = parser.arena.get_expression_statement(stmt_node) {
+                            if let Some(call_node) = parser.arena.get(expr_stmt.expression) {
+                                if call_node.kind == syntax_kind_ext::CALL_EXPRESSION {
+                                    if let Some(call_data) = parser.arena.get_call_expr(call_node) {
+                                        if let Some(args) = &call_data.arguments {
+                                            if let Some(&arg_idx) = args.nodes.first() {
+                                                if let Some(arg_node) = parser.arena.get(arg_idx) {
+                                                    if arg_node.kind == syntax_kind_ext::ARROW_FUNCTION
+                                                        || arg_node.kind == syntax_kind_ext::FUNCTION_EXPRESSION
+                                                    {
+                                                        if let Some(func) = parser.arena.get_function(arg_node) {
+                                                            let emitter = AsyncES5Emitter::new(&parser.arena);
+                                                            return emitter.body_contains_await(func.body);
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+#[test]
+fn test_async_callback_arrow_basic() {
+    let output = parse_and_emit_async_callback(
+        "process(async (x) => { await handle(x); });",
+    );
+    assert!(
+        output.contains("switch (_a.label)"),
+        "Async callback should have switch: {}",
+        output
+    );
+    assert!(
+        output.contains("[4 /*yield*/"),
+        "Async callback should have yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_callback_function_expression() {
+    let output = parse_and_emit_async_callback(
+        "run(async function(data) { await process(data); });",
+    );
+    assert!(
+        output.contains("switch (_a.label)"),
+        "Async function callback should have switch: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_callback_with_return() {
+    let output = parse_and_emit_async_callback(
+        "map(async (item) => { return await transform(item); });",
+    );
+    assert!(
+        output.contains("return [4 /*yield*/, transform(item)]"),
+        "Callback should yield transform: {}",
+        output
+    );
+    assert!(
+        output.contains("return [2 /*return*/, _a.sent()]"),
+        "Callback should return _a.sent(): {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_callback_no_await() {
+    let output = parse_and_emit_async_callback(
+        "forEach(async (x) => { return x * 2; });",
+    );
+    assert!(
+        output.contains("[2 /*return*/"),
+        "Simple async callback should have return: {}",
+        output
+    );
+    assert!(
+        !output.contains("switch"),
+        "No await should skip switch: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_callback_multiple_params() {
+    let output = parse_and_emit_async_callback(
+        "reduce(async (acc, item) => { return await combine(acc, item); });",
+    );
+    assert!(
+        output.contains("return [4 /*yield*/, combine(acc, item)]"),
+        "Callback with multiple params should yield combine: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_callback_body_contains_await() {
+    assert!(
+        callback_body_contains_await("handler(async () => { await x; });"),
+        "Should detect await in async callback body"
+    );
+}
+
+#[test]
+fn test_async_callback_body_no_await() {
+    assert!(
+        !callback_body_contains_await("handler(async () => { return 1; });"),
+        "Should not detect await when none present"
+    );
+}
+
+#[test]
+fn test_async_callback_ignores_nested_async() {
+    assert!(
+        !callback_body_contains_await(
+            "outer(async () => { const inner = async () => { await x; }; return 1; });"
+        ),
+        "Should ignore await in nested async"
+    );
+}
+
+#[test]
+fn test_async_callback_event_handler_pattern() {
+    let output = parse_and_emit_async_callback(
+        "on(async (event) => { await process(event); await respond(); });",
+    );
+    assert!(
+        output.contains("case 1:") && output.contains("case 2:"),
+        "Event handler callback should have multiple cases: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_callback_with_try_catch() {
+    assert!(
+        callback_body_contains_await(
+            "handle(async () => { try { await risky(); } catch (e) { log(e); } });"
+        ),
+        "Should detect await in try block of callback"
+    );
+}
+
+#[test]
+fn test_async_callback_promise_then_pattern() {
+    let output = parse_and_emit_async_callback(
+        "then(async (result) => { const processed = await enhance(result); return processed; });",
+    );
+    assert!(
+        output.contains("processed = _a.sent()"),
+        "Promise then callback should assign await result: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_callback_array_method_pattern() {
+    let output = parse_and_emit_async_callback(
+        "filter(async (item) => { const valid = await validate(item); return valid; });",
+    );
+    assert!(
+        output.contains("return [4 /*yield*/, validate(item)]"),
+        "Array method callback should yield validate: {}",
+        output
+    );
+}
