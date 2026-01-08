@@ -15,7 +15,7 @@ Priority: 1
 - [ ] Confirm ES5 output removes `super[` for computed super calls in class fields.
 
 ## Completed
-- [x] (Move finished items here with brief notes and tests run)
+- [x] Implemented async/nested arrow `this` capture handling in ES5 class emission, added derived async field regression; ran `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
 
 ## Ready for Merge
 No

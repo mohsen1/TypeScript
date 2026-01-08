@@ -78,6 +78,8 @@ pub struct ClassES5Emitter<'a> {
     source_text: Option<&'a str>,
     /// Whether we're emitting inside a scope that uses _this capture
     use_this_capture: bool,
+    /// Whether a `_this` capture is available in the current scope
+    this_capture_available: bool,
     /// Counter for temporary variables (_a, _b, _c, etc.)
     temp_var_counter: u32,
     /// Private fields for the current class
@@ -94,6 +96,7 @@ impl<'a> ClassES5Emitter<'a> {
             indent_level: 0,
             source_text: None,
             use_this_capture: false,
+            this_capture_available: false,
             temp_var_counter: 0,
             private_fields: Vec::new(),
             class_name: String::new(),
@@ -237,6 +240,9 @@ impl<'a> ClassES5Emitter<'a> {
     }
     
     fn emit_constructor(&mut self, class_name: &str, class_data: &ClassData, has_extends: bool) {
+        let prev_capture_available = self.this_capture_available;
+        self.this_capture_available = false;
+
         // Collect instance property initializers (non-private only)
         let instance_props: Vec<NodeIndex> = class_data.members.nodes.iter()
             .filter_map(|&member_idx| {
@@ -306,6 +312,7 @@ impl<'a> ClassES5Emitter<'a> {
                         self.write_indent();
                         self.write("var _this = this;");
                         self.write_line();
+                        self.this_capture_available = true;
                         // Note: use_this_capture is set per-arrow-function, not globally
                     }
 
@@ -378,6 +385,7 @@ impl<'a> ClassES5Emitter<'a> {
                 self.write_indent();
                 self.write("var _this = _super !== null && _super.apply(this, arguments) || this;");
                 self.write_line();
+                self.this_capture_available = true;
 
                 // Emit private field initializations first
                 self.emit_private_field_initializations(true);
@@ -409,6 +417,7 @@ impl<'a> ClassES5Emitter<'a> {
                     self.write_indent();
                     self.write("var _this = this;");
                     self.write_line();
+                    self.this_capture_available = true;
                 }
                 self.emit_private_field_initializations(false);
 
@@ -433,6 +442,8 @@ impl<'a> ClassES5Emitter<'a> {
             self.write("}");
             self.write_line();
         }
+
+        self.this_capture_available = prev_capture_available;
     }
 
     /// Check if any property initializers contain arrow functions that reference `this`
@@ -446,10 +457,8 @@ impl<'a> ClassES5Emitter<'a> {
                 let init_node = self.arena.get(prop_data.initializer);
                 if let Some(node) = init_node {
                     if node.kind == syntax_kind_ext::ARROW_FUNCTION {
-                        if let Some(func) = self.arena.get_function(node) {
-                            if !func.body.is_none() && contains_this_reference(self.arena, func.body) {
-                                return true;
-                            }
+                        if contains_this_reference(self.arena, prop_data.initializer) {
+                            return true;
                         }
                     }
                 }
@@ -706,11 +715,7 @@ impl<'a> ClassES5Emitter<'a> {
             let init_node = self.arena.get(prop_data.initializer);
             let needs_capture = if let Some(node) = init_node {
                 if node.kind == syntax_kind_ext::ARROW_FUNCTION {
-                    if let Some(func) = self.arena.get_function(node) {
-                        !func.body.is_none() && contains_this_reference(self.arena, func.body)
-                    } else {
-                        false
-                    }
+                    contains_this_reference(self.arena, prop_data.initializer)
                 } else {
                     false
                 }
@@ -793,6 +798,7 @@ impl<'a> ClassES5Emitter<'a> {
 
         self.write(") || this;");
         self.write_line();
+        self.this_capture_available = true;
     }
 
     /// Emit a statement, but transform `this` references to `_this`
@@ -1339,6 +1345,42 @@ impl<'a> ClassES5Emitter<'a> {
         self.write_indent();
         self.write("});");
         self.write_line();
+    }
+
+    fn emit_async_arrow_function(&mut self, func: &FunctionData, this_expr: &str) {
+        self.write("function (");
+        let param_transforms = self.emit_parameters(&func.parameters);
+        self.write(") {");
+        self.write_line();
+        self.increase_indent();
+
+        self.emit_param_destructuring_prologue(&param_transforms);
+
+        let mut async_emitter = AsyncES5Emitter::new(self.arena);
+        async_emitter.set_indent_level(self.indent_level + 1);
+
+        let generator_body = if async_emitter.body_contains_await(func.body) {
+            async_emitter.emit_generator_body_with_await(func.body)
+        } else {
+            async_emitter.emit_simple_generator_body(func.body)
+        };
+
+        self.write_indent();
+        self.write("return __awaiter(");
+        self.write(this_expr);
+        self.write(", void 0, void 0, function () {");
+        self.write_line();
+        self.increase_indent();
+        self.write(&generator_body);
+        self.decrease_indent();
+        self.write_line();
+        self.write_indent();
+        self.write("});");
+        self.write_line();
+
+        self.decrease_indent();
+        self.write_indent();
+        self.write("}");
     }
 
     fn emit_param_default_assignment(&mut self, name: &str, initializer: NodeIndex) {
@@ -2841,50 +2883,64 @@ impl<'a> ClassES5Emitter<'a> {
             k if k == syntax_kind_ext::ARROW_FUNCTION => {
                 // Transform arrow to function expression
                 if let Some(func) = self.arena.get_function(expr_node) {
-                    // Check if this arrow function body uses `this`
-                    let body_uses_this = !func.body.is_none()
-                        && contains_this_reference(self.arena, func.body);
-
-                    // Enable _this capture for the body if needed
+                    let captures_this = contains_this_reference(self.arena, expr_idx);
+                    let has_outer_capture = self.use_this_capture || self.this_capture_available;
+                    let use_iife = captures_this && !has_outer_capture;
                     let prev_capture = self.use_this_capture;
-                    if body_uses_this {
+                    if captures_this {
                         self.use_this_capture = true;
                     }
 
-                    self.write("function (");
-                    let param_transforms = self.emit_parameters(&func.parameters);
-                    self.write(") ");
+                    if use_iife {
+                        self.write("(function (_this) { return ");
+                    }
 
-                    // Check if body is an expression or block
-                    if let Some(body_node) = self.arena.get(func.body) {
-                        if body_node.kind == syntax_kind_ext::BLOCK {
-                            if param_transforms.is_empty() {
-                                self.emit_statement(func.body);
+                    if func.is_async {
+                        let parent_this = if prev_capture { "_this" } else { "this" };
+                        let this_expr = if captures_this { "_this" } else { parent_this };
+                        self.emit_async_arrow_function(func, this_expr);
+                    } else {
+                        self.write("function (");
+                        let param_transforms = self.emit_parameters(&func.parameters);
+                        self.write(") ");
+
+                        // Check if body is an expression or block
+                        if let Some(body_node) = self.arena.get(func.body) {
+                            if body_node.kind == syntax_kind_ext::BLOCK {
+                                if param_transforms.is_empty() {
+                                    self.emit_statement(func.body);
+                                } else {
+                                    self.write("{");
+                                    self.write_line();
+                                    self.increase_indent();
+                                    self.emit_param_destructuring_prologue(&param_transforms);
+                                    self.emit_block_contents(func.body);
+                                    self.decrease_indent();
+                                    self.write_indent();
+                                    self.write("}");
+                                }
                             } else {
+                                // Expression body - wrap in return
                                 self.write("{");
                                 self.write_line();
                                 self.increase_indent();
                                 self.emit_param_destructuring_prologue(&param_transforms);
-                                self.emit_block_contents(func.body);
+                                self.write_indent();
+                                self.write("return ");
+                                self.emit_expression(func.body);
+                                self.write(";");
+                                self.write_line();
                                 self.decrease_indent();
                                 self.write_indent();
                                 self.write("}");
                             }
-                        } else {
-                            // Expression body - wrap in return
-                            self.write("{");
-                            self.write_line();
-                            self.increase_indent();
-                            self.emit_param_destructuring_prologue(&param_transforms);
-                            self.write_indent();
-                            self.write("return ");
-                            self.emit_expression(func.body);
-                            self.write(";");
-                            self.write_line();
-                            self.decrease_indent();
-                            self.write_indent();
-                            self.write("}");
                         }
+                    }
+
+                    if use_iife {
+                        self.write("; })(");
+                        self.write("this");
+                        self.write("))");
                     }
 
                     // Restore previous capture state
