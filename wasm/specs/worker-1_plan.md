@@ -59,6 +59,7 @@ Priority: 1
 - [x] Number index treats 1e+21 exponent name as numeric; added `test_resolve_bounds_number_index_accepts_exponent_boundary_name`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_accepts_exponent_boundary_name`.
 - [x] Number index ignores non-canonical exponent name; added `test_resolve_bounds_number_index_ignores_non_canonical_exponent_name`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_non_canonical_exponent_name`.
 - [x] Number index ignores uppercase exponent name; added `test_resolve_bounds_number_index_ignores_uppercase_exponent_name`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_uppercase_exponent_name`.
+- [x] Number index ignores uppercase exponent missing sign; added `test_resolve_bounds_number_index_ignores_uppercase_exponent_missing_sign`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_uppercase_exponent_missing_sign`.
 - [x] Number index ignores missing exponent sign; added `test_resolve_bounds_number_index_ignores_missing_exponent_sign`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_missing_exponent_sign`.
 - [x] Number index ignores leading-zero decimal name; added `test_resolve_bounds_number_index_ignores_leading_zero_decimal_name`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_leading_zero_decimal_name`.
 - [x] Number index ignores hex literal name; added `test_resolve_bounds_number_index_ignores_hex_name`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_hex_name`.
