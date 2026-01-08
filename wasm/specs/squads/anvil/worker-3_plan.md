@@ -72,6 +72,7 @@ Priority: 3
 - [x] Added namespace export compilation tests (basic, nested, with class); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 - [x] Added enum compilation E2E tests (numeric, string, const, computed); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 - [x] Added arrow function compilation E2E tests (basic, rest params, default params, class properties); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
+- [x] Added spread operator compilation E2E tests (array spread, object spread, function call spread); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 
 ## Ready for Merge
 Yes
