@@ -9595,6 +9595,9 @@ impl<'a> ThinCheckerState<'a> {
             return;
         };
 
+        // Push method type parameters into scope (e.g., U in transform<U>(...): Builder<U>)
+        let (_type_params, type_param_updates) = self.push_type_parameters(&method.type_parameters);
+
         // Error 1248: A class member cannot have the 'const' keyword
         if let Some(const_mod) = self.get_const_modifier(&method.modifiers) {
             self.error_at_node(
@@ -9654,6 +9657,9 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         self.pop_return_type();
+
+        // Pop method type parameters from scope
+        self.pop_type_parameters(type_param_updates);
     }
 
     /// Check a constructor declaration.
