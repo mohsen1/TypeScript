@@ -53,9 +53,15 @@ Phase 8 - Conformance, Convergence, and Hardening: Output fidelity across the in
 - Focus on regression tests to guard against breakage
 
 ## Squad Status
-- Last EM Report: Conformance-driven focus confirmed; prioritize ES5 emitter regressions and source-map fidelity.
-- Workers Active: 0/5
-- Branches Pending Merge: None
-- Current Focus: Conformance-driven emitter regressions and ES5 fidelity
+- Last EM Report: 2026-01-08 - All workers assigned and active
+- Workers Active: 5/5
+- Branches Pending Merge: None (all merged to squad/anvil)
+- Current Focus: ES5 downleveling tests and source-map fidelity
 - Direction: Conformance-first integration; emitter fidelity before feature work
 - Blockers: None
+- Worker Assignments:
+  - W1: ES5 class tests for async static field initializers
+  - W2: ES5 emitter parity tests for static blocks
+  - W3: Decorator transform source map tests
+  - W4: ES5 class tests for parameter/property decorators
+  - W5: ES5 async iterator tests for for-await-of with destructuring
