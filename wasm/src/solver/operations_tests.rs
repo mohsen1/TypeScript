@@ -308,6 +308,15 @@ fn test_binary_overlap_disjoint_primitives() {
 }
 
 #[test]
+fn test_binary_overlap_disjoint_primitives_loose_equality() {
+    let interner = TypeInterner::new();
+    let evaluator = BinaryOpEvaluator::new(&interner);
+
+    let result = evaluator.evaluate(TypeId::STRING, TypeId::NUMBER, "==");
+    assert!(matches!(result, BinaryOpResult::TypeError { .. }));
+}
+
+#[test]
 fn test_binary_overlap_disjoint_literals() {
     let interner = TypeInterner::new();
     let evaluator = BinaryOpEvaluator::new(&interner);
