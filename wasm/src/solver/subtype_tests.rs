@@ -3786,6 +3786,54 @@ fn test_void_return_exception_subtype() {
 }
 
 #[test]
+fn test_void_return_exception_method_property() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+    let method_name = interner.intern_string("m");
+
+    let returns_number = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::NUMBER,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let returns_void = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let source = interner.object(vec![PropertyInfo {
+        name: method_name,
+        type_id: returns_number,
+        write_type: returns_number,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+    let target = interner.object(vec![PropertyInfo {
+        name: method_name,
+        type_id: returns_void,
+        write_type: returns_void,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    assert!(!checker.is_subtype_of(source, target));
+
+    checker.allow_void_return = true;
+    assert!(checker.is_subtype_of(source, target));
+    assert!(!checker.is_subtype_of(target, source));
+}
+
+#[test]
 fn test_constructor_void_exception_subtype() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
