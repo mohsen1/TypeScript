@@ -71,15 +71,19 @@ Per Project Direction: **Autocratic Scheduling + Bisect-on-Merge**
 - Zero-Idle: All workers swarm the blocker
 
 ## Squad Status
-- Last EM Report: 2026-01-08 - Operation Crucible activated
-- Workers Active: 5/5
-- Current Focus: 🚨 Redux/Lodash Generics blocker - Deferred state in evaluate.rs
+- Last EM Report: 2026-01-09 - Operation Crucible in progress
+- Workers Active: 1/5 (pane 4 actively debugging type param substitution)
+- Current Focus: 🚨 Redux/Lodash Generics blocker - type parameter registration
 - Direction: SWARM THE BLOCKER
-- Blockers: `test_check_redux_lodash_style_generics` (6 diagnostics vs 0)
-- Root Cause: Eager evaluation of conditionals with unbound InferenceVars
+- Blockers: `test_check_redux_lodash_style_generics` (4 diagnostics vs 0)
+- Progress: 6 → 4 diagnostics (33% reduction)
+- Issues:
+  - Worker 2's changes cause REGRESSION (removes Ref handling in evaluate.rs)
+  - Type params not being registered in TypeEnvironment for cross-file symbols
+  - Symbols resolving to TypeId(4) (any) instead of actual types
 - Worker Assignments:
-  - W1: Implement Deferred state in solver/evaluate.rs
-  - W2: Update inference context finalization in solver/infer.rs
-  - W3: Add TypeKey::Conditional preservation logic
-  - W4: Write regression tests for deferred conditional evaluation
-  - W5: Investigate cross-file resolution with deferred conditionals
+  - W1: (idle)
+  - W2: BLOCKED - must restore Ref/TypeQuery handling in evaluate.rs
+  - W3: (merged docs update)
+  - W4: (merged namespace fix) - now investigating type param registration
+  - W5: (idle)
