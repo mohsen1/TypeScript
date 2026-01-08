@@ -79,6 +79,7 @@ Priority: 3
 - [x] Solver unsoundness: key remap with optional+readonly remove yields required mutable properties in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_key_remap_optional_readonly_remove_subtyping`.
 - [x] Solver unsoundness: base constraint not assignable to type parameter in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_base_constraint_not_assignable_to_param`.
 - [x] Solver unsoundness: template literal subtyping to string in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_template_literal_subtyping_to_string`.
+- [x] Solver unsoundness: mapped type over number keys with optional+readonly add in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_over_number_keys_optional_readonly_add_subtyping` (fails: missing `/app/package.json` in container after `cli/driver.rs` change).
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
