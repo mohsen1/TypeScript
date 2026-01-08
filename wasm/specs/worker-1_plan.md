@@ -54,6 +54,7 @@ Priority: 1
 - [x] Number index treats NaN name as numeric; added `test_resolve_bounds_number_index_accepts_nan_name`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_accepts_nan_name`.
 - [x] Number index treats -Infinity name as numeric; added `test_resolve_bounds_number_index_accepts_negative_infinity_name`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_accepts_negative_infinity_name`.
 - [x] Number index ignores -0 name; added `test_resolve_bounds_number_index_ignores_negative_zero_name`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_negative_zero_name`.
+- [x] Number index ignores -0 property on object; added `test_resolve_bounds_number_index_ignores_negative_zero_property`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_negative_zero_property`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
