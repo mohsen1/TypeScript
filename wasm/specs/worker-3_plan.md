@@ -84,8 +84,10 @@ Priority: 3
 - [x] CLI: avoid `package.json` version borrow in `wasm/src/cli/driver.rs`. Tests: `./wasm/test.sh test_template_literal_subtyping_to_string`.
 - [x] Solver unsoundness: object trifecta null/undefined rejection in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_object_trifecta_nullish_rejection`.
 - [x] Solver unsoundness: mapped type over string keys with key remap omits length property in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_over_string_keys_key_remap_omit_length`.
+- [x] Solver unsoundness: mapped type over string keys includes number index signature in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_over_string_keys_number_index_subtyping`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
 - Use Docker for Rust tests (`./wasm/test.sh`), never `cargo test` directly.
 - Update this plan after each task and keep it accurate.
+- Ready for merge.
