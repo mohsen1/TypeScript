@@ -14,6 +14,7 @@ Priority: 2
 - [x] Ensure rest-parameter assignability still matches `tsc` for both `unknown[]` and `number[]` cases.
 
 ## Completed
+- [x] Rest-parameter assignability parity checks for unknown[] vs number[]; restored AsyncES5Emitter setter to unblock builds; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Added rest number[] assignability guard test; ran `./wasm/test.sh` (fails: missing `AsyncES5Emitter::set_use_this_capture` in `es5_helpers.rs` and `class_es5.rs`).
 - [x] Refactored compat subtype configuration and tightened rest mismatch diagnostics assertions; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Added rest-parameter explain_failure coverage for source rest mismatches; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
