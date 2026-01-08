@@ -472,3 +472,52 @@ class Derived extends Base {
         output
     );
 }
+
+/// Parity test for ES5 async generator function.
+/// Async generators (`async function*`) should be downleveled using
+/// __awaiter, __generator, and __asyncGenerator helpers.
+#[test]
+fn test_parity_es5_async_generator_function() {
+    let source = "async function* gen() { yield 1; yield await Promise.resolve(2); }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 async generator function downlevel
+    assert!(
+        output.contains("__awaiter") || output.contains("__asyncGenerator"),
+        "ES5 output should include async helper (__awaiter or __asyncGenerator): {}",
+        output
+    );
+    assert!(
+        output.contains("__generator"),
+        "ES5 output should include __generator helper: {}",
+        output
+    );
+    assert!(
+        output.contains("function gen"),
+        "ES5 output should define gen function: {}",
+        output
+    );
+    // Should not have async function* syntax
+    assert!(
+        !output.contains("async function*"),
+        "ES5 output should not contain async function* syntax: {}",
+        output
+    );
+}
