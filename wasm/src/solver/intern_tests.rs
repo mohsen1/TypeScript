@@ -75,6 +75,14 @@ fn test_interner_union_unknown_dominates() {
 }
 
 #[test]
+fn test_interner_union_any_beats_unknown() {
+    let interner = TypeInterner::new();
+
+    let any_and_unknown = interner.union(vec![TypeId::ANY, TypeId::UNKNOWN]);
+    assert_eq!(any_and_unknown, TypeId::ANY);
+}
+
+#[test]
 fn test_interner_intersection_normalization() {
     let interner = TypeInterner::new();
 
@@ -108,6 +116,14 @@ fn test_interner_intersection_unknown_identity() {
 
     let only_unknown = interner.intersection(vec![TypeId::UNKNOWN]);
     assert_eq!(only_unknown, TypeId::UNKNOWN);
+}
+
+#[test]
+fn test_interner_intersection_any_over_unknown() {
+    let interner = TypeInterner::new();
+
+    let any_and_unknown = interner.intersection(vec![TypeId::ANY, TypeId::UNKNOWN]);
+    assert_eq!(any_and_unknown, TypeId::ANY);
 }
 
 #[test]
