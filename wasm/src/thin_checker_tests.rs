@@ -4384,6 +4384,61 @@ Foo;
 }
 
 #[test]
+fn test_numeric_enum_open_and_nominal_assignability() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+enum A { X, Y }
+enum B { X, Y }
+let a: A = 1;
+let n: number = a;
+let b: B = a;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count_2322 = codes.iter().filter(|&&code| code == 2322).count();
+    assert_eq!(
+        count_2322,
+        1,
+        "Expected one 2322 error for cross-enum assignment, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_string_enum_rejects_string_literal() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+enum S { A = "a", B = "b" }
+let s: S = "a";
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(codes.contains(&2322), "Expected error 2322 for string enum assignment, got: {:?}", codes);
+}
+
+#[test]
 fn test_nested_namespace_member_resolution() {
     use crate::thin_parser::ThinParserState;
 

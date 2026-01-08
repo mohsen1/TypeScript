@@ -52,6 +52,12 @@ pub const MAX_INSTANTIATION_DEPTH: u32 = 50;
 /// Maximum depth for call expression resolution.
 pub const MAX_CALL_DEPTH: u32 = 20;
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum EnumKind {
+    Numeric,
+    String,
+}
+
 impl<'a> ThinCheckerState<'a> {
     /// Create a new ThinCheckerState.
     ///
@@ -2819,6 +2825,11 @@ impl<'a> ThinCheckerState<'a> {
             return self.ctx.types.intern(TypeKey::Ref(SymbolRef(sym_id.0)));
         }
 
+        // Enum - return a nominal reference type
+        if flags & symbol_flags::ENUM != 0 {
+            return self.ctx.types.intern(TypeKey::Ref(SymbolRef(sym_id.0)));
+        }
+
         // Function - build function type or callable overload set
         if flags & symbol_flags::FUNCTION != 0 {
             use crate::solver::CallableShape;
@@ -4699,12 +4710,113 @@ impl<'a> ThinCheckerState<'a> {
     // Type Relations (uses solver::CompatChecker for assignability)
     // =========================================================================
 
+    fn enum_symbol_from_type(&self, type_id: TypeId) -> Option<SymbolId> {
+        use crate::solver::{SymbolRef, TypeKey};
+
+        let Some(TypeKey::Ref(SymbolRef(sym_id))) = self.ctx.types.lookup(type_id) else {
+            return None;
+        };
+        let symbol = self.ctx.binder.get_symbol(SymbolId(sym_id))?;
+        if symbol.flags & symbol_flags::ENUM == 0 {
+            return None;
+        }
+        Some(SymbolId(sym_id))
+    }
+
+    fn enum_kind(&self, sym_id: SymbolId) -> Option<EnumKind> {
+        let symbol = self.ctx.binder.get_symbol(sym_id)?;
+        if symbol.flags & symbol_flags::ENUM == 0 {
+            return None;
+        }
+
+        let decl_idx = if !symbol.value_declaration.is_none() {
+            symbol.value_declaration
+        } else {
+            *symbol.declarations.first()?
+        };
+        let node = self.ctx.arena.get(decl_idx)?;
+        let enum_decl = self.ctx.arena.get_enum(node)?;
+
+        let mut saw_string = false;
+        for &member_idx in &enum_decl.members.nodes {
+            let Some(member_node) = self.ctx.arena.get(member_idx) else {
+                continue;
+            };
+            let Some(member) = self.ctx.arena.get_enum_member(member_node) else {
+                continue;
+            };
+            if member.initializer.is_none() {
+                continue;
+            }
+            let Some(init_node) = self.ctx.arena.get(member.initializer) else {
+                continue;
+            };
+            if init_node.kind == SyntaxKind::StringLiteral as u16
+                || init_node.kind == SyntaxKind::NoSubstitutionTemplateLiteral as u16
+            {
+                saw_string = true;
+                break;
+            }
+        }
+
+        if saw_string {
+            Some(EnumKind::String)
+        } else {
+            Some(EnumKind::Numeric)
+        }
+    }
+
+    fn enum_assignability_override(
+        &self,
+        source: TypeId,
+        target: TypeId,
+        env: Option<&crate::solver::TypeEnvironment>,
+    ) -> Option<bool> {
+        let source_enum = self.enum_symbol_from_type(source);
+        let target_enum = self.enum_symbol_from_type(target);
+
+        if let (Some(source_enum), Some(target_enum)) = (source_enum, target_enum) {
+            return Some(source_enum == target_enum);
+        }
+
+        if let Some(source_enum) = source_enum {
+            if self.enum_kind(source_enum) == Some(EnumKind::Numeric) {
+                if let Some(env) = env {
+                    let mut checker =
+                        crate::solver::CompatChecker::with_resolver(self.ctx.types, env);
+                    return Some(checker.is_assignable(TypeId::NUMBER, target));
+                }
+                let mut checker = crate::solver::CompatChecker::new(self.ctx.types);
+                return Some(checker.is_assignable(TypeId::NUMBER, target));
+            }
+        }
+
+        if let Some(target_enum) = target_enum {
+            if self.enum_kind(target_enum) == Some(EnumKind::Numeric) {
+                if let Some(env) = env {
+                    let mut checker =
+                        crate::solver::CompatChecker::with_resolver(self.ctx.types, env);
+                    return Some(checker.is_assignable(source, TypeId::NUMBER));
+                }
+                let mut checker = crate::solver::CompatChecker::new(self.ctx.types);
+                return Some(checker.is_assignable(source, TypeId::NUMBER));
+            }
+        }
+
+        None
+    }
+
     /// Check if `source` type is assignable to `target` type.
     ///
     /// Uses the solver's SubtypeChecker with coinductive cycle detection.
     /// Note: Does not resolve Ref types (use `is_assignable_to_with_resolution` for that).
     pub fn is_assignable_to(&self, source: TypeId, target: TypeId) -> bool {
         use crate::solver::CompatChecker;
+
+        if let Some(result) = self.enum_assignability_override(source, target, None) {
+            return result;
+        }
+
         let mut checker = CompatChecker::new(self.ctx.types);
         checker.is_assignable(source, target)
     }
@@ -4719,6 +4831,11 @@ impl<'a> ThinCheckerState<'a> {
         env: &crate::solver::TypeEnvironment,
     ) -> bool {
         use crate::solver::CompatChecker;
+
+        if let Some(result) = self.enum_assignability_override(source, target, Some(env)) {
+            return result;
+        }
+
         let mut checker = CompatChecker::with_resolver(self.ctx.types, env);
         checker.is_assignable(source, target)
     }
