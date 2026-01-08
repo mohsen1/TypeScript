@@ -60,6 +60,11 @@ Priority: 4
 - [x] Add derived ctor param property ordering test. Tests: `./wasm/test.sh derived_constructor_orders_param_property`
 - [x] Add derived ctor private field ordering test. Tests: `./wasm/test.sh derived_constructor_orders_private`
 - [x] Add async await property name source-map coverage. Tests: `./wasm/test.sh async_await_property_name_mapping`
+- [x] Add async await detection for if statement conditions. Tests: `./wasm/test.sh body_contains_await_in_if_condition`
+- [x] Add async await detection for if else branches. Tests: `./wasm/test.sh body_contains_await_in_if_else_branch`
+- [x] Add async await detection for throw statements (with fix). Tests: `./wasm/test.sh body_contains_await_in_throw_statement`
+- [x] Add async spread await source-map coverage. Tests: `./wasm/test.sh async_spread_await_mapping`
+- [x] Add async chained method await source-map coverage. Tests: `./wasm/test.sh async_chained_method_await_mapping`
 
 ## Ready for Merge
 Yes
