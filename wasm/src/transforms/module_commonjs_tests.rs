@@ -24,6 +24,13 @@ fn test_emit_exports_init() {
 }
 
 #[test]
+fn test_emit_exports_init_empty() {
+    let mut output = String::new();
+    emit_exports_init(&mut output, &[]).unwrap();
+    assert!(output.is_empty(), "Expected no output for empty exports");
+}
+
+#[test]
 fn test_emit_export_assignment() {
     assert_eq!(emit_export_assignment("foo"), "exports.foo = foo;");
 }
