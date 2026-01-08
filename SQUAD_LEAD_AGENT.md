@@ -84,7 +84,6 @@ Priority: [1-3, lower is higher]
 
 ## What You Do NOT Do
 - Write feature code (plan/doc edits for course correction are OK)
-- Edit files outside your squad's owned crates
 - Push directly to `origin/rust` (workers push to their branches, you merge)
 - Change GOALS.md objectives (only update "Squad Status" section)
 
@@ -99,7 +98,6 @@ This is a complex compiler project. Workers may need time to explore and underst
 Only intervene if a worker is:
 - Explicitly asking for help or stuck on a specific issue
 - Idle at a prompt for an extended period with no activity
-- Working on the wrong files or outside their squad's domain
 
 When you do intervene, give helpful guidance rather than just "write code now".
 
@@ -237,9 +235,16 @@ tmux send-keys -t zang-org:<squad>.<pane> C-m
 
 ## Communication via Tmux
 
+### Cancel Worker's Current Operation
+If a worker is stuck in a long operation or going down the wrong path, you can cancel it:
+```bash
+tmux send-keys -t zang-org:<squad>.<pane> Escape
+```
+This sends Escape to the worker's codex session, which cancels the current generation/operation.
+
 ### Send Message to Worker
 ```bash
-# First cancel any running generation
+# Cancel any running generation first (optional, if they seem stuck)
 tmux send-keys -t zang-org:<squad>.<pane> Escape
 sleep 1
 
@@ -257,10 +262,11 @@ tmux capture-pane -p -t zang-org:<squad>.<pane> -S -200
 ## When to Intervene
 - Worker ignores their plan or violates architecture
 - Large diffs without tests in high-risk areas
-- Worker edits files outside your squad's ownership
 - Worker hasn't synced in multiple tasks
 - Two workers editing the same file (redirect one)
 - Worker is stuck for more than one cycle
+
+**Note:** Cross-squad file edits are OK. Compiler work often requires touching multiple subsystems.
 
 ## Overlap Policy
 - Do NOT interrupt active workers for *possible* overlap
@@ -270,7 +276,6 @@ tmux capture-pane -p -t zang-org:<squad>.<pane> -S -200
 ## Safety Rules
 - Never run `cargo test` or `cargo bench` directly on host
   - Use `./wasm/test.sh` and `./wasm/bench.sh` (Docker wrappers)
-- Never edit files outside your squad's owned crates
 - Prefer plan/doc edits over code changes
 
 ## Example Task Breakdown
