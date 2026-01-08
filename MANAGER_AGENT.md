@@ -66,11 +66,18 @@ Useful commands:
 - Project name: Codename Zang (Zang = Persian for rust).
 - CLI binary: `tsz`.
 
+## Branching policy (critical)
+- Workers must use per-worker branches (never push directly to `rust`).
+- Branch naming: `worker/<name>` (e.g., `worker/worker-1` for `worker-1`).
+- Manager merges worker branches into `rust` and pushes `origin/rust`.
+
 ## Management loop
 
 This is what do we mean by "managing"
 
-0. Pull origin/rust into TypeScript (the main repo) to have the latest changes
+0. Pull origin/rust into TypeScript (the main repo) to have the latest changes.
+   - Merge worker branches into `rust` only after they are green and scoped.
+   - Push `origin/rust` after merges.
 1. Check all worker panes before anything else; if any are waiting or stalled, respond and unblock.
 2. Keep five workers active; never allow an idle worker. If a worker is complete or blocked, immediately reassign it to the next highest-impact task.
 3. Quick risk scan:
@@ -107,6 +114,8 @@ Manager actions:
 - To stop a worker, add `Status: Complete` to its plan file.
 - If a worker is complete, immediately assign the next highest-impact task in that same plan.
 - Always respond to stalled worker panes before doing other work.
+ - Ensure workers are on their own branches and push to `origin/worker/<name>`.
+ - Merge worker branches into `rust` and push `origin/rust`.
 
 
 ## Communication via tmux
