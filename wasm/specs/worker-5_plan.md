@@ -123,6 +123,8 @@ Priority: 5
       Tests: `./wasm/test.sh test_source_map_es5_transform_async_nested_await_call_mapping`.
 - [x] Added ES5 async template literal await source map mapping test in `wasm/src/source_map_tests.rs`.
       Tests: `./wasm/test.sh test_source_map_es5_transform_async_template_literal_mapping`.
+- [x] Added ES5 async binary add await source map mapping test in `wasm/src/source_map_tests.rs`.
+      Tests: `./wasm/test.sh test_source_map_es5_transform_async_binary_add_mapping`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
