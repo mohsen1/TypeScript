@@ -3536,3 +3536,219 @@ fn test_async_private_field_conditional() {
         output
     );
 }
+
+// ============================================================================
+// Async with decorators tests
+// ============================================================================
+
+/// Helper to parse and emit an async method with decorators
+fn parse_and_emit_async_decorated(source: &str) -> String {
+    use crate::parser::syntax_kind_ext;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &class_idx in &source_file.statements.nodes {
+                if let Some(class_node) = parser.arena.get(class_idx) {
+                    if class_node.kind == syntax_kind_ext::CLASS_DECLARATION {
+                        if let Some(class_data) = parser.arena.get_class(class_node) {
+                            // Find the first method declaration
+                            for &member_idx in &class_data.members.nodes {
+                                if let Some(member_node) = parser.arena.get(member_idx) {
+                                    if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
+                                        if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                            let emitter = AsyncES5Emitter::new(&parser.arena);
+                                            let has_await = emitter.body_contains_await(method_data.body);
+                                            let mut emitter = AsyncES5Emitter::new(&parser.arena);
+                                            if has_await {
+                                                return emitter.emit_generator_body_with_await(method_data.body);
+                                            } else {
+                                                return emitter.emit_simple_generator_body(method_data.body);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    String::new()
+}
+
+/// Helper to check if decorated async method body contains await
+fn decorated_method_contains_await(source: &str) -> bool {
+    use crate::parser::syntax_kind_ext;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &class_idx in &source_file.statements.nodes {
+                if let Some(class_node) = parser.arena.get(class_idx) {
+                    if class_node.kind == syntax_kind_ext::CLASS_DECLARATION {
+                        if let Some(class_data) = parser.arena.get_class(class_node) {
+                            for &member_idx in &class_data.members.nodes {
+                                if let Some(member_node) = parser.arena.get(member_idx) {
+                                    if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
+                                        if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                            let emitter = AsyncES5Emitter::new(&parser.arena);
+                                            return emitter.body_contains_await(method_data.body);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+#[test]
+fn test_async_decorated_method_basic() {
+    let output = parse_and_emit_async_decorated(
+        "@classDecorator class Foo { @methodDecorator async bar() { await process(); } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Decorated async method should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_decorated_method_with_return() {
+    let output = parse_and_emit_async_decorated(
+        "class Foo { @log async bar() { return await getValue(); } }",
+    );
+    assert!(
+        output.contains("return [2 /*return*/, _a.sent()]") || output.contains("[4 /*yield*/"),
+        "Decorated async method with return should emit correctly: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_decorated_method_no_await() {
+    let output = parse_and_emit_async_decorated(
+        "class Foo { @memoize async bar() { return 42; } }",
+    );
+    assert!(
+        output.contains("[2 /*return*/"),
+        "Decorated sync async method should have return: {}",
+        output
+    );
+    assert!(
+        !output.contains("switch"),
+        "No await should skip switch: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_decorated_method_multiple_decorators() {
+    let output = parse_and_emit_async_decorated(
+        "class Foo { @log @validate @cache async bar() { await process(); } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Multi-decorated async method should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_decorated_method_body_contains_await() {
+    assert!(
+        decorated_method_contains_await(
+            "class Foo { @decorator async bar() { await process(); } }"
+        ),
+        "Should detect await in decorated async method"
+    );
+}
+
+#[test]
+fn test_async_decorated_method_body_no_await() {
+    assert!(
+        !decorated_method_contains_await(
+            "class Foo { @decorator async bar() { return 1; } }"
+        ),
+        "Should not detect await when none present"
+    );
+}
+
+#[test]
+fn test_async_decorated_method_ignores_nested_async() {
+    assert!(
+        !decorated_method_contains_await(
+            "class Foo { @decorator async bar() { const inner = async () => { await x; }; return 1; } }"
+        ),
+        "Should ignore await in nested async"
+    );
+}
+
+#[test]
+fn test_async_decorated_class_method() {
+    let output = parse_and_emit_async_decorated(
+        "@injectable() class Service { async fetchData() { return await api.get(); } }",
+    );
+    assert!(
+        output.contains("[4 /*yield*/") || output.contains("switch (_a.label)"),
+        "Class-decorated async method should have yield or switch: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_decorated_method_with_try_catch() {
+    assert!(
+        decorated_method_contains_await(
+            "class Foo { @errorHandler async bar() { try { await riskyOp(); } catch (e) { log(e); } } }"
+        ),
+        "Should detect await in try block of decorated method"
+    );
+}
+
+#[test]
+fn test_async_decorated_static_method() {
+    let output = parse_and_emit_async_decorated(
+        "class Foo { @deprecated static async bar() { await process(); } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Decorated static async method should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_decorated_method_with_params() {
+    let output = parse_and_emit_async_decorated(
+        "class Foo { @validate async bar(id: number) { return await fetchById(id); } }",
+    );
+    assert!(
+        output.contains("[4 /*yield*/") || output.contains("switch (_a.label)"),
+        "Decorated async method with params should have yield or switch: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_decorator_factory() {
+    let output = parse_and_emit_async_decorated(
+        "class Foo { @timeout async bar() { await longProcess(); } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Decorator async method should have switch or yield: {}",
+        output
+    );
+}
