@@ -266,3 +266,55 @@ fn test_source_map_es5_transform_async_await_mapping() {
     assert_eq!(mapping.generated_line, output_line);
     assert_eq!(mapping.generated_column, output_col);
 }
+
+#[test]
+fn test_source_map_es5_transform_class_extends_mapping() {
+    let source = "class Base { base = 1; }\nclass Derived extends Base { value = 2; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    assert!(
+        output.contains("__extends"),
+        "expected __extends helper in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+    let (source_line, source_col) = find_line_col(source, "class Derived");
+    let (output_line, output_col) = find_line_col(&output, "var Derived");
+
+    let mapping = decoded
+        .iter()
+        .find(|entry| {
+            entry.original_line == source_line
+                && entry.original_column == source_col
+        })
+        .unwrap_or_else(|| {
+            panic!(
+                "expected mapping for Derived class. mappings: {mappings} output: {output}"
+            )
+        });
+
+    assert_eq!(mapping.source_index, 0);
+    assert_eq!(mapping.generated_line, output_line);
+    assert_eq!(mapping.generated_column, output_col);
+}
