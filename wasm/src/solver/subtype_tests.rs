@@ -108,6 +108,52 @@ fn test_template_literal_subtyping_to_string() {
 }
 
 #[test]
+fn test_template_literal_apparent_member_subtyping() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let red = interner.literal_string("red");
+    let blue = interner.literal_string("blue");
+    let colors = interner.union(vec![red, blue]);
+    let template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("color-")),
+        TemplateSpan::Type(colors),
+    ]);
+
+    let method = |return_type| {
+        interner.function(FunctionShape {
+            params: Vec::new(),
+            this_type: None,
+            return_type,
+            type_params: Vec::new(),
+            type_predicate: None,
+            is_constructor: false,
+        })
+    };
+
+    let to_upper = interner.intern_string("toUpperCase");
+    let target = interner.object(vec![PropertyInfo {
+        name: to_upper,
+        type_id: method(TypeId::STRING),
+        write_type: method(TypeId::STRING),
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+    let mismatch = interner.object(vec![PropertyInfo {
+        name: to_upper,
+        type_id: method(TypeId::NUMBER),
+        write_type: method(TypeId::NUMBER),
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    assert!(checker.is_subtype_of(template, target));
+    assert!(!checker.is_subtype_of(template, mismatch));
+}
+
+#[test]
 fn test_apparent_number_member_subtyping() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
@@ -184,6 +230,33 @@ fn test_apparent_string_member_subtyping() {
         optional: false,
         readonly: false,
         is_method: true,
+    }]);
+
+    assert!(checker.is_subtype_of(TypeId::STRING, target));
+    assert!(!checker.is_subtype_of(TypeId::STRING, mismatch));
+}
+
+#[test]
+fn test_apparent_string_length_subtyping() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let length = interner.intern_string("length");
+    let target = interner.object(vec![PropertyInfo {
+        name: length,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let mismatch = interner.object(vec![PropertyInfo {
+        name: length,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
     }]);
 
     assert!(checker.is_subtype_of(TypeId::STRING, target));
