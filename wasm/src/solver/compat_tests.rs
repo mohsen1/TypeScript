@@ -1789,6 +1789,33 @@ fn test_apparent_number_method_assignable() {
 }
 
 #[test]
+fn test_apparent_number_method_not_assignable_to_number() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let to_fixed = interner.intern_string("toFixed");
+    let to_fixed_type = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let target = interner.object(vec![PropertyInfo {
+        name: to_fixed,
+        type_id: to_fixed_type,
+        write_type: to_fixed_type,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    assert!(!checker.is_assignable(target, TypeId::NUMBER));
+}
+
+#[test]
 fn test_apparent_number_member_rejects_mismatch() {
     let interner = TypeInterner::new();
     let mut checker = CompatChecker::new(&interner);
