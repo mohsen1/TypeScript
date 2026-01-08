@@ -13087,3 +13087,382 @@ fn test_application_ref_expansion_with_tuple_arg() {
         "Box<[string, number]> should expand to {{ value: [string, number] }}"
     );
 }
+
+// =============================================================================
+// Conditional Type Edge Cases
+// =============================================================================
+
+/// Test conditional with `unknown` as check type.
+///
+/// `unknown extends string ? true : false` should evaluate to `false`
+/// because `unknown` is not assignable to `string`.
+#[test]
+fn test_conditional_unknown_check_type() {
+    let interner = TypeInterner::new();
+
+    let lit_true = interner.literal_boolean(true);
+    let lit_false = interner.literal_boolean(false);
+
+    // unknown extends string ? true : false
+    let cond = ConditionalType {
+        check_type: TypeId::UNKNOWN,
+        extends_type: TypeId::STRING,
+        true_type: lit_true,
+        false_type: lit_false,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+
+    // unknown is not assignable to string, so false branch
+    assert_eq!(result, lit_false, "unknown extends string should be false");
+}
+
+/// Test conditional with `unknown` extends `unknown`.
+///
+/// `unknown extends unknown ? true : false` should evaluate to `true`
+/// because `unknown` is assignable to itself.
+#[test]
+fn test_conditional_unknown_extends_unknown() {
+    let interner = TypeInterner::new();
+
+    let lit_true = interner.literal_boolean(true);
+    let lit_false = interner.literal_boolean(false);
+
+    // unknown extends unknown ? true : false
+    let cond = ConditionalType {
+        check_type: TypeId::UNKNOWN,
+        extends_type: TypeId::UNKNOWN,
+        true_type: lit_true,
+        false_type: lit_false,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+
+    assert_eq!(result, lit_true, "unknown extends unknown should be true");
+}
+
+/// Test distributive conditional over intersection type.
+///
+/// `(string & { length: number }) extends string ? true : false`
+/// The intersection should extend string, so result is true.
+#[test]
+fn test_conditional_intersection_check_type() {
+    let interner = TypeInterner::new();
+
+    let lit_true = interner.literal_boolean(true);
+    let lit_false = interner.literal_boolean(false);
+
+    // Create intersection: string & { length: number }
+    let length_name = interner.intern_string("length");
+    let length_obj = interner.object(vec![PropertyInfo {
+        name: length_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let string_intersection = interner.intersection(vec![TypeId::STRING, length_obj]);
+
+    // (string & { length: number }) extends string ? true : false
+    let cond = ConditionalType {
+        check_type: string_intersection,
+        extends_type: TypeId::STRING,
+        true_type: lit_true,
+        false_type: lit_false,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+
+    // string & {...} extends string should be true (intersection is more specific)
+    assert_eq!(result, lit_true, "string intersection extends string should be true");
+}
+
+/// Test conditional with `never` as check type (non-distributive).
+///
+/// `never extends T ? A : B` should be `never` when distributive is false
+/// and check type is exactly `never`.
+#[test]
+fn test_conditional_never_check_type_non_distributive() {
+    let interner = TypeInterner::new();
+
+    let lit_true = interner.literal_boolean(true);
+    let lit_false = interner.literal_boolean(false);
+
+    // never extends string ? true : false (non-distributive)
+    let cond = ConditionalType {
+        check_type: TypeId::NEVER,
+        extends_type: TypeId::STRING,
+        true_type: lit_true,
+        false_type: lit_false,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+
+    // With non-distributive, never extends T should evaluate normally
+    // never is assignable to everything, so true branch
+    assert_eq!(result, lit_true, "never extends string (non-distributive) should be true");
+}
+
+/// Test conditional with `never` extends type.
+///
+/// `string extends never ? true : false` should be `false`
+/// because string is not assignable to never.
+#[test]
+fn test_conditional_extends_never() {
+    let interner = TypeInterner::new();
+
+    let lit_true = interner.literal_boolean(true);
+    let lit_false = interner.literal_boolean(false);
+
+    // string extends never ? true : false
+    let cond = ConditionalType {
+        check_type: TypeId::STRING,
+        extends_type: TypeId::NEVER,
+        true_type: lit_true,
+        false_type: lit_false,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+
+    // string is not assignable to never, so false branch
+    assert_eq!(result, lit_false, "string extends never should be false");
+}
+
+/// Test conditional with `never` extends `never`.
+///
+/// `never extends never ? true : false` should be `true`
+/// because never is assignable to never.
+#[test]
+fn test_conditional_never_extends_never() {
+    let interner = TypeInterner::new();
+
+    let lit_true = interner.literal_boolean(true);
+    let lit_false = interner.literal_boolean(false);
+
+    // never extends never ? true : false
+    let cond = ConditionalType {
+        check_type: TypeId::NEVER,
+        extends_type: TypeId::NEVER,
+        true_type: lit_true,
+        false_type: lit_false,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+
+    // never extends never should be true
+    assert_eq!(result, lit_true, "never extends never should be true");
+}
+
+/// Test multiple `infer` in tuple pattern.
+///
+/// `[string, number] extends [infer A, infer B] ? [B, A] : never`
+/// Should extract both elements and swap them.
+#[test]
+fn test_conditional_infer_tuple_multiple_positions() {
+    let interner = TypeInterner::new();
+
+    // Create tuple: [string, number]
+    let tuple_type = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+
+    // Create infer placeholders for A and B
+    let a_name = interner.intern_string("A");
+    let b_name = interner.intern_string("B");
+    let infer_a = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: a_name,
+        constraint: None,
+        default: None,
+    }));
+    let infer_b = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: b_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // Create extends pattern: [infer A, infer B]
+    let pattern = interner.tuple(vec![
+        TupleElement { type_id: infer_a, name: None, optional: false, rest: false },
+        TupleElement { type_id: infer_b, name: None, optional: false, rest: false },
+    ]);
+
+    // Create true branch: [B, A] - swapped
+    // We reference the inferred types using their positions
+    let swapped = interner.tuple(vec![
+        TupleElement { type_id: infer_b, name: None, optional: false, rest: false },
+        TupleElement { type_id: infer_a, name: None, optional: false, rest: false },
+    ]);
+
+    let cond = ConditionalType {
+        check_type: tuple_type,
+        extends_type: pattern,
+        true_type: swapped,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+
+    // Expected: [number, string] (swapped)
+    let expected = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+
+    assert_eq!(result, expected, "[string, number] with [infer A, infer B] should swap to [number, string]");
+}
+
+/// Test nested conditional types (conditional in true branch).
+///
+/// `T extends string ? (T extends "hello" ? "greeting" : "other") : "not string"`
+#[test]
+fn test_conditional_nested_in_true_branch() {
+    let interner = TypeInterner::new();
+
+    let hello_lit = interner.literal_string("hello");
+    let greeting_lit = interner.literal_string("greeting");
+    let other_lit = interner.literal_string("other");
+    let not_string_lit = interner.literal_string("not string");
+
+    // Inner conditional: "hello" extends "hello" ? "greeting" : "other"
+    let inner_cond = interner.conditional(ConditionalType {
+        check_type: hello_lit,
+        extends_type: hello_lit,
+        true_type: greeting_lit,
+        false_type: other_lit,
+        is_distributive: false,
+    });
+
+    // Outer: "hello" extends string ? <inner> : "not string"
+    let outer_cond = ConditionalType {
+        check_type: hello_lit,
+        extends_type: TypeId::STRING,
+        true_type: inner_cond,
+        false_type: not_string_lit,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &outer_cond);
+
+    // "hello" extends string -> true, then "hello" extends "hello" -> "greeting"
+    assert_eq!(result, greeting_lit, "nested conditional should resolve to 'greeting'");
+}
+
+/// Test distributive conditional with literal union.
+///
+/// `("a" | "b" | "c") extends "a" ? "yes" : "no"`
+/// Distributes to: ("a" extends "a" ? "yes" : "no") | ("b" extends "a" ? "yes" : "no") | ...
+#[test]
+fn test_conditional_distributive_literal_union() {
+    let interner = TypeInterner::new();
+
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+    let lit_c = interner.literal_string("c");
+    let yes_lit = interner.literal_string("yes");
+    let no_lit = interner.literal_string("no");
+
+    let abc_union = interner.union(vec![lit_a, lit_b, lit_c]);
+
+    // ("a" | "b" | "c") extends "a" ? "yes" : "no"
+    let cond = ConditionalType {
+        check_type: abc_union,
+        extends_type: lit_a,
+        true_type: yes_lit,
+        false_type: no_lit,
+        is_distributive: true,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+
+    // "a" -> "yes", "b" -> "no", "c" -> "no"
+    // Result: "yes" | "no"
+    let expected = interner.union(vec![yes_lit, no_lit]);
+    assert_eq!(result, expected, "distributive over literal union should produce 'yes' | 'no'");
+}
+
+/// Test conditional with `any` in extends position.
+///
+/// `string extends any ? true : false` should be `true`
+/// because everything extends any.
+#[test]
+fn test_conditional_extends_any() {
+    let interner = TypeInterner::new();
+
+    let lit_true = interner.literal_boolean(true);
+    let lit_false = interner.literal_boolean(false);
+
+    // string extends any ? true : false
+    let cond = ConditionalType {
+        check_type: TypeId::STRING,
+        extends_type: TypeId::ANY,
+        true_type: lit_true,
+        false_type: lit_false,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+
+    // string extends any is always true
+    assert_eq!(result, lit_true, "string extends any should be true");
+}
+
+/// Test infer with constraint that doesn't match.
+///
+/// `{ x: number } extends { x: infer T extends string } ? T : never`
+/// The constraint `T extends string` doesn't match `number`, so false branch.
+#[test]
+fn test_conditional_infer_constraint_mismatch_edge() {
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+    let t_name = interner.intern_string("T");
+
+    // Create { x: number }
+    let obj_number = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Create infer T extends string
+    let infer_t = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: t_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    // Create pattern { x: infer T extends string }
+    let pattern = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: infer_t,
+        write_type: infer_t,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let cond = ConditionalType {
+        check_type: obj_number,
+        extends_type: pattern,
+        true_type: infer_t,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+
+    // number doesn't satisfy constraint `extends string`, so false branch
+    assert_eq!(result, TypeId::NEVER, "infer with mismatched constraint should produce never");
+}
