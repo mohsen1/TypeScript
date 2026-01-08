@@ -107,6 +107,10 @@ fn find_line_col(text: &str, needle: &str) -> (u32, u32) {
         .find(needle)
         .unwrap_or_else(|| panic!("expected to find {needle} in {text}"));
 
+    find_line_col_at(text, idx)
+}
+
+fn find_line_col_at(text: &str, idx: usize) -> (u32, u32) {
     let mut line = 0u32;
     let mut col = 0u32;
     for &b in text.as_bytes().iter().take(idx) {
@@ -736,6 +740,80 @@ fn test_source_map_es5_transform_async_await_call_mapping() {
     assert!(
         output_slice.starts_with("compute"),
         "expected mapped output to start with compute. line: {output_line_text} column: {} output: {output}",
+        mapping.generated_column
+    );
+}
+
+#[test]
+fn test_source_map_es5_transform_async_await_call_argument_mapping() {
+    let source = "async function run(value) { return await compute(value); }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    assert!(
+        output.contains("__awaiter(") && output.contains("__generator("),
+        "expected async downlevel output, got: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+    let arg_idx = source
+        .rfind("value")
+        .unwrap_or_else(|| panic!("expected to find value in {source}"));
+    let (arg_line, arg_col) = find_line_col_at(source, arg_idx);
+
+    let mapping = decoded
+        .iter()
+        .find(|entry| {
+            entry.original_line == arg_line
+                && entry.original_column == arg_col
+        })
+        .unwrap_or_else(|| {
+            panic!(
+                "expected mapping for value. mappings: {mappings} output: {output}"
+            )
+        });
+
+    assert_eq!(mapping.source_index, 0);
+    let output_line_text = output
+        .lines()
+        .nth(mapping.generated_line as usize)
+        .unwrap_or_else(|| {
+            panic!(
+                "missing output line {} in output: {output}",
+                mapping.generated_line
+            )
+        });
+    let output_slice = output_line_text
+        .get(mapping.generated_column as usize..)
+        .unwrap_or_else(|| {
+            panic!(
+                "missing output column {} in line: {output_line_text}",
+                mapping.generated_column
+            )
+        });
+    assert!(
+        output_slice.starts_with("value"),
+        "expected mapped output to start with value. line: {output_line_text} column: {} output: {output}",
         mapping.generated_column
     );
 }

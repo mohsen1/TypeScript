@@ -26,6 +26,7 @@ Priority: 4
 - [x] Add async await call property source-map coverage. Tests: `./wasm/test.sh async_await_call_property_mapping`
 - [x] Add async await element access source-map coverage. Tests: `./wasm/test.sh async_await_element_access_mapping`
 - [x] Add async await call source-map coverage. Tests: `./wasm/test.sh async_await_call_mapping`
+- [x] Add async await call argument source-map coverage. Tests: `./wasm/test.sh async_await_call_argument_mapping`
 - [x] Add derived ctor param property ordering test. Tests: `./wasm/test.sh derived_constructor_orders_param_property`
 - [x] Add derived ctor private field ordering test. Tests: `./wasm/test.sh derived_constructor_orders_private`
 - [x] Add async await property name source-map coverage. Tests: `./wasm/test.sh async_await_property_name_mapping`
