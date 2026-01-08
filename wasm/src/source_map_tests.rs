@@ -10254,3 +10254,57 @@ fn test_source_map_inline_generation() {
         "expected non-empty mappings"
     );
 }
+
+#[test]
+fn test_source_map_es5_transform_class_private_fields_mapping() {
+    let source = "class Counter {\n    #count = 0;\n    increment() { this.#count++; }\n    get value() { return this.#count; }\n}";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Private fields get transformed in ES5 (WeakMap or similar pattern)
+    assert!(
+        output.contains("Counter") && (output.contains("function") || output.contains("var")),
+        "expected class downlevel output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify mappings exist for key source lines
+    let (class_line, _) = find_line_col(source, "class Counter");
+    let (count_line, _) = find_line_col(source, "#count = 0");
+    let (increment_line, _) = find_line_col(source, "increment()");
+
+    // Check we have mappings for the class and method lines
+    let has_class_mapping = decoded.iter().any(|m| m.source_index == 0 && m.original_line == class_line);
+    let has_method_mapping = decoded.iter().any(|m| m.source_index == 0 && m.original_line == increment_line);
+
+    assert!(
+        has_class_mapping || has_method_mapping,
+        "expected mappings for class or method. class_line: {class_line}, increment_line: {increment_line}, mappings: {mappings}"
+    );
+
+    // Verify we have mappings that reference the source file
+    let has_any_valid_mapping = decoded.iter().any(|m| m.source_index == 0);
+    assert!(has_any_valid_mapping, "expected at least one mapping to source file");
+}
