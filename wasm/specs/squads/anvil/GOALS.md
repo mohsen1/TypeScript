@@ -5,7 +5,7 @@ Updated: 2026-01-08
 Priority: 2
 
 ## Current Milestone
-Phase 8 - Conformance, Convergence, and Hardening: Output fidelity across the integrated pipeline.
+Phase 8 - Conformance, Convergence, and Hardening: output fidelity across the integrated pipeline, driven by conformance tests.
 
 ## Project Direction Alignment
 - Strategic shift: integration and correctness across the pipeline; conformance tests drive work.
@@ -27,7 +27,7 @@ Phase 8 - Conformance, Convergence, and Hardening: Output fidelity across the in
 
 2. **Source Map Validation**
    - Context: Source maps must be valid and usable by debuggers
-   - Success Criteria: Generated source maps validate and attach correctly in debuggers
+   - Success Criteria: Generated source maps validate and attach correctly in debuggers, including async ES5 mappings
    - Key Files: `thin_emitter/source_writer.rs`, `thin_emitter/source_map.rs`
    - Estimated Complexity: Medium
 
@@ -44,7 +44,7 @@ Phase 8 - Conformance, Convergence, and Hardening: Output fidelity across the in
 - New AST nodes or isolated features outside emitter correctness
 
 ## Cross-Squad Dependencies
-- Forge squad owns type checking; emitter may expose Forge bugs
+- Forge squad owns type checking; emitter may expose Forge bugs; coordinate on shared conformance regressions
 
 ## Notes to EM
 - Re-anchor worker tasks to conformance-driven integration; avoid feature work that does not close emitter fidelity gaps.
