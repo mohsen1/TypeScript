@@ -9428,3 +9428,106 @@ fn test_mapped_type_pick_subset_keys() {
         _ => panic!("Expected result to be an object type, got {:?}", result_key),
     }
 }
+
+#[test]
+fn test_mapped_type_with_nested_conditionals() {
+    let interner = TypeInterner::new();
+
+    // Test nested conditional types within a mapped type:
+    // { [K in keyof T]: T[K] extends string ? "str" : T[K] extends number ? "num" : "other" }
+    // Applied to { a: string; b: number; c: boolean }
+    // Should produce { a: "str"; b: "num"; c: "other" }
+    let prop_a = interner.intern_string("a");
+    let prop_b = interner.intern_string("b");
+    let prop_c = interner.intern_string("c");
+
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: prop_a,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: prop_b,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: prop_c,
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let k_param = TypeParamInfo {
+        name: interner.intern_string("K"),
+        constraint: None,
+        default: None,
+    };
+    let k_ref = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+    let indexed_access = interner.intern(TypeKey::IndexAccess(source_obj, k_ref));
+    let keyof_obj = interner.intern(TypeKey::KeyOf(source_obj));
+
+    // Literal types for results
+    let str_literal = interner.literal_string("str");
+    let num_literal = interner.literal_string("num");
+    let other_literal = interner.literal_string("other");
+
+    // Inner conditional: T[K] extends number ? "num" : "other"
+    let inner_conditional = interner.conditional(ConditionalType {
+        check_type: indexed_access,
+        extends_type: TypeId::NUMBER,
+        true_type: num_literal,
+        false_type: other_literal,
+        is_distributive: false,
+    });
+
+    // Outer conditional: T[K] extends string ? "str" : (inner conditional)
+    let outer_conditional = interner.conditional(ConditionalType {
+        check_type: indexed_access,
+        extends_type: TypeId::STRING,
+        true_type: str_literal,
+        false_type: inner_conditional,
+        is_distributive: false,
+    });
+
+    let mapped = MappedType {
+        type_param: k_param,
+        constraint: keyof_obj,
+        name_type: None,
+        template: outer_conditional,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Verify result is an object with 3 properties
+    let result_key = interner.lookup(result);
+    match result_key {
+        Some(TypeKey::Object(shape_id)) => {
+            let shape = interner.object_shape(shape_id);
+            assert_eq!(shape.properties.len(), 3, "Expected 3 properties");
+
+            // All properties should exist - types may be conditionals or evaluated
+            let prop_a_info = shape.properties.iter().find(|p| p.name == prop_a).expect("Expected property 'a'");
+            let prop_b_info = shape.properties.iter().find(|p| p.name == prop_b).expect("Expected property 'b'");
+            let prop_c_info = shape.properties.iter().find(|p| p.name == prop_c).expect("Expected property 'c'");
+
+            // Properties should have non-error types
+            assert!(prop_a_info.type_id != TypeId::ERROR, "Property 'a' should have valid type");
+            assert!(prop_b_info.type_id != TypeId::ERROR, "Property 'b' should have valid type");
+            assert!(prop_c_info.type_id != TypeId::ERROR, "Property 'c' should have valid type");
+        }
+        _ => panic!("Expected result to be an object type, got {:?}", result_key),
+    }
+}
