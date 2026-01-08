@@ -19,18 +19,18 @@ CODEX_RESTART_DELAY="${CODEX_RESTART_DELAY:-2}"
 CODEX_AUTO_UPDATE="${CODEX_AUTO_UPDATE:-1}"
 CODEX_UPDATE_CMD="${CODEX_UPDATE_CMD:-npm install -g @openai/codex}"
 
-# Idle monitoring
-DIRECTOR_IDLE_SECONDS="${DIRECTOR_IDLE_SECONDS:-120}"
-DIRECTOR_POKE="${DIRECTOR_POKE:-continue}"
+# Idle monitoring (Director should be mostly idle - hands-off management)
+DIRECTOR_IDLE_SECONDS="${DIRECTOR_IDLE_SECONDS:-600}"
+DIRECTOR_POKE="${DIRECTOR_POKE:-Check if any intervention is needed. If EMs are working, do nothing.}"
 EM_IDLE_SECONDS="${EM_IDLE_SECONDS:-90}"
-EM_POKE="${EM_POKE:-continue}"
-WORKER_IDLE_SECONDS="${WORKER_IDLE_SECONDS:-180}"
-WORKER_POKE="${WORKER_POKE:-continue with your plan.}"
+EM_POKE="${EM_POKE:-Check worker panes. If any worker is asking for help or idle at a prompt, provide guidance.}"
+WORKER_IDLE_SECONDS="${WORKER_IDLE_SECONDS:-300}"
+WORKER_POKE="${WORKER_POKE:-How is your task going? If you need help, describe what you are stuck on.}"
 
 # Startup timing (codex boots in ~5s)
-WORKER_START_PROMPT="${WORKER_START_PROMPT:-Read your plan file and start working on your current assignment.}"
-EM_START_PROMPT="${EM_START_PROMPT:-Read your squad GOALS.md and assign tasks to your workers.}"
-DIRECTOR_START_PROMPT="${DIRECTOR_START_PROMPT:-Read the Project Direction and update squad goals.}"
+WORKER_START_PROMPT="${WORKER_START_PROMPT:-You are worker \$WORKER_NUM in squad \$SQUAD_NAME. Read AGENTS.md then your plan at wasm/specs/squads/\$SQUAD_NAME/worker-\${WORKER_NUM}_plan.md. Switch to branch worker/\$SQUAD_NAME-\$WORKER_NUM and work on your current assignment.}"
+EM_START_PROMPT="${EM_START_PROMPT:-You are an Engineering Manager. Do NOT read AGENTS.md (that is for workers). Read SQUAD_LEAD_AGENT.md for your instructions. Your job: manage workers via tmux, merge branches, update plans. Do NOT write code.}"
+DIRECTOR_START_PROMPT="${DIRECTOR_START_PROMPT:-Read DIRECTOR_AGENT.md. Be hands-off. Only intervene if EMs need help.}"
 START_PAUSE="${START_PAUSE:-10}"
 SEND_ENTER_PAUSE="${SEND_ENTER_PAUSE:-1}"
 STAGGER_PAUSE="${STAGGER_PAUSE:-2}"
@@ -49,6 +49,15 @@ if [ "${1:-}" = "--kill" ]; then
     echo "No tmux session found: $SESSION"
   fi
   exit 0
+fi
+
+# =============================================================================
+# Fresh mode - reset all branches to origin/rust
+# =============================================================================
+FRESH_MODE=0
+if [ "${1:-}" = "--fresh" ]; then
+  FRESH_MODE=1
+  echo "Fresh mode: will reset all branches to origin/rust"
 fi
 
 # =============================================================================
@@ -107,7 +116,7 @@ fi
 # Ensure rust branch exists
 # =============================================================================
 if [ "$AUTO_FETCH" = "1" ]; then
-  git -C "$ROOT_DIR" fetch --prune origin rust >/dev/null 2>&1 || true
+  git -C "$ROOT_DIR" fetch --prune origin >/dev/null 2>&1 || true
 fi
 
 if ! git -C "$ROOT_DIR" show-ref --verify --quiet refs/heads/rust; then
@@ -116,6 +125,37 @@ if ! git -C "$ROOT_DIR" show-ref --verify --quiet refs/heads/rust; then
   else
     git -C "$ROOT_DIR" branch rust >/dev/null 2>&1 || true
   fi
+fi
+
+# =============================================================================
+# Fresh mode: Reset all branches to origin/rust
+# =============================================================================
+if [ "$FRESH_MODE" = "1" ]; then
+  echo "Resetting all branches to origin/rust..."
+
+  # Reset squad branches
+  for squad in forge anvil; do
+    branch="squad/$squad"
+    if git -C "$ROOT_DIR" show-ref --verify --quiet "refs/heads/$branch"; then
+      git -C "$ROOT_DIR" branch -D "$branch" >/dev/null 2>&1 || true
+    fi
+    git -C "$ROOT_DIR" branch "$branch" origin/rust >/dev/null 2>&1 || true
+    echo "  Reset $branch -> origin/rust"
+  done
+
+  # Reset worker branches
+  for squad in forge anvil; do
+    for n in 1 2 3 4 5; do
+      branch="worker/${squad}-${n}"
+      if git -C "$ROOT_DIR" show-ref --verify --quiet "refs/heads/$branch"; then
+        git -C "$ROOT_DIR" branch -D "$branch" >/dev/null 2>&1 || true
+      fi
+      git -C "$ROOT_DIR" branch "$branch" origin/rust >/dev/null 2>&1 || true
+      echo "  Reset $branch -> origin/rust"
+    done
+  done
+
+  echo "All branches reset to origin/rust"
 fi
 
 # =============================================================================
@@ -234,11 +274,20 @@ is_worktree() {
 ensure_worktree() {
   local name="$1"
   local dir="$WORKTREE_BASE/TypeScript-${name}-track"
+  local branch="worker/$name"
 
   if [ -d "$dir" ]; then
     if ! is_worktree "$dir"; then
       echo "warning: $dir exists but is not a git worktree; skipping" >&2
       return 1
+    fi
+    # Fresh mode: reset worktree to origin/rust
+    if [ "$FRESH_MODE" = "1" ]; then
+      git -C "$dir" fetch origin >/dev/null 2>&1 || true
+      git -C "$dir" reset --hard origin/rust >/dev/null 2>&1 || true
+      git -C "$dir" clean -fd >/dev/null 2>&1 || true
+      git -C "$dir" checkout -B "$branch" origin/rust >/dev/null 2>&1 || true
+      echo "  Reset worktree $name -> origin/rust" >&2
     fi
   else
     git -C "$ROOT_DIR" worktree add --force "$dir" rust >/dev/null 2>&1 || {
@@ -307,69 +356,93 @@ fi
 tmux new-session -d -s "$SESSION" -n "director" -c "$ROOT_DIR"
 
 # =============================================================================
-# Window 1: Director
+# Window 1: Director + EMs (Director left, EMs stacked on right)
 # =============================================================================
-echo "Setting up Director window..."
-tmux send-keys -t "$SESSION:director" "bash -lc '$director_cmd'" C-m
+echo "Setting up Director window with EMs..."
+
+# Pane 0: Director (left side)
+tmux send-keys -t "$SESSION:director.0" "bash -lc '$director_cmd'" C-m
 tmux select-pane -t "$SESSION:director.0" -T "director" 2>/dev/null || true
+
+# Split right for EM-Forge (pane 1)
+tmux split-window -h -t "$SESSION:director.0" -c "$ROOT_DIR"
+tmux send-keys -t "$SESSION:director.1" "export SQUAD_NAME=forge && bash -lc '$em_cmd'" C-m
+tmux select-pane -t "$SESSION:director.1" -T "em-forge" 2>/dev/null || true
+
+# Split below EM-Forge for EM-Anvil (pane 2)
+tmux split-window -v -t "$SESSION:director.1" -c "$ROOT_DIR"
+tmux send-keys -t "$SESSION:director.2" "export SQUAD_NAME=anvil && bash -lc '$em_cmd'" C-m
+tmux select-pane -t "$SESSION:director.2" -T "em-anvil" 2>/dev/null || true
+
+# Wait for director and EMs to boot
 sleep "$START_PAUSE"
+
+# Send start prompts to Director and EMs
 tmux send-keys -t "$SESSION:director.0" "$DIRECTOR_START_PROMPT"
 sleep "$SEND_ENTER_PAUSE"
 tmux send-keys -t "$SESSION:director.0" C-m
 
+tmux send-keys -t "$SESSION:director.1" "$EM_START_PROMPT"
+sleep "$SEND_ENTER_PAUSE"
+tmux send-keys -t "$SESSION:director.1" C-m
+
+tmux send-keys -t "$SESSION:director.2" "$EM_START_PROMPT"
+sleep "$SEND_ENTER_PAUSE"
+tmux send-keys -t "$SESSION:director.2" C-m
+
 # =============================================================================
-# Helper: Setup squad window (EM + 5 workers)
+# Helper: Setup squad window (5 workers only, EM is in director window)
 # =============================================================================
 setup_squad_window() {
   local squad="$1"
   local window="$squad"
 
-  echo "Setting up $squad squad window..."
+  echo "Setting up $squad squad window (workers only)..."
 
-  # Create window for squad
+  # Create window for squad workers
   tmux new-window -t "$SESSION" -n "$window" -c "$ROOT_DIR"
 
-  # Pane 0: EM - start codex with squad identity
-  tmux send-keys -t "$SESSION:$window.0" "export SQUAD_NAME=$squad && bash -lc '$em_cmd'" C-m
-  tmux select-pane -t "$SESSION:$window.0" -T "em-$squad" 2>/dev/null || true
-
-  # Create 5 worker panes - just start the shell, codex will be started after layout is set
+  # Create 5 worker panes
   local worker_dir
-  for n in 1 2 3 4 5; do
+
+  # First worker in pane 0
+  worker_dir="$(get_worktree_dir "$squad" 1)"
+  [ -z "$worker_dir" ] && worker_dir="$ROOT_DIR"
+  tmux send-keys -t "$SESSION:$window.0" "cd '$worker_dir'" C-m
+
+  # Workers 2-5 via splits
+  for n in 2 3 4 5; do
     worker_dir="$(get_worktree_dir "$squad" "$n")"
     [ -z "$worker_dir" ] && worker_dir="$ROOT_DIR"
-
-    # Split pane (starts with shell, not codex yet)
     tmux split-window -t "$SESSION:$window" -c "$worker_dir"
     tmux select-layout -t "$SESSION:$window" tiled
-  done
-
-  # Rename panes for clarity (pane 0 is EM, panes 1-5 are workers)
-  tmux select-pane -t "$SESSION:$window.0" -T "em-$squad" 2>/dev/null || true
-  for n in 1 2 3 4 5; do
-    tmux select-pane -t "$SESSION:$window.$n" -T "${squad}-${n}" 2>/dev/null || true
   done
 
   # Final layout balance
   tmux select-layout -t "$SESSION:$window" tiled
 
-  # Now start codex in each worker pane (staggered so they don't all boot at once)
-  for n in 1 2 3 4 5; do
-    tmux send-keys -t "$SESSION:$window.$n" "export SQUAD_NAME=$squad WORKER_NUM=$n && bash -lc '$worker_cmd'" C-m
+  # Rename panes (panes 0-4 are workers 1-5)
+  for n in 0 1 2 3 4; do
+    local worker_num=$((n + 1))
+    tmux select-pane -t "$SESSION:$window.$n" -T "${squad}-${worker_num}" 2>/dev/null || true
+  done
+
+  # Start codex in each worker pane (staggered)
+  for n in 0 1 2 3 4; do
+    local worker_num=$((n + 1))
+    local worker_dir
+    worker_dir="$(get_worktree_dir "$squad" "$worker_num")"
+    [ -z "$worker_dir" ] && worker_dir="$ROOT_DIR"
+    tmux send-keys -t "$SESSION:$window.$n" "cd '$worker_dir' && export SQUAD_NAME=$squad WORKER_NUM=$worker_num && bash -lc '$worker_cmd'" C-m
     sleep 2  # Small delay between starting each codex
   done
 
-  # Wait for all codex instances to boot
+  # Wait for codex instances to boot
   echo "  Waiting ${START_PAUSE}s for codex to boot in $squad squad..."
   sleep "$START_PAUSE"
 
-  # Send start prompts to EM
-  tmux send-keys -t "$SESSION:$window.0" "$EM_START_PROMPT"
-  sleep "$SEND_ENTER_PAUSE"
-  tmux send-keys -t "$SESSION:$window.0" C-m
-
   # Send start prompts to workers (staggered)
-  for pane in 1 2 3 4 5; do
+  for pane in 0 1 2 3 4; do
     sleep "$STAGGER_PAUSE"
     tmux send-keys -t "$SESSION:$window.$pane" "$WORKER_START_PROMPT"
     sleep "$SEND_ENTER_PAUSE"
@@ -547,9 +620,9 @@ echo "=============================================="
 echo "Session: $SESSION"
 echo ""
 echo "Windows:"
-echo "  1. director  - Director agent"
-echo "  2. forge     - EM-Forge + 5 Workers (type system)"
-echo "  3. anvil     - EM-Anvil + 5 Workers (output)"
+echo "  1. director  - Director (pane 0) + EM-Forge (pane 1) + EM-Anvil (pane 2)"
+echo "  2. forge     - 5 Workers (type system, panes 0-4)"
+echo "  3. anvil     - 5 Workers (output, panes 0-4)"
 echo ""
 echo "Worktrees:"
 for squad in forge anvil; do
@@ -566,6 +639,7 @@ echo "  tmux select-window -t $SESSION:anvil"
 echo ""
 echo "Attach: tmux attach -t $SESSION"
 echo "Kill:   $0 --kill"
+echo "Fresh:  $0 --fresh  (reset all branches to origin/rust)"
 echo "=============================================="
 
 # =============================================================================

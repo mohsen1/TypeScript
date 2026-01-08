@@ -27,7 +27,8 @@ Director (sets GOALS.md)
 | `forge` | `zang-org:forge` | `solver/`, `checker/`, `binder/`, `types/` (Type System) |
 | `anvil` | `zang-org:anvil` | `thin_emitter/`, `transforms/`, `cli/`, `lsp/` (Output) |
 
-Your workers are in panes 1-5 of your window. You are in pane 0.
+Your workers are in panes 0-4 of your squad window (zang-org:forge or zang-org:anvil).
+You (EM) are in the director window (zang-org:director pane 1 for forge, pane 2 for anvil).
 
 ## Workspace Layout
 - Main repo: `TypeScript` (branch: `rust`)
@@ -83,7 +84,6 @@ Priority: [1-3, lower is higher]
 
 ## What You Do NOT Do
 - Write feature code (plan/doc edits for course correction are OK)
-- Edit files outside your squad's owned crates
 - Push directly to `origin/rust` (workers push to their branches, you merge)
 - Change GOALS.md objectives (only update "Squad Status" section)
 
@@ -92,6 +92,15 @@ Keep all 5 workers active at all times. If a worker finishes or stalls:
 1. Immediately assign the next task from the queue
 2. If queue is empty, break down the next GOALS.md objective into tasks
 
+## Worker Support Policy
+This is a complex compiler project. Workers may need time to explore and understand the codebase before making changes - that's OK.
+
+Only intervene if a worker is:
+- Explicitly asking for help or stuck on a specific issue
+- Idle at a prompt for an extended period with no activity
+
+When you do intervene, give helpful guidance rather than just "write code now".
+
 ## EM Management Loop
 
 **Priority: Workers First, Merges Second.** Never leave a worker idle while doing merges.
@@ -99,12 +108,13 @@ Keep all 5 workers active at all times. If a worker finishes or stalls:
 ### 1. Check & Unblock Workers FIRST (Highest Priority)
 Before anything else, check all worker panes for prompts or stalls:
 ```bash
-tmux capture-pane -p -t zang-org:<squad>.1 -S -80  # Worker 1
-tmux capture-pane -p -t zang-org:<squad>.2 -S -80  # Worker 2
-tmux capture-pane -p -t zang-org:<squad>.3 -S -80  # Worker 3
-tmux capture-pane -p -t zang-org:<squad>.4 -S -80  # Worker 4
-tmux capture-pane -p -t zang-org:<squad>.5 -S -80  # Worker 5
+tmux capture-pane -p -t zang-org:<squad>.0 -S -80  # Worker 1
+tmux capture-pane -p -t zang-org:<squad>.1 -S -80  # Worker 2
+tmux capture-pane -p -t zang-org:<squad>.2 -S -80  # Worker 3
+tmux capture-pane -p -t zang-org:<squad>.3 -S -80  # Worker 4
+tmux capture-pane -p -t zang-org:<squad>.4 -S -80  # Worker 5
 ```
+Note: Panes 0-4 are workers 1-5. EM is in the director window.
 
 **Pane status heuristics:**
 - **Busy/working**: "Running", "Compiling", "Analyzing", streaming logs
@@ -245,10 +255,11 @@ tmux capture-pane -p -t zang-org:<squad>.<pane> -S -200
 ## When to Intervene
 - Worker ignores their plan or violates architecture
 - Large diffs without tests in high-risk areas
-- Worker edits files outside your squad's ownership
 - Worker hasn't synced in multiple tasks
 - Two workers editing the same file (redirect one)
 - Worker is stuck for more than one cycle
+
+**Note:** Cross-squad file edits are OK. Compiler work often requires touching multiple subsystems.
 
 ## Overlap Policy
 - Do NOT interrupt active workers for *possible* overlap
@@ -258,7 +269,6 @@ tmux capture-pane -p -t zang-org:<squad>.<pane> -S -200
 ## Safety Rules
 - Never run `cargo test` or `cargo bench` directly on host
   - Use `./wasm/test.sh` and `./wasm/bench.sh` (Docker wrappers)
-- Never edit files outside your squad's owned crates
 - Prefer plan/doc edits over code changes
 
 ## Example Task Breakdown

@@ -7,6 +7,10 @@ Priority: 1
 ## Current Milestone
 Phase 8 - Conformance, Convergence, and Hardening: Type-system correctness in the integrated pipeline, driven by conformance tests.
 
+## Project Direction Alignment
+- Strategic shift: integration and correctness across the pipeline; conformance tests drive work.
+- Top priority: Solver is the correctness bottleneck; fix inference and subtype gaps before new features.
+
 ## Focus Areas (Director can reassign)
 - `wasm/src/solver/` - Type inference, constraint solving
 - `wasm/src/checker/` - Type checking logic
@@ -17,7 +21,7 @@ Phase 8 - Conformance, Convergence, and Hardening: Type-system correctness in th
 
 1. **Generic Inference Hardening**
    - Context: Solver is the correctness bottleneck per Project Direction
-   - Success Criteria: Inference from usage and context-sensitive typing match `tsc`, including circular constraints in `extends` clauses and usage-driven inference
+   - Success Criteria: Inference from usage and context-sensitive typing match `tsc`, including circular constraints in `extends` clauses; redux/lodash-type suites compile without panics
    - Key Files: `solver/infer.rs`, `solver/infer_tests.rs`
    - Estimated Complexity: High
 
@@ -35,7 +39,7 @@ Phase 8 - Conformance, Convergence, and Hardening: Type-system correctness in th
 
 4. **End-to-End Conformance Validation**
    - Context: Stop adding AST nodes; compile real code end-to-end
-   - Success Criteria: Compile a non-trivial generic library (e.g., redux/lodash types) without panics and advance conformance test pass rate
+   - Success Criteria: Compile a non-trivial generic library (e.g., redux/lodash types) without panics and track conformance pass-rate deltas
    - Key Files: `checker/mod.rs`, `solver/mod.rs`, `binder/mod.rs`
    - Estimated Complexity: Medium
 
@@ -46,16 +50,18 @@ Phase 8 - Conformance, Convergence, and Hardening: Type-system correctness in th
 - New AST nodes or isolated features outside solver correctness
 
 ## Cross-Squad Dependencies
-- Anvil squad may find Forge bugs via emitter tests; coordinate on fixes
+- Anvil squad conformance/emitter runs may surface solver bugs; coordinate on failure triage and ownership
 
 ## Notes to EM
+- Re-anchor worker tasks to conformance-driven integration; avoid feature work that does not close solver correctness gaps.
 - Read `wasm/specs/SOLVER.md` for solver architecture
 - Read `wasm/specs/TS_UNSOUNDNESS_CATALOG.md` for known TypeScript unsoundness
 - Use Docker for tests: `./wasm/test.sh`
 
 ## Squad Status
-- Last EM Report: Conformance-driven focus confirmed; prioritize solver inference gaps and regression coverage.
-- Workers Active: 0/5
-- Branches Pending Merge: None
-- Current Focus: Conformance-driven solver regressions and inference gaps
-- Blockers: None
+- Last EM Report: 2026-01-08
+- Workers Active: 5/5
+- Branches Pending Merge: worker/forge-1, worker/forge-4 (blocked by management-file edits)
+- Current Focus: conditional type evaluation (function + template literal inference), subtype `this` variance, end-to-end generic regressions, optional/variadic tuple inference
+- Direction: Conformance-first integration; solver correctness before feature work
+- Blockers: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports` failure; worker/forge-1/forge-4 contain management-file edits

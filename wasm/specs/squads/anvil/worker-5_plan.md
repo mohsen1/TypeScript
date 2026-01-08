@@ -7,11 +7,12 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- Add regression coverage for ES5 downleveling of `super()` in derived classes with field initializers and nested async/arrow `this` capture; target `wasm/src/transforms/async_es5.rs` and `wasm/src/emitter_transform_integration_tests.rs`; run `./wasm/test.sh`.
+- Expand async ES5 source-map coverage for loop/try constructs in `wasm/src/source_map_tests.rs` (e.g., `for` init/condition/increment awaits, `do/while` await condition); ensure mappings are non-trivial; run `./wasm/test.sh`.
 
 ## Task Queue
-- [ ] Review `async_es5.rs` for `this` capture handling in nested arrows inside class fields.
-- [ ] Add a focused unit test in `wasm/src/transforms/async_es5_tests.rs` for `super()` + async field initializer ordering.
+- [ ] Add async `for` loop mapping tests with await in init/condition/update positions.
+- [ ] Add async `do/while` or `switch` mapping test with await in the condition/discriminant.
+- [ ] Add an async `try/finally` mapping test to cover await in `finally` and verify map entries.
 
 ## Completed
 - [x] (Move finished items here with brief notes and tests run)
@@ -20,6 +21,7 @@ Priority: 5
 No
 
 ## Notes
+- Project Direction: integration and conformance-first; prioritize emitter fidelity (ES5 downleveling/source maps) before new features.
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
 - Conformance focus: tie regressions to official TypeScript conformance cases when possible.

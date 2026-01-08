@@ -7,14 +7,16 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- Drive end-to-end conformance by compiling a non-trivial generic library (e.g., lodash types) without panics; investigate failures in `wasm/src/cli/driver.rs` and `wasm/src/thin_emitter/mod.rs`; add minimal repro tests; run `./wasm/test.sh`.
+- [ ] Awaiting EM assignment.
 
 ## Task Queue
-- [ ] Identify top panic site during library compile and file actionable follow-up tasks for Forge if type checking issues surface.
-- [ ] Add a conformance regression test that exercises generic library emit.
+- [ ] [EM: Add queued tasks]
 
 ## Completed
-- [x] (Move finished items here with brief notes and tests run)
+- [x] Add async/class ES5 transform source-map mappings and offsets. Tests: `./wasm/test.sh source_map`
+- [x] Add async nested function source-map offset coverage. Tests: `./wasm/test.sh source_map`
+- [x] Add async await detection test for nested functions. Tests: `./wasm/test.sh body_contains_await`
+- [x] Add ES5 derived default constructor ordering test. Tests: `./wasm/test.sh default_derived_constructor`
 
 ## Ready for Merge
 No
@@ -27,3 +29,6 @@ No
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/anvil-4`
 - **NEVER edit**: `DIRECTOR_AGENT.md`, `SQUAD_LEAD_AGENT.md`, `MANAGER_AGENT.md`, `AGENTS.md`, `start_*.sh`
+- Proposed next tasks for EM assignment:
+  - Validate ES5 class downleveling edge cases for `super()` + field initializers in `wasm/src/transforms/class_es5.rs`.
+  - Add coverage for async downlevel source-map offsets in `wasm/src/transforms/async_es5.rs`.

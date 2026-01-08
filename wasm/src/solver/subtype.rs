@@ -1145,8 +1145,9 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                     // Property exists, check type compatibility
                     let source_type = self.optional_property_type(sp);
                     let target_type = self.optional_property_type(t_prop);
+                    let allow_bivariant = sp.is_method || t_prop.is_method;
                     if !self
-                        .check_subtype_with_method_variance(source_type, target_type, t_prop.is_method)
+                        .check_subtype_with_method_variance(source_type, target_type, allow_bivariant)
                         .is_true()
                     {
                         return SubtypeResult::False;
@@ -1157,7 +1158,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                         let source_write = self.optional_property_write_type(sp);
                         let target_write = self.optional_property_write_type(t_prop);
                         if !self
-                            .check_subtype_with_method_variance(target_write, source_write, t_prop.is_method)
+                            .check_subtype_with_method_variance(target_write, source_write, allow_bivariant)
                             .is_true()
                         {
                             return SubtypeResult::False;
@@ -1275,8 +1276,9 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 }
                 let source_type = self.optional_property_type(sp);
                 let target_type = self.optional_property_type(t_prop);
+                let allow_bivariant = sp.is_method || t_prop.is_method;
                 if !self
-                    .check_subtype_with_method_variance(source_type, target_type, t_prop.is_method)
+                    .check_subtype_with_method_variance(source_type, target_type, allow_bivariant)
                     .is_true()
                 {
                     return SubtypeResult::False;
@@ -1287,7 +1289,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                     let source_write = self.optional_property_write_type(sp);
                     let target_write = self.optional_property_write_type(t_prop);
                     if !self
-                        .check_subtype_with_method_variance(target_write, source_write, t_prop.is_method)
+                        .check_subtype_with_method_variance(target_write, source_write, allow_bivariant)
                         .is_true()
                     {
                         return SubtypeResult::False;
@@ -1369,10 +1371,19 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
         for prop in source {
             let prop_type = self.optional_property_type(prop);
+            let allow_bivariant = prop.is_method;
 
             if let Some(number_idx) = number_index {
                 let is_numeric = self.is_numeric_property_name(prop.name);
-                if is_numeric && !self.check_subtype(prop_type, number_idx.value_type).is_true() {
+                if is_numeric
+                    && !self
+                        .check_subtype_with_method_variance(
+                            prop_type,
+                            number_idx.value_type,
+                            allow_bivariant,
+                        )
+                        .is_true()
+                {
                     return SubtypeResult::False;
                 }
                 if is_numeric && !number_idx.readonly && prop.readonly {
@@ -1384,7 +1395,10 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 if !string_idx.readonly && prop.readonly {
                     return SubtypeResult::False;
                 }
-                if !self.check_subtype(prop_type, string_idx.value_type).is_true() {
+                if !self
+                    .check_subtype_with_method_variance(prop_type, string_idx.value_type, allow_bivariant)
+                    .is_true()
+                {
                     return SubtypeResult::False;
                 }
             }
@@ -1417,12 +1431,18 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
     /// In legacy mode (bivariant): target_type <: source_type OR source_type <: target_type
     /// See https://github.com/microsoft/TypeScript/issues/18654.
     fn are_parameters_compatible(&mut self, source_type: TypeId, target_type: TypeId) -> bool {
+        let contains_this = self.type_contains_this_type(source_type)
+            || self.type_contains_this_type(target_type);
+
         // Contravariant check: Target <: Source
         // Example: (x: Animal) => void <: (x: Cat) => void
         // Because Cat <: Animal (target <: source)
         let is_contravariant = self.check_subtype(target_type, source_type).is_true();
 
         if self.strict_function_types {
+            if contains_this {
+                return self.check_subtype(source_type, target_type).is_true();
+            }
             is_contravariant
         } else {
             // Bivariant: either direction works (Unsound, Legacy TS behavior)
@@ -1431,6 +1451,181 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             }
             // Covariant check: Source <: Target
             self.check_subtype(source_type, target_type).is_true()
+        }
+    }
+
+    fn type_contains_this_type(&self, type_id: TypeId) -> bool {
+        let mut visited: HashSet<TypeId> = HashSet::new();
+        self.type_contains_this_type_inner(type_id, &mut visited)
+    }
+
+    fn type_contains_this_type_inner(
+        &self,
+        type_id: TypeId,
+        visited: &mut HashSet<TypeId>,
+    ) -> bool {
+        if !visited.insert(type_id) {
+            return false;
+        }
+
+        let Some(key) = self.interner.lookup(type_id) else {
+            return false;
+        };
+
+        match key {
+            TypeKey::ThisType => true,
+            TypeKey::Array(elem) => self.type_contains_this_type_inner(elem, visited),
+            TypeKey::Tuple(list_id) => {
+                let elements = self.interner.tuple_list(list_id);
+                elements
+                    .iter()
+                    .any(|elem| self.type_contains_this_type_inner(elem.type_id, visited))
+            }
+            TypeKey::Union(list_id) | TypeKey::Intersection(list_id) => {
+                let members = self.interner.type_list(list_id);
+                members
+                    .iter()
+                    .any(|&member| self.type_contains_this_type_inner(member, visited))
+            }
+            TypeKey::Object(shape_id) => {
+                let shape = self.interner.object_shape(shape_id);
+                shape.properties.iter().any(|prop| {
+                    self.type_contains_this_type_inner(prop.type_id, visited)
+                        || self.type_contains_this_type_inner(prop.write_type, visited)
+                })
+            }
+            TypeKey::ObjectWithIndex(shape_id) => {
+                let shape = self.interner.object_shape(shape_id);
+                if shape.properties.iter().any(|prop| {
+                    self.type_contains_this_type_inner(prop.type_id, visited)
+                        || self.type_contains_this_type_inner(prop.write_type, visited)
+                }) {
+                    return true;
+                }
+                if let Some(index) = &shape.string_index {
+                    if self.type_contains_this_type_inner(index.key_type, visited)
+                        || self.type_contains_this_type_inner(index.value_type, visited)
+                    {
+                        return true;
+                    }
+                }
+                if let Some(index) = &shape.number_index {
+                    if self.type_contains_this_type_inner(index.key_type, visited)
+                        || self.type_contains_this_type_inner(index.value_type, visited)
+                    {
+                        return true;
+                    }
+                }
+                false
+            }
+            TypeKey::Function(shape_id) => {
+                let shape = self.interner.function_shape(shape_id);
+                shape
+                    .params
+                    .iter()
+                    .any(|param| self.type_contains_this_type_inner(param.type_id, visited))
+                    || shape
+                        .this_type
+                        .is_some_and(|this_type| {
+                            self.type_contains_this_type_inner(this_type, visited)
+                        })
+                    || self.type_contains_this_type_inner(shape.return_type, visited)
+            }
+            TypeKey::Callable(shape_id) => {
+                let shape = self.interner.callable_shape(shape_id);
+                if shape.call_signatures.iter().any(|sig| {
+                    sig.params.iter().any(|param| {
+                        self.type_contains_this_type_inner(param.type_id, visited)
+                    }) || sig
+                        .this_type
+                        .is_some_and(|this_type| {
+                            self.type_contains_this_type_inner(this_type, visited)
+                        }) || self.type_contains_this_type_inner(sig.return_type, visited)
+                }) {
+                    return true;
+                }
+                if shape.construct_signatures.iter().any(|sig| {
+                    sig.params.iter().any(|param| {
+                        self.type_contains_this_type_inner(param.type_id, visited)
+                    }) || sig
+                        .this_type
+                        .is_some_and(|this_type| {
+                            self.type_contains_this_type_inner(this_type, visited)
+                        }) || self.type_contains_this_type_inner(sig.return_type, visited)
+                }) {
+                    return true;
+                }
+                shape.properties.iter().any(|prop| {
+                    self.type_contains_this_type_inner(prop.type_id, visited)
+                        || self.type_contains_this_type_inner(prop.write_type, visited)
+                })
+            }
+            TypeKey::TypeParameter(info) | TypeKey::Infer(info) => {
+                info.constraint
+                    .is_some_and(|constraint| {
+                        self.type_contains_this_type_inner(constraint, visited)
+                    }) || info
+                    .default
+                    .is_some_and(|default| {
+                        self.type_contains_this_type_inner(default, visited)
+                    })
+            }
+            TypeKey::Application(app_id) => {
+                let app = self.interner.type_application(app_id);
+                self.type_contains_this_type_inner(app.base, visited)
+                    || app
+                        .args
+                        .iter()
+                        .any(|&arg| self.type_contains_this_type_inner(arg, visited))
+            }
+            TypeKey::Conditional(cond_id) => {
+                let cond = self.interner.conditional_type(cond_id);
+                self.type_contains_this_type_inner(cond.check_type, visited)
+                    || self.type_contains_this_type_inner(cond.extends_type, visited)
+                    || self.type_contains_this_type_inner(cond.true_type, visited)
+                    || self.type_contains_this_type_inner(cond.false_type, visited)
+            }
+            TypeKey::Mapped(mapped_id) => {
+                let mapped = self.interner.mapped_type(mapped_id);
+                mapped
+                    .type_param
+                    .constraint
+                    .is_some_and(|constraint| {
+                        self.type_contains_this_type_inner(constraint, visited)
+                    }) || mapped
+                    .type_param
+                    .default
+                    .is_some_and(|default| {
+                        self.type_contains_this_type_inner(default, visited)
+                    }) || self.type_contains_this_type_inner(mapped.constraint, visited)
+                    || mapped
+                        .name_type
+                        .is_some_and(|name_type| {
+                            self.type_contains_this_type_inner(name_type, visited)
+                        }) || self.type_contains_this_type_inner(mapped.template, visited)
+            }
+            TypeKey::IndexAccess(obj, idx) => {
+                self.type_contains_this_type_inner(obj, visited)
+                    || self.type_contains_this_type_inner(idx, visited)
+            }
+            TypeKey::KeyOf(inner) | TypeKey::ReadonlyType(inner) => {
+                self.type_contains_this_type_inner(inner, visited)
+            }
+            TypeKey::TemplateLiteral(spans) => {
+                let spans = self.interner.template_list(spans);
+                spans.iter().any(|span| match span {
+                    TemplateSpan::Text(_) => false,
+                    TemplateSpan::Type(inner) => {
+                        self.type_contains_this_type_inner(*inner, visited)
+                    }
+                })
+            }
+            TypeKey::Intrinsic(_)
+            | TypeKey::Literal(_)
+            | TypeKey::Ref(_)
+            | TypeKey::TypeQuery(_)
+            | TypeKey::UniqueSymbol(_)
+            | TypeKey::Error => false,
         }
     }
 
@@ -2264,13 +2459,14 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                     // Check property type compatibility
                     let source_type = self.optional_property_type(sp);
                     let target_type = self.optional_property_type(t_prop);
+                    let allow_bivariant = sp.is_method || t_prop.is_method;
                     if !self
-                        .check_subtype_with_method_variance(source_type, target_type, t_prop.is_method)
+                        .check_subtype_with_method_variance(source_type, target_type, allow_bivariant)
                         .is_true()
                     {
                         // Recursively explain the nested failure
                         let nested = self
-                            .explain_failure_with_method_variance(source_type, target_type, t_prop.is_method);
+                            .explain_failure_with_method_variance(source_type, target_type, allow_bivariant);
                         return Some(SubtypeFailureReason::PropertyTypeMismatch {
                             property_name: t_prop.name,
                             source_property_type: source_type,
@@ -2284,11 +2480,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                         let source_write = self.optional_property_write_type(sp);
                         let target_write = self.optional_property_write_type(t_prop);
                         if !self
-                            .check_subtype_with_method_variance(target_write, source_write, t_prop.is_method)
+                            .check_subtype_with_method_variance(target_write, source_write, allow_bivariant)
                             .is_true()
                         {
                             let nested = self
-                                .explain_failure_with_method_variance(target_write, source_write, t_prop.is_method);
+                                .explain_failure_with_method_variance(target_write, source_write, allow_bivariant);
                             return Some(SubtypeFailureReason::PropertyTypeMismatch {
                                 property_name: t_prop.name,
                                 source_property_type: source_write,
@@ -2420,12 +2616,13 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
                 let source_type = self.optional_property_type(sp);
                 let target_type = self.optional_property_type(t_prop);
+                let allow_bivariant = sp.is_method || t_prop.is_method;
                 if !self
-                    .check_subtype_with_method_variance(source_type, target_type, t_prop.is_method)
+                    .check_subtype_with_method_variance(source_type, target_type, allow_bivariant)
                     .is_true()
                 {
                     let nested =
-                        self.explain_failure_with_method_variance(source_type, target_type, t_prop.is_method);
+                        self.explain_failure_with_method_variance(source_type, target_type, allow_bivariant);
                     return Some(SubtypeFailureReason::PropertyTypeMismatch {
                         property_name: t_prop.name,
                         source_property_type: source_type,
@@ -2439,11 +2636,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                     let source_write = self.optional_property_write_type(sp);
                     let target_write = self.optional_property_write_type(t_prop);
                     if !self
-                        .check_subtype_with_method_variance(target_write, source_write, t_prop.is_method)
+                        .check_subtype_with_method_variance(target_write, source_write, allow_bivariant)
                         .is_true()
                     {
                         let nested = self
-                            .explain_failure_with_method_variance(target_write, source_write, t_prop.is_method);
+                            .explain_failure_with_method_variance(target_write, source_write, allow_bivariant);
                         return Some(SubtypeFailureReason::PropertyTypeMismatch {
                             property_name: t_prop.name,
                             source_property_type: source_write,
@@ -2532,6 +2729,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
         for prop in source {
             let prop_type = self.optional_property_type(prop);
+            let allow_bivariant = prop.is_method;
 
             if let Some(number_idx) = number_index {
                 let is_numeric = self.is_numeric_property_name(prop.name);
@@ -2541,7 +2739,14 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                             property_name: prop.name,
                         });
                     }
-                    if !self.check_subtype(prop_type, number_idx.value_type).is_true() {
+                    if !self
+                        .check_subtype_with_method_variance(
+                            prop_type,
+                            number_idx.value_type,
+                            allow_bivariant,
+                        )
+                        .is_true()
+                    {
                         return Some(SubtypeFailureReason::IndexSignatureMismatch {
                             index_kind: "number",
                             source_value_type: prop_type,
@@ -2557,7 +2762,10 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                         property_name: prop.name,
                     });
                 }
-                if !self.check_subtype(prop_type, string_idx.value_type).is_true() {
+                if !self
+                    .check_subtype_with_method_variance(prop_type, string_idx.value_type, allow_bivariant)
+                    .is_true()
+                {
                     return Some(SubtypeFailureReason::IndexSignatureMismatch {
                         index_kind: "string",
                         source_value_type: prop_type,
@@ -2599,7 +2807,8 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             && matches!(rest_elem_type, Some(TypeId::ANY | TypeId::UNKNOWN));
         let source_required = self.required_param_count(&source.params);
         let target_required = self.required_param_count(&target.params);
-        if !rest_is_top && source_required > target_required {
+        let too_many_params = !rest_is_top && source_required > target_required;
+        if !target_has_rest && too_many_params {
             return Some(SubtypeFailureReason::TooManyParameters {
                 source_count: source_required,
                 target_count: target_required,
@@ -2680,6 +2889,13 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                     }
                 }
             }
+        }
+
+        if target_has_rest && too_many_params {
+            return Some(SubtypeFailureReason::TooManyParameters {
+                source_count: source_required,
+                target_count: target_required,
+            });
         }
 
         None
