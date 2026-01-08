@@ -7,7 +7,7 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [x] Add solver tests for Partial<T>, Readonly<T>, and mapped type modifiers (+readonly, -readonly, +?, -?). **Done:** Added 5 tests covering these patterns with keyof/index access.
+- [x] Add solver tests for Record<K, V> pattern. **Done:** Added 6 tests. Exclude<T, U> already covered by existing tests.
 
 ## Task Queue
 (empty - awaiting next assignment)
@@ -71,6 +71,12 @@ Priority: 4
 - [x] Added solver coverage for -readonly modifier (Mutable pattern). Tests: `./wasm/test.sh`.
 - [x] Added solver coverage for combined modifiers (-readonly -?). Tests: `./wasm/test.sh`.
 - [x] Added solver coverage for combined modifiers (+readonly +?). Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for Record<K, V> with string literal keys. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for Record with template value (key as value). Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for Record with single key. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for Record with index signature (string key). Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for Readonly Record combination. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for Partial Record combination. Tests: `./wasm/test.sh`.
 
 ## Ready for Merge
 Yes
