@@ -128,6 +128,44 @@ fn test_class_es5_preserves_pre_super_statement_order() {
 }
 
 #[test]
+fn test_class_es5_default_derived_constructor_orders_super_and_props() {
+    let source = "class Base {} class Derived extends Base { y = 1; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected derived class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    let super_pos = output
+        .find("_super.apply(this, arguments)")
+        .expect("expected super apply call");
+    let init_pos = output.find("_this.y = 1").expect("expected initializer");
+    let return_pos = output.find("return _this").expect("expected return _this");
+
+    assert!(
+        super_pos < init_pos,
+        "Expected super call before property initializer: {}",
+        output
+    );
+    assert!(
+        init_pos < return_pos,
+        "Expected return after property initializer: {}",
+        output
+    );
+}
+
+#[test]
 fn test_class_es5_computed_super_arrow_in_field_initializer() {
     let source = r#"
 class Base { m(x) { return x; } }
