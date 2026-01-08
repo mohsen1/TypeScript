@@ -6986,6 +6986,110 @@ const reducer = createReducer(0, {
     }
 }
 
+/// TS Unsoundness #41: Key Remapping with `as never`
+/// In mapped types, remapping a key to `never` removes that key from the result.
+/// This is the mechanism behind the `Omit` utility type.
+/// Note: Full instantiation of generic mapped types is tested in solver/evaluate_tests.rs.
+#[test]
+fn test_key_remapping_syntax_parsing() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test that key remapping syntax parses and binds correctly
+    let source = r#"
+// Custom Omit using key remapping with `as never`
+type MyOmit<T, K extends keyof any> = {
+    [P in keyof T as P extends K ? never : P]: T[P]
+};
+
+// Custom Pick using key remapping
+type MyPick<T, K extends keyof T> = {
+    [P in keyof T as P extends K ? P : never]: T[P]
+};
+
+// Custom Exclude using `as`
+type ExcludeKeys<T, U> = {
+    [K in keyof T as K extends U ? never : K]: T[K]
+};
+
+// Source type for reference
+interface Person {
+    name: string;
+    age: number;
+    email: string;
+}
+
+// Type alias usages (verify no parse errors)
+declare const o: MyOmit<Person, "email">;
+declare const p: MyPick<Person, "name">;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // No diagnostics expected for type declarations
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Unexpected diagnostics: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// TS Unsoundness #28: Constructor Void Exception
+/// A constructor type declared as `new () => void` accepts concrete classes
+/// that construct objects, similar to the void return exception for functions (#6).
+#[test]
+fn test_constructor_void_exception() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// Constructor type returning void
+type VoidCtor = new () => void;
+
+// A concrete class that constructs an instance
+class MyClass {
+    value: number = 42;
+}
+
+// Assignment should be allowed: class constructor is assignable to void constructor
+const ctor: VoidCtor = MyClass;
+
+// Another class with a constructor
+class AnotherClass {
+    constructor(public name: string = "default") {}
+}
+
+// This should also work - constructor with default params is compatible
+type DefaultCtor = new () => void;
+const ctor2: DefaultCtor = AnotherClass;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // No diagnostics expected - void constructor should accept any class
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Unexpected diagnostics: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
 /// TS Unsoundness #40: Distributivity Disabling via [T] extends [U]
 /// Tests the is_distributive flag parsing and lowering through conditional types.
 /// Verifies that naked type parameters are marked distributive while tuple-wrapped are not.
