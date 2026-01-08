@@ -1407,6 +1407,7 @@ impl<'a> ClassES5Emitter<'a> {
         let mut async_emitter = AsyncES5Emitter::new(self.arena);
         async_emitter.set_indent_level(self.indent_level + 1);
         async_emitter.set_lexical_this(self.use_this_capture);
+        async_emitter.set_class_name(&self.class_name);
 
         let generator_body = if async_emitter.body_contains_await(body) {
             async_emitter.emit_generator_body_with_await(body)
@@ -1444,6 +1445,7 @@ impl<'a> ClassES5Emitter<'a> {
         let mut async_emitter = AsyncES5Emitter::new(self.arena);
         async_emitter.set_indent_level(self.indent_level + 1);
         async_emitter.set_lexical_this(this_expr != "this");
+        async_emitter.set_class_name(&self.class_name);
 
         let generator_body = if async_emitter.body_contains_await(func.body) {
             async_emitter.emit_generator_body_with_await(func.body)
