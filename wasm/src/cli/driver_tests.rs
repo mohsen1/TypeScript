@@ -3215,3 +3215,178 @@ fn compile_outdir_multiple_entry_points() {
     assert!(base.join("dist/worker.js").is_file());
     assert!(base.join("dist/cli.js").is_file());
 }
+
+// =============================================================================
+// Error Handling: Missing Input Files
+// =============================================================================
+
+#[test]
+fn compile_missing_file_in_files_array_returns_error() {
+    // Test that referencing a missing file in tsconfig.json "files" returns an error
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "files": ["src/missing.ts"]
+        }"#,
+    );
+    // Intentionally NOT creating src/missing.ts
+
+    let args = default_args();
+    let result = compile(&args, base);
+
+    assert!(result.is_err(), "Should return error for missing file");
+    let err = result.unwrap_err().to_string();
+    assert!(
+        err.contains("file not found") || err.contains("not found") || err.contains("missing"),
+        "Error should mention file not found: {}",
+        err
+    );
+    // No output should be produced
+    assert!(!base.join("dist").is_dir());
+}
+
+#[test]
+fn compile_missing_file_in_include_pattern_returns_error() {
+    // Test that an include pattern matching no files returns an error
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+    // Intentionally NOT creating any .ts files in src/
+
+    let args = default_args();
+    let result = compile(&args, base);
+
+    assert!(
+        result.is_err(),
+        "Should return error when no input files found"
+    );
+    let err = result.unwrap_err().to_string();
+    assert!(
+        err.contains("no input files") || err.contains("no files"),
+        "Error should mention no input files: {}",
+        err
+    );
+}
+
+#[test]
+fn compile_missing_single_file_via_cli_args_returns_error() {
+    // Test that passing a non-existent file via CLI args returns an error
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    let mut args = default_args();
+    args.files = vec![PathBuf::from("nonexistent.ts")];
+
+    let result = compile(&args, base);
+
+    assert!(result.is_err(), "Should return error for missing CLI file");
+    let err = result.unwrap_err().to_string();
+    assert!(
+        err.contains("not found") || err.contains("No such file"),
+        "Error should mention file not found: {}",
+        err
+    );
+}
+
+#[test]
+fn compile_missing_multiple_files_in_files_array_returns_error() {
+    // Test that multiple missing files in tsconfig.json "files" returns an error
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "files": ["src/a.ts", "src/b.ts", "src/c.ts"]
+        }"#,
+    );
+    // Only create one of the three files
+    write_file(&base.join("src/b.ts"), "export const b = 2;");
+
+    let args = default_args();
+    let result = compile(&args, base);
+
+    // Should return error for missing files
+    assert!(
+        result.is_err(),
+        "Should return error when some files in files array are missing"
+    );
+}
+
+#[test]
+fn compile_missing_project_directory_returns_error() {
+    // Test that specifying a non-existent project directory returns an error
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    let mut args = default_args();
+    args.project = Some(PathBuf::from("nonexistent_project"));
+
+    let result = compile(&args, base);
+
+    assert!(
+        result.is_err(),
+        "Should return error for missing project directory"
+    );
+}
+
+#[test]
+fn compile_missing_tsconfig_in_project_dir_returns_error() {
+    // Test that a project directory without tsconfig.json returns an error
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    // Create project directory but no tsconfig.json
+    std::fs::create_dir_all(base.join("myproject")).expect("create dir");
+    write_file(
+        &base.join("myproject/index.ts"),
+        "export const value = 42;",
+    );
+
+    let mut args = default_args();
+    args.project = Some(PathBuf::from("myproject"));
+
+    let result = compile(&args, base);
+
+    // Should return error since there's no tsconfig.json
+    assert!(
+        result.is_err(),
+        "Should return error when tsconfig.json is missing in project dir"
+    );
+}
+
+#[test]
+fn compile_missing_tsconfig_uses_defaults() {
+    // Test that compilation works without tsconfig.json using defaults
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(&base.join("src/index.ts"), "export const value = 42;");
+
+    let mut args = default_args();
+    args.files = vec![PathBuf::from("src/index.ts")];
+
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty());
+    // Output should be next to source when no outDir specified
+    assert!(base.join("src/index.js").is_file());
+}
