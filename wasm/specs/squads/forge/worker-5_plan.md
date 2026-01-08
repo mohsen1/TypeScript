@@ -15,6 +15,7 @@ Priority: 5
 - [ ] [EM: Add queued tasks]
 
 ## Completed
+- [x] Added union handling for non-distributive object/nested-object infer in conditional evaluation; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
 - [x] Added non-distributive union-branch regression for nested object infer; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
 - [x] Added non-distributive union-branch regressions for string/number index signature infer; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
 - [x] Added non-distributive union-branch regressions for readonly array/tuple infer; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).

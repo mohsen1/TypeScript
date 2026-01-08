@@ -581,19 +581,29 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                             })
                             .or_else(|| prop_optional.then_some(TypeId::UNDEFINED))
                     }
-                    Some(TypeKey::Union(members)) if prop_optional => {
+                    Some(TypeKey::Union(members)) => {
                         let members = self.interner.type_list(members);
                         let mut inferred_members = Vec::new();
                         for &member in members.iter() {
-                            match self.interner.lookup(member) {
+                            let member_unwrapped = match self.interner.lookup(member) {
+                                Some(TypeKey::ReadonlyType(inner)) => inner,
+                                _ => member,
+                            };
+                            match self.interner.lookup(member_unwrapped) {
                                 Some(TypeKey::Object(shape_id) | TypeKey::ObjectWithIndex(shape_id)) => {
                                     let shape = self.interner.object_shape(shape_id);
                                     if let Some(prop) =
                                         shape.properties.iter().find(|prop| prop.name == prop_name)
                                     {
-                                        inferred_members.push(self.optional_property_type(prop));
-                                    } else {
+                                        inferred_members.push(if prop_optional {
+                                            self.optional_property_type(prop)
+                                        } else {
+                                            prop.type_id
+                                        });
+                                    } else if prop_optional {
                                         inferred_members.push(TypeId::UNDEFINED);
+                                    } else {
+                                        return self.evaluate(cond.false_type);
                                     }
                                 }
                                 _ => return self.evaluate(cond.false_type),
@@ -676,6 +686,50 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                                     _ => None,
                                 }
                             })
+                    }
+                    Some(TypeKey::Union(members)) => {
+                        let members = self.interner.type_list(members);
+                        let mut inferred_members = Vec::new();
+                        for &member in members.iter() {
+                            let member_unwrapped = match self.interner.lookup(member) {
+                                Some(TypeKey::ReadonlyType(inner)) => inner,
+                                _ => member,
+                            };
+                            let Some(TypeKey::Object(shape_id) | TypeKey::ObjectWithIndex(shape_id)) =
+                                self.interner.lookup(member_unwrapped)
+                            else {
+                                return self.evaluate(cond.false_type);
+                            };
+                            let shape = self.interner.object_shape(shape_id);
+                            let Some(prop) =
+                                shape.properties.iter().find(|prop| prop.name == outer_name)
+                            else {
+                                return self.evaluate(cond.false_type);
+                            };
+                            let inner_type = match self.interner.lookup(prop.type_id) {
+                                Some(TypeKey::ReadonlyType(inner)) => inner,
+                                _ => prop.type_id,
+                            };
+                            let Some(TypeKey::Object(inner_shape_id) | TypeKey::ObjectWithIndex(inner_shape_id)) =
+                                self.interner.lookup(inner_type)
+                            else {
+                                return self.evaluate(cond.false_type);
+                            };
+                            let inner_shape = self.interner.object_shape(inner_shape_id);
+                            let Some(inner_prop) =
+                                inner_shape.properties.iter().find(|prop| prop.name == inner_name)
+                            else {
+                                return self.evaluate(cond.false_type);
+                            };
+                            inferred_members.push(inner_prop.type_id);
+                        }
+                        if inferred_members.is_empty() {
+                            None
+                        } else if inferred_members.len() == 1 {
+                            Some(inferred_members[0])
+                        } else {
+                            Some(self.interner.union(inferred_members))
+                        }
                     }
                     _ => None,
                 };
