@@ -4400,3 +4400,206 @@ fn test_parity_es5_exponentiation_arrow() {
         output
     );
 }
+
+/// Parity test for ES5 arrow function with typed expression body.
+/// () => expr should convert to function() { return expr; }.
+#[test]
+fn test_parity_es5_arrow_typed_expression() {
+    let source = "const double = (x: number) => x * 2;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify arrow is converted to function
+    assert!(
+        output.contains("function"),
+        "ES5 output should contain function keyword: {}",
+        output
+    );
+    // Expression body should have return added
+    assert!(
+        output.contains("return"),
+        "ES5 output should add return for expression body: {}",
+        output
+    );
+    // Type annotation should be erased
+    assert!(
+        !output.contains(": number"),
+        "ES5 output should erase type annotation: {}",
+        output
+    );
+    // No arrow syntax
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should not contain arrow syntax: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 arrow function with block body.
+/// () => { stmts } should convert to function() { stmts }.
+#[test]
+fn test_parity_es5_arrow_block_body() {
+    let source = "const greet = (name: string) => { console.log('Hello ' + name); };";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify arrow is converted to function
+    assert!(
+        output.contains("function"),
+        "ES5 output should contain function keyword: {}",
+        output
+    );
+    // Console.log should be preserved
+    assert!(
+        output.contains("console.log"),
+        "ES5 output should preserve console.log: {}",
+        output
+    );
+    // Type annotation should be erased
+    assert!(
+        !output.contains(": string"),
+        "ES5 output should erase type annotation: {}",
+        output
+    );
+    // No arrow syntax
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should not contain arrow syntax: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 arrow function with this capture.
+/// Arrow functions should capture outer this.
+#[test]
+fn test_parity_es5_arrow_this_capture() {
+    let source = r#"class Counter {
+    count = 0;
+    increment = () => { this.count++; };
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify class is converted to function
+    assert!(
+        output.contains("function Counter") || output.contains("var Counter"),
+        "ES5 output should convert class to function: {}",
+        output
+    );
+    // No arrow syntax
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should not contain arrow syntax: {}",
+        output
+    );
+    // Class declaration should be converted (class Counter {)
+    assert!(
+        !output.contains("class Counter {"),
+        "ES5 output should not contain class declaration: {}",
+        output
+    );
+    // Should capture this with _this
+    assert!(
+        output.contains("_this"),
+        "ES5 output should capture this with _this: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 arrow function with multiple parameters.
+/// (a, b, c) => expr should convert correctly.
+#[test]
+fn test_parity_es5_arrow_multi_params() {
+    let source = "const sum = (a: number, b: number, c: number) => a + b + c;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify arrow is converted to function
+    assert!(
+        output.contains("function"),
+        "ES5 output should contain function keyword: {}",
+        output
+    );
+    // Parameters should be preserved (without types)
+    assert!(
+        output.contains("a") && output.contains("b") && output.contains("c"),
+        "ES5 output should preserve parameters: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+    // No arrow syntax
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should not contain arrow syntax: {}",
+        output
+    );
+}

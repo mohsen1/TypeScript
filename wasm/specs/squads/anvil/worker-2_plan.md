@@ -7,12 +7,13 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] Add ES5 emitter parity tests for arrow functions in `wasm/src/thin_emitter/emitter_parity_tests.rs`. Run `./wasm/test.sh emitter_parity`.
+- [ ] (awaiting next task)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 arrow function parity tests (typed expression, block body, this capture, multi params) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (100 tests).
 - [x] Added ES5 exponentiation operator parity tests (type erasure, const/let, arrow) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (96 tests).
 - [x] Added ES5 logical assignment operator parity tests (||=, &&=, ??=, property) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (92 tests).
 - [x] Added ES5 for-of loop parity tests (array destruct, object destruct, nested, let) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (88 tests).
