@@ -737,6 +737,7 @@ impl<'a> AsyncES5Emitter<'a> {
                         }
                     }
                 }
+            }
             k if k == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION => {
                 if let Some(access) = self.arena.get_access_expr(node) {
                     self.emit_expression(access.expression);

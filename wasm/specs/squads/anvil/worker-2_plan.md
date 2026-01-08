@@ -13,6 +13,7 @@ Priority: 2
 - [ ] [EM: Add queued tasks]
 
 ## Completed
+- [x] Cleared merge artifact in async ES5 emitter while validating computed `super[...]` lowering + integration coverage; `./wasm/test.sh` failed at `emitter_parity_tests::test_parity_commonjs_export` (trailing newline mismatch).
 - [x] Lowered async ES5 computed `super[...]` element access in returned/nested arrows + updated integration expectations; `./wasm/test.sh` failed at `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports` (unrelated).
 - [x] Lowered computed `super[...]` calls in async ES5 emitter + updated integration expectations; `./wasm/test.sh` failed at `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports` (unrelated).
 - [x] Added integration coverage for computed `super[...]` in class field arrow initializers; `./wasm/test.sh` failed at `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports` (unrelated).
