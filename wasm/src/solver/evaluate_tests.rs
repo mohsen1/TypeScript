@@ -8513,6 +8513,31 @@ fn test_conditional_infer_multi_template_never_input() {
 }
 
 #[test]
+fn test_conditional_infer_readonly_array_never_input() {
+    let interner = TypeInterner::new();
+
+    let r_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: r_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // never extends readonly (infer R)[] ? R : string -> never
+    let extends_array = interner.intern(TypeKey::ReadonlyType(interner.array(infer_r)));
+    let cond = ConditionalType {
+        check_type: TypeId::NEVER,
+        extends_type: extends_array,
+        true_type: infer_r,
+        false_type: TypeId::STRING,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
 fn test_conditional_infer_constraint_mismatch() {
     let interner = TypeInterner::new();
 
