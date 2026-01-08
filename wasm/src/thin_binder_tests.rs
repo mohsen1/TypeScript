@@ -774,6 +774,37 @@ namespace Merge {
 }
 
 #[test]
+fn test_namespace_enum_merge_exports_reverse_order() {
+    use crate::thin_parser::ThinParserState;
+    use crate::thin_binder::ThinBinderState;
+
+    let source = r#"
+namespace Merge {
+    export const extra = 1;
+    const hidden = 2;
+}
+enum Merge {
+    A,
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let merge_sym_id = binder.file_locals.get("Merge").expect("'Merge' should be in file_locals");
+    let merge_symbol = binder.get_symbol(merge_sym_id).expect("Merge symbol should exist");
+
+    let exports = merge_symbol.exports.as_ref().expect("Merge should have exports");
+    assert!(exports.get("extra").is_some(), "extra should be in Merge exports");
+    assert!(exports.get("hidden").is_none(), "hidden should not be in Merge exports");
+    assert_eq!(exports.len(), 1, "Merge should have exactly 1 export");
+}
+
+#[test]
 fn test_thin_binder_deep_binary_expression() {
     const COUNT: usize = 50000;
     let mut source = String::with_capacity(COUNT * 4);
