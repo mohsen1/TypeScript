@@ -333,6 +333,53 @@ class Derived extends Base {
 }
 
 #[test]
+fn test_two_phase_emission_es5_class_ctor_arrow_super_call() {
+    let source = r#"
+class Base { m() { return this.x; } }
+class Derived extends Base {
+    constructor() {
+        super();
+        const f = () => super.m();
+        return f();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("var _this = _super.call(this"),
+        "ES5 output should initialize _this from super: {}",
+        output
+    );
+    assert!(
+        output.contains("_super.prototype.m.call(_this"),
+        "ES5 output should lower super call with lexical this: {}",
+        output
+    );
+    assert!(
+        !output.contains("super.m"),
+        "ES5 output should not contain super method access: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel arrow: {}",
+        output
+    );
+}
+
+#[test]
 fn test_two_phase_emission_es5_class_super_nested_arrow_this_capture() {
     let source = r#"
 class Base {}
