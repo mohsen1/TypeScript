@@ -8,7 +8,7 @@
 //! The emitter (ThinPrinter) delegates all text output to SourceWriter,
 //! allowing for accurate source map generation and cleaner separation of concerns.
 
-use crate::source_map::SourceMapGenerator;
+use crate::source_map::{Mapping, SourceMapGenerator};
 use crate::thin_emitter::NewLineKind;
 
 /// A source position from the original AST
@@ -239,6 +239,11 @@ impl SourceWriter {
         self.indent_level = level;
     }
 
+    /// Get the current indentation width in columns.
+    pub fn indent_width(&self) -> u32 {
+        self.indent_level.saturating_mul(self.indent_str.len() as u32)
+    }
+
     // =========================================================================
     // Position Tracking
     // =========================================================================
@@ -251,6 +256,11 @@ impl SourceWriter {
     /// Get current output column (0-indexed)
     pub fn current_column(&self) -> u32 {
         self.column
+    }
+
+    /// Get current source index for source map entries.
+    pub fn current_source_index(&self) -> u32 {
+        self.current_source_index
     }
 
     /// Check if we're at the start of a line
@@ -306,6 +316,55 @@ impl SourceWriter {
     /// Generate source map JSON (if source mapping is enabled)
     pub fn generate_source_map_json(&mut self) -> Option<String> {
         self.source_map.as_mut().map(|sm| sm.generate_json())
+    }
+
+    /// Add mappings with a base line/column offset. Column offset applies only to the first line.
+    pub fn add_offset_mappings(&mut self, base_line: u32, base_column: u32, mappings: &[Mapping]) {
+        let Some(ref mut sm) = self.source_map else {
+            return;
+        };
+
+        for mapping in mappings {
+            let line = base_line + mapping.generated_line;
+            let column = if mapping.generated_line == 0 {
+                base_column + mapping.generated_column
+            } else {
+                mapping.generated_column
+            };
+            sm.add_mapping(
+                line,
+                column,
+                mapping.source_index,
+                mapping.original_line,
+                mapping.original_column,
+                mapping.name_index,
+            );
+        }
+    }
+
+    /// Add mappings with a base line offset and a column offset applied to every line.
+    pub fn add_mappings_with_line_column_offset(
+        &mut self,
+        base_line: u32,
+        column_offset: u32,
+        mappings: &[Mapping],
+    ) {
+        let Some(ref mut sm) = self.source_map else {
+            return;
+        };
+
+        for mapping in mappings {
+            let line = base_line + mapping.generated_line;
+            let column = column_offset + mapping.generated_column;
+            sm.add_mapping(
+                line,
+                column,
+                mapping.source_index,
+                mapping.original_line,
+                mapping.original_column,
+                mapping.name_index,
+            );
+        }
     }
 
     // =========================================================================

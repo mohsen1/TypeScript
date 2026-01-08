@@ -7,15 +7,21 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-- [ ] Generic inference hardening: implement circular `extends` constraint resolution and contextual signature + usage inference in `wasm/src/solver/infer.rs`; add regressions in `wasm/src/solver/infer_tests.rs`; run `./wasm/test.sh`.
+- [ ] Conditional type evaluation: implement function parameter/return inference in `wasm/src/solver/evaluate.rs`; update regressions in `wasm/src/solver/evaluate_tests.rs`; run `./wasm/test.sh`.
 
 ## Task Queue
-- [ ] Add circular bounds tests (e.g., `T extends U`, `U extends T`, `U extends string`) and verify constraint merge order in `wasm/src/solver/infer_tests.rs`.
-- [ ] Add contextual signature + usage-based inference cases in `wasm/src/solver/infer_tests.rs` and fix inference wiring in `wasm/src/solver/infer.rs`.
-- [ ] Cover union targets with placeholder members and numeric index-name bound inference; confirm inference does not collapse to `never`.
+- [ ] Cover function optional/rest parameter inference in conditional types (distributive and non-distributive) in `wasm/src/solver/evaluate_tests.rs`.
+- [ ] Add callable-parameter inference regressions (e.g., union inputs, overload shapes) in `wasm/src/solver/evaluate_tests.rs`.
+- [ ] Validate function return inference in conditional types and fix any mismatches in `wasm/src/solver/evaluate.rs`.
 
 ## Completed
-- [x] (Move finished items here with brief notes and tests run)
+- [x] Solver inference hardening: add cyclic upper bound expansion + usage-based inference tests. Ran `./wasm/test.sh` (fails: emitter_edge_case_tests::test_export_assignment_suppresses_other_exports).
+- [x] Added contextual signature bounds tests for function parameter/return variance. Ran `./wasm/test.sh` (fails: emitter_edge_case_tests::test_export_assignment_suppresses_other_exports).
+- [x] Added circular upper-bound order regression test. Ran `./wasm/test.sh` (fails: emitter_edge_case_tests::test_export_assignment_suppresses_other_exports).
+- [x] Added union target placeholder inference test. Ran `./wasm/test.sh` (fails: emitter_edge_case_tests::test_export_assignment_suppresses_other_exports).
+- [x] Checked `wasm/src/solver/evaluate.rs` for FunctionId build error (not reproducible after sync). Ran `./wasm/test.sh` (fails: emitter_edge_case_tests::test_export_assignment_suppresses_other_exports).
+- [x] Re-ran `./wasm/test.sh`; FunctionId build error still not reproducible (fails: emitter_edge_case_tests::test_export_assignment_suppresses_other_exports).
+- [x] Re-ran `./wasm/test.sh` (FAIL: emitter_edge_case_tests::test_export_assignment_suppresses_other_exports). FunctionId build error not reproducible after sync.
 
 ## Ready for Merge
 No

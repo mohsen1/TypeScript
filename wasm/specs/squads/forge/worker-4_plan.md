@@ -7,10 +7,12 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [x] Fix the `FunctionId` build error in `wasm/src/solver/evaluate.rs` and re-run `./wasm/test.sh`.
+- [ ] End-to-end validation: add a larger redux/lodash-style generic library regression in `wasm/src/parallel_tests.rs` (or `wasm/src/thin_checker_tests.rs`) and fix the first panic or mismatch in `wasm/src/checker/mod.rs` or `wasm/src/solver/mod.rs`; run `./wasm/test.sh`.
 
 ## Task Queue
-- [x] Verify the fix passes `./wasm/test.sh` and note any unrelated failures.
+- [ ] Add a multi-file generic library test case with mapped/conditional types and assert no panics + expected diagnostics.
+- [ ] If a panic arises, minimize to a focused solver/checker regression test.
+- [ ] Validate the new test still passes with `./wasm/test.sh`.
 
 ## Completed
 - [x] Added generic library regression + fixed declare function overload handling. Tests: `./wasm/test.sh test_generic_library_snippet_compiles_and_checks` (full suite fails on existing `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
@@ -18,7 +20,7 @@ Priority: 4
 - [x] Synced with `origin/rust`; `FunctionId` build error not reproducible in `wasm/src/solver/evaluate.rs`. Tests: `./wasm/test.sh` (fails on existing `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize solver correctness (inference/conditional/subtype) before new features.
