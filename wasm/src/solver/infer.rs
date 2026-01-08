@@ -559,13 +559,8 @@ impl<'a> InferenceContext<'a> {
         }
         let mut lower_bounds = constraints.lower_bounds;
 
-        if !lower_bounds.is_empty() && !upper_bounds.is_empty() {
-            let has_informative = lower_bounds.iter().any(|ty| {
-                !matches!(*ty, TypeId::ANY | TypeId::UNKNOWN | TypeId::ERROR)
-            });
-            if !has_informative {
-                lower_bounds.clear();
-            }
+        if !upper_bounds.is_empty() {
+            lower_bounds.retain(|ty| !matches!(*ty, TypeId::ANY | TypeId::UNKNOWN | TypeId::ERROR));
         }
 
         let result = if !lower_bounds.is_empty() {

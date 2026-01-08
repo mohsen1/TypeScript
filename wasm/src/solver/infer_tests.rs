@@ -264,6 +264,22 @@ fn test_resolve_error_lower_prefers_upper_bound() {
 }
 
 #[test]
+fn test_resolve_contextual_ignores_any_lower_with_literal() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let hello = interner.literal_string("hello");
+
+    ctx.add_lower_bound(var, TypeId::ANY);
+    ctx.add_lower_bound(var, hello);
+    ctx.add_upper_bound(var, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, hello);
+}
+
+#[test]
 fn test_resolve_circular_upper_bound_defaults_unknown() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);
