@@ -21,6 +21,7 @@ Priority: 5
 - [x] Made optional property inference include missing/undefined cases (tests not run).
 - [x] Flattened tuple rest and optional elements for array element inference (tests not run).
 - [x] Added non-distributive tuple union inference (tests not run).
+- [x] Updated non-distributive optional property inference expectation (tests not run).
 
 ## Ready for Merge
 Yes

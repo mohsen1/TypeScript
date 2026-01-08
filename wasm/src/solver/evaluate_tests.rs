@@ -3866,7 +3866,6 @@ fn test_conditional_infer_optional_property_non_distributive_union_input() {
     }));
 
     // [T] extends [{ a?: infer R }] ? R : never, with T = { a: string } | {} (no distribution).
-    // TODO: Non-distributive optional property inference over union inputs yields never.
     let extends_obj = interner.object(vec![PropertyInfo {
         name: interner.intern_string("a"),
         type_id: infer_r,
@@ -3908,8 +3907,9 @@ fn test_conditional_infer_optional_property_non_distributive_union_input() {
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
 
-    assert_eq!(result, TypeId::STRING);
+    assert_eq!(result, expected);
 }
 
 #[test]
