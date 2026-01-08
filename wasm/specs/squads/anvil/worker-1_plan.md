@@ -13,6 +13,9 @@ Priority: 1
 - [x] Audit computed `super[...]` lowering paths in `wasm/src/transforms/class_es5.rs` for nested arrows.
 - [x] Add a focused unit test in `wasm/src/transforms/class_es5_tests.rs` for pre-`super()` statement ordering (already covered by existing test).
 - [x] Confirm ES5 output removes `super[` for computed super calls in class fields.
+- [x] Capture `_this` in synthesized derived constructors for field initializers referencing `this`/`super`.
+- [x] Capture `_this` in derived private field initializers referencing `this`/`super`.
+- [x] Add regression tests for synthesized ctor and private field initializer captures.
 
 ## Completed
 - [x] Implemented derived `super()` ordering adjustment and broader `this`/`super` capture in field initializers; added integration regression for nested async arrow in derived field; ran `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_parse_error_tolerance`).
@@ -20,6 +23,7 @@ Priority: 1
 - [x] Added class ES5 computed super field arrow regression; ran `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
 - [x] Ensured derived constructors initialize private fields after `super` and added async arrow field regression; ran `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
 - [x] Allowed ES6 `class C` in export assignment edge-case test; ran `./wasm/test.sh emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`.
+- [x] Ensured synthesized derived constructors use `_this` in field/private initializers; added tests; ran `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_parse_error_tolerance`).
 
 ## Ready for Merge
 Yes
