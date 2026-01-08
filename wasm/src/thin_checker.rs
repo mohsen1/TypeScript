@@ -5098,16 +5098,36 @@ impl<'a> ThinCheckerState<'a> {
             return result;
         }
 
-        // Recursively expand Application types until we reach a fixpoint
-        let source_expanded = self.expand_type_deeply(source);
-        let target_expanded = self.expand_type_deeply(target);
+        // Iteratively expand and evaluate until we reach a fixpoint.
+        // This handles cases where evaluation creates new Application types that need expansion.
+        let mut source_current = source;
+        let mut target_current = target;
+        const MAX_ITERATIONS: usize = 5;
 
-        // Evaluate Mapped/IndexAccess/Conditional types to their structural form
-        let source_evaluated = evaluate_type(self.ctx.types, source_expanded);
-        let target_evaluated = evaluate_type(self.ctx.types, target_expanded);
+        for _ in 0..MAX_ITERATIONS {
+            // First pass: expand Application types
+            let source_expanded = self.expand_type_deeply(source_current);
+            let target_expanded = self.expand_type_deeply(target_current);
+
+            // Second pass: evaluate Mapped/IndexAccess/Conditional types
+            let source_evaluated = evaluate_type(self.ctx.types, source_expanded);
+            let target_evaluated = evaluate_type(self.ctx.types, target_expanded);
+
+            // Check if we've reached a fixpoint
+            if source_evaluated == source_current && target_evaluated == target_current {
+                break;
+            }
+
+            source_current = source_evaluated;
+            target_current = target_evaluated;
+        }
+
+        // Final expansion pass after all evaluation is done
+        let source_final = self.expand_type_deeply(source_current);
+        let target_final = self.expand_type_deeply(target_current);
 
         let mut checker = CompatChecker::new(self.ctx.types);
-        checker.is_assignable(source_evaluated, target_evaluated)
+        checker.is_assignable(source_final, target_final)
     }
 
     /// Recursively expand Application types and evaluate until we reach a fixpoint.
@@ -5135,25 +5155,12 @@ impl<'a> ThinCheckerState<'a> {
 
         // First, handle the top-level type
         let expanded = match key {
-            TypeKey::Application(app_id) => {
-                // Debug: print what we're expanding
-                let app = self.ctx.types.type_application(app_id);
-                if let Some(TypeKey::Ref(sym_ref)) = self.ctx.types.lookup(app.base) {
-                    let sym_id = SymbolId(sym_ref.0);
-                    let sym_name = self.ctx.binder.get_symbol(sym_id)
-                        .map(|s| s.escaped_name.clone())
-                        .unwrap_or_default();
-                    eprintln!("[DEBUG] expand_type_recursive: Application with Ref({}), args={}", sym_name, app.args.len());
-                }
-
+            TypeKey::Application(_) => {
                 // Expand Application types
                 let exp = self.try_expand_application_shallow(type_id);
                 // Recursively expand the result
                 if exp != type_id {
-                    eprintln!("[DEBUG]   -> expanded to different type");
                     return self.expand_type_recursive(exp, visited);
-                } else {
-                    eprintln!("[DEBUG]   -> NOT expanded (same type returned)");
                 }
                 exp
             }
@@ -5305,11 +5312,6 @@ impl<'a> ThinCheckerState<'a> {
         // Try to get the cached type for this symbol, or resolve it
         let sym_id = SymbolId(sym_ref.0);
 
-        // Debug: get symbol name
-        let sym_name = self.ctx.binder.get_symbol(sym_id)
-            .map(|s| s.escaped_name.clone())
-            .unwrap_or_default();
-
         let resolved = if let Some(&cached) = self.ctx.symbol_types.get(&sym_id) {
             cached
         } else {
@@ -5320,8 +5322,6 @@ impl<'a> ThinCheckerState<'a> {
         // Extract type parameters from the symbol's declaration (more reliable than type body scanning)
         let type_params = self.get_type_params_from_symbol_decl(sym_id);
         if type_params.is_empty() || type_params.len() != app.args.len() {
-            // Debug: print when type params don't match
-            eprintln!("[DEBUG] try_expand_application_shallow: sym='{}', type_params={}, args={}", sym_name, type_params.len(), app.args.len());
             // No type params or mismatch - return resolved without substitution
             return resolved;
         }
