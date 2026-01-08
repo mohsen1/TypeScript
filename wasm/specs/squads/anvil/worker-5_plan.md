@@ -1,30 +1,22 @@
 # Worker 5 Plan
 
-## 🔥 CRUCIBLE TASK - TEST PORTING
-
-**Reassigned from Anvil emitter work to Crucible test porting.**
-
 ## Mission
-Port conditional and mapped type tests from the official TypeScript repo into `tests/cases/`.
+Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transforms, cli, lsp).
 
 Status: Active
 Priority: 5
-Mode: **CRUCIBLE - TEST PORTING**
 
 ## Current Assignment
-- [ ] Port 15-20 conditional/mapped type tests from official TypeScript repo into `tests/cases/`.
+- [ ] Add ES5 async tests for async IIFE patterns in `wasm/src/transforms/async_es5_tests.rs`. Run `./wasm/test.sh async_es5_tests`.
 
 ## Task Queue
-- [ ] Port `distributiveConditionalTypes.ts` - distributive conditional tests
-- [ ] Port `conditionalTypesWithInfer.ts` - infer in conditionals
-- [ ] Port `mappedTypeRecursiveInference.ts` - recursive mapped types
-- [ ] Port `templateLiteralTypes.ts` - template literal type tests
-- [ ] Target: 50 total solver test cases this week (shared with workers 3-4)
-
-## Goal
-Give Forge workers failing tests to triangulate correct behavior for the Redux blocker.
+- [ ] (empty)
 
 ## Completed
+- [x] Added 12 async generator function tests (basic yield, with await, yield await, multiple yields, yield in loop, body_contains_await, ignores nested async, for-await-of, try/catch, yield*, return value) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (124 tests PASS).
+- [x] Added 12 async method expression tests (basic, with return, no await, multiple awaits, with parameters, body_contains_await, ignores nested async, shorthand syntax, try/catch, in loop, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (112 tests PASS).
+- [x] Added 12 async arrow function tests (block body, expression body, no await, with parameters, multiple awaits, body_contains_await, ignores nested async, rest params, destructuring params, try/catch, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (100 tests PASS).
+- [x] Added 12 async class method tests (basic, with return, no await, multiple awaits, static method, with parameters, body_contains_await, ignores nested async, try/catch, in loop, conditional await) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (88 tests PASS).
 - [x] Added 14 error handling pattern tests (try/catch basic, try/finally basic, try/catch/finally full, await in catch, await in finally, nested try/catch, rethrow, error wrapping, sequential try, return in finally, type guard catch, multiple catches, finally always runs, catch and rethrow new error) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (76 tests PASS).
 - [x] Added 12 Promise combinator tests (Promise.all basic/with map/destructuring, Promise.race basic/with timeout, Promise.allSettled, Promise.any, Promise.resolve, chained combinators, nested Promise.all, Promise.all in try/catch, Promise.race in loop) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (62 tests PASS).
 - [x] Added 12 nested async functions and closures tests (nested async function declaration, nested async arrow, nested async function expression, sync closure, deeply nested async, mixed nested, async IIFE, async callback, async method in object, async arrow in array, async arrow as argument, async closure capturing variable) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (50 tests PASS).
