@@ -10,7 +10,6 @@ Priority: 1
 - Awaiting next assignment.
 
 ## Task Queue
-- [ ] Add mixed-case exponent missing sign with leading zeros test (`1Ee01`).
 - [ ] Add mixed-case exponent trailing double-minus test (`1Ee--`).
 - [ ] Add uppercase exponent leading zeros with zero exponent test (`1E+00`).
 - [ ] Add lowercase exponent plus missing digits test (`1e+`).
@@ -27,6 +26,7 @@ Priority: 1
 - [ ] Add numeric separator in hex/binary name test (`0x1_0`, `0b1_0`, `0o1_0`).
 
 ## Completed
+- [x] Number index ignores mixed-case exponent missing sign with leading zeros; added `test_resolve_bounds_number_index_ignores_mixed_case_exponent_missing_sign_with_leading_zeros`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_mixed_case_exponent_missing_sign_with_leading_zeros`.
 - [x] Number index ignores mixed-case negative exponent leading zeros; added `test_resolve_bounds_number_index_ignores_mixed_case_exponent_negative_leading_zeros`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_mixed_case_exponent_negative_leading_zeros`.
 - [x] Docker build failure in `wasm/src/cli/driver.rs` (E0515) resolved via rust merge; validated by `./wasm/test.sh test_resolve_bounds_number_index_ignores_positive_exponent_zero`.
 - [x] Conditional infer object coverage in `wasm/src/solver/evaluate.rs` with tests in `wasm/src/solver/evaluate_tests.rs`. Tests: `./wasm/test.sh test_conditional_infer_object_`.

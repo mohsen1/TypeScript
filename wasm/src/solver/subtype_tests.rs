@@ -408,6 +408,42 @@ fn test_object_trifecta_object_interface_accepts_primitives() {
 }
 
 #[test]
+fn test_object_trifecta_nullish_rejection() {
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let to_string = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let object_interface = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("toString"),
+        type_id: to_string,
+        write_type: to_string,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+    let sym = SymbolRef(99);
+    env.insert(sym, object_interface);
+    let object_ref = interner.reference(sym);
+
+    let mut checker = SubtypeChecker::with_resolver(&interner, &env);
+    let empty_object = interner.object(Vec::new());
+
+    assert!(!checker.is_subtype_of(TypeId::NULL, TypeId::OBJECT));
+    assert!(!checker.is_subtype_of(TypeId::UNDEFINED, TypeId::OBJECT));
+    assert!(!checker.is_subtype_of(TypeId::NULL, empty_object));
+    assert!(!checker.is_subtype_of(TypeId::UNDEFINED, empty_object));
+    assert!(!checker.is_subtype_of(TypeId::NULL, object_ref));
+    assert!(!checker.is_subtype_of(TypeId::UNDEFINED, object_ref));
+}
+
+#[test]
 fn test_primitive_boxing_assignability() {
     let interner = TypeInterner::new();
     let mut env = TypeEnvironment::new();
@@ -4177,6 +4213,58 @@ fn test_mapped_type_over_string_keys_subtyping() {
     assert!(checker.is_subtype_of(mapped, expected));
     assert!(!checker.is_subtype_of(mapped, mismatch));
     assert!(!checker.is_subtype_of(expected, mapped));
+}
+
+#[test]
+fn test_mapped_type_over_string_keys_key_remap_omit_length() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let constraint = interner.intern(TypeKey::KeyOf(TypeId::STRING));
+    let key_param = TypeParamInfo {
+        name: interner.intern_string("K"),
+        constraint: None,
+        default: None,
+    };
+    let key_param_id = interner.intern(TypeKey::TypeParameter(key_param.clone()));
+    let length_key = interner.literal_string("length");
+    let name_type = interner.conditional(ConditionalType {
+        check_type: key_param_id,
+        extends_type: length_key,
+        true_type: TypeId::NEVER,
+        false_type: key_param_id,
+        is_distributive: true,
+    });
+    let mapped = interner.mapped(MappedType {
+        type_param: key_param,
+        constraint,
+        name_type: Some(name_type),
+        template: TypeId::BOOLEAN,
+        readonly_modifier: None,
+        optional_modifier: None,
+    });
+
+    let to_upper = interner.intern_string("toUpperCase");
+    let expected = interner.object(vec![PropertyInfo {
+        name: to_upper,
+        type_id: TypeId::BOOLEAN,
+        write_type: TypeId::BOOLEAN,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let length = interner.intern_string("length");
+    let requires_length = interner.object(vec![PropertyInfo {
+        name: length,
+        type_id: TypeId::BOOLEAN,
+        write_type: TypeId::BOOLEAN,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(checker.is_subtype_of(mapped, expected));
+    assert!(!checker.is_subtype_of(mapped, requires_length));
 }
 
 #[test]

@@ -14,7 +14,7 @@ Priority: 4
 - [x] TODO (was blocked by `cli/driver.rs` E0515 in Docker): re-apply stash "wip async nested super" and run `./wasm/test.sh class_async_nested_arrow_super_computed_key_this_arguments_capture`.
 - [ ] TODO: add async arrow with computed super key + this + arguments in nested return.
 - [x] TODO: add async method arrow with computed super key + this + arguments (non-nested). Expected: no `=>`, `_this` capture, `arguments[0]` preserved, computed super likely left as `super[key]` (current behavior).
-- [ ] TODO: add async nested arrow with computed super key + arguments only. Expected: no `=>`, `arguments[0]` preserved, computed super likely left as `super[key]` (current behavior).
+- [x] TODO: add async nested arrow with computed super key + arguments only. Expected: no `=>`, `arguments[0]` preserved, computed super likely left as `super[key]` (current behavior).
 - [ ] TODO: add async method returning arrow with `super.m(arguments[0])` (non-computed). Expected: no `=>`, `_super.prototype.m.call(_this, arguments[0])` (if return-arrow lowering matches other arrow cases).
 
 ## Completed
@@ -32,6 +32,7 @@ Priority: 4
 - [x] ES5 async class method arrow uses computed super key + this capture (current behavior); test `./wasm/test.sh class_async_arrow_super_computed_key_this_capture`.
 - [x] ES5 async class method arrow uses computed super key + this + arguments (current behavior); test `./wasm/test.sh class_async_arrow_super_computed_key_this_arguments_capture`.
 - [x] ES5 async class nested arrow uses computed super key + this + arguments (current behavior); test `./wasm/test.sh class_async_nested_arrow_super_computed_key_this_arguments_capture`.
+- [x] ES5 async class nested arrow uses computed super key + arguments (current behavior); test `./wasm/test.sh class_async_nested_arrow_super_computed_key_arguments_capture`.
 - [x] ES5 async class nested arrow super + this capture; test `./wasm/test.sh class_async_nested_arrow_super_this_capture`.
 - [x] ES5 async class nested arrow super + arguments capture; test `./wasm/test.sh class_async_nested_arrow_super_arguments`.
 - [x] ES5 async class nested arrow super call without args; test `./wasm/test.sh class_async_nested_arrow_super_call_no_args`.
