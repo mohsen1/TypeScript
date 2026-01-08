@@ -4363,3 +4363,128 @@ export class Builder<T> {
     assert!(dts.contains("Builder<T>"), "Generic class should be in declaration");
     assert!(dts.contains("transform<U>"), "Generic method should be in declaration");
 }
+
+// =============================================================================
+// E2E: Namespace Exports
+// =============================================================================
+
+#[test]
+fn compile_basic_namespace_export() {
+    // Test basic namespace compiles without errors and produces JS output
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/utils.ts"),
+        r#"
+export namespace Utils {
+    export const VERSION = "1.0.0";
+    export function greet(name: string): string {
+        return "Hello, " + name;
+    }
+}
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+
+    let js = std::fs::read_to_string(base.join("dist/src/utils.js")).expect("read js");
+    // Namespace should produce some output
+    assert!(!js.is_empty(), "JS output should not be empty");
+}
+
+#[test]
+fn compile_nested_namespace_export() {
+    // Test nested namespace compiles without errors
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/api.ts"),
+        r#"
+export namespace API {
+    export namespace V1 {
+        export function getUsers(): string[] {
+            return ["user1", "user2"];
+        }
+    }
+
+    export namespace V2 {
+        export function getUsers(): string[] {
+            return ["user1", "user2", "user3"];
+        }
+    }
+}
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+
+    let js = std::fs::read_to_string(base.join("dist/src/api.js")).expect("read js");
+    assert!(!js.is_empty(), "JS output should not be empty");
+}
+
+#[test]
+fn compile_namespace_with_class() {
+    // Test namespace containing a class compiles without errors
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/models.ts"),
+        r#"
+export namespace Models {
+    export class User {
+        name: string;
+        constructor(name: string) {
+            this.name = name;
+        }
+    }
+}
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+
+    let js = std::fs::read_to_string(base.join("dist/src/models.js")).expect("read js");
+    assert!(!js.is_empty(), "JS output should not be empty");
+}
