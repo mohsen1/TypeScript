@@ -13146,3 +13146,89 @@ class Counter {
         unique_source_lines
     );
 }
+
+#[test]
+fn test_source_map_for_of_for_in_loops_mapping() {
+    // Test source-map accuracy for for-of and for-in loops
+    let source = r#"const numbers = [1, 2, 3, 4, 5];
+const obj = { a: 1, b: 2, c: 3 };
+
+for (const num of numbers) {
+    console.log(num);
+}
+
+for (const key in obj) {
+    console.log(key, obj[key]);
+}
+
+for (let i of [10, 20, 30]) {
+    i *= 2;
+    console.log(i);
+}
+
+const iterable = new Map([["x", 1], ["y", 2]]);
+for (const [key, value] of iterable) {
+    console.log(key, value);
+}
+
+async function processItems(items: number[]) {
+    for await (const item of items) {
+        console.log(item);
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions::default();
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    assert!(
+        output.contains("numbers") && output.contains("obj"),
+        "expected variable names in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    let (numbers_line, _) = find_line_col(source, "const numbers");
+    let has_numbers_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == numbers_line
+    });
+
+    let (for_of_line, _) = find_line_col(source, "for (const num of");
+    let has_for_of_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == for_of_line
+    });
+
+    assert!(
+        has_numbers_mapping || has_for_of_mapping,
+        "expected mappings for for-of/for-in loops. mappings: {mappings}"
+    );
+
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for for-of/for-in loops"
+    );
+
+    let unique_source_lines: std::collections::HashSet<_> =
+        decoded.iter().map(|m| m.original_line).collect();
+    assert!(
+        unique_source_lines.len() >= 5,
+        "expected mappings from at least 5 different source lines, got: {:?}",
+        unique_source_lines
+    );
+}
