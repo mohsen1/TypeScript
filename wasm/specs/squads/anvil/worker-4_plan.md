@@ -7,7 +7,7 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [x] Add ES5 class tests for class expressions in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
+- [ ] Add ES5 class tests for accessor keyword (ES2022) in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
 
 ## Task Queue
 - [ ] (empty)
