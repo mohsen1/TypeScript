@@ -3975,6 +3975,64 @@ fn test_this_parameter_function_property_contravariant() {
 }
 
 #[test]
+fn test_this_type_in_param_covariant() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+    let func_name = interner.intern_string("compare");
+
+    let this_type = interner.intern(TypeKey::ThisType);
+    let this_or_number = interner.union(vec![this_type, TypeId::NUMBER]);
+
+    let narrow_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("other")),
+            type_id: this_type,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let wide_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("other")),
+            type_id: this_or_number,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let narrow_obj = interner.object(vec![PropertyInfo {
+        name: func_name,
+        type_id: narrow_fn,
+        write_type: narrow_fn,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let wide_obj = interner.object(vec![PropertyInfo {
+        name: func_name,
+        type_id: wide_fn,
+        write_type: wide_fn,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(checker.is_subtype_of(narrow_obj, wide_obj));
+    assert!(!checker.is_subtype_of(wide_obj, narrow_obj));
+}
+
+#[test]
 fn test_function_fixed_to_rest_subtyping() {
     use std::sync::Arc;
 

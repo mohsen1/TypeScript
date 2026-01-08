@@ -7,10 +7,9 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] Structural compatibility/variance: implement covariant `this`-type handling for class method parameters (TS unsoundness #19) in `wasm/src/solver/subtype.rs`; add regressions in `wasm/src/solver/subtype_tests.rs`; run `./wasm/test.sh`.
+- [ ] Add class-subtyping regressions where `this` appears in method parameters (base vs derived) and confirm assignment matches `tsc`.
 
 ## Task Queue
-- [ ] Add class-subtyping regressions where `this` appears in method parameters (base vs derived) and confirm assignment matches `tsc`.
 - [ ] Confirm method vs function-property variance (including `this` parameters) in `wasm/src/solver/subtype.rs` matches `tsc`, add coverage if missing.
 - [ ] Add a void-return exception regression (`() => void` accepts `() => string`) if not already covered, or pick the next unsoundness case from `wasm/specs/TS_UNSOUNDNESS_CATALOG.md`.
 
@@ -20,6 +19,7 @@ Priority: 3
 - [x] Method vs function-property variance coverage for function-source to method-target. Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
 - [x] Index-signature consistency with method bivariance regression (TS unsoundness #25). Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
 - [x] Investigated FunctionId build error in `wasm/src/solver/evaluate.rs` after sync; no references found, build succeeded. Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
+- [x] Implemented covariant `this`-type handling in parameter variance with regression coverage. Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
 
 ## Ready for Merge
 No
