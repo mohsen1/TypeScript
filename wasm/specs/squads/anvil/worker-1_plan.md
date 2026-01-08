@@ -10,15 +10,16 @@ Priority: 1
 - Implement ES5 derived `super()` + field initializer ordering and nested arrow/async `this` capture in `wasm/src/transforms/class_es5.rs`; add regression in `wasm/src/emitter_transform_integration_tests.rs`; run `./wasm/test.sh`.
 
 ## Task Queue
-- [ ] Audit computed `super[...]` lowering paths in `wasm/src/transforms/class_es5.rs` for nested arrows.
-- [ ] Add a focused unit test in `wasm/src/transforms/class_es5_tests.rs` for pre-`super()` statement ordering.
-- [ ] Confirm ES5 output removes `super[` for computed super calls in class fields.
+- [x] Audit computed `super[...]` lowering paths in `wasm/src/transforms/class_es5.rs` for nested arrows.
+- [x] Add a focused unit test in `wasm/src/transforms/class_es5_tests.rs` for pre-`super()` statement ordering (already covered by existing test).
+- [x] Confirm ES5 output removes `super[` for computed super calls in class fields.
 
 ## Completed
 - [x] Implemented async/nested arrow `this` capture handling in ES5 class emission, added derived async field regression; ran `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
+- [x] Added class ES5 computed super field arrow regression; ran `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
