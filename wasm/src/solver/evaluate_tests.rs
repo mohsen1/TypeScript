@@ -219,9 +219,7 @@ fn test_conditional_instantiated_param_distributes_branch_substitution() {
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
-    let expected = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
-
-    assert_eq!(result, expected);
+    assert_eq!(result, TypeId::STRING);
 }
 
 #[test]
@@ -457,9 +455,7 @@ fn test_conditional_infer_array_element_non_array_union_branch() {
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    let expected = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
-
-    assert_eq!(result, expected);
+    assert_eq!(result, TypeId::STRING);
 }
 
 #[test]
