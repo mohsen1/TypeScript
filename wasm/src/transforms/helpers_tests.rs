@@ -64,3 +64,13 @@ fn test_emit_export_star_orders_create_binding() {
     let export_star_pos = output.find("__exportStar").expect("Expected __exportStar helper");
     assert!(create_binding_pos < export_star_pos, "__createBinding should precede __exportStar");
 }
+
+#[test]
+fn test_emit_import_star_orders_set_module_default() {
+    let mut helpers = HelpersNeeded::default();
+    helpers.import_star = true;
+    let output = emit_helpers(&helpers);
+    let set_module_default_pos = output.find("__setModuleDefault").expect("Expected __setModuleDefault helper");
+    let import_star_pos = output.find("__importStar").expect("Expected __importStar helper");
+    assert!(set_module_default_pos < import_star_pos, "__setModuleDefault should precede __importStar");
+}
