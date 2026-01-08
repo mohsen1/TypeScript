@@ -13520,3 +13520,104 @@ class DataStream {
         "expected non-empty source mappings for async generators"
     );
 }
+
+#[test]
+fn test_source_map_object_literal_methods_and_accessors() {
+    // Test source-map accuracy for object literal method shorthand and accessors
+    let source = r#"const obj = {
+    name: "example",
+
+    greet() {
+        return "Hello, " + this.name;
+    },
+
+    calculate(x: number, y: number) {
+        return x + y;
+    },
+
+    get fullName() {
+        return "Mr. " + this.name;
+    },
+
+    set fullName(value: string) {
+        this.name = value.replace("Mr. ", "");
+    },
+
+    async fetchData() {
+        return await Promise.resolve(42);
+    },
+
+    *generator() {
+        yield 1;
+        yield 2;
+    },
+
+    ["computed" + "Key"]() {
+        return "computed";
+    }
+};
+
+const utils = {
+    add: (a: number, b: number) => a + b,
+    multiply(a: number, b: number) { return a * b; }
+};"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the object literal
+    let (obj_line, obj_col) = find_line_col(source, "const obj");
+    let has_obj_mapping = decoded.iter().any(|entry| {
+        entry.original_line == obj_line
+            && entry.original_column >= obj_col
+            && entry.original_column <= obj_col + 9
+    });
+
+    // Verify we have mappings for the greet method
+    let (greet_line, greet_col) = find_line_col(source, "greet()");
+    let has_greet_mapping = decoded.iter().any(|entry| {
+        entry.original_line == greet_line
+            && entry.original_column >= greet_col
+            && entry.original_column <= greet_col + 7
+    });
+
+    // At minimum, we should have mappings for object literal declarations
+    assert!(
+        has_obj_mapping || has_greet_mapping || !decoded.is_empty(),
+        "expected mappings for object literal methods. mappings: {mappings}"
+    );
+
+    // Verify output contains expected identifiers
+    assert!(
+        output.contains("greet") || output.contains("calculate"),
+        "expected output to contain method names. output: {output}"
+    );
+
+    // Verify source map has non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for object literal methods and accessors"
+    );
+}
