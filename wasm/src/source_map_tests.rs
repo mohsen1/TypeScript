@@ -14291,4 +14291,3 @@ fn test_source_map_namespace_es5_nested_mapping() {
         "expected non-empty source mappings for nested namespace"
     );
 }
-
