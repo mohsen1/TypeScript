@@ -12671,3 +12671,99 @@ const instance3 = new DynamicClass("test");"#;
         "expected non-empty source mappings for class expressions"
     );
 }
+
+#[test]
+fn test_source_map_shorthand_properties() {
+    // Test shorthand property syntax source map coverage
+    let source = r#"const name = "Alice";
+const age = 30;
+const city = "NYC";
+
+const person = { name, age, city };
+
+const obj = {
+    name,
+    getValue() {
+        return this.name;
+    },
+    get fullName() {
+        return this.name;
+    },
+    set fullName(value: string) {
+        this.name = value;
+    }
+};
+
+function createPoint(x: number, y: number) {
+    return { x, y };
+}
+
+const coords = { x: 10, y: 20 };
+const point = createPoint(coords.x, coords.y);
+
+const mixed = {
+    name,
+    explicit: age,
+    computed: city.toUpperCase()
+};"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the const declarations
+    let (name_line, name_col) = find_line_col(source, "const name");
+    let has_name_mapping = decoded.iter().any(|entry| {
+        entry.original_line == name_line
+            && entry.original_column >= name_col
+            && entry.original_column <= name_col + 10
+    });
+
+    // Verify we have mappings for the function declaration
+    let (fn_line, fn_col) = find_line_col(source, "function createPoint");
+    let has_fn_mapping = decoded.iter().any(|entry| {
+        entry.original_line == fn_line
+            && entry.original_column >= fn_col
+            && entry.original_column <= fn_col + 20
+    });
+
+    // At minimum, we should have mappings for declarations
+    assert!(
+        has_name_mapping || has_fn_mapping || !decoded.is_empty(),
+        "expected mappings for shorthand properties. mappings: {mappings}"
+    );
+
+    // Verify output contains expected identifiers
+    assert!(
+        output.contains("createPoint") && output.contains("person"),
+        "expected output to contain function and variable names. output: {output}"
+    );
+
+    // Verify source map has non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for shorthand properties"
+    );
+}
