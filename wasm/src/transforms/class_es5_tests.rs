@@ -1426,3 +1426,51 @@ class MathUtils {
         output
     );
 }
+
+#[test]
+fn test_class_es5_computed_property_in_object_literal() {
+    let source = r#"
+class DynamicObject {
+    createObject(key: string, value: number) {
+        return { [key]: value };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Should NOT contain computed property syntax in object literal (ES5 doesn't support it)
+    assert!(
+        !output.contains("[key]:") && !output.contains("[key] :"),
+        "Expected computed property to be transformed, not raw [key]: syntax: {}",
+        output
+    );
+
+    // Should use bracket notation assignment or temp variable pattern
+    assert!(
+        output.contains("[key]") || output.contains("_a"),
+        "Expected ES5 computed property to use bracket notation or temp var: {}",
+        output
+    );
+
+    // Method should be on prototype
+    assert!(
+        output.contains(".prototype.createObject") || output.contains("prototype[\"createObject\"]"),
+        "Expected createObject method on prototype: {}",
+        output
+    );
+}
