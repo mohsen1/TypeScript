@@ -2318,6 +2318,20 @@ fn test_base_constraint_assignability_subtyping() {
 }
 
 #[test]
+fn test_base_constraint_not_assignable_to_param() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    assert!(!checker.is_subtype_of(TypeId::STRING, t_param));
+}
+
+#[test]
 fn test_type_parameter_identity_only() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
