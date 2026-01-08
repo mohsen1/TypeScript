@@ -86,8 +86,10 @@ Priority: 3
 - [x] Solver unsoundness: mapped type over string keys with key remap omits length property in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_over_string_keys_key_remap_omit_length`.
 - [x] Solver unsoundness: mapped type over string keys includes number index signature in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_over_string_keys_number_index_subtyping`.
 - [x] Solver unsoundness: apparent string number index signature in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_apparent_string_number_index_subtyping`.
+- [x] Solver unsoundness: index signature consistency (number index must subtype string index) in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_index_signature_consistency_number_vs_string_index`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
 - Use Docker for Rust tests (`./wasm/test.sh`), never `cargo test` directly.
 - Update this plan after each task and keep it accurate.
+- Ready for merge.
