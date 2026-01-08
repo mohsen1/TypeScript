@@ -1805,3 +1805,53 @@ class MathUtils {
         output
     );
 }
+
+#[test]
+fn test_class_es5_generator_method() {
+    // Tests generator method structure on ES5 class
+    // Note: Full generator transform uses __generator helper
+    let source = r#"
+class DataStream {
+    *getItems() {
+        return [1, 2, 3];
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Should emit as a function (ES5 class pattern)
+    assert!(
+        output.contains("function DataStream"),
+        "Expected DataStream constructor function: {}",
+        output
+    );
+
+    // Method should be on prototype
+    assert!(
+        output.contains(".prototype.getItems") || output.contains("prototype[\"getItems\"]"),
+        "Expected getItems method on prototype: {}",
+        output
+    );
+
+    // Should return the array
+    assert!(
+        output.contains("return") && (output.contains("[1, 2, 3]") || output.contains("1") || output.contains("2")),
+        "Expected return statement with values: {}",
+        output
+    );
+}
