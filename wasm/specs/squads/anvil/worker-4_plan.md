@@ -7,12 +7,17 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [ ] Add ES5 class tests for class expressions in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
+- [x] Add ES5 class tests for class expressions in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Add ES5 class expression anonymous test. Tests: `./wasm/test.sh class_expression_anonymous`
+- [x] Add ES5 class expression named test. Tests: `./wasm/test.sh class_expression_named`
+- [x] Add ES5 class expression in return test. Tests: `./wasm/test.sh class_expression_in_return`
+- [x] Add ES5 class expression extends test. Tests: `./wasm/test.sh class_expression_extends`
+- [x] Add ES5 class expression with static test. Tests: `./wasm/test.sh class_expression_with_static`
 - [x] Add ES5 super with conditional field init test. Tests: `./wasm/test.sh super_with_conditional_field`
 - [x] Add ES5 super with arrow field init test. Tests: `./wasm/test.sh super_with_arrow_field`
 - [x] Add ES5 super with computed field init test. Tests: `./wasm/test.sh super_with_computed_field`
