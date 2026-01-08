@@ -41,6 +41,7 @@ Priority: 2
 - [x] Added function return infer test for distributive conditionals (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_function_return_distributive`.
 - [x] Added non-distributive object-property infer test over matching union inputs (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_object_property_non_distributive_union_all_match`.
 - [x] Added non-distributive tuple wrapper array infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_array_element_non_distributive_tuple_wrapper`.
+- [x] Added non-distributive union-array infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_array_element_non_distributive_union_input`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
