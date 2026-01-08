@@ -14739,7 +14739,7 @@ fn test_index_access_array_number() {
 }
 
 #[test]
-fn test_index_access_tuple_literal() {
+fn test_index_access_tuple_literal_middle_element() {
     let interner = TypeInterner::new();
 
     // [string, number, boolean][1] should be number
