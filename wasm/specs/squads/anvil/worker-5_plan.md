@@ -7,7 +7,7 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- Complete: Added async binding/computed-name await coverage in `wasm/src/transforms/async_es5.rs` and `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (PASS).
+- Complete: Added async array literal spread and binding computed-name await coverage in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (PASS).
 
 ## Task Queue
 - [ ] (empty)
@@ -38,6 +38,7 @@ Priority: 5
 - [x] Added async while/do-while await condition coverage in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (PASS).
 - [x] Added async literal/spread await coverage in `wasm/src/transforms/async_es5.rs` and `wasm/src/transforms/async_es5_tests.rs`; updated spread lookup in `wasm/src/parser/thin_node.rs`; ran `./wasm/test.sh async_es5_tests` (PASS).
 - [x] Added async binding/computed-name await coverage in `wasm/src/transforms/async_es5.rs` and `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (PASS).
+- [x] Added async array literal spread and binding computed-name await coverage in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (PASS).
 
 ## Ready for Merge
 Yes
