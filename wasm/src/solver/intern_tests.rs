@@ -83,6 +83,17 @@ fn test_interner_union_any_beats_unknown() {
 }
 
 #[test]
+fn test_interner_union_dedups_and_flattens() {
+    let interner = TypeInterner::new();
+
+    let nested = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let flattened = interner.union(vec![TypeId::STRING, nested, TypeId::STRING]);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    assert_eq!(flattened, expected);
+}
+
+#[test]
 fn test_interner_intersection_normalization() {
     let interner = TypeInterner::new();
 

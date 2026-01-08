@@ -4115,6 +4115,481 @@ type Alias = Foo.Bar;
 }
 
 #[test]
+fn test_checker_namespace_merges_with_class_exports_reverse_order() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::TypeKey;
+
+    let source = r#"
+namespace Foo {
+    export interface Bar { x: number; }
+}
+class Foo {}
+type Alias = Foo.Bar;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let alias_sym = binder.file_locals.get("Alias").expect("Alias should exist");
+    let alias_type = checker.get_type_of_symbol(alias_sym);
+    let alias_key = types.lookup(alias_type).expect("Alias type should exist");
+    match alias_key {
+        TypeKey::Object(shape_id) => {
+            let shape = types.object_shape(shape_id);
+            let prop = shape
+                .properties
+                .iter()
+                .find(|prop| types.resolve_atom(prop.name) == "x")
+                .expect("Expected property x");
+            assert_eq!(prop.type_id, TypeId::NUMBER);
+        }
+        _ => panic!("Expected Alias to resolve to Object type, got {:?}", alias_key),
+    }
+}
+
+#[test]
+fn test_checker_namespace_merges_with_class_value_exports() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Foo {}
+namespace Foo {
+    export const value = 1;
+}
+const direct = Foo.value;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let direct_sym = binder.file_locals.get("direct").expect("direct should exist");
+    assert_eq!(checker.get_type_of_symbol(direct_sym), TypeId::NUMBER);
+}
+
+#[test]
+fn test_checker_namespace_merges_with_class_value_exports_reverse_order() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace Foo {
+    export const value = 1;
+}
+class Foo {}
+const direct = Foo.value;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let direct_sym = binder.file_locals.get("direct").expect("direct should exist");
+    assert_eq!(checker.get_type_of_symbol(direct_sym), TypeId::NUMBER);
+}
+
+#[test]
+fn test_checker_namespace_merges_across_decls_value_access() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace Merge {
+    export const a = 1;
+}
+namespace Merge {
+    export const b = 2;
+}
+const sum = Merge.a + Merge.b;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let sum_sym = binder.file_locals.get("sum").expect("sum should exist");
+    assert_eq!(checker.get_type_of_symbol(sum_sym), TypeId::NUMBER);
+}
+
+#[test]
+fn test_checker_namespace_merges_across_decls_type_access() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::TypeKey;
+
+    let source = r#"
+namespace Merge {
+    export interface A { x: number; }
+}
+namespace Merge {
+    export interface B { y: number; }
+}
+type Alias = Merge.A;
+const value: Merge.B = { y: 1 };
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let alias_sym = binder.file_locals.get("Alias").expect("Alias should exist");
+    let alias_type = checker.get_type_of_symbol(alias_sym);
+    let alias_key = types.lookup(alias_type).expect("Alias type should exist");
+    match alias_key {
+        TypeKey::Object(shape_id) => {
+            let shape = types.object_shape(shape_id);
+            let prop = shape
+                .properties
+                .iter()
+                .find(|prop| types.resolve_atom(prop.name) == "x")
+                .expect("Expected property x");
+            assert_eq!(prop.type_id, TypeId::NUMBER);
+        }
+        _ => panic!("Expected Alias to resolve to Object type, got {:?}", alias_key),
+    }
+}
+
+#[test]
+fn test_checker_namespace_merges_with_function_value_exports() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function Merge() {}
+namespace Merge {
+    export const extra = 1;
+}
+const direct = Merge.extra;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let direct_sym = binder.file_locals.get("direct").expect("direct should exist");
+    assert_eq!(checker.get_type_of_symbol(direct_sym), TypeId::NUMBER);
+}
+
+#[test]
+fn test_checker_namespace_merges_with_function_value_exports_reverse_order() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace Merge {
+    export const extra = 1;
+}
+function Merge() {}
+const direct = Merge.extra;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let direct_sym = binder.file_locals.get("direct").expect("direct should exist");
+    assert_eq!(checker.get_type_of_symbol(direct_sym), TypeId::NUMBER);
+}
+
+#[test]
+fn test_checker_namespace_merges_with_function_type_exports() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::TypeKey;
+
+    let source = r#"
+function Merge() {}
+namespace Merge {
+    export interface Extra { value: number; }
+}
+type Alias = Merge.Extra;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let alias_sym = binder.file_locals.get("Alias").expect("Alias should exist");
+    let alias_type = checker.get_type_of_symbol(alias_sym);
+    let alias_key = types.lookup(alias_type).expect("Alias type should exist");
+    match alias_key {
+        TypeKey::Object(shape_id) => {
+            let shape = types.object_shape(shape_id);
+            let prop = shape
+                .properties
+                .iter()
+                .find(|prop| types.resolve_atom(prop.name) == "value")
+                .expect("Expected property value");
+            assert_eq!(prop.type_id, TypeId::NUMBER);
+        }
+        _ => panic!("Expected Alias to resolve to Object type, got {:?}", alias_key),
+    }
+}
+
+#[test]
+fn test_checker_namespace_merges_with_function_type_exports_reverse_order() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::TypeKey;
+
+    let source = r#"
+namespace Merge {
+    export interface Extra { value: number; }
+}
+function Merge() {}
+type Alias = Merge.Extra;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let alias_sym = binder.file_locals.get("Alias").expect("Alias should exist");
+    let alias_type = checker.get_type_of_symbol(alias_sym);
+    let alias_key = types.lookup(alias_type).expect("Alias type should exist");
+    match alias_key {
+        TypeKey::Object(shape_id) => {
+            let shape = types.object_shape(shape_id);
+            let prop = shape
+                .properties
+                .iter()
+                .find(|prop| types.resolve_atom(prop.name) == "value")
+                .expect("Expected property value");
+            assert_eq!(prop.type_id, TypeId::NUMBER);
+        }
+        _ => panic!("Expected Alias to resolve to Object type, got {:?}", alias_key),
+    }
+}
+
+#[test]
+fn test_checker_namespace_merges_with_enum_value_exports() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+enum Merge {
+    A,
+}
+namespace Merge {
+    export const extra = 1;
+}
+const direct = Merge.extra;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let direct_sym = binder.file_locals.get("direct").expect("direct should exist");
+    assert_eq!(checker.get_type_of_symbol(direct_sym), TypeId::NUMBER);
+}
+
+#[test]
+fn test_checker_namespace_merges_with_enum_value_exports_reverse_order() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace Merge {
+    export const extra = 1;
+}
+enum Merge {
+    A,
+}
+const direct = Merge.extra;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let direct_sym = binder.file_locals.get("direct").expect("direct should exist");
+    assert_eq!(checker.get_type_of_symbol(direct_sym), TypeId::NUMBER);
+}
+
+#[test]
+fn test_checker_namespace_merges_with_enum_type_exports() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::TypeKey;
+
+    let source = r#"
+enum Merge {
+    A,
+}
+namespace Merge {
+    export interface Extra { value: number; }
+}
+type Alias = Merge.Extra;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let alias_sym = binder.file_locals.get("Alias").expect("Alias should exist");
+    let alias_type = checker.get_type_of_symbol(alias_sym);
+    let alias_key = types.lookup(alias_type).expect("Alias type should exist");
+    match alias_key {
+        TypeKey::Object(shape_id) => {
+            let shape = types.object_shape(shape_id);
+            let prop = shape
+                .properties
+                .iter()
+                .find(|prop| types.resolve_atom(prop.name) == "value")
+                .expect("Expected property value");
+            assert_eq!(prop.type_id, TypeId::NUMBER);
+        }
+        _ => panic!("Expected Alias to resolve to Object type, got {:?}", alias_key),
+    }
+}
+
+#[test]
+fn test_checker_namespace_merges_with_enum_type_exports_reverse_order() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::TypeKey;
+
+    let source = r#"
+namespace Merge {
+    export interface Extra { value: number; }
+}
+enum Merge {
+    A,
+}
+type Alias = Merge.Extra;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let alias_sym = binder.file_locals.get("Alias").expect("Alias should exist");
+    let alias_type = checker.get_type_of_symbol(alias_sym);
+    let alias_key = types.lookup(alias_type).expect("Alias type should exist");
+    match alias_key {
+        TypeKey::Object(shape_id) => {
+            let shape = types.object_shape(shape_id);
+            let prop = shape
+                .properties
+                .iter()
+                .find(|prop| types.resolve_atom(prop.name) == "value")
+                .expect("Expected property value");
+            assert_eq!(prop.type_id, TypeId::NUMBER);
+        }
+        _ => panic!("Expected Alias to resolve to Object type, got {:?}", alias_key),
+    }
+}
+
+#[test]
+fn test_checker_namespace_merges_with_class_element_access() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Foo {}
+namespace Foo {
+    export const value = 1;
+}
+const direct = Foo["value"];
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let direct_sym = binder.file_locals.get("direct").expect("direct should exist");
+    assert_eq!(checker.get_type_of_symbol(direct_sym), TypeId::NUMBER);
+}
+
+#[test]
 fn test_checker_interface_typeof_value_reference() {
     use crate::thin_parser::ThinParserState;
     use crate::solver::{TypeKey, SymbolRef};
@@ -4181,6 +4656,45 @@ interface Bar {
             }
         }
         _ => panic!("Expected Bar to resolve to Object type, got {:?}", bar_key),
+    }
+}
+
+#[test]
+fn test_checker_typeof_namespace_alias_member() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::{TypeKey, SymbolRef};
+
+    let source = r#"
+namespace Ns {
+    export const value = 1;
+}
+import Alias = Ns;
+type T = typeof Alias.value;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let ns_sym = binder.file_locals.get("Ns").expect("Ns should exist");
+    let value_sym = binder.get_symbol(ns_sym)
+        .and_then(|symbol| symbol.exports.as_ref())
+        .and_then(|exports| exports.get("value"))
+        .expect("Ns.value should exist");
+
+    let t_sym = binder.file_locals.get("T").expect("T should exist");
+    let t_type = checker.get_type_of_symbol(t_sym);
+    let t_key = types.lookup(t_type).expect("T type should exist");
+    match t_key {
+        TypeKey::TypeQuery(SymbolRef(sym_id)) => assert_eq!(sym_id, value_sym.0),
+        other => panic!("Expected T to be typeof Alias.value, got {:?}", other),
     }
 }
 
