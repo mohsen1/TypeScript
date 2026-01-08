@@ -2219,6 +2219,50 @@ fn test_conditional_infer_readonly_array_element_extraction() {
 }
 
 #[test]
+fn test_conditional_infer_readonly_array_element_non_distributive_union_input() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends readonly (infer R)[] ? R : never, with T = readonly string[] | readonly number[] (no distribution).
+    // TODO: Non-distributive readonly array inference over union inputs yields never.
+    let extends_array =
+        interner.intern(TypeKey::ReadonlyType(interner.array(infer_r)));
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_array,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let readonly_string_array =
+        interner.intern(TypeKey::ReadonlyType(interner.array(TypeId::STRING)));
+    let readonly_number_array =
+        interner.intern(TypeKey::ReadonlyType(interner.array(TypeId::NUMBER)));
+    subst.insert(t_name, interner.union(vec![readonly_string_array, readonly_number_array]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
 fn test_conditional_infer_readonly_tuple_element_extraction() {
     let interner = TypeInterner::new();
 
