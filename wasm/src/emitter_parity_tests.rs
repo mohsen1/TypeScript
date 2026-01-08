@@ -3062,3 +3062,161 @@ class Service {
         output
     );
 }
+
+/// Parity test for ES5 function call spread downlevel.
+/// Spread in function calls should use .apply() or similar.
+#[test]
+fn test_parity_es5_call_spread() {
+    let source = "const result = Math.max(...numbers);";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify variable declaration
+    assert!(
+        output.contains("result"),
+        "ES5 output should define result: {}",
+        output
+    );
+    // Spread syntax should not appear in ES5 output
+    assert!(
+        !output.contains("...numbers"),
+        "ES5 output should not contain spread syntax: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 new expression spread downlevel.
+/// Spread in new expressions should be handled.
+#[test]
+fn test_parity_es5_new_spread() {
+    let source = "const date = new Date(...args);";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify variable declaration
+    assert!(
+        output.contains("date"),
+        "ES5 output should define date: {}",
+        output
+    );
+    // Spread syntax should not appear in ES5 output
+    assert!(
+        !output.contains("...args"),
+        "ES5 output should not contain spread syntax: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 rest parameters in function downlevel.
+/// Rest parameters should be converted to arguments slicing.
+#[test]
+fn test_parity_es5_rest_params_function() {
+    let source = "function collect(first: number, ...rest: number[]) { return [first, ...rest]; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify function exists
+    assert!(
+        output.contains("function collect"),
+        "ES5 output should define collect function: {}",
+        output
+    );
+    // Rest parameter syntax should be removed
+    assert!(
+        !output.contains("...rest"),
+        "ES5 output should not contain rest parameter syntax: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number") && !output.contains(": number[]"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 spread in array literal with mixed elements.
+/// Mixed spread and regular elements should be handled.
+#[test]
+fn test_parity_es5_array_spread_mixed() {
+    let source = "const arr = [1, ...middle, 2, ...end, 3];";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify variable declaration
+    assert!(
+        output.contains("arr"),
+        "ES5 output should define arr: {}",
+        output
+    );
+    // Spread syntax should not appear in ES5 output
+    assert!(
+        !output.contains("...middle") && !output.contains("...end"),
+        "ES5 output should not contain spread syntax: {}",
+        output
+    );
+}
