@@ -2441,6 +2441,67 @@ fn test_conditional_infer_optional_property_present_distributive() {
 }
 
 #[test]
+fn test_conditional_infer_optional_property_with_constraint() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    // T extends { a?: infer R extends string } ? R : never, with T = { a?: string } | { a?: number }.
+    let extends_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: infer_r,
+        write_type: infer_r,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_obj,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let obj_string = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_number = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+    subst.insert(t_name, interner.union(vec![obj_string, obj_number]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
 fn test_conditional_infer_optional_property_non_distributive_union_input() {
     let interner = TypeInterner::new();
 
