@@ -1176,3 +1176,51 @@ class Calculator {
         output
     );
 }
+
+#[test]
+fn test_class_es5_rest_parameters_in_method() {
+    let source = r#"
+class Logger {
+    log(prefix: string, ...messages: string[]) {
+        return prefix + ": " + messages.join(", ");
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Should NOT contain rest parameter syntax (ES5 doesn't support it)
+    assert!(
+        !output.contains("...messages"),
+        "Expected rest parameters to be transformed, not raw ...messages: {}",
+        output
+    );
+
+    // Should use Array.prototype.slice or similar for rest params
+    assert!(
+        output.contains("slice") || output.contains("arguments"),
+        "Expected ES5 rest parameter to use slice or arguments: {}",
+        output
+    );
+
+    // Method should be on prototype
+    assert!(
+        output.contains(".prototype.log") || output.contains("prototype[\"log\"]"),
+        "Expected log method on prototype: {}",
+        output
+    );
+}
