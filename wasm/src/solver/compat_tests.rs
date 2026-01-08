@@ -1060,10 +1060,63 @@ fn test_explain_failure_reports_rest_mismatch() {
         is_constructor: false,
     });
 
+    let reason = checker.explain_failure(source, target);
     assert!(matches!(
-        checker.explain_failure(source, target),
+        reason,
         Some(SubtypeFailureReason::ParameterTypeMismatch { .. })
     ));
+    if let Some(SubtypeFailureReason::ParameterTypeMismatch { param_index, source_param, target_param }) = reason
+    {
+        assert_eq!(param_index, 1);
+        assert_eq!(source_param, TypeId::STRING);
+        assert_eq!(target_param, TypeId::NUMBER);
+    }
+}
+
+#[test]
+fn test_explain_failure_reports_rest_mismatch_source_rest() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let source = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: interner.array(TypeId::STRING),
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let target = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let reason = checker.explain_failure(source, target);
+    assert!(matches!(
+        reason,
+        Some(SubtypeFailureReason::ParameterTypeMismatch { .. })
+    ));
+    if let Some(SubtypeFailureReason::ParameterTypeMismatch { param_index, source_param, target_param }) = reason
+    {
+        assert_eq!(param_index, 0);
+        assert_eq!(source_param, TypeId::STRING);
+        assert_eq!(target_param, TypeId::NUMBER);
+    }
 }
 
 #[test]
