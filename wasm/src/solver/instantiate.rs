@@ -73,6 +73,7 @@ pub struct TypeInstantiator<'a> {
     visiting: FxHashMap<TypeId, TypeId>,
     /// Type parameter names that are shadowed in the current scope.
     shadowed: Vec<Atom>,
+    substitute_infer: bool,
 }
 
 impl<'a> TypeInstantiator<'a> {
@@ -83,6 +84,7 @@ impl<'a> TypeInstantiator<'a> {
             substitution,
             visiting: FxHashMap::default(),
             shadowed: Vec::new(),
+            substitute_infer: false,
         }
     }
 
@@ -359,6 +361,40 @@ impl<'a> TypeInstantiator<'a> {
             // Conditional: instantiate all parts
             TypeKey::Conditional(cond_id) => {
                 let cond = self.interner.conditional_type(*cond_id);
+                if cond.is_distributive {
+                    if let Some(TypeKey::TypeParameter(info)) =
+                        self.interner.lookup(cond.check_type)
+                    {
+                        if !self.is_shadowed(info.name) {
+                            if let Some(substituted) = self.substitution.get(info.name) {
+                                if let Some(TypeKey::Union(members)) =
+                                    self.interner.lookup(substituted)
+                                {
+                                    let members = self.interner.type_list(members);
+                                    let cond_type =
+                                        self.interner.conditional(cond.as_ref().clone());
+                                    let mut results = Vec::with_capacity(members.len());
+                                    for &member in members.iter() {
+                                        let mut member_subst = self.substitution.clone();
+                                        member_subst.insert(info.name, member);
+                                        let instantiated = instantiate_type(
+                                            self.interner,
+                                            cond_type,
+                                            &member_subst,
+                                        );
+                                        let evaluated =
+                                            crate::solver::evaluate::evaluate_type(
+                                                self.interner,
+                                                instantiated,
+                                            );
+                                        results.push(evaluated);
+                                    }
+                                    return self.interner.union(results);
+                                }
+                            }
+                        }
+                    }
+                }
                 let instantiated = ConditionalType {
                     check_type: self.instantiate(cond.check_type),
                     extends_type: self.instantiate(cond.extends_type),
@@ -424,8 +460,13 @@ impl<'a> TypeInstantiator<'a> {
                 self.interner.template_literal(instantiated)
             }
 
-            // Infer: keep as-is (these are only resolved in conditional type checking)
+            // Infer: keep as-is unless explicitly substituting inference variables
             TypeKey::Infer(info) => {
+                if self.substitute_infer && !self.is_shadowed(info.name) {
+                    if let Some(substituted) = self.substitution.get(info.name) {
+                        return substituted;
+                    }
+                }
                 self.interner.intern(TypeKey::Infer(info.clone()))
             }
         }
@@ -442,6 +483,20 @@ pub fn instantiate_type(
         return type_id;
     }
     let mut instantiator = TypeInstantiator::new(interner, substitution);
+    instantiator.instantiate(type_id)
+}
+
+/// Convenience function for instantiating a type while substituting infer variables.
+pub fn instantiate_type_with_infer(
+    interner: &dyn TypeDatabase,
+    type_id: TypeId,
+    substitution: &TypeSubstitution,
+) -> TypeId {
+    if substitution.is_empty() {
+        return type_id;
+    }
+    let mut instantiator = TypeInstantiator::new(interner, substitution);
+    instantiator.substitute_infer = true;
     instantiator.instantiate(type_id)
 }
 

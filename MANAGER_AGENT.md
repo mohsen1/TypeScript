@@ -71,13 +71,39 @@ Useful commands:
 - Branch naming: `worker/<name>` (e.g., `worker/worker-1` for `worker-1`).
 - Manager merges worker branches into `rust` and pushes `origin/rust`.
 
+### Sync/Merge Protocol (CRITICAL)
+
+**Manager merge duties (do this frequently, at least every management loop):**
+```bash
+# In main TypeScript repo (rust branch):
+git fetch origin
+# For each worker with "Ready for merge" in their plan:
+git merge origin/worker/worker-1 --no-edit  # (repeat for each ready worker)
+git push origin rust
+```
+
+**After merging, clear the "Ready for merge" flag from worker plans.**
+
+Workers are instructed to:
+1. Sync from `origin/rust` before starting each task
+2. Push to their worker branch and mark "Ready for merge" when done
+
+This keeps `rust` up-to-date and prevents giant conflicts from accumulating.
+
 ## Management loop
 
 This is what do we mean by "managing"
 
-0. Pull origin/rust into TypeScript (the main repo) to have the latest changes.
-   - Merge worker branches into `rust` only after they are green and scoped.
-   - Push `origin/rust` after merges.
+0. **Sync rust branch first** (do this EVERY loop):
+   ```bash
+   cd /path/to/TypeScript  # main repo
+   git fetch origin
+   # Check each worker plan for "Ready for merge"
+   # For each ready worker, merge their branch:
+   git merge origin/worker/worker-1 --no-edit  # etc.
+   git push origin rust
+   # Clear "Ready for merge" from merged worker plans
+   ```
 1. Check all worker panes before anything else; if any are waiting or stalled, respond and unblock.
 2. Keep five workers active; never allow an idle worker. If a worker is complete or blocked, immediately reassign it to the next highest-impact task.
 3. Quick risk scan:
@@ -114,8 +140,10 @@ Manager actions:
 - To stop a worker, add `Status: Complete` to its plan file.
 - If a worker is complete, immediately assign the next highest-impact task in that same plan.
 - Always respond to stalled worker panes before doing other work.
- - Ensure workers are on their own branches and push to `origin/worker/<name>`.
- - Merge worker branches into `rust` and push `origin/rust`.
+- Ensure workers are on their own branches and push to `origin/worker/<name>`.
+- **Merge frequently**: Check worker plans for "Ready for merge" and merge those branches into `rust` immediately.
+- After merging a worker branch, push `origin/rust` and clear the "Ready for merge" flag from that worker's plan.
+- Remind workers to sync from `origin/rust` if they haven't done so recently.
 
 
 ## Communication via tmux
@@ -150,3 +178,5 @@ If sessions need to be recreated:
 - Regressions in emitter output or solver behavior.
 - Merge churn or recurring conflicts across workers.
 - Actual duplicated work on the same task or same hot file (redirect only then).
+- Worker hasn't synced from `origin/rust` in multiple tasks (remind them to sync).
+- Worker branches are diverging too far from `rust` (merge them promptly).

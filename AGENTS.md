@@ -24,8 +24,28 @@ You must track todo items and progress in your worker plan file. The manager ass
 Each worker uses its own branch. Naming: `worker/<name>` (example: `worker/worker-1`).
 - Create once: `git switch -c worker/<name>`
 - Push: `git push -u origin worker/<name>`
-- Sync: `git fetch origin && git merge origin/rust`
 
+### Sync Protocol (CRITICAL - do this before AND after each task)
+
+**Before starting a task:**
+```bash
+git fetch origin
+git merge origin/rust --no-edit
+# Resolve any conflicts, then:
+git push origin worker/<name>
+```
+
+**After completing a task:**
+```bash
+git add -A && git commit -m "[wasm] <component>: <description>"
+git push origin worker/<name>
+# Then notify manager that branch is ready for merge into rust
+```
+
+This ensures:
+1. You start with the latest code (fewer conflicts)
+2. Your work gets merged into `rust` promptly
+3. Other workers see your changes sooner
 
 ## Must Read
 
@@ -34,11 +54,13 @@ Each worker uses its own branch. Naming: `worker/<name>` (example: `worker/worke
 
 ## Workflow (loop)
 
-1. Read your worker *_plan.md and manager assignment.
-2. Execute the highest-impact assigned task (no self-switching).
-3. Add tests and run `./wasm/test.sh` (Docker only).
-4. Update your plan, commit, and push to your worker branch.
-5. Repeat.
+1. **Sync first**: `git fetch origin && git merge origin/rust --no-edit` (resolve conflicts if any)
+2. Read your worker *_plan.md and manager assignment.
+3. Execute the highest-impact assigned task (no self-switching).
+4. Add tests and run `./wasm/test.sh` (Docker only).
+5. Update your plan, commit, and push to your worker branch.
+6. **Signal manager**: After pushing, note in your plan that branch is ready for merge.
+7. Repeat from step 1 (sync again before next task).
 
 
 ## ✅ Commit Format
@@ -55,7 +77,8 @@ Commit frequently and atomically
 3. **Separate test files**: `foo.rs` and `foo_tests.rs` or `tests/foo.rs`.
 4. **Update your plan** after each task; keep it accurate.
 5. **Commit and push** to your worker branch frequently; do not push to `origin/rust`.
-6. **Sync** by merging `origin/rust` into your worker branch when idle.
+6. **Sync before EVERY task**: `git fetch origin && git merge origin/rust --no-edit` - this is mandatory, not optional.
+7. **Signal readiness**: After pushing, add `Ready for merge` to your plan so manager knows to merge.
 
 ## 🎯 If Blocked
 
