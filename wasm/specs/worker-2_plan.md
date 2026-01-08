@@ -46,6 +46,7 @@ Priority: 2
 - [x] Added tuple infer test with non-tuple union branch. Tests: `./wasm/test.sh test_conditional_infer_tuple_element_non_tuple_union_branch`.
 - [x] Added non-distributive tuple infer test over union input (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_tuple_element_non_distributive_union_input`.
 - [x] Added non-distributive readonly array infer test over union input (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_readonly_array_element_non_distributive_union_input`.
+- [x] Added non-distributive readonly tuple infer test over union input (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_readonly_tuple_element_non_distributive_union_input`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
