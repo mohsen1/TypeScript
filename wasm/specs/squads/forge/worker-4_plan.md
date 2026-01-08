@@ -7,7 +7,7 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [x] Add solver edge case tests (intersections, unions, generics, conditionals, functions, index access, literals). **Done:** Added 32 tests.
+- [x] Add solver tests for type operations (applications, tuples, arrays, objects, keyof, infer, instantiation, primitives). **Done:** Added 38 tests.
 
 ## Task Queue
 (empty - awaiting next assignment)
@@ -103,6 +103,7 @@ Priority: 4
 - [x] Added solver coverage for default type params, index access, keyof union/intersection, homomorphic mapped, conditional edge cases. Tests: `./wasm/test.sh`.
 - [x] Added solver coverage for mapped type edge cases (homomorphic modifiers, key remapping with template literals, intrinsics, conditionals). Tests: `./wasm/test.sh`.
 - [x] Added solver edge case tests (intersections with never/unknown/any, union normalization, generic constraints, nested conditionals, function subtyping, index access, literal types). Tests: `./wasm/test.sh`.
+- [x] Added solver tests for type operations (type applications, tuples with labels/optional/rest, arrays, objects with index signatures, keyof primitives, infer types, type instantiation, primitives). Tests: `./wasm/test.sh`.
 
 ## Ready for Merge
 Yes
