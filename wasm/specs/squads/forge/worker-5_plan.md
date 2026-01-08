@@ -15,6 +15,7 @@ Priority: 5
 - [ ] [EM: Add queued tasks]
 
 ## Completed
+- [x] Added non-distributive union branch regression for conditional object call signatures; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
 - [x] Added non-distributive union branch regression for function return conditional inference; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
 - [x] Added non-distributive union branch regression test for array-element conditional inference; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Updated conditional infer array element tests to expect `string` for non-array union branches; ran `./wasm/test.sh test_conditional_infer_array_element_non_array_union_branch` and `./wasm/test.sh test_conditional_instantiated_param_distributes_branch_substitution`.
