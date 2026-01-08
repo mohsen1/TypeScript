@@ -4891,3 +4891,107 @@ fn test_transform_directive_composability() {
     assert!(ctx.has_transform(NodeIndex(1)));
     assert!(!ctx.has_transform(NodeIndex(2)));
 }
+
+#[test]
+fn test_two_phase_emission_es5_async_function_triple_nested_arrow_this_capture() {
+    // Test 3 levels of deeply nested arrows with this capture in async function
+    let source = "async function foo() { const bar = () => () => () => this.x; await bar()()(); }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("_this.x"),
+        "ES5 async output should capture this inside triple-nested arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 async output should downlevel all nested arrows: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_async_method_triple_nested_arrow_super_this_capture() {
+    // Test 3 levels of deeply nested arrows with super and this capture in async class method
+    let source = r#"
+class Derived extends Base {
+    async foo() {
+        const bar = () => () => () => super.method() + this.x;
+        await bar()()();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("_this.x"),
+        "ES5 async class method should capture this inside triple-nested arrow: {}",
+        output
+    );
+    assert!(
+        output.contains("_super.prototype.method.call"),
+        "ES5 async class method should lower super.method() inside triple-nested arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 async class method should downlevel all nested arrows: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_async_function_triple_nested_arrow_this_arguments_capture() {
+    // Test 3 levels of deeply nested arrows with both this and arguments capture
+    let source = "async function foo(a) { const bar = () => () => () => this.x + arguments[0]; await bar()()(); }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("_this.x"),
+        "ES5 async output should capture this inside triple-nested arrow: {}",
+        output
+    );
+    assert!(
+        output.contains("arguments"),
+        "ES5 async output should preserve arguments usage in triple-nested arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 async output should downlevel all nested arrows: {}",
+        output
+    );
+}

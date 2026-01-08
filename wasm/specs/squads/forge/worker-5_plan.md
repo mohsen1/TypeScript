@@ -43,6 +43,7 @@ No
 - Project Direction: integration and conformance-first; prioritize solver correctness (inference/conditional/subtype) before new features.
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
+- Conformance focus: tie regressions to official TypeScript conformance cases when possible.
 - Commit format: `[wasm] solver: <description>` or `[wasm] checker: <description>`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/forge-5`
