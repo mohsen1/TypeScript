@@ -29,6 +29,7 @@ Priority: 3
 - [x] Updated async ES5 emitter call sites to use `set_lexical_this`; `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 - [x] Extended CommonJS module name sanitization coverage for hyphen/dot paths; `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 - [x] Added CommonJS export-name test for shorthand `export { foo }`; `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
+- [x] Added CommonJS module name sanitization coverage for scoped paths with hyphens/dots; `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 
 ## Ready for Merge
 No
