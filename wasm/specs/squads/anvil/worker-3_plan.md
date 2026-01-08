@@ -82,6 +82,7 @@ Priority: 3
 - [x] Added block scoping ES5 source map tests (let/const, nested blocks, for loop, function scope); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 - [x] Added enum ES5 source map tests (string enum, exported enum, computed members, mixed values); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 - [x] Added CommonJS module source map tests (import, export, default export, re-export); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
+- [x] Added declaration emitter source map tests (type alias, function, class, enum, multiple declarations); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 
 ## Ready for Merge
 Yes
