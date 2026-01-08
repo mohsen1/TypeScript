@@ -697,10 +697,9 @@ class Derived extends Base {
         "ES5 output should emit __awaiter for async method: {}",
         output
     );
-    // TODO: async ES5 emission should lower computed super element access.
     assert!(
-        output.contains("void 0[\"m\"](arguments[0])"),
-        "ES5 output currently leaves computed super element access unlowered: {}",
+        output.contains("_super.prototype[\"m\"].call(this, arguments[0])"),
+        "ES5 output should lower computed super element access: {}",
         output
     );
     assert!(
@@ -738,10 +737,9 @@ class Derived extends Base {
         "ES5 output should emit __awaiter for async method: {}",
         output
     );
-    // TODO: async ES5 emission should lower computed super element access.
     assert!(
-        output.contains("void 0[\"m\"]"),
-        "ES5 output currently leaves computed super element access unlowered: {}",
+        output.contains("_super.prototype[\"m\"].call(this, this.x + arguments[0])"),
+        "ES5 output should lower computed super element access: {}",
         output
     );
     assert!(

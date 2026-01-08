@@ -10,9 +10,11 @@ Priority: 2
 - [EM: Assign next task]
 
 ## Task Queue
+- [ ] Add regression coverage for computed `super[...]` inside async arrow returns with `this`/`arguments` capture.
 - [ ] Expand integration coverage if ordering regression is found.
 
 ## Completed
+- [x] Lowered computed `super[...]` calls in async ES5 emitter + updated integration expectations; `./wasm/test.sh` failed at `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports` (unrelated).
 - [x] Added integration coverage for computed `super[...]` in class field arrow initializers; `./wasm/test.sh` failed at `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports` (unrelated).
 - [x] Confirmed `super()` ordering remains stable with computed field initializers via regression; `./wasm/test.sh` failed at `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports` (unrelated).
 
