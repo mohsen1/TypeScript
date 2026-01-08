@@ -577,3 +577,64 @@ fn test_parity_es5_arrow_rest_parameters() {
         output
     );
 }
+
+/// Parity test for ES5 default export class in CommonJS.
+/// Default exported class should be downleveled and exported via exports.default.
+#[test]
+fn test_parity_es5_default_export_class() {
+    let source = "export default class Foo { constructor(x) { this.x = x; } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::CommonJS;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 default export class in CommonJS
+    assert!(
+        output.contains("exports.default"),
+        "CommonJS output should export via exports.default: {}",
+        output
+    );
+    assert!(
+        output.contains("__esModule"),
+        "CommonJS output should include __esModule marker: {}",
+        output
+    );
+    // Class should be downleveled to function
+    assert!(
+        output.contains("function Foo") || output.contains("var Foo = /** @class */"),
+        "ES5 output should downlevel class to function: {}",
+        output
+    );
+    // Constructor body preserved
+    assert!(
+        output.contains("this.x = x"),
+        "ES5 output should preserve constructor body: {}",
+        output
+    );
+    // No ES6 class syntax
+    assert!(
+        !output.contains("class Foo"),
+        "ES5 output should not contain class syntax: {}",
+        output
+    );
+    // No export default syntax
+    assert!(
+        !output.contains("export default"),
+        "ES5 output should not contain export default syntax: {}",
+        output
+    );
+}
