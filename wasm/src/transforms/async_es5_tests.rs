@@ -41,6 +41,28 @@ fn test_simple_async_with_return() {
 }
 
 #[test]
+fn test_simple_async_multiple_statements() {
+    let output = parse_and_emit_async("async function foo() { foo(); bar(); }");
+    let foo_pos = output.find("foo()").expect("Expected foo() statement");
+    let bar_pos = output.find("bar()").expect("Expected bar() statement");
+    let ret_pos = output
+        .rfind("return [2 /*return*/];")
+        .expect("Expected final return instruction");
+
+    assert!(foo_pos < bar_pos, "Expected foo() before bar(): {}", output);
+    assert!(
+        bar_pos < ret_pos,
+        "Expected return after statements: {}",
+        output
+    );
+    assert!(
+        !output.contains("switch (_a.label)"),
+        "No await should skip switch emission: {}",
+        output
+    );
+}
+
+#[test]
 fn test_async_with_await() {
     let output = parse_and_emit_async("async function foo() { await bar(); }");
     assert!(output.contains("switch (_a.label)"), "Should have switch statement");
