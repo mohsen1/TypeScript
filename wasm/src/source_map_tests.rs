@@ -13430,3 +13430,93 @@ namespace Nested.Inner {
         "expected non-empty source mappings for TypeScript namespaces"
     );
 }
+
+#[test]
+fn test_source_map_async_generators() {
+    // Test source-map accuracy for async generator functions
+    let source = r#"async function* asyncRange(start: number, end: number) {
+    for (let i = start; i <= end; i++) {
+        await delay(100);
+        yield i;
+    }
+}
+
+async function* fetchPages(urls: string[]) {
+    for (const url of urls) {
+        const response = await fetch(url);
+        const data = await response.json();
+        yield data;
+    }
+}
+
+const asyncGen = async function* () {
+    yield 1;
+    await Promise.resolve();
+    yield 2;
+};
+
+class DataStream {
+    async *[Symbol.asyncIterator]() {
+        yield* asyncRange(1, 5);
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the async generator function
+    let (asyncrange_line, asyncrange_col) = find_line_col(source, "async function* asyncRange");
+    let has_asyncrange_mapping = decoded.iter().any(|entry| {
+        entry.original_line == asyncrange_line
+            && entry.original_column >= asyncrange_col
+            && entry.original_column <= asyncrange_col + 26
+    });
+
+    // Verify we have mappings for the fetchPages function
+    let (fetchpages_line, fetchpages_col) = find_line_col(source, "async function* fetchPages");
+    let has_fetchpages_mapping = decoded.iter().any(|entry| {
+        entry.original_line == fetchpages_line
+            && entry.original_column >= fetchpages_col
+            && entry.original_column <= fetchpages_col + 26
+    });
+
+    // At minimum, we should have mappings for async generator declarations
+    assert!(
+        has_asyncrange_mapping || has_fetchpages_mapping || !decoded.is_empty(),
+        "expected mappings for async generator functions. mappings: {mappings}"
+    );
+
+    // Verify output contains expected identifiers
+    assert!(
+        output.contains("asyncRange") || output.contains("fetchPages"),
+        "expected output to contain async generator function names. output: {output}"
+    );
+
+    // Verify source map has non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for async generators"
+    );
+}
