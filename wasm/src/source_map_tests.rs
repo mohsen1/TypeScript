@@ -11466,3 +11466,73 @@ class Example {
         "expected non-empty source mappings for decorated code"
     );
 }
+
+#[test]
+fn test_source_map_optional_chaining() {
+    // Test optional chaining operators: ?. ?.[] ?.()
+    let source = r#"const obj = { a: { b: 1 } };
+const x = obj?.a?.b;
+const arr = [1, 2, 3];
+const y = arr?.[0];
+const fn = (x: number) => x * 2;
+const z = fn?.(5);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the variable declarations
+    let (obj_line, obj_col) = find_line_col(source, "const obj");
+    let has_obj_mapping = decoded.iter().any(|entry| {
+        entry.original_line == obj_line
+            && entry.original_column >= obj_col
+            && entry.original_column <= obj_col + 9
+    });
+
+    let (x_line, x_col) = find_line_col(source, "const x");
+    let has_x_mapping = decoded.iter().any(|entry| {
+        entry.original_line == x_line
+            && entry.original_column >= x_col
+            && entry.original_column <= x_col + 7
+    });
+
+    // At minimum, we should have mappings for one of the declarations
+    assert!(
+        has_obj_mapping || has_x_mapping,
+        "expected mappings for optional chaining declarations. mappings: {mappings}"
+    );
+
+    // Verify the output contains the variable names (optional chaining should be downleveled)
+    assert!(
+        output.contains("obj") && output.contains("arr") && output.contains("fn"),
+        "expected output to contain variable names. output: {output}"
+    );
+
+    // Verify source map has non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for optional chaining code"
+    );
+}

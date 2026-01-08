@@ -7,12 +7,13 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- Complete: Added source map with decorators test in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
+- Complete: Added source map for optional chaining test in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added source map for optional chaining test in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
 - [x] Added source map with decorators test in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
 - [x] Added sourcesContent field accuracy test in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
 - [x] Added source-map names array test in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
