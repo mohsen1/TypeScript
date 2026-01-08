@@ -1534,3 +1534,51 @@ class Dog extends Animal {
         output
     );
 }
+
+#[test]
+fn test_class_es5_nullish_coalescing() {
+    let source = r#"
+class Config {
+    getValue(input: string | null | undefined) {
+        return input ?? "default";
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Should NOT contain ?? operator (ES5 doesn't support it)
+    assert!(
+        !output.contains("??"),
+        "Expected nullish coalescing to be transformed, not raw ?? syntax: {}",
+        output
+    );
+
+    // Should preserve the default value
+    assert!(
+        output.contains("default"),
+        "Expected default value to be preserved: {}",
+        output
+    );
+
+    // Method should be on prototype
+    assert!(
+        output.contains(".prototype.getValue") || output.contains("prototype[\"getValue\"]"),
+        "Expected getValue method on prototype: {}",
+        output
+    );
+}

@@ -5444,3 +5444,129 @@ export class Rectangle {
     let js = std::fs::read_to_string(base.join("dist/src/accessors.js")).expect("read js");
     assert!(!js.is_empty(), "JS output should not be empty");
 }
+
+#[test]
+fn compile_computed_property_names() {
+    // Test computed property names compilation
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/computed.ts"),
+        r#"
+const KEY = "dynamicKey";
+
+export const obj = {
+    [KEY]: "value",
+    ["literal" + "Key"]: 42
+};
+
+export function getProp(key: string): { [k: string]: number } {
+    return { [key]: 100 };
+}
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+
+    let js = std::fs::read_to_string(base.join("dist/src/computed.js")).expect("read js");
+    assert!(!js.is_empty(), "JS output should not be empty");
+}
+
+#[test]
+fn compile_for_of_loop() {
+    // Test for...of loop compilation
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/forof.ts"),
+        r#"
+export function sumArray(arr: number[]): number {
+    let sum = 0;
+    for (const num of arr) {
+        sum += num;
+    }
+    return sum;
+}
+
+export function joinStrings(arr: string[]): string {
+    let result = "";
+    for (const str of arr) {
+        result += str;
+    }
+    return result;
+}
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+
+    let js = std::fs::read_to_string(base.join("dist/src/forof.js")).expect("read js");
+    assert!(!js.is_empty(), "JS output should not be empty");
+}
+
+#[test]
+fn compile_shorthand_methods() {
+    // Test shorthand method syntax compilation
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/methods.ts"),
+        r#"
+export const calculator = {
+    add(a: number, b: number): number {
+        return a + b;
+    },
+    subtract(a: number, b: number): number {
+        return a - b;
+    }
+};
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+
+    let js = std::fs::read_to_string(base.join("dist/src/methods.js")).expect("read js");
+    assert!(!js.is_empty(), "JS output should not be empty");
+}
