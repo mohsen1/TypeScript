@@ -84,4 +84,3 @@ Priority: 4
 - Use Docker for Rust tests (`./wasm/test.sh`), never `cargo test` directly.
 - Update this plan after each task and keep it accurate.
 - `cli/driver.rs` E0515 blocker resolved; async nested super tests re-run.
-- Ready for merge.
