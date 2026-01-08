@@ -1163,6 +1163,127 @@ fn test_conditional_infer_object_property_readonly_non_distributive_union_branch
 }
 
 #[test]
+fn test_conditional_infer_object_property_readonly_wrapper_non_distributive_union_input() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends Readonly<{ a: infer R }> ? R : never,
+    // with T = Readonly<{ a: string }> | { a: number } (no distribution).
+    let extends_inner = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: infer_r,
+        write_type: infer_r,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let extends_obj = interner.intern(TypeKey::ReadonlyType(extends_inner));
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_obj,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let obj_string_inner = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_string = interner.intern(TypeKey::ReadonlyType(obj_string_inner));
+    let obj_number = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    subst.insert(t_name, interner.union(vec![obj_string, obj_number]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_conditional_infer_object_property_readonly_wrapper_non_distributive_union_branch() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends Readonly<{ a: infer R }> ? R : never,
+    // with T = Readonly<{ a: string }> | number (no distribution).
+    let extends_inner = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: infer_r,
+        write_type: infer_r,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let extends_obj = interner.intern(TypeKey::ReadonlyType(extends_inner));
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_obj,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let obj_string_inner = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_string = interner.intern(TypeKey::ReadonlyType(obj_string_inner));
+    subst.insert(t_name, interner.union(vec![obj_string, TypeId::NUMBER]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
 fn test_conditional_infer_object_property_function_return_distributive() {
     let interner = TypeInterner::new();
 

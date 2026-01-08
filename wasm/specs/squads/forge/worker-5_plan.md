@@ -15,6 +15,7 @@ Priority: 5
 - [ ] [EM: Add queued tasks]
 
 ## Completed
+- [x] Added non-distributive readonly wrapper object-property inference tests; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
 - [x] Added non-distributive readonly object-property inference tests (union input/branch); ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
 - [x] Added non-distributive readonly nested union-branch inference test; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
 - [x] Added non-distributive readonly nested object inference test; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
