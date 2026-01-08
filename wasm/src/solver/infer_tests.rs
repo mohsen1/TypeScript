@@ -4115,6 +4115,76 @@ fn test_resolve_bounds_function_this_parameter_any_upper_bound() {
 }
 
 #[test]
+fn test_resolve_bounds_function_this_parameter_contravariant() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+
+    let lower_this = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let lower = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: Vec::new(),
+        this_type: Some(lower_this),
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let upper = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: Vec::new(),
+        this_type: Some(TypeId::STRING),
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    ctx.add_lower_bound(var, lower);
+    ctx.add_upper_bound(var, upper);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower);
+}
+
+#[test]
+fn test_resolve_bounds_callable_this_parameter_contravariant() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+
+    let lower_this = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let lower = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+            type_params: Vec::new(),
+            params: Vec::new(),
+            this_type: Some(lower_this),
+            return_type: TypeId::VOID,
+            type_predicate: None,
+        }],
+        construct_signatures: Vec::new(),
+        properties: Vec::new(),
+    });
+    let upper = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+            type_params: Vec::new(),
+            params: Vec::new(),
+            this_type: Some(TypeId::STRING),
+            return_type: TypeId::VOID,
+            type_predicate: None,
+        }],
+        construct_signatures: Vec::new(),
+        properties: Vec::new(),
+    });
+
+    ctx.add_lower_bound(var, lower);
+    ctx.add_upper_bound(var, upper);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower);
+}
+
+#[test]
 fn test_resolve_bounds_optional_property_compatible() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);
