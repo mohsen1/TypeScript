@@ -530,6 +530,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             (TypeKey::Function(s_fn_id), TypeKey::Function(t_fn_id)) => {
                 let s_fn = self.interner.function_shape(*s_fn_id);
                 let t_fn = self.interner.function_shape(*t_fn_id);
+                eprintln!("[DEBUG fn_compare] Comparing functions: source_shape={:?}, target_shape={:?}", s_fn_id, t_fn_id);
+                eprintln!("[DEBUG fn_compare] Source params: {:?}", s_fn.params.iter().map(|p| p.type_id).collect::<Vec<_>>());
+                eprintln!("[DEBUG fn_compare] Target params: {:?}", t_fn.params.iter().map(|p| p.type_id).collect::<Vec<_>>());
+                eprintln!("[DEBUG fn_compare] Source ret: {:?} ({:?})", s_fn.return_type, self.interner.lookup(s_fn.return_type));
+                eprintln!("[DEBUG fn_compare] Target ret: {:?} ({:?})", t_fn.return_type, self.interner.lookup(t_fn.return_type));
                 self.check_function_subtype(&s_fn, &t_fn)
             }
 
@@ -1173,10 +1178,15 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                     let source_type = self.optional_property_type(sp);
                     let target_type = self.optional_property_type(t_prop);
                     let allow_bivariant = sp.is_method || t_prop.is_method;
-                    if !self
-                        .check_subtype_with_method_variance(source_type, target_type, allow_bivariant)
-                        .is_true()
+                    let result = self
+                        .check_subtype_with_method_variance(source_type, target_type, allow_bivariant);
+                    if !result.is_true()
                     {
+                        let prop_name = self.interner.resolve_atom(t_prop.name);
+                        let src_key = self.interner.lookup(source_type);
+                        let tgt_key = self.interner.lookup(target_type);
+                        eprintln!("[DEBUG subtype] FAILED property '{}': source={:?} ({:?}), target={:?} ({:?})",
+                            prop_name, source_type, src_key, target_type, tgt_key);
                         return SubtypeResult::False;
                     }
                     if !t_prop.readonly
@@ -1470,6 +1480,12 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             if contains_this {
                 return self.check_subtype(source_type, target_type).is_true();
             }
+            if !is_contravariant {
+                let src_key = self.interner.lookup(source_type);
+                let tgt_key = self.interner.lookup(target_type);
+                eprintln!("[DEBUG param_compat] FAIL strict: source={:?} ({:?}), target={:?} ({:?})",
+                    source_type, src_key, target_type, tgt_key);
+            }
             is_contravariant
         } else {
             // Bivariant: either direction works (Unsound, Legacy TS behavior)
@@ -1477,7 +1493,20 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 return true;
             }
             // Covariant check: Source <: Target
-            self.check_subtype(source_type, target_type).is_true()
+            let is_covariant = self.check_subtype(source_type, target_type).is_true();
+            if !is_covariant {
+                let src_key = self.interner.lookup(source_type);
+                let tgt_key = self.interner.lookup(target_type);
+                eprintln!("[DEBUG param_compat] FAIL bivariant: source={:?} ({:?}), target={:?} ({:?})",
+                    source_type, src_key, target_type, tgt_key);
+                // Dump more info about Application type
+                if let Some(crate::solver::TypeKey::Application(app_id)) = tgt_key {
+                    let app = self.interner.type_application(app_id);
+                    eprintln!("[DEBUG param_compat] Application base: {:?} ({:?}), args: {:?}",
+                        app.base, self.interner.lookup(app.base), app.args);
+                }
+            }
+            is_covariant
         }
     }
 
@@ -1744,6 +1773,10 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
         // Return type is covariant
         if !self.check_return_compat(source.return_type, target.return_type).is_true() {
+            let src_ret_key = self.interner.lookup(source.return_type);
+            let tgt_ret_key = self.interner.lookup(target.return_type);
+            eprintln!("[DEBUG fn_subtype] Return type mismatch: source={:?} ({:?}), target={:?} ({:?})",
+                source.return_type, src_ret_key, target.return_type, tgt_ret_key);
             return SubtypeResult::False;
         }
 

@@ -12,9 +12,12 @@ Priority: 1
   - app.ts:375 (x2) - Action type inference with nested mapped/conditional types
   - Root cause investigation complete:
     1. Conditional types with type params ARE being deferred correctly (lines 386-392 in evaluate.rs)
-    2. The issue is in TYPE EQUIVALENCE checking: when comparing `R extends Reducer<infer S, AnyAction> ? S : never` (inline) vs `StateFromReducer<R>` (Ref to alias with same body), they should be equivalent but aren't
-    3. `types_equivalent` in subtype.rs uses bidirectional subtyping, but Ref types may not resolve to their alias bodies before comparison
-  - Potential fix: In subtype checker, when comparing Conditional vs Ref, resolve the Ref first and then compare
+    2. Application types ARE being expanded correctly (debug confirmed TypeId(177) -> TypeId(236))
+    3. The issue is in comparing function signatures where return types are deferred conditionals
+    4. Source: `getState: () => R extends Reducer<infer S, AnyAction> ? S : never`
+    5. Target after Store expansion: `getState: () => StateFromReducer<R>` (which should evaluate to same conditional)
+    6. Both should be equivalent but the comparison is failing somewhere in the structural Object comparison
+  - Next steps: Add debug to Object subtype comparison to see which property is failing
 
 ## Task Queue
 - [ ] Add callable-parameter inference regressions (e.g., union inputs, overload shapes) in `wasm/src/solver/evaluate_tests.rs`.
