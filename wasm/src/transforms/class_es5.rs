@@ -670,6 +670,34 @@ impl<'a> ClassES5Emitter<'a> {
         }
     }
 
+    /// Emit a method name for prototype assignment: .name or [expr]
+    fn emit_method_name(&mut self, name_idx: NodeIndex) {
+        let Some(name_node) = self.arena.get(name_idx) else { return };
+
+        if name_node.kind == syntax_kind_ext::COMPUTED_PROPERTY_NAME {
+            if let Some(computed) = self.arena.get_computed_property(name_node) {
+                self.write("[");
+                self.emit_expression(computed.expression);
+                self.write("]");
+            }
+        } else if name_node.kind == SyntaxKind::Identifier as u16 {
+            self.write(".");
+            self.write_identifier_text(name_idx);
+        } else if name_node.kind == SyntaxKind::StringLiteral as u16 {
+            if let Some(lit) = self.arena.get_literal(name_node) {
+                self.write("[\"");
+                self.write(&lit.text);
+                self.write("\"]");
+            }
+        } else if name_node.kind == SyntaxKind::NumericLiteral as u16 {
+            if let Some(lit) = self.arena.get_literal(name_node) {
+                self.write("[");
+                self.write(&lit.text);
+                self.write("]");
+            }
+        }
+    }
+
     /// Emit private field initializations using WeakMap.set() pattern
     /// For each private field:
     /// 1. _ClassName_field.set(this, void 0); - allocate slot
@@ -1056,16 +1084,7 @@ impl<'a> ClassES5Emitter<'a> {
                 self.write_indent();
                 self.write(class_name);
                 self.write(".prototype");
-                let use_bracket = !self.is_valid_identifier_name(method_data.name);
-                if use_bracket {
-                    let method_name = self.get_computed_property_name(method_data.name);
-                    self.write("[");
-                    self.write(&method_name);
-                    self.write("]");
-                } else {
-                    self.write(".");
-                    self.write_identifier_text(method_data.name);
-                }
+                self.emit_method_name(method_data.name);
                 self.write(" = function (");
                 let param_transforms = self.emit_parameters(&method_data.parameters);
                 self.write(") ");

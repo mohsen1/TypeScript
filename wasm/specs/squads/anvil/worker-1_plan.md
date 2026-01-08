@@ -7,7 +7,7 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-- Complete: Added nested async arrow in constructor with field initializer test; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` - pre-existing Forge domain failure).
+- Complete: Added computed method name with async body test; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` - pre-existing Forge domain failure).
 
 ## Task Queue
 - [x] Inspect `wasm/src/emitter_edge_case_tests.rs` to capture the failing case and expected output.
@@ -41,6 +41,7 @@ Priority: 1
 - [x] Added async ES5 await detection coverage for try/finally bodies; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Added super property access in static block support; added `CLASS_STATIC_BLOCK_DECLARATION` handling in `emit_static_members`; added `SuperKeyword` handling in `emit_expression` to emit `_super`; added test for `super.value` in static block. Ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Added nested async arrow in constructor with field initializer test; added `body_contains_arrow_with_this` helper to detect arrows in constructor body that reference `this`; fixed `emit_instance_property_initializers` to use `_this` when needed. Ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
+- [x] Added computed method name with async body test; fixed `COMPUTED_PROPERTY_NAME` emission for method names by adding `emit_method_name` helper. Ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 
 ## Ready for Merge
 Yes

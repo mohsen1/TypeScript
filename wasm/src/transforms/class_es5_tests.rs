@@ -713,3 +713,61 @@ class Foo {
         output
     );
 }
+
+#[test]
+fn test_class_es5_computed_method_name_with_async_body() {
+    let source = r#"
+const methodName = "doWork";
+class Foo {
+    value = 42;
+    async [methodName]() {
+        await fetch();
+        return this.value;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Computed method should use bracket notation
+    assert!(
+        output.contains(".prototype[methodName]") || output.contains(".prototype[\"doWork\"]"),
+        "Expected computed method to use bracket notation: {}",
+        output
+    );
+
+    // Async body should use __awaiter
+    assert!(
+        output.contains("__awaiter"),
+        "Expected async method to use __awaiter: {}",
+        output
+    );
+
+    // Async body should use __generator
+    assert!(
+        output.contains("__generator"),
+        "Expected async method to use __generator: {}",
+        output
+    );
+
+    // this.value should be preserved or captured properly
+    assert!(
+        output.contains("this.value") || output.contains("_this.value"),
+        "Expected this.value reference: {}",
+        output
+    );
+}
