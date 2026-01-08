@@ -8,12 +8,13 @@ Priority: 1
 Blocked: Awaiting next EM-Anvil assignment.
 
 ## Current Assignment
-- [ ] Add ES5 class tests for static blocks in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
+- Complete: Added ES5 tests for static blocks (6 tests); ran `./wasm/test.sh class_es5_tests` (all 98 pass).
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 tests for static blocks (6 tests): basic static block, static block with static methods, static block with private access, multiple static blocks, static block with try/catch, static block with super property access. Ran `./wasm/test.sh class_es5_tests` (all 98 pass).
 - [x] Added ES5 tests for computed properties and Symbol-keyed members (6 tests): computed property method, computed property accessor, Symbol.toStringTag, Symbol.hasInstance, multiple computed properties, computed static property. Ran `./wasm/test.sh class_es5_tests` (all 93 pass).
 - [x] Added ES5 tests for private methods (6 tests): instance private method, static private method, private method calling private method, private async method, private generator method, private method with private field. Ran `./wasm/test.sh class_es5_tests` (all 90 pass).
 - [x] Added ES5 tests for accessor decorators (6 tests): getter with decorator, setter with decorator, getter/setter pair with decorators, static getter with decorator, accessor with multiple decorators, accessor in derived class. Ran `./wasm/test.sh class_es5_tests` (all 84 pass).
