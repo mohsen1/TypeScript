@@ -10773,3 +10773,237 @@ fn test_mapped_type_add_both_modifiers() {
         }
     }
 }
+
+#[test]
+fn test_mapped_type_record_string_literal_keys() {
+    let interner = TypeInterner::new();
+
+    // Test Record<K, V> pattern: { [P in K]: V }
+    // Record<"a" | "b", number> = { a: number, b: number }
+
+    let key_a = interner.literal_string("a");
+    let key_b = interner.literal_string("b");
+    let keys = interner.union(vec![key_a, key_b]);
+
+    // Record<K, V> = { [P in K]: V }
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("P"),
+            constraint: None,
+            default: None,
+        },
+        constraint: keys,
+        name_type: None,
+        template: TypeId::NUMBER, // V = number
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Result should be { a: number, b: number }
+    let expected = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_mapped_type_record_with_template_value() {
+    let interner = TypeInterner::new();
+
+    // Test Record<K, V> where V references the key type
+    // { [P in "x" | "y"]: P } = { x: "x", y: "y" }
+
+    let key_x = interner.literal_string("x");
+    let key_y = interner.literal_string("y");
+    let keys = interner.union(vec![key_x, key_y]);
+
+    // Template is the type parameter P itself
+    let p_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("P"),
+        constraint: None,
+        default: None,
+    }));
+
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("P"),
+            constraint: None,
+            default: None,
+        },
+        constraint: keys,
+        name_type: None,
+        template: p_type, // V = P (the key itself)
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Result should be { x: "x", y: "y" }
+    let key = interner.lookup(result);
+    assert!(key.is_some(), "Record with template value should produce valid type");
+
+    if let Some(TypeKey::Object(shape_id)) = key {
+        let shape = interner.object_shape(shape_id);
+        assert_eq!(shape.properties.len(), 2, "Should have 2 properties");
+    }
+}
+
+#[test]
+fn test_mapped_type_record_single_key() {
+    let interner = TypeInterner::new();
+
+    // Test Record with single key: Record<"id", string>
+    // Should produce { id: string }
+
+    let key_id = interner.literal_string("id");
+
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("P"),
+            constraint: None,
+            default: None,
+        },
+        constraint: key_id,
+        name_type: None,
+        template: TypeId::STRING,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    let expected = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("id"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_mapped_type_record_with_index_signature() {
+    let interner = TypeInterner::new();
+
+    // Test Record<string, number> pattern
+    // This should produce an object with string index signature: { [key: string]: number }
+
+    // When the key type is 'string' (not a literal), it creates an index signature
+    // For this test, we verify the mapped type handles the string intrinsic
+
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("P"),
+            constraint: None,
+            default: None,
+        },
+        constraint: TypeId::STRING, // K = string
+        name_type: None,
+        template: TypeId::NUMBER, // V = number
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // The result should be valid (either an object with index signature or handled appropriately)
+    assert!(result != TypeId::ERROR, "Record<string, number> should not produce error");
+}
+
+#[test]
+fn test_mapped_type_record_readonly() {
+    let interner = TypeInterner::new();
+
+    // Test Readonly Record: { readonly [P in K]: V }
+    // Readonly<Record<"a" | "b", number>> = { readonly a: number, readonly b: number }
+
+    let key_a = interner.literal_string("a");
+    let key_b = interner.literal_string("b");
+    let keys = interner.union(vec![key_a, key_b]);
+
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("P"),
+            constraint: None,
+            default: None,
+        },
+        constraint: keys,
+        name_type: None,
+        template: TypeId::NUMBER,
+        readonly_modifier: Some(MappedModifier::Add), // +readonly
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    let key = interner.lookup(result);
+    assert!(key.is_some(), "Readonly Record should produce valid type");
+
+    if let Some(TypeKey::Object(shape_id)) = key {
+        let shape = interner.object_shape(shape_id);
+        assert_eq!(shape.properties.len(), 2, "Should have 2 properties");
+        for prop in &shape.properties {
+            assert!(prop.readonly, "Properties should be readonly");
+            assert!(!prop.optional, "Properties should not be optional");
+        }
+    }
+}
+
+#[test]
+fn test_mapped_type_partial_record() {
+    let interner = TypeInterner::new();
+
+    // Test Partial Record: { [P in K]?: V }
+    // Partial<Record<"a" | "b", number>> = { a?: number, b?: number }
+
+    let key_a = interner.literal_string("a");
+    let key_b = interner.literal_string("b");
+    let keys = interner.union(vec![key_a, key_b]);
+
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("P"),
+            constraint: None,
+            default: None,
+        },
+        constraint: keys,
+        name_type: None,
+        template: TypeId::NUMBER,
+        readonly_modifier: None,
+        optional_modifier: Some(MappedModifier::Add), // +?
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    let key = interner.lookup(result);
+    assert!(key.is_some(), "Partial Record should produce valid type");
+
+    if let Some(TypeKey::Object(shape_id)) = key {
+        let shape = interner.object_shape(shape_id);
+        assert_eq!(shape.properties.len(), 2, "Should have 2 properties");
+        for prop in &shape.properties {
+            assert!(!prop.readonly, "Properties should not be readonly");
+            assert!(prop.optional, "Properties should be optional");
+        }
+    }
+}
