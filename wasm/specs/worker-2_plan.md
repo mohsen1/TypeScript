@@ -70,6 +70,7 @@ Priority: 2
 - [x] Added any-check infer preservation test. Tests: `./wasm/test.sh test_conditional_infer_any_check_type_distributive`.
 - [x] Added non-distributive function parameter infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_function_param_non_distributive_union_input`.
 - [x] Added non-distributive function this-parameter infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_function_this_param_non_distributive_union_input`.
+- [x] Added non-distributive function return infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_function_return_non_distributive_union_input`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.

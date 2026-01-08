@@ -2746,6 +2746,78 @@ fn test_conditional_infer_function_return_distributive() {
 }
 
 #[test]
+fn test_conditional_infer_function_return_non_distributive_union_input() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // [T] extends [() => infer R] ? R : never, with T = (() => string) | (() => number).
+    // TODO: Non-distributive function return inference is not implemented; current behavior yields never.
+    let extends_fn = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: None,
+        return_type: infer_r,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let cond = ConditionalType {
+        check_type: interner.tuple(vec![TupleElement {
+            type_id: t_param,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        extends_type: interner.tuple(vec![TupleElement {
+            type_id: extends_fn,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let string_fn = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let number_fn = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::NUMBER,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    subst.insert(t_name, interner.union(vec![string_fn, number_fn]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
 fn test_conditional_infer_object_property_non_distributive_union_all_match() {
     let interner = TypeInterner::new();
 
