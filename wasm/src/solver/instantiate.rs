@@ -359,6 +359,40 @@ impl<'a> TypeInstantiator<'a> {
             // Conditional: instantiate all parts
             TypeKey::Conditional(cond_id) => {
                 let cond = self.interner.conditional_type(*cond_id);
+                if cond.is_distributive {
+                    if let Some(TypeKey::TypeParameter(info)) =
+                        self.interner.lookup(cond.check_type)
+                    {
+                        if !self.is_shadowed(info.name) {
+                            if let Some(substituted) = self.substitution.get(info.name) {
+                                if let Some(TypeKey::Union(members)) =
+                                    self.interner.lookup(substituted)
+                                {
+                                    let members = self.interner.type_list(members);
+                                    let cond_type =
+                                        self.interner.conditional(cond.as_ref().clone());
+                                    let mut results = Vec::with_capacity(members.len());
+                                    for &member in members.iter() {
+                                        let mut member_subst = self.substitution.clone();
+                                        member_subst.insert(info.name, member);
+                                        let instantiated = instantiate_type(
+                                            self.interner,
+                                            cond_type,
+                                            &member_subst,
+                                        );
+                                        let evaluated =
+                                            crate::solver::evaluate::evaluate_type(
+                                                self.interner,
+                                                instantiated,
+                                            );
+                                        results.push(evaluated);
+                                    }
+                                    return self.interner.union(results);
+                                }
+                            }
+                        }
+                    }
+                }
                 let instantiated = ConditionalType {
                     check_type: self.instantiate(cond.check_type),
                     extends_type: self.instantiate(cond.extends_type),
