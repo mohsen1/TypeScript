@@ -2068,6 +2068,46 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     }
                     true
                 }
+                Some(TypeKey::Union(members)) => {
+                    let members = self.interner.type_list(members);
+                    let mut combined = FxHashMap::default();
+                    for &member in members.iter() {
+                        let Some(TypeKey::Tuple(source_elems)) = self.interner.lookup(member)
+                        else {
+                            return false;
+                        };
+                        let source_elems = self.interner.tuple_list(source_elems);
+                        let pattern_elems = self.interner.tuple_list(pattern_elems);
+                        if source_elems.len() != pattern_elems.len() {
+                            return false;
+                        }
+                        let mut member_bindings = FxHashMap::default();
+                        let mut local_visited = FxHashSet::default();
+                        for (source_elem, pattern_elem) in
+                            source_elems.iter().zip(pattern_elems.iter())
+                        {
+                            if !self.match_infer_pattern(
+                                source_elem.type_id,
+                                pattern_elem.type_id,
+                                &mut member_bindings,
+                                &mut local_visited,
+                                checker,
+                            ) {
+                                return false;
+                            }
+                        }
+                        for (name, ty) in member_bindings {
+                            combined
+                                .entry(name)
+                                .and_modify(|existing| {
+                                    *existing = self.interner.union2(*existing, ty);
+                                })
+                                .or_insert(ty);
+                        }
+                    }
+                    bindings.extend(combined);
+                    true
+                }
                 _ => false,
             },
             TypeKey::ReadonlyType(pattern_inner) => {

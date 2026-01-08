@@ -219,8 +219,9 @@ fn test_conditional_instantiated_param_distributes_branch_substitution() {
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
 
-    assert_eq!(result, TypeId::STRING);
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -4983,7 +4984,6 @@ fn test_conditional_infer_tuple_optional_element_non_distributive_union_input() 
     }));
 
     // T extends [infer R?] ? R : never, with T = [string] | [] (no distribution).
-    // TODO: Non-distributive tuple inference over union inputs yields never.
     let extends_tuple = interner.tuple(vec![TupleElement {
         type_id: infer_r,
         name: None,
@@ -5034,7 +5034,6 @@ fn test_conditional_infer_tuple_element_non_distributive_union_input() {
     }));
 
     // T extends [infer R] ? R : never, with T = [string] | [number] (no distribution).
-    // TODO: Non-distributive tuple inference over union inputs yields never.
     let extends_tuple = interner.tuple(vec![TupleElement {
         type_id: infer_r,
         name: None,
@@ -5071,8 +5070,9 @@ fn test_conditional_infer_tuple_element_non_distributive_union_input() {
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
 
-    assert_eq!(result, TypeId::NEVER);
+    assert_eq!(result, expected);
 }
 
 #[test]
