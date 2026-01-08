@@ -1762,3 +1762,46 @@ const Factory = class InnerClass {
         output
     );
 }
+
+#[test]
+fn test_class_es5_exponentiation_operator() {
+    // Tests that exponentiation operator in class methods is handled
+    // Note: Full ES5 transform would use Math.pow(), currently emits as-is
+    let source = r#"
+class MathUtils {
+    power(base: number, exp: number) {
+        return Math.pow(base, exp);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Should preserve Math.pow call
+    assert!(
+        output.contains("Math.pow"),
+        "Expected Math.pow to be preserved: {}",
+        output
+    );
+
+    // Method should be on prototype
+    assert!(
+        output.contains(".prototype.power") || output.contains("prototype[\"power\"]"),
+        "Expected power method on prototype: {}",
+        output
+    );
+}
