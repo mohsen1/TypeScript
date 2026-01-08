@@ -7,13 +7,13 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- Solver hardening: verify variance rules in `wasm/src/solver/subtype.rs`. Add targeted cases in `wasm/src/solver/subtype_tests.rs` for parameter contravariance and return-type covariance, then fix any inconsistencies.
+- Awaiting next manager assignment.
 
 ## Task Queue
-- [ ] If variance coverage is solid, add edge cases for optional/rest parameters and `this` parameters in assignability.
+- [ ] (none)
 
 ## Completed
-- [x] (Move finished items here with brief notes and tests run.)
+- [x] Solver inference: include function/callable `this` types in occurs-checks and add `test_inference_occurs_check_function_this_type`. Tests: `./wasm/test.sh test_inference_occurs_check_function_this_type`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.

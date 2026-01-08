@@ -345,7 +345,12 @@ impl<'a> InferenceContext<'a> {
                 if shape.type_params.iter().any(|tp| tp.name == target) {
                     return false;
                 }
-                shape.params.iter().any(|p| self.type_contains_param(p.type_id, target, visited))
+                shape.this_type.is_some_and(|this_type| {
+                    self.type_contains_param(this_type, target, visited)
+                }) || shape
+                    .params
+                    .iter()
+                    .any(|p| self.type_contains_param(p.type_id, target, visited))
                     || self.type_contains_param(shape.return_type, target, visited)
             }
             TypeKey::Callable(shape_id) => {
@@ -354,7 +359,12 @@ impl<'a> InferenceContext<'a> {
                     if sig.type_params.iter().any(|tp| tp.name == target) {
                         false
                     } else {
-                        sig.params.iter().any(|p| self.type_contains_param(p.type_id, target, visited))
+                        sig.this_type.is_some_and(|this_type| {
+                            self.type_contains_param(this_type, target, visited)
+                        }) || sig
+                            .params
+                            .iter()
+                            .any(|p| self.type_contains_param(p.type_id, target, visited))
                             || self.type_contains_param(sig.return_type, target, visited)
                     }
                 });
@@ -365,7 +375,12 @@ impl<'a> InferenceContext<'a> {
                     if sig.type_params.iter().any(|tp| tp.name == target) {
                         false
                     } else {
-                        sig.params.iter().any(|p| self.type_contains_param(p.type_id, target, visited))
+                        sig.this_type.is_some_and(|this_type| {
+                            self.type_contains_param(this_type, target, visited)
+                        }) || sig
+                            .params
+                            .iter()
+                            .any(|p| self.type_contains_param(p.type_id, target, visited))
                             || self.type_contains_param(sig.return_type, target, visited)
                     }
                 });
