@@ -11,6 +11,8 @@ fn test_sanitize_module_name() {
         sanitize_module_name("@scope/foo-bar/baz.qux"),
         "_scope_foo_bar_baz_qux"
     );
+    assert_eq!(sanitize_module_name("foo/bar"), "foo_bar");
+    assert_eq!(sanitize_module_name("foo-bar"), "foo_bar");
 }
 
 #[test]
