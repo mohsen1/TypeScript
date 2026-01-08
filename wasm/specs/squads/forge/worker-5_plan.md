@@ -24,6 +24,18 @@ Priority: 5
 - [x] Added 7 Application expansion edge case tests: with defaults, with constraints, with never/unknown/any args, with union args, and non-Ref base passthrough.
 - [x] Added 5 more Application expansion edge case tests: recursive type alias, intersection arg, multi-parameter (Map<K,V>), conditional type body, tuple arg.
 - [x] Updated all new edge case tests to use `insert_with_params` for proper Application expansion testing now that Worker 2/3's fix is merged.
+- [x] Added 11 conditional type edge case tests in `evaluate_tests.rs`:
+  - `test_conditional_unknown_check_type` - unknown extends string
+  - `test_conditional_unknown_extends_unknown` - unknown extends unknown
+  - `test_conditional_intersection_check_type` - intersection extends base type
+  - `test_conditional_never_check_type_non_distributive` - never extends T (non-distributive)
+  - `test_conditional_extends_never` - T extends never
+  - `test_conditional_never_extends_never` - never extends never
+  - `test_conditional_infer_tuple_multiple_positions` - [infer A, infer B] swap pattern
+  - `test_conditional_nested_in_true_branch` - nested conditionals
+  - `test_conditional_distributive_literal_union` - distributive over literal union
+  - `test_conditional_extends_any` - T extends any
+  - `test_conditional_infer_constraint_mismatch_edge` - infer with constraint mismatch
 
 ### Circular Reference Root Cause (for Worker 1)
 
