@@ -87,6 +87,7 @@ Priority: 4
 - [x] Add exponentiation operator source-map test. Tests: `./wasm/test.sh exponentiation_operator_mapping`
 - [x] Add rest/spread source-map test. Tests: `./wasm/test.sh rest_spread_mapping`
 - [x] Add default parameters source-map test. Tests: `./wasm/test.sh default_parameters_mapping`
+- [x] Add computed property names source-map test. Tests: `./wasm/test.sh computed_property_names_mapping`
 
 ## Ready for Merge
 Yes

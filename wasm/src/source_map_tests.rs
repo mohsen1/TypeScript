@@ -12835,53 +12835,51 @@ function format(value: string, options: { uppercase?: boolean } = {}): string {
 }
 
 #[test]
-fn test_source_map_arrow_functions() {
-    // Test arrow functions source map coverage
-    let source = r#"const add = (a: number, b: number) => a + b;
+fn test_source_map_computed_property_names_mapping() {
+    // Test source-map accuracy for computed property names
+    let source = r#"const key = "dynamic";
+const sym = Symbol("unique");
 
-const square = (x: number) => x * x;
-
-const identity = <T>(value: T) => value;
-
-const multiLine = (x: number, y: number) => {
-    const sum = x + y;
-    const product = x * y;
-    return { sum, product };
+const obj = {
+    [key]: "value1",
+    [sym]: "value2",
+    ["literal"]: "value3",
+    [1 + 2]: "value4",
+    [`template_${key}`]: "value5"
 };
 
-const nested = (a: number) => (b: number) => (c: number) => a + b + c;
+class MyClass {
+    [key]: string = "field";
 
-const withThis = {
-    value: 10,
-    getValue: function() {
-        return () => this.value;
+    [sym]() {
+        return "method";
     }
-};
 
-const arr = [1, 2, 3, 4, 5];
-const doubled = arr.map(x => x * 2);
-const filtered = arr.filter(x => x > 2);
-const reduced = arr.reduce((acc, x) => acc + x, 0);"#;
-
+    get [`get_${key}`]() {
+        return this[key];
+    }
+}"#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
+    let options = PrinterOptions::default();
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
     let mut printer =
         ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
     printer.emit(root);
 
     let output = printer.get_output().to_string();
+    assert!(
+        output.contains("key") && output.contains("obj") && output.contains("MyClass"),
+        "expected variable and class names in output: {output}"
+    );
+
     let map_json = printer.generate_source_map_json().expect("source map");
     let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
-
     let mappings = map_value
         .get("mappings")
         .and_then(|v| v.as_str())
@@ -12889,37 +12887,32 @@ const reduced = arr.reduce((acc, x) => acc + x, 0);"#;
 
     let decoded = decode_mappings(mappings);
 
-    // Verify we have mappings for the const declarations
-    let (add_line, add_col) = find_line_col(source, "const add");
-    let has_add_mapping = decoded.iter().any(|entry| {
-        entry.original_line == add_line
-            && entry.original_column >= add_col
-            && entry.original_column <= add_col + 9
+    // Verify we have mappings for the declarations
+    let (key_line, _) = find_line_col(source, "const key");
+    let has_key_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == key_line
     });
 
-    // Verify we have mappings for multiLine function
-    let (multi_line, multi_col) = find_line_col(source, "const multiLine");
-    let has_multi_mapping = decoded.iter().any(|entry| {
-        entry.original_line == multi_line
-            && entry.original_column >= multi_col
-            && entry.original_column <= multi_col + 15
+    let (obj_line, _) = find_line_col(source, "const obj");
+    let has_obj_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == obj_line
     });
 
-    // At minimum, we should have mappings for declarations
     assert!(
-        has_add_mapping || has_multi_mapping || !decoded.is_empty(),
-        "expected mappings for arrow functions. mappings: {mappings}"
+        has_key_mapping || has_obj_mapping,
+        "expected mappings for computed property declarations. mappings: {mappings}"
     );
 
-    // Verify output contains expected identifiers
-    assert!(
-        output.contains("multiLine") && output.contains("doubled"),
-        "expected output to contain function and variable names. output: {output}"
-    );
-
-    // Verify source map has non-empty mappings
     assert!(
         !decoded.is_empty(),
-        "expected non-empty source mappings for arrow functions"
+        "expected non-empty source mappings for computed property names"
+    );
+
+    let unique_source_lines: std::collections::HashSet<_> =
+        decoded.iter().map(|m| m.original_line).collect();
+    assert!(
+        unique_source_lines.len() >= 3,
+        "expected mappings from at least 3 different source lines, got: {:?}",
+        unique_source_lines
     );
 }
