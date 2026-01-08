@@ -84,6 +84,7 @@ Priority: 3
 - [x] Added CommonJS module source map tests (import, export, default export, re-export); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 - [x] Added declaration emitter source map tests (type alias, function, class, enum, multiple declarations); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 - [x] Added comprehensive helpers tests (16 new tests for remaining helpers: decorate, param, metadata, generator, values, read, spread_array, import_default, import_star, export_star, make_template_object, class_private_field_get/set/in, create_binding, plus all-helpers test); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
+- [x] Added JSX source map tests (element, fragment, expression, component); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 
 ## Ready for Merge
 Yes
