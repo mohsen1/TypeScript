@@ -2807,7 +2807,8 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             && matches!(rest_elem_type, Some(TypeId::ANY | TypeId::UNKNOWN));
         let source_required = self.required_param_count(&source.params);
         let target_required = self.required_param_count(&target.params);
-        if !rest_is_top && source_required > target_required {
+        let too_many_params = !rest_is_top && source_required > target_required;
+        if !target_has_rest && too_many_params {
             return Some(SubtypeFailureReason::TooManyParameters {
                 source_count: source_required,
                 target_count: target_required,
@@ -2888,6 +2889,13 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                     }
                 }
             }
+        }
+
+        if target_has_rest && too_many_params {
+            return Some(SubtypeFailureReason::TooManyParameters {
+                source_count: source_required,
+                target_count: target_required,
+            });
         }
 
         None
