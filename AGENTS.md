@@ -99,5 +99,13 @@ Commit frequently and atomically
 
 ## 🎯 If Blocked
 
-- Ask the EM for the next assignment and propose high-impact tasks.
-- Add tests, tighten architecture compliance, and polish performance or diagnostics.
+**You are almost never truly blocked. Do not ask permission. Act.**
+
+- Dirty worktree? `git stash` and continue.
+- No assignment in plan? Pick the first item from Task Queue.
+- Task Queue empty? Add a test for existing code.
+- Build error? Fix it.
+- Merge conflict? Resolve it.
+- Wrong branch? Switch to the right one.
+
+**Stop asking questions. Start writing code.**

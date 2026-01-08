@@ -25,10 +25,10 @@ DIRECTOR_POKE="${DIRECTOR_POKE:-Check if any intervention is needed. If EMs are 
 EM_IDLE_SECONDS="${EM_IDLE_SECONDS:-90}"
 EM_POKE="${EM_POKE:-Check worker panes. If any worker has been exploring for 10+ min without commits, tell them to stop and ship code now.}"
 WORKER_IDLE_SECONDS="${WORKER_IDLE_SECONDS:-180}"
-WORKER_POKE="${WORKER_POKE:-Stop exploring. Write code, commit, push. No more reading - ship it.}"
+WORKER_POKE="${WORKER_POKE:-STOP. Do not ask questions. Write code now. Commit. Push. If blocked, stash and continue.}"
 
 # Startup timing (codex boots in ~5s)
-WORKER_START_PROMPT="${WORKER_START_PROMPT:-Read AGENTS.md and your plan file. Write code and tests. Commit and push to your branch within 10 minutes. No lengthy exploration.}"
+WORKER_START_PROMPT="${WORKER_START_PROMPT:-You are worker \$WORKER_NUM in squad \$SQUAD_NAME. Read AGENTS.md then your plan at wasm/specs/squads/\$SQUAD_NAME/worker-\${WORKER_NUM}_plan.md. Do NOT ask questions. Stash dirty files, switch to branch worker/\$SQUAD_NAME-\$WORKER_NUM, write code, commit, push. Go.}"
 EM_START_PROMPT="${EM_START_PROMPT:-Read SQUAD_LEAD_AGENT.md. Check worker panes for idle workers. Ensure workers are committing code, not just exploring.}"
 DIRECTOR_START_PROMPT="${DIRECTOR_START_PROMPT:-Read DIRECTOR_AGENT.md. Be hands-off. Only intervene if EMs need help.}"
 START_PAUSE="${START_PAUSE:-10}"
