@@ -12410,3 +12410,78 @@ fn test_source_map_class_static_block_mapping() {
         unique_source_lines
     );
 }
+
+#[test]
+fn test_source_map_bigint_literals_mapping() {
+    // Test source-map accuracy for BigInt literals
+    let source = r#"const big = 9007199254740991n;
+const hex = 0x1fffffffffffffn;
+const binary = 0b11111111111111111111111111111111111111111111111111111n;
+const sum = 1n + 2n;"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions::default();
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Verify variable declarations are in output
+    assert!(
+        output.contains("big") && output.contains("hex") && output.contains("sum"),
+        "expected variable names in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the variable declarations
+    let (big_line, _) = find_line_col(source, "const big");
+    let has_big_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == big_line
+    });
+
+    let (hex_line, _) = find_line_col(source, "const hex");
+    let has_hex_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == hex_line
+    });
+
+    let (sum_line, _) = find_line_col(source, "const sum");
+    let has_sum_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == sum_line
+    });
+
+    // We should have mappings for BigInt declarations
+    assert!(
+        has_big_mapping || has_hex_mapping || has_sum_mapping,
+        "expected mappings for BigInt declarations. mappings: {mappings}"
+    );
+
+    // Verify non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for BigInt literals"
+    );
+
+    // Verify mappings span multiple source lines
+    let unique_source_lines: std::collections::HashSet<_> =
+        decoded.iter().map(|m| m.original_line).collect();
+    assert!(
+        unique_source_lines.len() >= 2,
+        "expected mappings from at least 2 different source lines, got: {:?}",
+        unique_source_lines
+    );
+}
