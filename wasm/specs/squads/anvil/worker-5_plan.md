@@ -7,12 +7,13 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- [ ] Add ES5 async tests for async methods with super calls in `wasm/src/transforms/async_es5_tests.rs`. Run `./wasm/test.sh async_es5_tests`.
+- [ ] (awaiting assignment)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added 12 async super call method tests (basic, with return, no await, multiple awaits, with args, body_contains_await, body_no_await, ignores nested async, assign result, try/catch, chain, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (160 tests PASS).
 - [x] Added 12 async callback pattern tests (arrow basic, function expression, with return, no await, multiple params, body_contains_await, ignores nested async, event handler pattern, try/catch, promise then pattern, array method pattern) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (148 tests PASS).
 - [x] Added 12 async IIFE pattern tests (arrow basic, function expression, with return, no await, with arguments, body_contains_await, ignores nested async, named function, try/catch, in expression, multiple awaits) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (136 tests PASS).
 - [x] Added 12 async generator function tests (basic yield, with await, yield await, multiple yields, yield in loop, body_contains_await, ignores nested async, for-await-of, try/catch, yield*, return value) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (124 tests PASS).
