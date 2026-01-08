@@ -7,7 +7,7 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- Complete: Added 14 error handling pattern tests (try/catch basic, try/finally basic, try/catch/finally full, await in catch, await in finally, nested try/catch, rethrow, error wrapping, sequential try, return in finally, type guard catch, multiple catches, finally always runs, catch and rethrow new error) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (76 tests PASS).
+- [ ] Add ES5 async tests for async class methods in `wasm/src/transforms/async_es5_tests.rs`. Run `./wasm/test.sh async_es5_tests`.
 
 ## Task Queue
 - [ ] (empty)
