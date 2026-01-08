@@ -2338,6 +2338,61 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     }
                     true
                 }
+                Some(TypeKey::Intersection(members)) => {
+                    let members = self.interner.type_list(members);
+                    let pattern_shape = self.interner.object_shape(pattern_shape_id);
+                    for pattern_prop in &pattern_shape.properties {
+                        let mut merged_type = None;
+                        for &member in members.iter() {
+                            let shape_id = match self.interner.lookup(member) {
+                                Some(TypeKey::Object(shape_id))
+                                | Some(TypeKey::ObjectWithIndex(shape_id)) => shape_id,
+                                _ => return false,
+                            };
+                            let shape = self.interner.object_shape(shape_id);
+                            if let Some(source_prop) = shape
+                                .properties
+                                .iter()
+                                .find(|prop| prop.name == pattern_prop.name)
+                            {
+                                let source_type = self.optional_property_type(source_prop);
+                                merged_type = Some(match merged_type {
+                                    Some(existing) => self.interner.intersection2(existing, source_type),
+                                    None => source_type,
+                                });
+                            }
+                        }
+
+                        let Some(source_type) = merged_type else {
+                            if pattern_prop.optional {
+                                if self.type_contains_infer(pattern_prop.type_id)
+                                    && !self.match_infer_pattern(
+                                        TypeId::UNDEFINED,
+                                        pattern_prop.type_id,
+                                        bindings,
+                                        visited,
+                                        checker,
+                                    )
+                                {
+                                    return false;
+                                }
+                                continue;
+                            }
+                            return false;
+                        };
+
+                        if !self.match_infer_pattern(
+                            source_type,
+                            pattern_prop.type_id,
+                            bindings,
+                            visited,
+                            checker,
+                        ) {
+                            return false;
+                        }
+                    }
+                    true
+                }
                 Some(TypeKey::Union(members)) => {
                     let members = self.interner.type_list(members);
                     let mut combined = FxHashMap::default();

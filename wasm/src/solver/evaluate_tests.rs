@@ -3968,7 +3968,6 @@ fn test_conditional_infer_object_property_intersection_check() {
     }));
 
     // T extends { a: infer R } ? R : never, with T = { a: string } & { b: number }.
-    // TODO: Intersection object inference currently yields never; TypeScript infers string.
     let extends_obj = interner.object(vec![PropertyInfo {
         name: interner.intern_string("a"),
         type_id: infer_r,
@@ -4009,7 +4008,7 @@ fn test_conditional_infer_object_property_intersection_check() {
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::NEVER);
+    assert_eq!(result, TypeId::STRING);
 }
 
 #[test]
