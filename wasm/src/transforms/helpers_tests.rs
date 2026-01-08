@@ -29,3 +29,10 @@ fn test_emit_multiple_helpers() {
     assert!(output.contains("__assign"));
     assert!(output.contains("__rest"));
 }
+
+#[test]
+fn test_emit_helpers_empty() {
+    let helpers = HelpersNeeded::default();
+    let output = emit_helpers(&helpers);
+    assert!(output.is_empty(), "Expected no helpers when none requested");
+}
