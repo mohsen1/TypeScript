@@ -39,6 +39,7 @@ fn test_emit_export_assignment() {
 fn test_emit_reexport_property() {
     let result = emit_reexport_property("foo", "module_1", "foo");
     assert!(result.contains("Object.defineProperty"));
+    assert!(result.contains("enumerable: true"));
     assert!(result.contains("\"foo\""));
     assert!(result.contains("module_1.foo"));
 }
