@@ -343,6 +343,12 @@ type Dictionary<T> = { [key: string]: T };
 type ValueOf<T> = T[keyof T];
 type PickValue<T, V> = { [K in keyof T]: T[K] extends V ? T[K] : never };
 type ActionByType<A extends AnyAction, T extends string> = A extends { type: T } ? A : never;
+
+interface Store<S, A> {
+  getState: () => S;
+  dispatch: (action: A) => A;
+  replaceState: (next: DeepPartial<S>) => void;
+}
 "#.to_string()),
         ("reducers.ts".to_string(), r#"
 type CounterAction = { type: "inc" } | { type: "dec" };
@@ -434,6 +440,18 @@ function runApp() {
 
     assert_eq!(stats.file_count, 4);
     assert!(stats.function_count >= 5, "Expected at least 5 functions");
+
+    // Debug: print diagnostics if there are any
+    if result.diagnostic_count > 0 {
+        eprintln!("\n=== DIAGNOSTICS ({}) ===", result.diagnostic_count);
+        for file_result in &result.file_results {
+            for diag in &file_result.diagnostics {
+                eprintln!("  [{}:{}] {}", diag.file, diag.start, diag.message_text);
+            }
+        }
+        eprintln!("=== END DIAGNOSTICS ===\n");
+    }
+
     assert_eq!(result.diagnostic_count, 0);
 }
 

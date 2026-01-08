@@ -7,13 +7,16 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [x] Fix compat regression `solver::compat::tests::test_explain_failure_reports_rest_mismatch` in `wasm/src/solver/compat.rs`; adjust diagnostics in `wasm/src/solver/compat_tests.rs` if needed; run `./wasm/test.sh`.
+- [ ] Fix `parallel::tests::test_check_redux_lodash_style_generics` - cross-file type alias resolution (5 remaining diagnostics related to type alias expansion during subtype comparison)
 
 ## Task Queue
-- [x] Reproduce the rest-parameter mismatch failure and confirm expected `SubtypeFailureReason`.
-- [x] Ensure rest-parameter assignability still matches `tsc` for both `unknown[]` and `number[]` cases.
+- [ ] Implement type alias expansion during subtype comparison (Ref<...> types need to be expanded to their underlying types for proper comparison)
 
 ## Completed
+- [x] Cross-file type resolution infrastructure: added `decl_file_idx` to Symbol, `alloc_from` for symbol cloning, `all_arenas` to CheckerContext for multi-file arena access.
+- [x] Fixed type parameter scope propagation to TypeLowering via `import_type_params` method.
+- [x] Fixed regression in `invalidate_paths_with_dependents_symbols_handles_import_equals` - handle require() string literals in import equals declarations.
+- [x] Reduced diagnostics from 6 to 5; type parameters now resolve correctly (showing `<R>` instead of `<error>`).
 - [x] Added strict-mode assignability comparison for rest unknown[] vs number[]; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Rest-parameter assignability parity checks for unknown[] vs number[]; restored AsyncES5Emitter setter to unblock builds; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Added rest number[] assignability guard test; ran `./wasm/test.sh` (fails: missing `AsyncES5Emitter::set_use_this_capture` in `es5_helpers.rs` and `class_es5.rs`).

@@ -291,13 +291,18 @@ pub fn merge_bind_results_ref(results: &[&BindResult]) -> MergedProgram {
     let mut files = Vec::with_capacity(results.len());
     let mut file_locals_list = Vec::with_capacity(results.len());
 
-    for result in results {
+    for (file_idx, result) in results.iter().enumerate() {
         // Copy symbols from this file to global arena, getting new IDs
+        // Use alloc_from to preserve declarations, exports, members, etc.
         let mut id_remap: FxHashMap<SymbolId, SymbolId> = FxHashMap::default();
         for i in 0..result.symbols.len() {
             let old_id = SymbolId(i as u32);
             if let Some(sym) = result.symbols.get(old_id) {
-                let new_id = global_symbols.alloc(sym.flags, sym.escaped_name.clone());
+                let new_id = global_symbols.alloc_from(sym);
+                // Set the file index so the checker knows which arena to use
+                if let Some(new_sym) = global_symbols.get_mut(new_id) {
+                    new_sym.decl_file_idx = file_idx as u32;
+                }
                 id_remap.insert(old_id, new_id);
             }
         }
@@ -531,6 +536,12 @@ pub fn check_functions_parallel(program: &MergedProgram) -> CheckResult {
 
     let function_count = all_functions.len();
 
+    // Collect all arenas for cross-file type resolution
+    let all_arenas: Vec<Arc<ThinNodeArena>> = program.files
+        .iter()
+        .map(|f| Arc::clone(&f.arena))
+        .collect();
+
     // Check functions in parallel
     // Note: We need to be careful here - ThinCheckerState holds mutable references
     // For now, we group by file and check each file's functions together
@@ -550,6 +561,9 @@ pub fn check_functions_parallel(program: &MergedProgram) -> CheckResult {
                 &program.type_interner,
                 file.file_name.clone(),
             );
+
+            // Set all arenas for cross-file type resolution
+            checker.ctx.set_all_arenas(all_arenas.clone());
 
             let mut function_results = Vec::new();
 

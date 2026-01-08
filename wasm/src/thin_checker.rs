@@ -502,6 +502,7 @@ impl<'a> ThinCheckerState<'a> {
                         &type_resolver,
                         &value_resolver,
                     );
+                    lowering.import_type_params(self.ctx.type_parameter_scope.iter());
                     return lowering.lower_type(idx);
                 }
                 return self.resolve_qualified_name(type_name_idx);
@@ -538,6 +539,7 @@ impl<'a> ThinCheckerState<'a> {
                         &type_resolver,
                         &value_resolver,
                     );
+                    lowering.import_type_params(self.ctx.type_parameter_scope.iter());
                     return lowering.lower_type(idx);
                 }
 
@@ -821,6 +823,55 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    /// Resolve a type symbol using a specific arena (for cross-file resolution).
+    fn resolve_type_symbol_in_arena(&self, idx: NodeIndex, arena: &ThinNodeArena) -> Option<u32> {
+        let sym_id = self.resolve_identifier_symbol_in_arena(idx, arena)?;
+        let symbol = self.ctx.binder.get_symbol(sym_id)?;
+        if (symbol.flags & symbol_flags::TYPE) != 0 {
+            Some(sym_id.0)
+        } else {
+            None
+        }
+    }
+
+    /// Resolve a value symbol using a specific arena (for cross-file resolution).
+    fn resolve_value_symbol_in_arena(&self, idx: NodeIndex, arena: &ThinNodeArena) -> Option<u32> {
+        let sym_id = self.resolve_identifier_symbol_in_arena(idx, arena)?;
+        let symbol = self.ctx.binder.get_symbol(sym_id)?;
+        if (symbol.flags & (symbol_flags::VALUE | symbol_flags::ALIAS)) != 0 {
+            Some(sym_id.0)
+        } else {
+            None
+        }
+    }
+
+    /// Resolve an identifier to a symbol using a specific arena.
+    /// This is used for cross-file type resolution where nodes are in a different arena.
+    fn resolve_identifier_symbol_in_arena(&self, idx: NodeIndex, arena: &ThinNodeArena) -> Option<SymbolId> {
+        let node = arena.get(idx)?;
+        let name = arena.get_identifier(node)?.escaped_text.as_str();
+
+        // First check type parameter scope
+        if self.ctx.type_parameter_scope.contains_key(name) {
+            // Type parameters don't have symbol IDs in the binder, return None
+            // The type will be resolved through the type parameter scope
+            return None;
+        }
+
+        // Look up in binder's file_locals (which includes merged globals)
+        if let Some(sym_id) = self.ctx.binder.file_locals.get(name) {
+            if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
+                if !Self::is_class_member_symbol(symbol.flags) {
+                    return Some(sym_id);
+                }
+            } else {
+                return Some(sym_id);
+            }
+        }
+
+        None
+    }
+
     /// Resolve a qualified name (A.B) to a type.
     /// Returns the type of the rightmost member, or reports TS2694 if not found.
     fn resolve_qualified_name(&mut self, idx: NodeIndex) -> TypeId {
@@ -1024,7 +1075,7 @@ impl<'a> ThinCheckerState<'a> {
             &type_resolver,
             &value_resolver,
         );
-
+        lowering.import_type_params(self.ctx.type_parameter_scope.iter());
         lowering.lower_type(idx)
     }
 
@@ -2888,6 +2939,7 @@ impl<'a> ThinCheckerState<'a> {
                     &type_resolver,
                     &value_resolver,
                 );
+                lowering.import_type_params(self.ctx.type_parameter_scope.iter());
                 let interface_type = lowering.lower_interface_declarations(&symbol.declarations);
                 return self.merge_interface_heritage_types(&symbol.declarations, interface_type);
             }
@@ -2905,13 +2957,39 @@ impl<'a> ThinCheckerState<'a> {
             } else {
                 symbol.declarations.first().copied().unwrap_or(NodeIndex::NONE)
             };
+            let decl_file_idx = symbol.decl_file_idx;
             if !decl_idx.is_none() {
-                if let Some(node) = self.ctx.arena.get(decl_idx) {
-                    if let Some(type_alias) = self.ctx.arena.get_type_alias(node) {
-                        let (_params, updates) = self.push_type_parameters(&type_alias.type_parameters);
-                        let alias_type = self.get_type_from_type_node(type_alias.type_node);
-                        self.pop_type_parameters(updates);
-                        return alias_type;
+                // For cross-file symbols, use TypeLowering directly with the correct arena
+                if decl_file_idx != u32::MAX && self.ctx.all_arenas.is_some() {
+                    let arena = self.ctx.get_arena_for_file(decl_file_idx);
+                    if let Some(node) = arena.get(decl_idx) {
+                        if let Some(type_alias) = arena.get_type_alias(node) {
+                            // Create cross-file aware resolvers that use the correct arena
+                            let type_resolver = |node_idx: NodeIndex| {
+                                self.resolve_type_symbol_in_arena(node_idx, arena)
+                            };
+                            let value_resolver = |node_idx: NodeIndex| {
+                                self.resolve_value_symbol_in_arena(node_idx, arena)
+                            };
+                            let lowering = TypeLowering::with_resolvers(
+                                arena,
+                                self.ctx.types,
+                                &type_resolver,
+                                &value_resolver,
+                            );
+                            lowering.import_type_params(self.ctx.type_parameter_scope.iter());
+                            return lowering.lower_type_alias_declaration(type_alias);
+                        }
+                    }
+                } else {
+                    // Same-file type alias - use existing path
+                    if let Some(node) = self.ctx.arena.get(decl_idx) {
+                        if let Some(type_alias) = self.ctx.arena.get_type_alias(node) {
+                            let (_params, updates) = self.push_type_parameters(&type_alias.type_parameters);
+                            let alias_type = self.get_type_from_type_node(type_alias.type_node);
+                            self.pop_type_parameters(updates);
+                            return alias_type;
+                        }
                     }
                 }
             }
@@ -2953,7 +3031,15 @@ impl<'a> ThinCheckerState<'a> {
                     // Handle Import Equals Declaration (import x = ns.member)
                     if node.kind == syntax_kind_ext::IMPORT_EQUALS_DECLARATION {
                         if let Some(import) = self.ctx.arena.get_import_decl(node) {
-                            // module_specifier holds the reference (e.g., 'ns.member' or require("..."))
+                            // Check if module_specifier is a string literal (from require("..."))
+                            // In that case, we need proper module resolution which isn't implemented yet.
+                            // Return ANY to avoid incorrectly typing the import as 'string'.
+                            if let Some(spec_node) = self.ctx.arena.get(import.module_specifier) {
+                                if spec_node.kind == SyntaxKind::StringLiteral as u16 {
+                                    return TypeId::ANY;
+                                }
+                            }
+                            // module_specifier is a qualified name (e.g., 'ns.member')
                             // Resolve it to get the aliased type
                             return self.get_type_of_node(import.module_specifier);
                         }
@@ -4911,6 +4997,8 @@ impl<'a> ThinCheckerState<'a> {
             &type_resolver,
             &value_resolver,
         );
+        // Import checker's type parameter scope so TypeLowering can resolve type parameters
+        lowering.import_type_params(self.ctx.type_parameter_scope.iter());
         lowering.lower_type(idx)
     }
 
