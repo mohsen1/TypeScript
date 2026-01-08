@@ -7,12 +7,12 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] Fix `parallel::tests::test_check_redux_lodash_style_generics` - cross-file type alias resolution (5 remaining diagnostics)
+- [ ] Fix `parallel::tests::test_check_redux_lodash_style_generics` - cross-file type alias resolution (2 remaining diagnostics)
 
 ## Task Queue
-- [ ] Implement TypeResolver that can resolve symbols to provide type alias expansion in SubtypeChecker
-- [ ] Wire up the TypeResolver to CompatChecker/SubtypeChecker in thin_checker.rs
-- [ ] Test and verify all 5 remaining diagnostics are resolved
+- [ ] Implement TypeResolver for TypeEvaluator to resolve Refs inside Mapped/IndexAccess types
+- [ ] Handle complex type patterns: `typeof` in type arguments, nested conditional types
+- [ ] Test and verify all remaining diagnostics are resolved
 
 ## Completed
 - [x] Cross-file type resolution infrastructure: added `decl_file_idx` to Symbol, `alloc_from` for symbol cloning, `all_arenas` to CheckerContext for multi-file arena access.
@@ -26,7 +26,16 @@ Priority: 2
 - [x] Refactored compat subtype configuration and tightened rest mismatch diagnostics assertions; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Added rest-parameter explain_failure coverage for source rest mismatches; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Implemented template-literal infer matching (including union-aware bindings) and updated conditional template inference tests. Ran `./wasm/test.sh` (fails: solver::compat::tests::test_explain_failure_reports_rest_mismatch).
-- [x] Deferred `TooManyParameters` reporting for rest targets so `explain_failure` surfaces rest element mismatches; `./wasm/test.sh test_explain_failure_reports_rest_mismatch` passes. Full `./wasm/test.sh` now fails at `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`.
+- [x] Deferred `TooManyParameters` reporting for rest targets so `explain_failure` surfaces rest element mismatches; `./wasm/test.sh test_explain_failure_reports_rest_mismatch` passes.
+- [x] Added `is_assignable_to` Application expansion with on-demand symbol resolution via `get_type_of_symbol`.
+- [x] Added `get_type_params_from_symbol_decl` to extract type parameters from symbol declarations (cross-file aware).
+- [x] Added `try_resolve_ref` to resolve Ref type arguments before instantiation.
+- [x] Added `expand_type_deeply` with recursive expansion of Application, IndexAccess, KeyOf, and Ref types.
+- [x] Reduced diagnostics from 5 to 2; DeepPartial<RootState> now expands and evaluates correctly.
+
+## Remaining Issues (2 diagnostics)
+1. `ActionFromReducers<typeof rootReducers>` - IndexAccess containing Mapped type with unresolved Refs; needs TypeResolver for evaluator
+2. `ValueOf<PickValue<RootState, number>>` - IndexAccess containing Application; evaluates to `undefined` incorrectly
 
 ## Ready for Merge
 No

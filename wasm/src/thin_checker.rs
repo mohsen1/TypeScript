@@ -4771,11 +4771,306 @@ impl<'a> ThinCheckerState<'a> {
     /// Check if `source` type is assignable to `target` type.
     ///
     /// Uses the solver's SubtypeChecker with coinductive cycle detection.
-    /// Note: Does not resolve Ref types (use `is_assignable_to_with_resolution` for that).
-    pub fn is_assignable_to(&self, source: TypeId, target: TypeId) -> bool {
+    /// Expands Application types before checking to handle generic type aliases.
+    pub fn is_assignable_to(&mut self, source: TypeId, target: TypeId) -> bool {
         use crate::solver::CompatChecker;
+        use crate::solver::evaluate_type;
+
+        // Recursively expand Application types until we reach a fixpoint
+        let source_expanded = self.expand_type_deeply(source);
+        let target_expanded = self.expand_type_deeply(target);
+
+        // Evaluate Mapped/IndexAccess/Conditional types to their structural form
+        let source_evaluated = evaluate_type(self.ctx.types, source_expanded);
+        let target_evaluated = evaluate_type(self.ctx.types, target_expanded);
+
         let mut checker = CompatChecker::new(self.ctx.types);
-        checker.is_assignable(source, target)
+        checker.is_assignable(source_evaluated, target_evaluated)
+    }
+
+    /// Recursively expand Application types and evaluate until we reach a fixpoint.
+    fn expand_type_deeply(&mut self, type_id: TypeId) -> TypeId {
+        use crate::solver::TypeKey;
+        use crate::solver::evaluate_type;
+        use std::collections::HashSet;
+
+        let mut visited = HashSet::new();
+        self.expand_type_recursive(type_id, &mut visited)
+    }
+
+    /// Recursively expand and evaluate a type, walking into nested structures.
+    fn expand_type_recursive(&mut self, type_id: TypeId, visited: &mut std::collections::HashSet<TypeId>) -> TypeId {
+        use crate::solver::TypeKey;
+        use crate::solver::evaluate_type;
+
+        if type_id.is_intrinsic() || !visited.insert(type_id) {
+            return type_id;
+        }
+
+        let Some(key) = self.ctx.types.lookup(type_id) else {
+            return type_id;
+        };
+
+        // First, handle the top-level type
+        let expanded = match key {
+            TypeKey::Application(_) => {
+                // Expand Application types
+                let exp = self.try_expand_application_shallow(type_id);
+                // Recursively expand the result
+                if exp != type_id {
+                    return self.expand_type_recursive(exp, visited);
+                }
+                exp
+            }
+            TypeKey::IndexAccess(obj, idx) => {
+                // Recursively expand the object and index types
+                let obj_expanded = self.expand_type_recursive(obj, visited);
+                let idx_expanded = self.expand_type_recursive(idx, visited);
+                if obj_expanded != obj || idx_expanded != idx {
+                    let new_type = self.ctx.types.intern(TypeKey::IndexAccess(obj_expanded, idx_expanded));
+                    // Evaluate the new IndexAccess
+                    return evaluate_type(self.ctx.types, new_type);
+                }
+                type_id
+            }
+            TypeKey::KeyOf(operand) => {
+                // Recursively expand the operand
+                let operand_expanded = self.expand_type_recursive(operand, visited);
+                if operand_expanded != operand {
+                    let new_type = self.ctx.types.intern(TypeKey::KeyOf(operand_expanded));
+                    return evaluate_type(self.ctx.types, new_type);
+                }
+                type_id
+            }
+            TypeKey::Ref(_) => {
+                // Try to resolve Refs
+                let resolved = self.try_resolve_ref(type_id);
+                if resolved != type_id && resolved != TypeId::ERROR {
+                    return self.expand_type_recursive(resolved, visited);
+                }
+                type_id
+            }
+            TypeKey::Mapped(mapped_id) => {
+                // For mapped types, try to evaluate them
+                let evaluated = evaluate_type(self.ctx.types, type_id);
+                if evaluated != type_id {
+                    return self.expand_type_recursive(evaluated, visited);
+                }
+                type_id
+            }
+            _ => type_id,
+        };
+
+        // Final evaluation pass
+        let evaluated = evaluate_type(self.ctx.types, expanded);
+        if evaluated != expanded && evaluated != type_id {
+            return self.expand_type_recursive(evaluated, visited);
+        }
+
+        evaluated
+    }
+
+    /// Try to expand an Application type one level.
+    /// For Application(Ref(sym), args), resolves the symbol and substitutes type parameters.
+    fn try_expand_application_shallow(&mut self, type_id: TypeId) -> TypeId {
+        use crate::solver::TypeKey;
+        use crate::solver::SymbolRef;
+        use crate::solver::{TypeSubstitution, instantiate_type};
+
+        let Some(key) = self.ctx.types.lookup(type_id) else {
+            return type_id;
+        };
+
+        let TypeKey::Application(app_id) = key else {
+            return type_id;
+        };
+
+        let app = self.ctx.types.type_application(app_id);
+
+        // Check if base is a Ref
+        let Some(base_key) = self.ctx.types.lookup(app.base) else {
+            return type_id;
+        };
+
+        let TypeKey::Ref(sym_ref) = base_key else {
+            return type_id;
+        };
+
+        // Try to get the cached type for this symbol, or resolve it
+        let sym_id = SymbolId(sym_ref.0);
+        let resolved = if let Some(&cached) = self.ctx.symbol_types.get(&sym_id) {
+            cached
+        } else {
+            // Resolve the symbol on demand
+            self.get_type_of_symbol(sym_id)
+        };
+
+        // Extract type parameters from the symbol's declaration (more reliable than type body scanning)
+        let type_params = self.get_type_params_from_symbol_decl(sym_id);
+        if type_params.is_empty() || type_params.len() != app.args.len() {
+            // No type params or mismatch - return resolved without substitution
+            return resolved;
+        }
+
+        // Build substitution, resolving Ref arguments first
+        let mut substitution = TypeSubstitution::new();
+        for (param_name, &arg) in type_params.iter().zip(app.args.iter()) {
+            // If arg is a Ref, try to resolve it first
+            let resolved_arg = self.try_resolve_ref(arg);
+            substitution.insert(*param_name, resolved_arg);
+        }
+
+        instantiate_type(self.ctx.types, resolved, &substitution)
+    }
+
+    /// Try to resolve a Ref type to its underlying type.
+    /// If the type is not a Ref or can't be resolved, returns the original type.
+    fn try_resolve_ref(&mut self, type_id: TypeId) -> TypeId {
+        use crate::solver::TypeKey;
+
+        let Some(key) = self.ctx.types.lookup(type_id) else {
+            return type_id;
+        };
+
+        let TypeKey::Ref(sym_ref) = key else {
+            return type_id;
+        };
+
+        let sym_id = SymbolId(sym_ref.0);
+        if let Some(&cached) = self.ctx.symbol_types.get(&sym_id) {
+            return cached;
+        }
+
+        // Resolve the symbol on demand
+        let resolved = self.get_type_of_symbol(sym_id);
+        if resolved == TypeId::ERROR {
+            return type_id; // Keep original Ref if resolution failed
+        }
+        resolved
+    }
+
+    /// Extract type parameter names from a type (for Application expansion).
+    fn extract_type_params_from_type(&self, type_id: TypeId) -> Vec<Atom> {
+        use crate::solver::TypeKey;
+        use std::collections::HashSet;
+
+        let mut params = Vec::new();
+        let mut visited = HashSet::new();
+        self.collect_type_params_from_type(type_id, &mut params, &mut visited);
+        params
+    }
+
+    fn collect_type_params_from_type(&self, type_id: TypeId, params: &mut Vec<Atom>, visited: &mut std::collections::HashSet<TypeId>) {
+        use crate::solver::TypeKey;
+
+        if !visited.insert(type_id) {
+            return;
+        }
+
+        let Some(key) = self.ctx.types.lookup(type_id) else {
+            return;
+        };
+
+        match key {
+            TypeKey::TypeParameter(info) => {
+                if !params.contains(&info.name) {
+                    params.push(info.name);
+                }
+            }
+            TypeKey::Function(fn_id) => {
+                let fn_shape = self.ctx.types.function_shape(fn_id);
+                // Collect from type params first (in declaration order)
+                for param in &fn_shape.type_params {
+                    if !params.contains(&param.name) {
+                        params.push(param.name);
+                    }
+                }
+                // Then collect from params and return type
+                for param in &fn_shape.params {
+                    self.collect_type_params_from_type(param.type_id, params, visited);
+                }
+                self.collect_type_params_from_type(fn_shape.return_type, params, visited);
+            }
+            TypeKey::Object(shape_id) => {
+                let shape = self.ctx.types.object_shape(shape_id);
+                for prop in &shape.properties {
+                    self.collect_type_params_from_type(prop.type_id, params, visited);
+                }
+            }
+            TypeKey::Union(list_id) | TypeKey::Intersection(list_id) => {
+                let types = self.ctx.types.type_list(list_id);
+                for &t in &*types {
+                    self.collect_type_params_from_type(t, params, visited);
+                }
+            }
+            TypeKey::Array(elem) => {
+                self.collect_type_params_from_type(elem, params, visited);
+            }
+            TypeKey::Tuple(tuple_id) => {
+                let elements = self.ctx.types.tuple_list(tuple_id);
+                for elem in &*elements {
+                    self.collect_type_params_from_type(elem.type_id, params, visited);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Get type parameter names from a symbol's declaration.
+    /// Looks at the first declaration in the symbol to extract type parameters in order.
+    fn get_type_params_from_symbol_decl(&self, sym_id: SymbolId) -> Vec<Atom> {
+        use crate::parser::syntax_kind_ext::{TYPE_ALIAS_DECLARATION, INTERFACE_DECLARATION, CLASS_DECLARATION};
+        use crate::parser::thin_node::ThinNodeArena;
+
+        let Some(sym) = self.ctx.binder.symbols.get(sym_id) else {
+            return Vec::new();
+        };
+
+        // Get the first declaration
+        let decl_idx = if !sym.declarations.is_empty() {
+            sym.declarations[0]
+        } else if !sym.value_declaration.is_none() {
+            sym.value_declaration
+        } else {
+            return Vec::new();
+        };
+
+        // Get the arena for the declaration's file (handles cross-file)
+        let arena: &ThinNodeArena = self.ctx.get_arena_for_file(sym.decl_file_idx);
+
+        let Some(node) = arena.get(decl_idx) else {
+            return Vec::new();
+        };
+
+        // Get type_parameters based on node kind
+        let type_params_list: Option<&crate::parser::NodeList> = match node.kind {
+            TYPE_ALIAS_DECLARATION => {
+                arena.get_type_alias(node).and_then(|d| d.type_parameters.as_ref())
+            }
+            INTERFACE_DECLARATION => {
+                arena.get_interface(node).and_then(|d| d.type_parameters.as_ref())
+            }
+            CLASS_DECLARATION => {
+                arena.get_class(node).and_then(|d| d.type_parameters.as_ref())
+            }
+            _ => None
+        };
+
+        let Some(type_params) = type_params_list else {
+            return Vec::new();
+        };
+
+        // Extract type parameter names in order
+        let mut names = Vec::new();
+        for &param_idx in &type_params.nodes {
+            let Some(param_node) = arena.get(param_idx) else { continue };
+            let Some(tp_data) = arena.get_type_parameter(param_node) else { continue };
+            let Some(name_node) = arena.get(tp_data.name) else { continue };
+            let Some(ident) = arena.get_identifier(name_node) else { continue };
+            names.push(self.ctx.types.intern_string(&ident.escaped_text));
+        }
+
+        names
     }
 
     /// Check if `source` type is assignable to `target` type, resolving Ref types.
