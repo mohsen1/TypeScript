@@ -8,7 +8,7 @@ Priority: 1
 Blocked: Awaiting next EM-Anvil assignment.
 
 ## Current Assignment
-- Complete: Added ES5 coverage tests (6 more tests); ran `./wasm/test.sh class_es5_tests` (all 75 pass).
+- [ ] Add ES5 class tests for generator methods with decorators in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
 
 ## Task Queue
 - [ ] (empty)
