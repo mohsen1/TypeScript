@@ -16464,3 +16464,732 @@ fn test_mapped_empty_constraint() {
     // Mapped over never should not produce error
     assert!(result != TypeId::ERROR, "Mapped over never should not produce error");
 }
+
+// =============================================================================
+// Intersection Type Edge Cases
+// =============================================================================
+
+#[test]
+fn test_intersection_with_never() {
+    let interner = TypeInterner::new();
+
+    // T & never = never
+    let intersection = interner.intersection(vec![TypeId::STRING, TypeId::NEVER]);
+    let result = evaluate_type(&interner, intersection);
+    assert_eq!(result, TypeId::NEVER, "T & never should be never");
+}
+
+#[test]
+fn test_intersection_with_unknown() {
+    let interner = TypeInterner::new();
+
+    // T & unknown = T
+    let intersection = interner.intersection(vec![TypeId::STRING, TypeId::UNKNOWN]);
+    let result = evaluate_type(&interner, intersection);
+    // Should simplify to string
+    assert!(result != TypeId::ERROR, "T & unknown should not error");
+}
+
+#[test]
+fn test_intersection_with_any() {
+    let interner = TypeInterner::new();
+
+    // T & any = any
+    let intersection = interner.intersection(vec![TypeId::STRING, TypeId::ANY]);
+    let result = evaluate_type(&interner, intersection);
+    assert!(result != TypeId::ERROR, "T & any should not error");
+}
+
+#[test]
+fn test_intersection_object_merge() {
+    let interner = TypeInterner::new();
+
+    // { a: string } & { b: number } = { a: string; b: number }
+    let obj1 = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj2 = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![obj1, obj2]);
+    let result = evaluate_type(&interner, intersection);
+    assert!(result != TypeId::ERROR, "Object intersection should merge properties");
+}
+
+#[test]
+fn test_intersection_same_property_narrows() {
+    let interner = TypeInterner::new();
+
+    // { a: string | number } & { a: string } = { a: string }
+    let string_or_number = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    let obj1 = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: string_or_number,
+        write_type: string_or_number,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj2 = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![obj1, obj2]);
+    let result = evaluate_type(&interner, intersection);
+    assert!(result != TypeId::ERROR, "Intersection should narrow common properties");
+}
+
+#[test]
+fn test_intersection_function_overload() {
+    let interner = TypeInterner::new();
+
+    // ((a: string) => void) & ((a: number) => void)
+    // Creates overloaded function
+    let fn1 = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("a")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn2 = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("a")),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let intersection = interner.intersection(vec![fn1, fn2]);
+    let result = evaluate_type(&interner, intersection);
+    assert!(result != TypeId::ERROR, "Function intersection should work");
+}
+
+#[test]
+fn test_intersection_flattens_nested() {
+    let interner = TypeInterner::new();
+
+    // (A & B) & C should flatten to A & B & C
+    let inner = interner.intersection(vec![TypeId::STRING, TypeId::NUMBER]);
+    let outer = interner.intersection(vec![inner, TypeId::BOOLEAN]);
+    let result = evaluate_type(&interner, outer);
+    assert!(result != TypeId::ERROR, "Nested intersection should flatten");
+}
+
+// =============================================================================
+// Union Type Edge Cases
+// =============================================================================
+
+#[test]
+fn test_union_with_never() {
+    let interner = TypeInterner::new();
+
+    // T | never = T
+    let union = interner.union(vec![TypeId::STRING, TypeId::NEVER]);
+    let result = evaluate_type(&interner, union);
+    // Should simplify to just string
+    assert!(result != TypeId::ERROR, "T | never should simplify");
+}
+
+#[test]
+fn test_union_with_unknown() {
+    let interner = TypeInterner::new();
+
+    // T | unknown = unknown
+    let union = interner.union(vec![TypeId::STRING, TypeId::UNKNOWN]);
+    let result = evaluate_type(&interner, union);
+    assert!(result != TypeId::ERROR, "T | unknown should work");
+}
+
+#[test]
+fn test_union_with_any() {
+    let interner = TypeInterner::new();
+
+    // T | any = any
+    let union = interner.union(vec![TypeId::STRING, TypeId::ANY]);
+    let result = evaluate_type(&interner, union);
+    assert!(result != TypeId::ERROR, "T | any should work");
+}
+
+#[test]
+fn test_union_flattens_nested() {
+    let interner = TypeInterner::new();
+
+    // (A | B) | C should flatten to A | B | C
+    let inner = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let outer = interner.union(vec![inner, TypeId::BOOLEAN]);
+    let result = evaluate_type(&interner, outer);
+    assert!(result != TypeId::ERROR, "Nested union should flatten");
+}
+
+#[test]
+fn test_union_deduplicates() {
+    let interner = TypeInterner::new();
+
+    // string | string | number = string | number
+    let union = interner.union(vec![TypeId::STRING, TypeId::STRING, TypeId::NUMBER]);
+    let result = evaluate_type(&interner, union);
+    assert!(result != TypeId::ERROR, "Union should deduplicate");
+}
+
+#[test]
+fn test_union_literal_subsumed_by_base() {
+    let interner = TypeInterner::new();
+
+    // "hello" | string = string (literal subsumed by base type)
+    let hello = interner.literal_string("hello");
+    let union = interner.union(vec![hello, TypeId::STRING]);
+    let result = evaluate_type(&interner, union);
+    assert!(result != TypeId::ERROR, "Literal should be subsumed by base type in union");
+}
+
+// =============================================================================
+// Generic Constraint Edge Cases
+// =============================================================================
+
+#[test]
+fn test_type_param_with_extends_string() {
+    let interner = TypeInterner::new();
+
+    // <T extends string>
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param));
+
+    let result = evaluate_type(&interner, t_type);
+    assert!(result != TypeId::ERROR, "Type param with constraint should work");
+}
+
+#[test]
+fn test_type_param_with_extends_union() {
+    let interner = TypeInterner::new();
+
+    // <T extends string | number>
+    let constraint = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: Some(constraint),
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param));
+
+    let result = evaluate_type(&interner, t_type);
+    assert!(result != TypeId::ERROR, "Type param with union constraint should work");
+}
+
+#[test]
+fn test_type_param_with_extends_keyof() {
+    let interner = TypeInterner::new();
+
+    // <T, K extends keyof T>
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param));
+
+    let keyof_t = interner.intern(TypeKey::KeyOf(t_type));
+
+    let k_name = interner.intern_string("K");
+    let k_param = TypeParamInfo {
+        name: k_name,
+        constraint: Some(keyof_t),
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param));
+
+    let result = evaluate_type(&interner, k_type);
+    assert!(result != TypeId::ERROR, "Type param with keyof constraint should work");
+}
+
+#[test]
+fn test_type_param_default_uses_constraint() {
+    let interner = TypeInterner::new();
+
+    // <T extends string = "default">
+    let default_val = interner.literal_string("default");
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: Some(TypeId::STRING),
+        default: Some(default_val),
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param));
+
+    let result = evaluate_type(&interner, t_type);
+    assert!(result != TypeId::ERROR, "Type param with constraint and default should work");
+}
+
+// =============================================================================
+// Nested Conditional Types
+// =============================================================================
+
+#[test]
+fn test_nested_conditional_both_branches() {
+    let interner = TypeInterner::new();
+
+    // T extends string ? (T extends "a" ? 1 : 2) : 3
+    let lit_1 = interner.literal_number(1.0);
+    let lit_2 = interner.literal_number(2.0);
+    let lit_3 = interner.literal_number(3.0);
+    let lit_a = interner.literal_string("a");
+
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    // Inner: T extends "a" ? 1 : 2
+    let inner_cond = interner.conditional(ConditionalType {
+        check_type: t_type,
+        extends_type: lit_a,
+        true_type: lit_1,
+        false_type: lit_2,
+        is_distributive: false,
+    });
+
+    // Outer: T extends string ? inner : 3
+    let outer_cond = ConditionalType {
+        check_type: t_type,
+        extends_type: TypeId::STRING,
+        true_type: inner_cond,
+        false_type: lit_3,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &outer_cond);
+    assert!(result != TypeId::ERROR, "Nested conditional should work");
+}
+
+#[test]
+fn test_conditional_with_infer_in_true_branch() {
+    let interner = TypeInterner::new();
+
+    // T extends (infer U)[] ? U : T
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let u_name = interner.intern_string("U");
+    let u_infer = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: u_name,
+        constraint: None,
+        default: None,
+    }));
+    let u_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: u_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let array_of_u = interner.array(u_infer);
+
+    let cond = ConditionalType {
+        check_type: t_type,
+        extends_type: array_of_u,
+        true_type: u_type,
+        false_type: t_type,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond.clone());
+    let result = evaluate_type(&interner, cond_type);
+    assert!(result != TypeId::ERROR, "Conditional with infer in extends should work");
+}
+
+#[test]
+fn test_conditional_chained() {
+    let interner = TypeInterner::new();
+
+    // T extends string ? "string" : T extends number ? "number" : "other"
+    let str_lit = interner.literal_string("string");
+    let num_lit = interner.literal_string("number");
+    let other_lit = interner.literal_string("other");
+
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    // Inner: T extends number ? "number" : "other"
+    let inner_cond = interner.conditional(ConditionalType {
+        check_type: t_type,
+        extends_type: TypeId::NUMBER,
+        true_type: num_lit,
+        false_type: other_lit,
+        is_distributive: false,
+    });
+
+    // Outer: T extends string ? "string" : inner
+    let outer_cond = ConditionalType {
+        check_type: t_type,
+        extends_type: TypeId::STRING,
+        true_type: str_lit,
+        false_type: inner_cond,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &outer_cond);
+    assert!(result != TypeId::ERROR, "Chained conditional should work");
+}
+
+// =============================================================================
+// Function Subtyping Edge Cases
+// =============================================================================
+
+#[test]
+fn test_function_param_contravariance() {
+    let interner = TypeInterner::new();
+
+    // (x: string | number) => void is subtype of (x: string) => void
+    // Due to contravariance of parameters
+    let string_or_number = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    let fn_wide = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: string_or_number,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_narrow = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    assert!(fn_wide != TypeId::ERROR, "Wide param function should be valid");
+    assert!(fn_narrow != TypeId::ERROR, "Narrow param function should be valid");
+}
+
+#[test]
+fn test_function_return_covariance() {
+    let interner = TypeInterner::new();
+
+    // () => string is subtype of () => string | number
+    // Due to covariance of return types
+    let string_or_number = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    let fn_narrow_return = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_wide_return = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: string_or_number,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    assert!(fn_narrow_return != TypeId::ERROR, "Narrow return function should be valid");
+    assert!(fn_wide_return != TypeId::ERROR, "Wide return function should be valid");
+}
+
+#[test]
+fn test_function_optional_param_compat() {
+    let interner = TypeInterner::new();
+
+    // (x?: string) => void accepts () => void call
+    let fn_optional = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: true,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_no_params = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    assert!(fn_optional != TypeId::ERROR, "Optional param function should be valid");
+    assert!(fn_no_params != TypeId::ERROR, "No param function should be valid");
+}
+
+#[test]
+fn test_function_rest_param_accepts_array() {
+    let interner = TypeInterner::new();
+
+    // (...args: string[]) => void
+    let string_array = interner.array(TypeId::STRING);
+    let fn_rest = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: string_array,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    assert!(fn_rest != TypeId::ERROR, "Rest param function should be valid");
+}
+
+#[test]
+fn test_function_generic_instantiation() {
+    let interner = TypeInterner::new();
+
+    // <T>(x: T) => T instantiated with string becomes (x: string) => string
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let generic_fn = interner.function(FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: t_type,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: t_type,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    assert!(generic_fn != TypeId::ERROR, "Generic function should be valid");
+
+    // Instantiate with string
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, TypeId::STRING);
+    let instantiated = instantiate_type(&interner, generic_fn, &subst);
+    assert!(instantiated != TypeId::ERROR, "Instantiated function should be valid");
+}
+
+// =============================================================================
+// Index Access Edge Cases
+// =============================================================================
+
+#[test]
+fn test_index_access_array_with_number_key() {
+    let interner = TypeInterner::new();
+
+    // string[][number] = string
+    let string_array = interner.array(TypeId::STRING);
+    let index_access = interner.intern(TypeKey::IndexAccess(string_array, TypeId::NUMBER));
+
+    let result = evaluate_type(&interner, index_access);
+    assert!(result != TypeId::ERROR, "Array indexed by number should work");
+}
+
+#[test]
+fn test_index_access_tuple_with_numeric_literal() {
+    let interner = TypeInterner::new();
+
+    // [string, number][0] = string
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+
+    let lit_0 = interner.literal_number(0.0);
+    let index_access = interner.intern(TypeKey::IndexAccess(tuple, lit_0));
+
+    let result = evaluate_type(&interner, index_access);
+    assert!(result != TypeId::ERROR, "Tuple indexed by numeric literal should work");
+}
+
+#[test]
+fn test_index_access_object_string_literal() {
+    let interner = TypeInterner::new();
+
+    // { a: string; b: number }["a"] = string
+    let obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let key_a = interner.literal_string("a");
+    let index_access = interner.intern(TypeKey::IndexAccess(obj, key_a));
+
+    let result = evaluate_type(&interner, index_access);
+    assert!(result != TypeId::ERROR, "Object indexed by string literal should work");
+}
+
+#[test]
+fn test_index_access_with_keyof() {
+    let interner = TypeInterner::new();
+
+    // T[keyof T] where T = { a: string; b: number } = string | number
+    let obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let keyof_obj = interner.intern(TypeKey::KeyOf(obj));
+    let index_access = interner.intern(TypeKey::IndexAccess(obj, keyof_obj));
+
+    let result = evaluate_type(&interner, index_access);
+    assert!(result != TypeId::ERROR, "Object indexed by keyof should work");
+}
+
+// =============================================================================
+// Literal Type Edge Cases
+// =============================================================================
+
+#[test]
+fn test_literal_string_type() {
+    let interner = TypeInterner::new();
+
+    let hello = interner.literal_string("hello");
+    let result = evaluate_type(&interner, hello);
+    assert!(result != TypeId::ERROR, "String literal type should work");
+}
+
+#[test]
+fn test_literal_number_type() {
+    let interner = TypeInterner::new();
+
+    let num = interner.literal_number(42.0);
+    let result = evaluate_type(&interner, num);
+    assert!(result != TypeId::ERROR, "Number literal type should work");
+}
+
+#[test]
+fn test_literal_boolean_type() {
+    let interner = TypeInterner::new();
+
+    let lit_true = interner.literal_boolean(true);
+    let lit_false = interner.literal_boolean(false);
+    let result_true = evaluate_type(&interner, lit_true);
+    let result_false = evaluate_type(&interner, lit_false);
+    assert!(result_true != TypeId::ERROR, "Boolean literal true should work");
+    assert!(result_false != TypeId::ERROR, "Boolean literal false should work");
+}
+
+#[test]
+fn test_literal_bigint_type() {
+    let interner = TypeInterner::new();
+
+    let bigint = interner.literal_bigint("9007199254740991");
+    let result = evaluate_type(&interner, bigint);
+    assert!(result != TypeId::ERROR, "BigInt literal type should work");
+}
+
+#[test]
+fn test_symbol_type() {
+    let interner = TypeInterner::new();
+
+    // Symbol type is a primitive
+    let result = evaluate_type(&interner, TypeId::SYMBOL);
+    assert!(result != TypeId::ERROR, "Symbol type should work");
+}
