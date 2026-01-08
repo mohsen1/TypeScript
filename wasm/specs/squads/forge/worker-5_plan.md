@@ -15,6 +15,7 @@ Priority: 5
 - [ ] [EM: Add queued tasks]
 
 ## Completed
+- [x] Ensured infer patterns bind `never` across templates; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
 - [x] Added conditional infer regression for never input; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
 - [x] Added infer union target placeholder + never regression test; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
 - [x] Added non-distributive template literal union input with template member; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
@@ -59,7 +60,7 @@ Priority: 5
 - [x] Updated non-distributive union object inference expectation (tests not run).
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize solver correctness (inference/conditional/subtype) before new features.
