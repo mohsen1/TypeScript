@@ -1324,3 +1324,213 @@ class Counter {
         output
     );
 }
+
+#[test]
+fn test_class_es5_arrow_function_this_binding() {
+    let source = r#"
+class Handler {
+    name = "handler";
+
+    getCallback() {
+        return () => {
+            return this.name;
+        };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Should NOT contain arrow function syntax (ES5 doesn't support it)
+    assert!(
+        !output.contains("=>"),
+        "Expected arrow function to be transformed, not raw => syntax: {}",
+        output
+    );
+
+    // Should capture this for arrow function (var _this = this or similar)
+    assert!(
+        output.contains("_this") || output.contains("self") || output.contains("that"),
+        "Expected this capture for arrow function (_this, self, or that): {}",
+        output
+    );
+
+    // Should use function keyword instead of arrow
+    assert!(
+        output.contains("function"),
+        "Expected arrow to be converted to function keyword: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_static_method() {
+    let source = r#"
+class MathUtils {
+    static add(a: number, b: number) {
+        return a + b;
+    }
+
+    static PI = 3.14159;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Static method should be on constructor, not prototype
+    assert!(
+        output.contains("MathUtils.add") || output.contains(".add ="),
+        "Expected static method on constructor function: {}",
+        output
+    );
+
+    // Static property should be on constructor
+    assert!(
+        output.contains("MathUtils.PI") || output.contains(".PI ="),
+        "Expected static property on constructor function: {}",
+        output
+    );
+
+    // Should contain the PI value
+    assert!(
+        output.contains("3.14159"),
+        "Expected PI value 3.14159 in output: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_computed_property_in_object_literal() {
+    let source = r#"
+class DynamicObject {
+    createObject(key: string, value: number) {
+        return { [key]: value };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Should NOT contain computed property syntax in object literal (ES5 doesn't support it)
+    assert!(
+        !output.contains("[key]:") && !output.contains("[key] :"),
+        "Expected computed property to be transformed, not raw [key]: syntax: {}",
+        output
+    );
+
+    // Should use bracket notation assignment or temp variable pattern
+    assert!(
+        output.contains("[key]") || output.contains("_a"),
+        "Expected ES5 computed property to use bracket notation or temp var: {}",
+        output
+    );
+
+    // Method should be on prototype
+    assert!(
+        output.contains(".prototype.createObject") || output.contains("prototype[\"createObject\"]"),
+        "Expected createObject method on prototype: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_inheritance_extends() {
+    let source = r#"
+class Animal {
+    name: string;
+    constructor(name: string) {
+        this.name = name;
+    }
+    speak() {
+        return this.name;
+    }
+}
+class Dog extends Animal {
+    constructor(name: string) {
+        super(name);
+    }
+    speak() {
+        return "Woof! " + super.speak();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected Dog class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Should use __extends helper for inheritance
+    assert!(
+        output.contains("__extends") || output.contains("extends"),
+        "Expected __extends helper for ES5 inheritance: {}",
+        output
+    );
+
+    // Should call super constructor
+    assert!(
+        output.contains("_super") || output.contains(".call("),
+        "Expected super constructor call pattern: {}",
+        output
+    );
+
+    // Should have Dog function
+    assert!(
+        output.contains("function Dog") || output.contains("Dog ="),
+        "Expected Dog constructor function: {}",
+        output
+    );
+}
