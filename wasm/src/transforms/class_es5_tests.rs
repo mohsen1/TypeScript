@@ -6870,3 +6870,241 @@ class User {
         output
     );
 }
+
+// =============================================================================
+// Ambient/Declare Class Tests
+// =============================================================================
+
+#[test]
+fn test_class_es5_declare_class_basic() {
+    // declare class should emit nothing - it's a type declaration only
+    let source = r#"
+declare class ExternalAPI {
+    version: string;
+    init(): void;
+    shutdown(): void;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Declare class should produce no output or empty output
+    let trimmed = output.trim();
+    assert!(
+        trimmed.is_empty() || !trimmed.contains("function ExternalAPI"),
+        "declare class should not emit a function constructor: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_declare_class_with_methods() {
+    // declare class with method signatures should emit nothing
+    let source = r#"
+declare class Database {
+    connect(url: string): Promise<void>;
+    query<T>(sql: string, params?: any[]): Promise<T[]>;
+    disconnect(): Promise<void>;
+    readonly isConnected: boolean;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Declare class with methods should produce no output
+    let trimmed = output.trim();
+    assert!(
+        trimmed.is_empty() || !trimmed.contains("function Database"),
+        "declare class should not emit a function constructor: {}",
+        output
+    );
+    assert!(
+        !trimmed.contains("prototype"),
+        "declare class should not emit prototype assignments: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_declare_class_with_static() {
+    // declare class with static members should emit nothing
+    let source = r#"
+declare class MathUtils {
+    static PI: number;
+    static E: number;
+    static sin(x: number): number;
+    static cos(x: number): number;
+    static random(): number;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Declare class with static members should produce no output
+    let trimmed = output.trim();
+    assert!(
+        trimmed.is_empty() || !trimmed.contains("function MathUtils"),
+        "declare class should not emit a function constructor: {}",
+        output
+    );
+    assert!(
+        !trimmed.contains("MathUtils.PI"),
+        "declare class should not emit static property assignments: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_declare_class_with_extends() {
+    // declare class with extends should emit nothing
+    let source = r#"
+declare class BaseEvent {
+    type: string;
+    timestamp: number;
+}
+
+declare class MouseEvent extends BaseEvent {
+    clientX: number;
+    clientY: number;
+    button: number;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Check second class (MouseEvent extends BaseEvent)
+    let class_idx = source_file.statements.nodes.get(1).expect("expected second class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Declare class with extends should produce no output
+    let trimmed = output.trim();
+    assert!(
+        trimmed.is_empty() || !trimmed.contains("function MouseEvent"),
+        "declare class should not emit a function constructor: {}",
+        output
+    );
+    assert!(
+        !trimmed.contains("__extends"),
+        "declare class should not emit __extends helper: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_declare_class_with_implements() {
+    // declare class with implements should emit nothing
+    let source = r#"
+interface Serializable {
+    serialize(): string;
+    deserialize(data: string): void;
+}
+
+declare class DataModel implements Serializable {
+    id: string;
+    serialize(): string;
+    deserialize(data: string): void;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Second statement is the declare class
+    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Declare class with implements should produce no output
+    let trimmed = output.trim();
+    assert!(
+        trimmed.is_empty() || !trimmed.contains("function DataModel"),
+        "declare class should not emit a function constructor: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_declare_class_with_constructor() {
+    // declare class with constructor signature should emit nothing
+    let source = r#"
+declare class Config {
+    readonly host: string;
+    readonly port: number;
+    readonly secure: boolean;
+
+    constructor(host: string, port: number, secure?: boolean);
+
+    getUrl(): string;
+    clone(): Config;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Declare class with constructor should produce no output
+    let trimmed = output.trim();
+    assert!(
+        trimmed.is_empty() || !trimmed.contains("function Config"),
+        "declare class should not emit a function constructor: {}",
+        output
+    );
+    assert!(
+        !trimmed.contains("this.host"),
+        "declare class should not emit property assignments: {}",
+        output
+    );
+}

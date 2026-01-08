@@ -196,6 +196,11 @@ impl<'a> ClassES5Emitter<'a> {
             return String::new();
         };
 
+        // Skip ambient/declare classes - they produce no output
+        if self.has_declare_modifier(&class_data.modifiers) {
+            return String::new();
+        }
+
         // Get class name
         let class_name = if let Some(name) = override_name {
             name.to_string()
@@ -3802,6 +3807,20 @@ impl<'a> ClassES5Emitter<'a> {
         }
     }
     
+    /// Check if modifiers include the `declare` keyword
+    fn has_declare_modifier(&self, modifiers: &Option<NodeList>) -> bool {
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(mod_node) = self.arena.get(mod_idx) {
+                    if mod_node.kind == SyntaxKind::DeclareKeyword as u16 {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
     fn get_identifier_text(&self, idx: NodeIndex) -> String {
         if let Some(node) = self.arena.get(idx) {
             if let Some(ident) = self.arena.get_identifier(node) {
