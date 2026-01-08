@@ -31,6 +31,7 @@ Priority: 1
 - [x] Union rest param context preserves literal; added `test_contextual_union_rest_param_preserves_literal`. Tests: `./wasm/test.sh test_contextual_union_rest_param_preserves_literal`.
 - [x] Union empty/one param context preserves literal; added `test_contextual_union_empty_param_preserves_literal`. Tests: `./wasm/test.sh test_contextual_union_empty_param_preserves_literal`.
 - [x] Union optional/required param preserves literal; added `test_contextual_union_optional_param_preserves_literal`. Tests: `./wasm/test.sh test_contextual_union_optional_param_preserves_literal`.
+- [x] Circular extends constraints resolve to unknown; added `test_resolve_all_with_circular_extends_unknown`. Tests: `./wasm/test.sh test_resolve_all_with_circular_extends_unknown`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.

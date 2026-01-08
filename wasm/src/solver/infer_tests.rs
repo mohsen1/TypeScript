@@ -1575,3 +1575,35 @@ fn test_resolve_all_with_constraints() {
     assert_eq!(results[0], (t_name, hello));
     assert_eq!(results[1], (u_name, forty_two));
 }
+
+#[test]
+fn test_resolve_all_with_circular_extends_unknown() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let u_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: u_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // Simulate: <T extends U, U extends T>
+    ctx.add_upper_bound(var_t, u_type);
+    ctx.add_upper_bound(var_u, t_type);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+
+    assert_eq!(results.len(), 2);
+    assert_eq!(results[0], (t_name, TypeId::UNKNOWN));
+    assert_eq!(results[1], (u_name, TypeId::UNKNOWN));
+}
