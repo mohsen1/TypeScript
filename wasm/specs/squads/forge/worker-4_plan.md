@@ -26,6 +26,7 @@ Priority: 4
 - [x] Added intersection flatten/dedup coverage. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` diagnostic count 6 vs 0).
 - [x] Added `any` vs `unknown` precedence coverage for unions/intersections. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` diagnostic count 6 vs 0).
 - [x] Fixed legacy module wrapper auto-lowering for AMD/UMD/System emit. Tests: `./wasm/test.sh`.
+- [x] Added union flatten/dedup regression for interner normalization. Tests: `./wasm/test.sh`.
 
 ## Ready for Merge
 Yes
