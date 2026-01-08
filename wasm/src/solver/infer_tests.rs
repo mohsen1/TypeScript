@@ -1549,6 +1549,51 @@ fn test_resolve_bounds_number_index_accepts_infinity_name() {
 }
 
 #[test]
+fn test_resolve_bounds_number_index_accepts_nan_name() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name = interner.intern_string("NaN");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var);
+    assert!(matches!(
+        result,
+        Err(InferenceError::BoundsViolation {
+            lower: actual_lower,
+            upper: actual_upper,
+            ..
+        }) if actual_lower == lower_type && actual_upper == upper_type
+    ));
+}
+
+#[test]
 fn test_resolve_bounds_inconsistent_index_signatures() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);

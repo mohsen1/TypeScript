@@ -51,6 +51,7 @@ Priority: 1
 - [x] Mutable number index rejects readonly numeric property; added `test_resolve_bounds_number_index_readonly_property_mismatch`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_readonly_property_mismatch`.
 - [x] Mutable number index rejects readonly number signature; added `test_resolve_bounds_number_index_readonly_signature_mismatch`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_readonly_signature_mismatch`.
 - [x] Readonly number index accepts mutable source; added `test_resolve_bounds_number_index_readonly_signature_allows_mutable_source`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_readonly_signature_allows_mutable_source`.
+- [x] Number index treats NaN name as numeric; added `test_resolve_bounds_number_index_accepts_nan_name`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_accepts_nan_name`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
