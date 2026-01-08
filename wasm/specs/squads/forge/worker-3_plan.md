@@ -11,6 +11,7 @@ Priority: 3
 
 ## Task Queue
 - [ ] Once Worker 2 fixes the core issue, verify all minimal repros pass (5 of 6 currently fail).
+- [ ] Once constraint property lookup is implemented, update `test_cross_scope_generic_constraints` to expect 0 errors.
 - [ ] Pick the next unsoundness case from `wasm/specs/TS_UNSOUNDNESS_CATALOG.md` and add coverage if missing.
 
 ## Completed
@@ -58,6 +59,7 @@ Priority: 3
 - [x] Constructor void exception (TS unsoundness #28): added thin checker coverage for `new () => void` accepting concrete classes. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
 - [x] Key remapping syntax (TS unsoundness #41): added thin checker coverage for `[P in keyof T as ...]: T[P]` key filtering syntax (Omit, Pick). Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
 - [x] Redux/Lodash pattern minimal repros: created 6 tests isolating specific patterns (ExtractState infer, StateFromReducers mapped, DeepPartial, createStore generic, ActionFromReducers index, ReducersMapObject). Root cause: generic Application types not expanded. 5/6 fail, 1 passes. Tests: `./wasm/test.sh -- test_redux_pattern`.
+- [x] Base constraint assignability (TS unsoundness #31): added 4 tests for generic type parameter constraint checking. Tests cover T <: Constraint(T), rejection of Constraint -> T assignments, param identity checks, and cross-scope constraint property access (currently 3 expected errors until constraint property lookup is implemented). Tests: `./wasm/test.sh -- test_base_constraint\|test_generic_constraint\|test_generic_param\|test_cross_scope`.
 
 ## Ready for Merge
 Yes

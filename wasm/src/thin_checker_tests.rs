@@ -7523,3 +7523,257 @@ const reducers: RootReducers = {
         checker.ctx.diagnostics
     );
 }
+
+/// TS Unsoundness #31: Base Constraint Assignability (Generic Erasure)
+///
+/// Inside a generic function, when checking `T <: U`:
+/// - If `T` and `U` are generic parameters, we check their constraints
+/// - Rule: `T <: U` if `Constraint(T) <: U`
+/// - Rule: `T <: Constraint(T)` is always true
+/// - A type parameter T can be assigned to its constraint
+/// - But the constraint cannot be assigned back to T (T could be narrower)
+///
+/// This relates to cross-file generics because constraint checking requires
+/// proper instantiation and resolution of type parameter bounds.
+#[test]
+fn test_base_constraint_assignability() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// T extends string, so T can be assigned to string
+function f<T extends string>(x: T): string {
+    return x; // OK: T <: string because Constraint(T) = string
+}
+
+// But string cannot be assigned to T - T could be a narrower type
+function g<T extends string>(x: T): T {
+    // return "hello"; // This would be an error
+    return x; // OK: must return x (which is of type T)
+}
+
+// Multiple constraints interact
+function h<T extends string, U extends T>(x: U): T {
+    return x; // OK: U <: T because Constraint(U) = T
+}
+
+// Constraint to constraint comparison
+function i<T extends string, U extends number>(x: T, y: U): string | number {
+    // Both T and U are assignable to their respective constraints
+    const a: string = x; // OK
+    const b: number = y; // OK
+    return x; // OK: T <: string <: string | number
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    if !checker.ctx.diagnostics.is_empty() {
+        eprintln!("=== Base Constraint Assignability Diagnostics ===");
+        for diag in &checker.ctx.diagnostics {
+            eprintln!("[{}] {}", diag.start, diag.message_text);
+        }
+    }
+
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Base constraint assignability should work: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// TS Unsoundness #31: Generic constraint rejection - constraint not assignable to T
+///
+/// Verifies that while T is assignable to its constraint,
+/// the constraint itself cannot be assigned back to T.
+#[test]
+fn test_generic_constraint_rejection() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// Error case: string is not assignable to T (T could be "hello" or other literal)
+function reject<T extends string>(): T {
+    return "hello"; // ERROR: string is not assignable to T
+}
+
+// Similarly, the constraint type cannot be assigned to a constrained parameter
+function reject2<T extends { name: string }>(obj: { name: string }): T {
+    return obj; // ERROR: { name: string } is not assignable to T
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Should have exactly 2 errors (one for each return statement)
+    let error_count = checker.ctx.diagnostics.len();
+
+    if error_count != 2 {
+        eprintln!("=== Generic Constraint Rejection Diagnostics ===");
+        eprintln!("Expected 2 errors, got {}", error_count);
+        for diag in &checker.ctx.diagnostics {
+            eprintln!("[{}] {}", diag.start, diag.message_text);
+        }
+    }
+
+    assert_eq!(
+        error_count, 2,
+        "Should reject constraint-to-T assignments (expected 2 errors): {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// TS Unsoundness #31: Generic parameter identity check
+///
+/// When checking T <: U where both are type parameters,
+/// first check identity (T == U), then check Constraint(T) <: U.
+#[test]
+fn test_generic_param_identity() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// Same type parameter is assignable to itself
+function identity<T>(x: T): T {
+    return x; // OK: T == T
+}
+
+// Different type parameters with compatible constraints
+function compatible<T extends string, U extends string>(x: T): string {
+    return x; // OK: T <: string
+}
+
+// Nested constraint: U extends T, so U <: T
+function nested<T, U extends T>(x: U): T {
+    return x; // OK: Constraint(U) = T, so U <: T
+}
+
+// Chain of constraints
+function chain<A extends string, B extends A, C extends B>(x: C): string {
+    // C <: B <: A <: string
+    const a: A = x; // OK: C <: A via B
+    const s: string = x; // OK: C <: string via chain
+    return x;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    if !checker.ctx.diagnostics.is_empty() {
+        eprintln!("=== Generic Param Identity Diagnostics ===");
+        for diag in &checker.ctx.diagnostics {
+            eprintln!("[{}] {}", diag.start, diag.message_text);
+        }
+    }
+
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Generic param identity check should work: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// TS Unsoundness #31: Cross-file generic constraint resolution
+///
+/// This test verifies that generic constraints work correctly when
+/// types are referenced across different "conceptual" modules.
+/// Relates to the Application expansion issue in cross-file type resolution.
+///
+/// EXPECTED TO FAIL: Property access on T where T extends SomeType
+/// should resolve properties from SomeType, but constraint lookup
+/// is not yet implemented for property access on type parameters.
+///
+/// Root cause: When checking `item.id` where `item: T` and `T extends Base`,
+/// we need to look up `Base` (the constraint) to find property `id`.
+/// Currently, property access on type params doesn't consult the constraint.
+#[test]
+fn test_cross_scope_generic_constraints() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// Simulate cross-file scenario with type aliases
+type Base = { id: number };
+type Extended = Base & { name: string };
+
+// Generic function with constraint referencing external type
+function process<T extends Base>(item: T): number {
+    return item.id; // Should work: T has .id because Constraint(T) = Base
+}
+
+// Constraint is a type alias to another type alias
+type Identifiable = Base;
+function identify<T extends Identifiable>(item: T): number {
+    return item.id; // Should work: need to resolve Identifiable -> Base -> { id: number }
+}
+
+// Constraint is a union type
+type Entity = { kind: "user"; name: string } | { kind: "bot"; version: number };
+function getKind<T extends Entity>(entity: T): "user" | "bot" {
+    return entity.kind; // Should work: both union members have .kind
+}
+
+// Generic with conditional constraint (relates to Application expansion)
+type ExtractId<T> = T extends { id: infer I } ? I : never;
+function extractId<T extends { id: number }>(item: T): ExtractId<T> {
+    // The return type ExtractId<T> should resolve when T is known
+    return item.id as ExtractId<T>; // Cast needed due to conditional complexity
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // EXPECTED: 3 errors due to constraint property lookup not implemented
+    // - Property 'id' does not exist on type 'T' (process function)
+    // - Property 'id' does not exist on type 'T' (identify function)
+    // - Property 'kind' does not exist on type 'T' (getKind function)
+    let error_count = checker.ctx.diagnostics.len();
+
+    if error_count != 3 {
+        eprintln!("=== Cross-Scope Generic Constraints Diagnostics ===");
+        eprintln!("Expected 3 errors (constraint property lookup not implemented), got {}", error_count);
+        for diag in &checker.ctx.diagnostics {
+            eprintln!("[{}] {}", diag.start, diag.message_text);
+        }
+    }
+
+    // Once constraint property lookup is implemented, change this to:
+    // assert!(checker.ctx.diagnostics.is_empty(), ...)
+    assert_eq!(
+        error_count, 3,
+        "Expected 3 errors for constraint property lookup (will pass once implemented): {:?}",
+        checker.ctx.diagnostics
+    );
+}
