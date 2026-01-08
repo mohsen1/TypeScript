@@ -4,19 +4,18 @@
 Execute tasks assigned by EM-Forge for the Forge squad (type system).
 
 Status: Active
-Priority: 1
+Priority: 2
 
 ## Current Assignment
-- [ ] Fix the `FunctionId` build error in `wasm/src/solver/evaluate.rs` and re-run `./wasm/test.sh` (this blocks solver test runs across workers).
+- [ ] Fix compat regression `solver::compat::tests::test_explain_failure_reports_rest_mismatch` in `wasm/src/solver/compat.rs`; adjust diagnostics in `wasm/src/solver/compat_tests.rs` if needed; run `./wasm/test.sh`.
 
 ## Task Queue
-- [ ] Resume conditional type evaluation: implement distributive conditional handling and non-distributive template-literal inference in `wasm/src/solver/evaluate.rs`; add regressions in `wasm/src/solver/evaluate_tests.rs`.
-- [ ] Add non-distributive conditional template-literal infer cases (prefix/suffix/middle/two-infer) in `wasm/src/solver/evaluate_tests.rs`.
-- [ ] Add constrained template-literal inference (`infer T extends ...`) and confirm behavior matches `tsc`.
-- [ ] Validate distributive vs wrapped conditional behavior with unions and `never`/`any`, including tuple/object/function-property conditional infer edges; fix `wasm/src/solver/evaluate.rs` if mismatched.
+- [ ] Reproduce the rest-parameter mismatch failure and confirm expected `SubtypeFailureReason`.
+- [ ] Ensure rest-parameter assignability still matches `tsc` for both `unknown[]` and `number[]` cases.
 
 ## Completed
-- [x] (Move finished items here with brief notes and tests run)
+- [x] Implemented template-literal infer matching (including union-aware bindings) and updated conditional template inference tests. Ran `./wasm/test.sh` (fails: solver::compat::tests::test_explain_failure_reports_rest_mismatch).
+- [x] Deferred `TooManyParameters` reporting for rest targets so `explain_failure` surfaces rest element mismatches; `./wasm/test.sh test_explain_failure_reports_rest_mismatch` passes. Full `./wasm/test.sh` now fails at `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`.
 
 ## Ready for Merge
 No

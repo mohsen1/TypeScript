@@ -93,6 +93,16 @@ Keep all 5 workers active at all times. If a worker finishes or stalls:
 1. Immediately assign the next task from the queue
 2. If queue is empty, break down the next GOALS.md objective into tasks
 
+## Worker Support Policy
+This is a complex compiler project. Workers may need time to explore and understand the codebase before making changes - that's OK.
+
+Only intervene if a worker is:
+- Explicitly asking for help or stuck on a specific issue
+- Idle at a prompt for an extended period with no activity
+- Working on the wrong files or outside their squad's domain
+
+When you do intervene, give helpful guidance rather than just "write code now".
+
 ## EM Management Loop
 
 **Priority: Workers First, Merges Second.** Never leave a worker idle while doing merges.
