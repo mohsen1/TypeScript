@@ -676,6 +676,31 @@ fn test_union_subtyping() {
 }
 
 #[test]
+fn test_recursion_depth_limit_provisional_subtyping() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    fn nest_array(interner: &TypeInterner, base: TypeId, depth: usize) -> TypeId {
+        let mut ty = base;
+        for _ in 0..depth {
+            ty = interner.array(ty);
+        }
+        ty
+    }
+
+    let shallow_string = nest_array(&interner, TypeId::STRING, 10);
+    let shallow_number = nest_array(&interner, TypeId::NUMBER, 10);
+    assert!(!checker.is_subtype_of(shallow_string, shallow_number));
+
+    let deep_string = nest_array(&interner, TypeId::STRING, 120);
+    let deep_number = nest_array(&interner, TypeId::NUMBER, 120);
+    assert!(matches!(
+        checker.check_subtype(deep_string, deep_number),
+        SubtypeResult::Provisional
+    ));
+}
+
+#[test]
 fn test_no_unchecked_indexed_access_array_subtyping() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);

@@ -35,6 +35,7 @@ Priority: 3
 - [x] Solver unsoundness: split accessor variance regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_split_accessor_variance`.
 - [x] Solver unsoundness: constructor void exception regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_constructor_void_exception_subtype`.
 - [x] Solver unsoundness: intersection reduction (disjoint intrinsics) regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_intersection_reduction_disjoint_intrinsics`.
+- [x] Solver unsoundness: recursion depth limiter provisional subtyping in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_recursion_depth_limit_provisional_subtyping`.
 - [x] Solver unsoundness: primitive boxing (`number` to `Number` interface) regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_primitive_boxing_assignability`.
 - [x] Solver unsoundness: primitive boxing (`bigint` to `BigInt` interface) regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_primitive_boxing_bigint_assignability`.
 - [x] Solver unsoundness: primitive boxing (`boolean` to `Boolean` interface) regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_primitive_boxing_boolean_assignability`.
