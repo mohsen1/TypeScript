@@ -2026,6 +2026,39 @@ fn test_commonjs_import_namespace_emits_helpers() {
 }
 
 #[test]
+fn test_commonjs_import_namespace_helper_ordering() {
+    let source = r#"import * as ns from "./module";"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    let create_binding_pos = output
+        .find("var __createBinding")
+        .expect("Expected __createBinding helper");
+    let set_module_default_pos = output
+        .find("var __setModuleDefault")
+        .expect("Expected __setModuleDefault helper");
+    let import_star_pos = output
+        .find("var __importStar")
+        .expect("Expected __importStar helper");
+    assert!(
+        create_binding_pos < set_module_default_pos,
+        "__createBinding should precede __setModuleDefault"
+    );
+    assert!(
+        set_module_default_pos < import_star_pos,
+        "__setModuleDefault should precede __importStar"
+    );
+}
+
+#[test]
 fn test_commonjs_import_default() {
     let source = r#"import myDefault from "./module";"#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -2129,6 +2162,32 @@ fn test_commonjs_export_star_emits_helpers() {
         output.contains("var __exportStar"),
         "Expected __exportStar helper in CommonJS output: {}",
         output
+    );
+}
+
+#[test]
+fn test_commonjs_export_star_helper_ordering() {
+    let source = r#"export * from "./module";"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    let create_binding_pos = output
+        .find("var __createBinding")
+        .expect("Expected __createBinding helper");
+    let export_star_pos = output
+        .find("var __exportStar")
+        .expect("Expected __exportStar helper");
+    assert!(
+        create_binding_pos < export_star_pos,
+        "__createBinding should precede __exportStar"
     );
 }
 
