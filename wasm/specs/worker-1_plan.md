@@ -7,10 +7,10 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-- Solver hardening: focus on inference from contextual types in `wasm/src/solver/infer.rs`. Add a focused test in `wasm/src/solver/infer_tests.rs` that currently fails (contextual function inference or circular constraint) and implement the minimal fix.
+- (Manager to fill in.)
 
 ## Task Queue
-- [ ] If contextual inference is already correct, target circular `extends` constraints and add a regression test.
+- [ ] (Manager to fill in.)
 
 ## Completed
 - [x] (Move finished items here with brief notes and tests run.)

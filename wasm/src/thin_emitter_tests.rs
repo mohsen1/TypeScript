@@ -1338,7 +1338,6 @@ fn test_thin_pipeline_integration() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let source_file = parser.parse_source_file();
     assert!(!source_file.is_none(), "Source file should be parsed");
-    let root = source_file;
 
     // Step 2: Bind
     let mut binder = ThinBinderState::new();
@@ -1809,6 +1808,7 @@ fn test_thin_emit_readonly_index_signature() {
 // CommonJS Module Tests
 // =============================================================================
 
+use crate::thin_emitter::ModuleKind;
 
 #[test]
 fn test_commonjs_preamble() {

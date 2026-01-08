@@ -40,16 +40,6 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
-        if func.is_async && self.ctx.target_es5 && !func.asterisk_token {
-            let func_name = if !func.name.is_none() {
-                self.get_identifier_text_idx(func.name)
-            } else {
-                String::new()
-            };
-            self.emit_async_function_es5(func, &func_name, "this");
-            return;
-        }
-
         if func.is_async {
             self.write("async ");
         }

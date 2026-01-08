@@ -10,30 +10,22 @@ an idle worker. If a worker's work is truly done, immediately reassign the next 
 Zero-idle policy: no worker stays at a prompt. If a worker finishes or stalls, immediately
 assign the next task so five workers stay active.
 
-Top priority: keep all five worker panes running. Never accept an idle worker. Be patient with active workers. Before any other action, check the worker panes
+Top priority: keep all five worker panes running. Never accept an idle worker. Before any other action, check the worker panes
 for prompts or stalls. If a worker is waiting for input, answer immediately (tmux send-keys,
 wait 1 second, then Enter).
 If a pane is actively working (e.g., last lines show "Updating", "Analyzing", "Running", or
 similar progress), do not send messages; wait and re-check later.
 Do not wait for user input to assign new work; keep workers busy with the next task as soon
 as they go idle.
-If a keepalive "continue" message arrives (from an external script or the monitor), do a light
-status check and only intervene if a worker is idle or blocked. Otherwise, wait.
-Avoid mid-task steering unless there is an actual conflict or a worker is stuck; prefer finishing
-the current task over redirecting.
 
 Pane status heuristics (use capture-pane -S -80):
 - Busy/working: last lines show "Running", "Compiling", "Analyzing", "Updating", "Working",
   "Benchmark", streaming logs, or test output that is still advancing.
 - Idle/waiting: last lines are a summary, "Next steps", a question ("If you want me to...",
-  "Pick one"), or a lone prompt ("›") with no active progress, or no output for 180s.
-- If unsure: wait 90s and re-check before sending a message.
-- When idle: send one clear directive and wait; avoid repeated nudges for at least 5 minutes.
+  "Pick one"), or a lone prompt ("›") with no active progress, or no output for 60s.
+- If unsure: wait 30s and re-check before sending a message.
+- When idle: send one clear directive and wait; avoid repeated nudges.
 - If a worker is truly done: immediately assign the next highest-impact task in that same worker plan.
-Overlap policy:
-- Do not interrupt active workers for possible overlap. Only redirect if two workers are
-  duplicating the same concrete task or editing the same hot file.
-- If overlap is likely, let the earlier worker finish and reassign the other worker afterward.
 
 ## Workspace layout
 - Main repo: `TypeScript` (branch: `rust`).
@@ -84,8 +76,8 @@ This is what do we mean by "managing"
 ## Automation (start_management.sh)
 - The manager and all workers run in one tmux window (six panes). Manager is top-left.
 - Workers auto-start with: "continue with your plan."
-- Background monitor nudges the manager if its pane output is idle.
-- Background monitor nudges any worker pane if its output is idle.
+- Background monitor nudges the manager if its pane output is idle for 60s.
+- Background monitor nudges any worker pane if its output is idle for 60s.
 - Worker lifecycle is automatic: completed workers are stopped; active workers are started.
 - The system keeps at most 5 active workers at a time (priority-driven). Worker plans are `wasm/specs/worker-*_plan.md` and are preferred when present.
 - All of this is driven by `start_management.sh` (no manual babysitting).
@@ -98,7 +90,6 @@ Environment overrides (optional):
 - `MANAGER_IDLE_SECONDS`, `MANAGER_POKE`
 - `TRACK_IDLE_SECONDS`, `TRACK_POKE`
 - `TRACK_LIMIT`
-- `AUTO_MONITOR` (set to 0 to disable monitor nudges)
 - `CODEX_ARGS`, `CODEX_MANAGER_ARGS`, `CODEX_TRACK_ARGS`
 - `CODEX_AUTO_UPDATE`, `CODEX_UPDATE_CMD`
 
@@ -110,13 +101,10 @@ Manager actions:
 
 
 ## Communication via tmux
-- Cancel a worker's current run before sending a new directive (Esc stops Codex generation):
-  - `tmux send-keys -t <session>:<window>.<pane> Escape`
-  - wait 1 second
 - Send message to a worker:
-  - `tmux send-keys -t <session>:<window>.<pane> "your message"`
+  - `tmux send-keys -t <session> "your message"`
   - wait 1 second
-  - `tmux send-keys -t <session>:<window>.<pane> C-m`
+  - `tmux send-keys -t <session> C-m`
 - Read a worker pane to decide next action:
   - `tmux capture-pane -p -t zang-hub:hub.<pane> -S -200`
   - Use the output to decide whether to nudge, pause, or redirect a worker.
@@ -140,4 +128,3 @@ If sessions need to be recreated:
 - Large diffs without tests in high-risk areas.
 - Regressions in emitter output or solver behavior.
 - Merge churn or recurring conflicts across workers.
-- Actual duplicated work on the same task or same hot file (redirect only then).

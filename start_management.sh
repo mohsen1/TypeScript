@@ -12,15 +12,14 @@ AUTO_RESTART_CODEX="${AUTO_RESTART_CODEX:-1}"
 CODEX_RESTART_DELAY="${CODEX_RESTART_DELAY:-2}"
 CODEX_AUTO_UPDATE="${CODEX_AUTO_UPDATE:-1}"
 CODEX_UPDATE_CMD="${CODEX_UPDATE_CMD:-npm install -g @openai/codex}"
-MANAGER_IDLE_SECONDS="${MANAGER_IDLE_SECONDS:-90}"
-MANAGER_POKE="${MANAGER_POKE:-continue}"
-TRACK_IDLE_SECONDS="${TRACK_IDLE_SECONDS:-180}"
+MANAGER_IDLE_SECONDS="${MANAGER_IDLE_SECONDS:-60}"
+MANAGER_POKE="${MANAGER_POKE:-Continue managing}"
+TRACK_IDLE_SECONDS="${TRACK_IDLE_SECONDS:-60}"
 TRACK_POKE="${TRACK_POKE:-continue with your plan.}"
 TRACK_START_PROMPT="${TRACK_START_PROMPT:-$TRACK_POKE}"
 TRACK_START_PAUSE="${TRACK_START_PAUSE:-15}"
 SEND_ENTER_PAUSE="${SEND_ENTER_PAUSE:-1}"
 TRACK_LIMIT="${TRACK_LIMIT:-5}"
-AUTO_MONITOR="${AUTO_MONITOR:-0}"
 PLAN_GLOB="${PLAN_GLOB:-worker-*_plan.md}"
 FALLBACK_PLAN_GLOB="${FALLBACK_PLAN_GLOB:-*_plan.md}"
 AUTO_ATTACH="${AUTO_ATTACH:-1}"
@@ -545,16 +544,12 @@ MONITOR_CMD="${MONITOR_CMD/__PLAN_GLOB__/$(escape_for_bash "$PLAN_GLOB")}"
 MONITOR_CMD="${MONITOR_CMD/__FALLBACK_PLAN_GLOB__/$(escape_for_bash "$FALLBACK_PLAN_GLOB")}"
 
 MONITOR_OPTION="@zang_auto_monitor"
-if [ "$AUTO_MONITOR" = "1" ]; then
-  MONITOR_FLAG="$(tmux show-option -gqv "$MONITOR_OPTION" 2>/dev/null || true)"
-  if [ "$MONITOR_FLAG" != "1" ]; then
-    tmux set-option -g "$MONITOR_OPTION" "1"
-    MONITOR_PATH="$MANAGER_DIR/.zang_monitor.sh"
-    printf "%s\n" "$MONITOR_CMD" > "$MONITOR_PATH"
-    tmux run-shell -b "bash $(printf '%q' "$MONITOR_PATH") >/dev/null 2>&1"
-  fi
-else
-  tmux set-option -g -u "$MONITOR_OPTION" 2>/dev/null || true
+MONITOR_FLAG="$(tmux show-option -gqv "$MONITOR_OPTION" 2>/dev/null || true)"
+if [ "$MONITOR_FLAG" != "1" ]; then
+  tmux set-option -g "$MONITOR_OPTION" "1"
+  MONITOR_PATH="$MANAGER_DIR/.zang_monitor.sh"
+  printf "%s\n" "$MONITOR_CMD" > "$MONITOR_PATH"
+  tmux run-shell -b "bash $(printf '%q' "$MONITOR_PATH") >/dev/null 2>&1"
 fi
 
 echo "Hub session (manager top-left): tmux attach -t $SESSION_MAIN"
