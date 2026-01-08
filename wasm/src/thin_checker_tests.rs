@@ -135,6 +135,36 @@ const ok: Foo = obj;
 }
 
 #[test]
+fn test_literal_widening_for_mutable_bindings() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let x = true;
+const y = true;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let x_sym = binder.file_locals.get("x").expect("x should exist");
+    let y_sym = binder.file_locals.get("y").expect("y should exist");
+    let x_type = checker.get_type_of_symbol(x_sym);
+    let y_type = checker.get_type_of_symbol(y_sym);
+
+    assert_eq!(x_type, TypeId::BOOLEAN);
+    assert_eq!(y_type, types.literal_boolean(true));
+}
+
+#[test]
 fn test_excess_property_in_call_argument() {
     use crate::thin_parser::ThinParserState;
 

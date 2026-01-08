@@ -3030,6 +3030,20 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    fn widen_literal_type(&self, type_id: TypeId) -> TypeId {
+        use crate::solver::{LiteralValue, TypeKey};
+
+        match self.ctx.types.lookup(type_id) {
+            Some(TypeKey::Literal(literal)) => match literal {
+                LiteralValue::String(_) => TypeId::STRING,
+                LiteralValue::Number(_) => TypeId::NUMBER,
+                LiteralValue::BigInt(_) => TypeId::BIGINT,
+                LiteralValue::Boolean(_) => TypeId::BOOLEAN,
+            },
+            _ => type_id,
+        }
+    }
+
     /// Get type of binary expression.
     fn get_type_of_binary_expression(&mut self, idx: NodeIndex) -> TypeId {
         use crate::solver::{BinaryOpEvaluator, BinaryOpResult};
@@ -5647,12 +5661,13 @@ impl<'a> ThinCheckerState<'a> {
                     declared_type
                 } else {
                     // No type annotation - use inferred type from initializer
-                    if checker.is_const_variable_declaration(decl_idx) {
-                        if let Some(literal_type) =
-                            checker.literal_type_from_initializer(var_decl.initializer)
-                        {
+                    if let Some(literal_type) =
+                        checker.literal_type_from_initializer(var_decl.initializer)
+                    {
+                        if checker.is_const_variable_declaration(decl_idx) {
                             return literal_type;
                         }
+                        return checker.widen_literal_type(literal_type);
                     }
                     init_type
                 }
