@@ -7,12 +7,13 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- [ ] Add ES5 async tests for nested async functions and closures in `wasm/src/transforms/async_es5_tests.rs`. Run `./wasm/test.sh async_es5_tests`.
+- Complete: Added 12 nested async functions and closures tests in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (50 tests PASS).
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added 12 nested async functions and closures tests (nested async function declaration, nested async arrow, nested async function expression, sync closure, deeply nested async, mixed nested, async IIFE, async callback, async method in object, async arrow in array, async arrow as argument, async closure capturing variable) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (50 tests PASS).
 - [x] Added 12 more async ES5 tests (multiple sequential awaits, binary expressions, conditional, if/else, loops, switch, catch/finally) and extended `body_contains_await` to handle loops and switch in `wasm/src/transforms/async_es5.rs`; ran `./wasm/test.sh async_es5_tests` (38 tests PASS).
 - [x] Added 6 more for-await-of destructuring tests (renamed properties, mixed nested, await in body, let binding, skipped elements, deep nesting) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (26 tests PASS).
 - [x] Added 6 for-await-of destructuring pattern tests (array, object, nested, defaults, rest element, computed property) in `wasm/src/transforms/async_es5_tests.rs`; also added try/catch/finally await detection in `wasm/src/transforms/async_es5.rs`; ran `./wasm/test.sh async_es5_tests` (20 tests PASS).
