@@ -15,6 +15,7 @@ Priority: 4
 ## Completed
 - [x] ES5 async class computed super with this + arguments (current behavior); test `./wasm/test.sh class_async_super_computed_method_this_arguments`.
 - [x] ES5 async class nested arrow computed super + this capture (current behavior); test `./wasm/test.sh class_async_nested_arrow_super_computed_this_capture`.
+- [x] ES5 async class nested arrow computed super + this + arguments capture (current behavior); test `./wasm/test.sh class_async_nested_arrow_super_computed_this_arguments_capture`.
 - [x] ES5 async class nested arrow computed super + arguments capture (current behavior); test `./wasm/test.sh class_async_nested_arrow_super_computed_arguments`.
 - [x] ES5 async class nested arrow computed super (current behavior); test `./wasm/test.sh class_async_nested_arrow_super_computed`.
 - [x] ES5 async class nested arrow super + this + arguments capture; test `./wasm/test.sh class_async_nested_arrow_super_this_arguments_capture`.
