@@ -13319,3 +13319,115 @@ async function processMultiple(streams: AsyncIterable<number>[]) {
         unique_source_lines
     );
 }
+
+#[test]
+fn test_source_map_class_getters_setters_mapping() {
+    // Test source-map accuracy for class getters and setters
+    let source = r#"class Rectangle {
+    private _width: number = 0;
+    private _height: number = 0;
+
+    get width(): number {
+        return this._width;
+    }
+
+    set width(value: number) {
+        if (value < 0) throw new Error("Width cannot be negative");
+        this._width = value;
+    }
+
+    get height(): number {
+        return this._height;
+    }
+
+    set height(value: number) {
+        if (value < 0) throw new Error("Height cannot be negative");
+        this._height = value;
+    }
+
+    get area(): number {
+        return this._width * this._height;
+    }
+
+    static get defaultSize(): number {
+        return 100;
+    }
+
+    static set defaultSize(value: number) {
+        console.log("Setting default size to", value);
+    }
+}
+
+const obj = {
+    _value: 0,
+    get value() {
+        return this._value;
+    },
+    set value(v: number) {
+        this._value = v;
+    }
+};"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the Rectangle class
+    let (class_line, _) = find_line_col(source, "class Rectangle");
+    let has_class_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == class_line
+    });
+
+    // Verify we have mappings for getter
+    let (get_width_line, _) = find_line_col(source, "get width()");
+    let has_get_width_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == get_width_line
+    });
+
+    // Verify we have mappings for setter
+    let (set_width_line, _) = find_line_col(source, "set width(value");
+    let has_set_width_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == set_width_line
+    });
+
+    assert!(
+        has_class_mapping || has_get_width_mapping || has_set_width_mapping,
+        "expected mappings for class getters/setters. mappings: {mappings}"
+    );
+
+    // Verify source map has non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for class getters/setters"
+    );
+
+    // Should have mappings from multiple source lines
+    let unique_source_lines: std::collections::HashSet<_> =
+        decoded.iter().map(|m| m.original_line).collect();
+    assert!(
+        unique_source_lines.len() >= 3,
+        "expected mappings from at least 3 different source lines for class getters/setters, got: {:?}",
+        unique_source_lines
+    );
+}
