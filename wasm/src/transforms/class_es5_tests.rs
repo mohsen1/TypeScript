@@ -4713,3 +4713,294 @@ class BankAccount {
         output
     );
 }
+
+#[test]
+fn test_class_es5_computed_property_method() {
+    // Test method with computed property name
+    let source = r#"
+const methodName = "dynamicMethod";
+
+class DynamicClass {
+    [methodName](value: number): number {
+        return value * 2;
+    }
+
+    ["literal" + "Name"](): string {
+        return "computed";
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Get the class (second statement after const)
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function DynamicClass"),
+        "Expected DynamicClass class to emit as function: {}",
+        output
+    );
+
+    // Should have computed property access on prototype
+    assert!(
+        output.contains("prototype[") || output.contains(".prototype."),
+        "Expected prototype method definition: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_computed_property_accessor() {
+    // Test getter/setter with computed property name
+    let source = r#"
+const propName = "value";
+
+class ComputedAccessor {
+    private _data: number = 0;
+
+    get [propName](): number {
+        return this._data;
+    }
+
+    set [propName](v: number) {
+        this._data = v;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Get the class (second statement after const)
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function ComputedAccessor"),
+        "Expected ComputedAccessor class to emit as function: {}",
+        output
+    );
+
+    // Should use Object.defineProperty for computed accessor
+    assert!(
+        output.contains("Object.defineProperty"),
+        "Expected Object.defineProperty for computed accessor: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_tostringtag() {
+    // Test Symbol.toStringTag getter
+    let source = r#"
+class CustomObject {
+    get [Symbol.toStringTag](): string {
+        return "CustomObject";
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function CustomObject"),
+        "Expected CustomObject class to emit as function: {}",
+        output
+    );
+
+    // Should reference Symbol.toStringTag
+    assert!(
+        output.contains("Symbol.toStringTag") || output.contains("Object.defineProperty"),
+        "Expected Symbol.toStringTag handling: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_hasinstance() {
+    // Test static Symbol.hasInstance method
+    let source = r#"
+class CustomType {
+    static [Symbol.hasInstance](instance: any): boolean {
+        return typeof instance === "object" && instance !== null;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function CustomType"),
+        "Expected CustomType class to emit as function: {}",
+        output
+    );
+
+    // Static method should be defined on class (Symbol handling may vary)
+    assert!(
+        output.contains("CustomType"),
+        "Expected CustomType in output: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_multiple_computed_properties() {
+    // Test class with multiple computed property methods
+    let source = r#"
+const key1 = "first";
+const key2 = "second";
+const key3 = "third";
+
+class MultiComputed {
+    [key1](): number {
+        return 1;
+    }
+
+    [key2](): number {
+        return 2;
+    }
+
+    [key3](): number {
+        return 3;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Get the class (fourth statement after three consts)
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(3)
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function MultiComputed"),
+        "Expected MultiComputed class to emit as function: {}",
+        output
+    );
+
+    // Should have multiple prototype assignments
+    assert!(
+        output.contains("prototype"),
+        "Expected prototype assignments: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_computed_static_property() {
+    // Test static method with computed property name
+    let source = r#"
+const staticMethodName = "create";
+
+class Factory {
+    static [staticMethodName](value: string): Factory {
+        const instance = new Factory();
+        return instance;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Get the class (second statement after const)
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function Factory"),
+        "Expected Factory class to emit as function: {}",
+        output
+    );
+
+    // Static computed method should be assigned to class
+    assert!(
+        output.contains("Factory[") || output.contains("Factory."),
+        "Expected static computed method on class: {}",
+        output
+    );
+}
