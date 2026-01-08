@@ -13,6 +13,7 @@ Priority: 2
 - [ ] [EM: Add queued tasks]
 
 ## Completed
+- [x] Added helper-ordering coverage for `__values` before `__read` in `helpers_tests.rs`; `./wasm/test.sh test_emit_values_before_read_helpers` passed.
 - [x] Added helper-ordering coverage for class private helpers in `helpers_tests.rs`; `./wasm/test.sh test_emit_class_private_helpers_ordering` passed.
 - [x] Added helper-ordering coverage to ensure `__createBinding` precedes import-star helpers in `helpers_tests.rs`; `./wasm/test.sh test_emit_create_binding_before_import_star_helpers` passed.
 - [x] Added helper-ordering coverage for `__setModuleDefault` before `__importStar` in `helpers_tests.rs`; `./wasm/test.sh test_emit_import_star_orders_set_module_default` passed.
