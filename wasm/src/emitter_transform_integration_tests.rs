@@ -682,6 +682,49 @@ class Foo {
 }
 
 #[test]
+fn test_two_phase_emission_es5_class_field_multi_arrow_this_capture() {
+    let source = r#"
+class Foo {
+    first = () => this.x;
+    second = () => () => this.y;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("var _this = this"),
+        "ES5 output should capture this for field initializers: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.x"),
+        "ES5 output should capture this in first arrow: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.y"),
+        "ES5 output should capture this in nested arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel arrows: {}",
+        output
+    );
+}
+
+#[test]
 fn test_two_phase_emission_es6_class_no_transform() {
     // Parse source
     let source = "class Point { constructor(x, y) { this.x = x; this.y = y; } }";
