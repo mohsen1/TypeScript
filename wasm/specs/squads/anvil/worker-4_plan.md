@@ -49,6 +49,7 @@ Priority: 4
 - [x] Add async await detection for finally blocks. Tests: `./wasm/test.sh body_contains_await_in_finally_block`
 - [x] Add async await detection for switch expressions. Tests: `./wasm/test.sh body_contains_await_in_switch_expression`
 - [x] Add async await detection for switch case statements. Tests: `./wasm/test.sh body_contains_await_in_switch_case_statement`
+- [x] Add async await detection for switch default clauses. Tests: `./wasm/test.sh body_contains_await_in_switch_default_clause`
 - [x] Add async await detection for for loop conditions. Tests: `./wasm/test.sh body_contains_await_in_for_loop_condition`
 - [x] Add async await detection for for loop incrementor. Tests: `./wasm/test.sh body_contains_await_in_for_loop_incrementor`
 - [x] Add async await detection for for loop initializer. Tests: `./wasm/test.sh body_contains_await_in_for_loop_initializer`
