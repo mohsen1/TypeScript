@@ -2502,6 +2502,35 @@ fn test_void_return_exception_subtype() {
 }
 
 #[test]
+fn test_function_top_assignability() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let function_top = interner.callable(CallableShape {
+        call_signatures: Vec::new(),
+        construct_signatures: Vec::new(),
+        properties: Vec::new(),
+    });
+
+    let specific_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    assert!(checker.is_subtype_of(specific_fn, function_top));
+    assert!(!checker.is_subtype_of(function_top, specific_fn));
+}
+
+#[test]
 fn test_this_parameter_variance() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
