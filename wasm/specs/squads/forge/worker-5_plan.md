@@ -7,12 +7,12 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- [ ] Inference edge cases: implement `this`-parameter inference and non-distributive optional tuple/property inference in `wasm/src/solver/infer.rs` and `wasm/src/solver/evaluate.rs`; add tests in `wasm/src/solver/infer_tests.rs` and `wasm/src/solver/evaluate_tests.rs` (convert TODOs for optional property/tuple inference); run `./wasm/test.sh`.
+- [ ] Conditional type inference edge cases: implement optional/variadic tuple inference and non-distributive readonly array/tuple inference in `wasm/src/solver/evaluate.rs`; update regressions in `wasm/src/solver/evaluate_tests.rs`; run `./wasm/test.sh`.
 
 ## Task Queue
-- [ ] Add tests for function `this`-parameter inference (contextual typing + call-site inference) in `wasm/src/solver/infer_tests.rs`.
-- [ ] Convert TODOs in `wasm/src/solver/evaluate_tests.rs` for optional property inference (missing vs `undefined`) and optional tuple element inference (undefined inclusion).
-- [ ] Follow up with remaining `infer` placeholder vs `never` TODOs in solver tests that block non-distributive inference.
+- [ ] Implement optional tuple inference so optionality is preserved (see TODOs near `evaluate_tests.rs` around 5202).
+- [ ] Implement variadic tuple inference for rest elements (TODOs near `evaluate_tests.rs` around 5262/5340).
+- [ ] Implement non-distributive readonly array/tuple inference over union inputs (TODOs near `evaluate_tests.rs` around 5557/5704).
 
 ## Completed
 - [x] Fixed FunctionId typo in `wasm/src/solver/evaluate.rs`; `./wasm/test.sh` failed: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`.
@@ -30,7 +30,7 @@ Priority: 5
 - [x] Updated non-distributive union object inference expectation (tests not run).
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize solver correctness (inference/conditional/subtype) before new features.

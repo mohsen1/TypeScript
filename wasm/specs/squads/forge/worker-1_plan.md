@@ -7,10 +7,12 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-- [x] Fix FunctionId build error in `wasm/src/solver/evaluate.rs`; run `./wasm/test.sh`.
+- [ ] Conditional type evaluation: implement function parameter/return inference in `wasm/src/solver/evaluate.rs`; update regressions in `wasm/src/solver/evaluate_tests.rs`; run `./wasm/test.sh`.
 
 ## Task Queue
-- [ ] [EM: Assign next task]
+- [ ] Cover function optional/rest parameter inference in conditional types (distributive and non-distributive) in `wasm/src/solver/evaluate_tests.rs`.
+- [ ] Add callable-parameter inference regressions (e.g., union inputs, overload shapes) in `wasm/src/solver/evaluate_tests.rs`.
+- [ ] Validate function return inference in conditional types and fix any mismatches in `wasm/src/solver/evaluate.rs`.
 
 ## Completed
 - [x] Solver inference hardening: add cyclic upper bound expansion + usage-based inference tests. Ran `./wasm/test.sh` (fails: emitter_edge_case_tests::test_export_assignment_suppresses_other_exports).
@@ -21,7 +23,7 @@ Priority: 1
 - [x] Re-ran `./wasm/test.sh`; FunctionId build error still not reproducible (fails: emitter_edge_case_tests::test_export_assignment_suppresses_other_exports).
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize solver correctness (inference/conditional/subtype) before new features.

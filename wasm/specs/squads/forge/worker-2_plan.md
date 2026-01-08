@@ -7,12 +7,12 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] Conditional type evaluation: implement distributive conditional handling and non-distributive template-literal inference in `wasm/src/solver/evaluate.rs`; add regressions in `wasm/src/solver/evaluate_tests.rs`; run `./wasm/test.sh`.
+- [ ] Conditional type evaluation: implement template-literal inference (distributive + non-distributive) in `wasm/src/solver/evaluate.rs`; update regressions in `wasm/src/solver/evaluate_tests.rs`; run `./wasm/test.sh`.
 
 ## Task Queue
-- [ ] Add non-distributive conditional template-literal infer cases (prefix/suffix/middle/two-infer) in `wasm/src/solver/evaluate_tests.rs`.
-- [ ] Add constrained template-literal inference (`infer T extends ...`) and confirm behavior matches `tsc`.
-- [ ] Validate distributive vs wrapped conditional behavior with unions and `never`/`any`, including tuple/object/function-property conditional infer edges; fix `wasm/src/solver/evaluate.rs` if mismatched.
+- [ ] Add distributive template-literal inference cases (prefix/suffix/middle/two-infer) in `wasm/src/solver/evaluate_tests.rs`.
+- [ ] Add non-distributive template-literal inference cases (prefix/suffix/middle/two-infer) and constrained `infer T extends ...` coverage.
+- [ ] Validate distributive vs wrapped conditional behavior with unions and `never`/`any` for template-literal inputs; fix `wasm/src/solver/evaluate.rs` if mismatched.
 
 ## Completed
 - [x] FunctionId build error fixed in `wasm/src/solver/evaluate.rs` via worker-5 (no action needed here).
