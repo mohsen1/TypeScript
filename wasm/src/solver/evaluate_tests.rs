@@ -1115,7 +1115,6 @@ fn test_conditional_infer_template_literal_distributive() {
     }));
 
     // T extends `${infer R}` ? R : never, with T = "foo" | "bar".
-    // TODO: Template literal inference is not implemented; current behavior yields never.
     let extends_template = interner.template_literal(vec![TemplateSpan::Type(infer_r)]);
     let cond = ConditionalType {
         check_type: t_param,
@@ -1134,7 +1133,8 @@ fn test_conditional_infer_template_literal_distributive() {
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::NEVER);
+    let expected = interner.union(vec![lit_foo, lit_bar]);
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -1156,7 +1156,6 @@ fn test_conditional_infer_template_literal_with_prefix_distributive() {
     }));
 
     // T extends `foo${infer R}` ? R : never, with T = "foo1" | "bar".
-    // TODO: Template literal inference is not implemented; current behavior yields never.
     let extends_template = interner.template_literal(vec![
         TemplateSpan::Text(interner.intern_string("foo")),
         TemplateSpan::Type(infer_r),
@@ -1178,7 +1177,8 @@ fn test_conditional_infer_template_literal_with_prefix_distributive() {
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::NEVER);
+    let expected = interner.literal_string("1");
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -1200,7 +1200,6 @@ fn test_conditional_infer_template_literal_with_suffix_distributive() {
     }));
 
     // T extends `${infer R}bar` ? R : never, with T = "foobar" | "baz".
-    // TODO: Template literal inference is not implemented; current behavior yields never.
     let extends_template = interner.template_literal(vec![
         TemplateSpan::Type(infer_r),
         TemplateSpan::Text(interner.intern_string("bar")),
@@ -1222,7 +1221,8 @@ fn test_conditional_infer_template_literal_with_suffix_distributive() {
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::NEVER);
+    let expected = interner.literal_string("foo");
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -1244,7 +1244,6 @@ fn test_conditional_infer_template_literal_non_distributive_union_input() {
     }));
 
     // [T] extends [`foo${infer R}`] ? R : never, with T = "foo1" | "foo2" (no distribution).
-    // TODO: Non-distributive template literal inference is not implemented; current behavior yields never.
     let extends_template = interner.template_literal(vec![
         TemplateSpan::Text(interner.intern_string("foo")),
         TemplateSpan::Type(infer_r),
@@ -1276,7 +1275,11 @@ fn test_conditional_infer_template_literal_non_distributive_union_input() {
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::NEVER);
+    let expected = interner.union(vec![
+        interner.literal_string("1"),
+        interner.literal_string("2"),
+    ]);
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -1298,7 +1301,6 @@ fn test_conditional_infer_template_literal_non_distributive_template_union_input
     }));
 
     // [T] extends [`foo${infer R}`] ? R : never, with T = `foo${string}` | `bar${string}` (no distribution).
-    // TODO: Non-distributive template literal inference is not implemented; current behavior yields never.
     let extends_template = interner.template_literal(vec![
         TemplateSpan::Text(interner.intern_string("foo")),
         TemplateSpan::Type(infer_r),
@@ -1358,7 +1360,6 @@ fn test_conditional_infer_template_literal_with_constrained_infer_non_distributi
     }));
 
     // [T] extends [`foo${infer R extends string}`] ? R : never, with T = "foo1" | "foo2" (no distribution).
-    // TODO: Non-distributive template literal inference with constraints is not implemented; current behavior yields never.
     let extends_template = interner.template_literal(vec![
         TemplateSpan::Text(interner.intern_string("foo")),
         TemplateSpan::Type(infer_r),
@@ -1390,7 +1391,11 @@ fn test_conditional_infer_template_literal_with_constrained_infer_non_distributi
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::NEVER);
+    let expected = interner.union(vec![
+        interner.literal_string("1"),
+        interner.literal_string("2"),
+    ]);
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -1412,7 +1417,6 @@ fn test_conditional_infer_template_literal_with_middle_infer_non_distributive_un
     }));
 
     // [T] extends [`foo${infer R}bar`] ? R : never, with T = "foobazbar" | "foobuzbar" (no distribution).
-    // TODO: Non-distributive template literal inference is not implemented; current behavior yields never.
     let extends_template = interner.template_literal(vec![
         TemplateSpan::Text(interner.intern_string("foo")),
         TemplateSpan::Type(infer_r),
@@ -1445,7 +1449,11 @@ fn test_conditional_infer_template_literal_with_middle_infer_non_distributive_un
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::NEVER);
+    let expected = interner.union(vec![
+        interner.literal_string("baz"),
+        interner.literal_string("buz"),
+    ]);
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -1468,7 +1476,6 @@ fn test_conditional_infer_template_literal_with_middle_constrained_non_distribut
 
     // [T] extends [`foo${infer R extends string}bar`] ? R : never,
     // with T = "foobazbar" | "foobuzbar" (no distribution).
-    // TODO: Non-distributive template literal inference is not implemented; current behavior yields never.
     let extends_template = interner.template_literal(vec![
         TemplateSpan::Text(interner.intern_string("foo")),
         TemplateSpan::Type(infer_r),
@@ -1501,7 +1508,11 @@ fn test_conditional_infer_template_literal_with_middle_constrained_non_distribut
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::NEVER);
+    let expected = interner.union(vec![
+        interner.literal_string("baz"),
+        interner.literal_string("buz"),
+    ]);
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -1523,7 +1534,6 @@ fn test_conditional_infer_template_literal_with_middle_non_distributive_non_matc
     }));
 
     // [T] extends [`foo${infer R}bar`] ? R : never, with T = "foobazbar" | "bar" (no distribution).
-    // TODO: Non-distributive template literal inference is not implemented; current behavior yields never.
     let extends_template = interner.template_literal(vec![
         TemplateSpan::Text(interner.intern_string("foo")),
         TemplateSpan::Type(infer_r),
@@ -1578,7 +1588,6 @@ fn test_conditional_infer_template_literal_with_middle_non_distributive_non_stri
     }));
 
     // [T] extends [`foo${infer R}bar`] ? R : never, with T = "foobazbar" | number (no distribution).
-    // TODO: Non-distributive template literal inference is not implemented; current behavior yields never.
     let extends_template = interner.template_literal(vec![
         TemplateSpan::Text(interner.intern_string("foo")),
         TemplateSpan::Type(infer_r),
@@ -1632,7 +1641,6 @@ fn test_conditional_infer_template_literal_with_middle_non_distributive_non_stri
     }));
 
     // [T] extends [`foo${infer R}bar`] ? R : never, with T = `foo${string}bar` | number (no distribution).
-    // TODO: Non-distributive template literal inference is not implemented; current behavior yields never.
     let extends_template = interner.template_literal(vec![
         TemplateSpan::Text(interner.intern_string("foo")),
         TemplateSpan::Type(infer_r),
@@ -1696,7 +1704,6 @@ fn test_conditional_infer_template_literal_two_infers_non_distributive_union_inp
     }));
 
     // [T] extends [`${infer A}-${infer B}`] ? A | B : never, with T = "foo-bar" | "baz-qux" (no distribution).
-    // TODO: Non-distributive template literal inference is not implemented; current behavior yields never.
     let extends_template = interner.template_literal(vec![
         TemplateSpan::Type(infer_a),
         TemplateSpan::Text(interner.intern_string("-")),
@@ -1729,7 +1736,13 @@ fn test_conditional_infer_template_literal_two_infers_non_distributive_union_inp
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::NEVER);
+    let expected = interner.union(vec![
+        interner.literal_string("foo"),
+        interner.literal_string("baz"),
+        interner.literal_string("bar"),
+        interner.literal_string("qux"),
+    ]);
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -1757,7 +1770,6 @@ fn test_conditional_infer_template_literal_two_infers_non_distributive_non_match
     }));
 
     // [T] extends [`${infer A}-${infer B}`] ? A | B : never, with T = "foo-bar" | "baz" (no distribution).
-    // TODO: Non-distributive template literal inference is not implemented; current behavior yields never.
     let extends_template = interner.template_literal(vec![
         TemplateSpan::Type(infer_a),
         TemplateSpan::Text(interner.intern_string("-")),
@@ -1812,7 +1824,6 @@ fn test_conditional_infer_template_literal_with_suffix_non_distributive_union_in
     }));
 
     // [T] extends [`${infer R}bar`] ? R : never, with T = "foobar" | "bazbar" (no distribution).
-    // TODO: Non-distributive template literal inference is not implemented; current behavior yields never.
     let extends_template = interner.template_literal(vec![
         TemplateSpan::Type(infer_r),
         TemplateSpan::Text(interner.intern_string("bar")),
@@ -1844,7 +1855,11 @@ fn test_conditional_infer_template_literal_with_suffix_non_distributive_union_in
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::NEVER);
+    let expected = interner.union(vec![
+        interner.literal_string("foo"),
+        interner.literal_string("baz"),
+    ]);
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -1866,7 +1881,6 @@ fn test_conditional_infer_template_literal_with_suffix_non_distributive_non_matc
     }));
 
     // [T] extends [`${infer R}bar`] ? R : never, with T = "foobar" | "baz" (no distribution).
-    // TODO: Non-distributive template literal inference is not implemented; current behavior yields never.
     let extends_template = interner.template_literal(vec![
         TemplateSpan::Type(infer_r),
         TemplateSpan::Text(interner.intern_string("bar")),
@@ -1920,7 +1934,6 @@ fn test_conditional_infer_template_literal_with_suffix_non_distributive_non_stri
     }));
 
     // [T] extends [`${infer R}bar`] ? R : never, with T = "foobar" | number (no distribution).
-    // TODO: Non-distributive template literal inference is not implemented; current behavior yields never.
     let extends_template = interner.template_literal(vec![
         TemplateSpan::Type(infer_r),
         TemplateSpan::Text(interner.intern_string("bar")),
@@ -1973,7 +1986,6 @@ fn test_conditional_infer_template_literal_with_suffix_non_distributive_non_stri
     }));
 
     // [T] extends [`${infer R}bar`] ? R : never, with T = `${string}bar` | number (no distribution).
-    // TODO: Non-distributive template literal inference is not implemented; current behavior yields never.
     let extends_template = interner.template_literal(vec![
         TemplateSpan::Type(infer_r),
         TemplateSpan::Text(interner.intern_string("bar")),
@@ -2029,7 +2041,6 @@ fn test_conditional_infer_template_literal_with_suffix_constrained_non_distribut
     }));
 
     // [T] extends [`${infer R extends string}bar`] ? R : never, with T = "foobar" | "bazbar" (no distribution).
-    // TODO: Non-distributive template literal inference is not implemented; current behavior yields never.
     let extends_template = interner.template_literal(vec![
         TemplateSpan::Type(infer_r),
         TemplateSpan::Text(interner.intern_string("bar")),
@@ -2061,7 +2072,11 @@ fn test_conditional_infer_template_literal_with_suffix_constrained_non_distribut
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::NEVER);
+    let expected = interner.union(vec![
+        interner.literal_string("foo"),
+        interner.literal_string("baz"),
+    ]);
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -2083,7 +2098,6 @@ fn test_conditional_infer_template_literal_with_prefix_non_distributive_union_in
     }));
 
     // [T] extends [`foo${infer R}`] ? R : never, with T = "foo1" | "foo2" (no distribution).
-    // TODO: Non-distributive template literal inference is not implemented; current behavior yields never.
     let extends_template = interner.template_literal(vec![
         TemplateSpan::Text(interner.intern_string("foo")),
         TemplateSpan::Type(infer_r),
@@ -2115,7 +2129,11 @@ fn test_conditional_infer_template_literal_with_prefix_non_distributive_union_in
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::NEVER);
+    let expected = interner.union(vec![
+        interner.literal_string("1"),
+        interner.literal_string("2"),
+    ]);
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -2137,7 +2155,6 @@ fn test_conditional_infer_template_literal_with_prefix_non_distributive_non_matc
     }));
 
     // [T] extends [`foo${infer R}`] ? R : never, with T = "foo1" | "bar" (no distribution).
-    // TODO: Non-distributive template literal inference is not implemented; current behavior yields never.
     let extends_template = interner.template_literal(vec![
         TemplateSpan::Text(interner.intern_string("foo")),
         TemplateSpan::Type(infer_r),
@@ -2191,7 +2208,6 @@ fn test_conditional_infer_template_literal_with_prefix_non_distributive_non_stri
     }));
 
     // [T] extends [`foo${infer R}`] ? R : never, with T = "foo1" | number (no distribution).
-    // TODO: Non-distributive template literal inference is not implemented; current behavior yields never.
     let extends_template = interner.template_literal(vec![
         TemplateSpan::Text(interner.intern_string("foo")),
         TemplateSpan::Type(infer_r),
@@ -2244,7 +2260,6 @@ fn test_conditional_infer_template_literal_with_prefix_constrained_non_distribut
     }));
 
     // [T] extends [`foo${infer R extends string}`] ? R : never, with T = "foo1" | "foo2" (no distribution).
-    // TODO: Non-distributive template literal inference is not implemented; current behavior yields never.
     let extends_template = interner.template_literal(vec![
         TemplateSpan::Text(interner.intern_string("foo")),
         TemplateSpan::Type(infer_r),
@@ -2276,7 +2291,11 @@ fn test_conditional_infer_template_literal_with_prefix_constrained_non_distribut
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::NEVER);
+    let expected = interner.union(vec![
+        interner.literal_string("1"),
+        interner.literal_string("2"),
+    ]);
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -2305,7 +2324,6 @@ fn test_conditional_infer_template_literal_two_infers_with_constraint_non_distri
 
     // [T] extends [`${infer A extends string}-${infer B extends string}`] ? A | B : never,
     // with T = "foo-bar" | "baz-qux" (no distribution).
-    // TODO: Non-distributive template literal inference is not implemented; current behavior yields never.
     let extends_template = interner.template_literal(vec![
         TemplateSpan::Type(infer_a),
         TemplateSpan::Text(interner.intern_string("-")),
@@ -2338,7 +2356,13 @@ fn test_conditional_infer_template_literal_two_infers_with_constraint_non_distri
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::NEVER);
+    let expected = interner.union(vec![
+        interner.literal_string("foo"),
+        interner.literal_string("baz"),
+        interner.literal_string("bar"),
+        interner.literal_string("qux"),
+    ]);
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -2367,7 +2391,6 @@ fn test_conditional_infer_template_literal_two_infers_with_constraint_non_distri
 
     // [T] extends [`${infer A extends string}-${infer B extends string}`] ? A | B : never,
     // with T = "foo-bar" | "baz" (no distribution).
-    // TODO: Non-distributive template literal inference is not implemented; current behavior yields never.
     let extends_template = interner.template_literal(vec![
         TemplateSpan::Type(infer_a),
         TemplateSpan::Text(interner.intern_string("-")),
@@ -2422,7 +2445,6 @@ fn test_conditional_infer_template_literal_union_input_distributive() {
     }));
 
     // T extends `foo${infer R}` ? R : never, with T = `foo${string}` | `bar${string}`.
-    // TODO: Template literal inference is not implemented; current behavior yields never.
     let extends_template = interner.template_literal(vec![
         TemplateSpan::Text(interner.intern_string("foo")),
         TemplateSpan::Type(infer_r),
@@ -2450,7 +2472,7 @@ fn test_conditional_infer_template_literal_union_input_distributive() {
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::NEVER);
+    assert_eq!(result, TypeId::STRING);
 }
 
 #[test]
@@ -2472,7 +2494,6 @@ fn test_conditional_infer_template_literal_from_string_input() {
     }));
 
     // T extends `${infer R}` ? R : never, with T = string.
-    // TODO: Template literal inference is not implemented; current behavior yields never.
     let extends_template = interner.template_literal(vec![TemplateSpan::Type(infer_r)]);
     let cond = ConditionalType {
         check_type: t_param,
@@ -2489,7 +2510,7 @@ fn test_conditional_infer_template_literal_from_string_input() {
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::NEVER);
+    assert_eq!(result, TypeId::STRING);
 }
 
 #[test]
@@ -2511,7 +2532,6 @@ fn test_conditional_infer_template_literal_from_template_string_input() {
     }));
 
     // T extends `${infer R}` ? R : never, with T = `${string}`.
-    // TODO: Template literal inference is not implemented; current behavior yields never.
     let extends_template = interner.template_literal(vec![TemplateSpan::Type(infer_r)]);
     let cond = ConditionalType {
         check_type: t_param,
@@ -2529,7 +2549,7 @@ fn test_conditional_infer_template_literal_from_template_string_input() {
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::NEVER);
+    assert_eq!(result, TypeId::STRING);
 }
 
 #[test]
@@ -2551,7 +2571,6 @@ fn test_conditional_infer_template_literal_with_middle_infer_distributive() {
     }));
 
     // T extends `foo${infer R}bar` ? R : never, with T = "foobazbar" | "bar".
-    // TODO: Template literal inference is not implemented; current behavior yields never.
     let extends_template = interner.template_literal(vec![
         TemplateSpan::Text(interner.intern_string("foo")),
         TemplateSpan::Type(infer_r),
@@ -2574,7 +2593,8 @@ fn test_conditional_infer_template_literal_with_middle_infer_distributive() {
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::NEVER);
+    let expected = interner.literal_string("baz");
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -2602,7 +2622,6 @@ fn test_conditional_infer_template_literal_two_infers_distributive() {
     }));
 
     // T extends `${infer A}-${infer B}` ? A | B : never, with T = "foo-bar" | "baz-qux".
-    // TODO: Template literal inference is not implemented; current behavior yields never.
     let extends_template = interner.template_literal(vec![
         TemplateSpan::Type(infer_a),
         TemplateSpan::Text(interner.intern_string("-")),
@@ -2625,7 +2644,13 @@ fn test_conditional_infer_template_literal_two_infers_distributive() {
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::NEVER);
+    let expected = interner.union(vec![
+        interner.literal_string("foo"),
+        interner.literal_string("baz"),
+        interner.literal_string("bar"),
+        interner.literal_string("qux"),
+    ]);
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -2647,7 +2672,6 @@ fn test_conditional_infer_template_literal_with_constrained_infer_distributive()
     }));
 
     // T extends `foo${infer R extends string}` ? R : never, with T = "foo1" | "foo2".
-    // TODO: Template literal inference is not implemented; current behavior yields never.
     let extends_template = interner.template_literal(vec![
         TemplateSpan::Text(interner.intern_string("foo")),
         TemplateSpan::Type(infer_r),
@@ -2669,7 +2693,11 @@ fn test_conditional_infer_template_literal_with_constrained_infer_distributive()
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::NEVER);
+    let expected = interner.union(vec![
+        interner.literal_string("1"),
+        interner.literal_string("2"),
+    ]);
+    assert_eq!(result, expected);
 }
 
 #[test]
