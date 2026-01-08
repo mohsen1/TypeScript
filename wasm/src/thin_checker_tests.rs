@@ -9673,3 +9673,246 @@ const config: Config = { ...base };
         checker.ctx.diagnostics
     );
 }
+
+/// TS Unsoundness #19: Covariant `this` Types - Basic class subtyping
+///
+/// In TypeScript, the polymorphic `this` type is treated as Covariant,
+/// even in method parameters where it should be Contravariant.
+/// This allows derived classes to be assigned to base class types.
+#[test]
+fn test_covariant_this_basic_subtyping() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Animal {
+    name: string = "";
+
+    // Method with `this` type parameter
+    compare(other: this): boolean {
+        return this.name === other.name;
+    }
+}
+
+class Dog extends Animal {
+    breed: string = "";
+
+    // Overriding with tighter `this` type
+    compare(other: this): boolean {
+        return super.compare(other) && this.breed === other.breed;
+    }
+}
+
+// This is unsound: Dog has tighter `compare` but is assignable to Animal
+const animal: Animal = new Dog();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    if !checker.ctx.diagnostics.is_empty() {
+        eprintln!("=== Covariant This Basic Diagnostics ===");
+        for diag in &checker.ctx.diagnostics {
+            eprintln!("[{}] {}", diag.start, diag.message_text);
+        }
+    }
+
+    // Covariant this should allow this assignment (0 errors expected)
+    // This is unsound but intentionally allowed by TypeScript
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Covariant this should allow class subtyping: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// TS Unsoundness #19: Covariant `this` Types - Fluent API pattern
+///
+/// The covariant `this` type enables fluent APIs where methods return `this`.
+/// This is a common and useful pattern in TypeScript.
+#[test]
+fn test_covariant_this_fluent_api() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Builder {
+    value: number = 0;
+
+    // Returns `this` for chaining
+    add(n: number): this {
+        this.value += n;
+        return this;
+    }
+
+    reset(): this {
+        this.value = 0;
+        return this;
+    }
+}
+
+class AdvancedBuilder extends Builder {
+    multiplier: number = 1;
+
+    multiply(n: number): this {
+        this.multiplier *= n;
+        return this;
+    }
+}
+
+// Fluent API with proper this typing
+const result = new AdvancedBuilder()
+    .add(5)
+    .multiply(2)
+    .reset();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    if !checker.ctx.diagnostics.is_empty() {
+        eprintln!("=== Covariant This Fluent API Diagnostics ===");
+        for diag in &checker.ctx.diagnostics {
+            eprintln!("[{}] {}", diag.start, diag.message_text);
+        }
+    }
+
+    // Fluent API pattern should work
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Fluent API with this return type should work: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// TS Unsoundness #19: Covariant `this` Types - Interface with this
+///
+/// Interfaces can also use `this` type for fluent patterns.
+#[test]
+fn test_covariant_this_interface_pattern() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface Cloneable {
+    clone(): this;
+}
+
+class Point implements Cloneable {
+    x: number;
+    y: number;
+
+    constructor(x: number, y: number) {
+        this.x = x;
+        this.y = y;
+    }
+
+    clone(): this {
+        return new Point(this.x, this.y) as this;
+    }
+}
+
+const p1 = new Point(1, 2);
+const p2 = p1.clone();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    if !checker.ctx.diagnostics.is_empty() {
+        eprintln!("=== Covariant This Interface Diagnostics ===");
+        for diag in &checker.ctx.diagnostics {
+            eprintln!("[{}] {}", diag.start, diag.message_text);
+        }
+    }
+
+    // Interface with this should work
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Interface with this type should work: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// TS Unsoundness #19: Covariant `this` Types - The unsound case
+///
+/// This demonstrates the actual unsoundness: calling a method on
+/// a base class reference with an incompatible derived class.
+#[test]
+fn test_covariant_this_unsound_call() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Box {
+    content: string = "";
+
+    // `this` in parameter position - should be contravariant but isn't
+    merge(other: this): void {
+        this.content += other.content;
+    }
+}
+
+class NumberBox extends Box {
+    value: number = 0;
+
+    merge(other: this): void {
+        super.merge(other);
+        this.value += other.value;
+    }
+}
+
+// This compiles but is unsound at runtime:
+const box: Box = new NumberBox();
+const plainBox = new Box();
+// box.merge(plainBox);  // Would crash: plainBox has no `value` property
+
+// Just assigning derived to base is allowed (the unsoundness)
+const b: Box = new NumberBox();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    if !checker.ctx.diagnostics.is_empty() {
+        eprintln!("=== Covariant This Unsound Call Diagnostics ===");
+        for diag in &checker.ctx.diagnostics {
+            eprintln!("[{}] {}", diag.start, diag.message_text);
+        }
+    }
+
+    // The unsound assignment is intentionally allowed
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Covariant this unsoundness should be allowed: {:?}",
+        checker.ctx.diagnostics
+    );
+}
