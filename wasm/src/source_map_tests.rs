@@ -231,6 +231,38 @@ fn test_source_map_with_names() {
 }
 
 #[test]
+fn test_decode_mappings_round_trip() {
+    let mut generator = SourceMapGenerator::new("output.js".to_string());
+    let source_idx = generator.add_source("input.ts".to_string());
+
+    generator.add_simple_mapping(0, 0, source_idx, 0, 0);
+    generator.add_simple_mapping(0, 5, source_idx, 0, 3);
+    generator.add_simple_mapping(1, 0, source_idx, 1, 0);
+
+    let json = generator.to_json();
+    let map_value: Value = serde_json::from_str(&json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+    assert_eq!(decoded.len(), 3);
+    assert_eq!(decoded[0].generated_line, 0);
+    assert_eq!(decoded[0].generated_column, 0);
+    assert_eq!(decoded[0].original_line, 0);
+    assert_eq!(decoded[0].original_column, 0);
+    assert_eq!(decoded[1].generated_line, 0);
+    assert_eq!(decoded[1].generated_column, 5);
+    assert_eq!(decoded[1].original_line, 0);
+    assert_eq!(decoded[1].original_column, 3);
+    assert_eq!(decoded[2].generated_line, 1);
+    assert_eq!(decoded[2].generated_column, 0);
+    assert_eq!(decoded[2].original_line, 1);
+    assert_eq!(decoded[2].original_column, 0);
+}
+
+#[test]
 fn test_source_map_es5_transform_records_names() {
     let source = "const value = 1; const other = value;";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
