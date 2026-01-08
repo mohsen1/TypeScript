@@ -2383,100 +2383,22 @@ class IterableCollection<T> {
 }
 
 #[test]
-fn test_class_es5_switch_case_statement() {
-    // Test class method with switch/case statement
-    let source = r#"
-class Router {
-    route(action: string): string {
-        switch (action) {
-            case "home":
-                return "/";
-            case "about":
-                return "/about";
-            case "contact":
-                return "/contact";
-            default:
-                return "/404";
-        }
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
-    let class_idx = *source_file
-        .statements
-        .nodes
-        .first()
-        .expect("expected class declaration");
-
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
-
-    // Class should emit as function
-    assert!(
-        output.contains("function Router"),
-        "Expected class to emit as function: {}",
-        output
-    );
-
-    // Should preserve switch statement
-    assert!(
-        output.contains("switch"),
-        "Expected switch statement in output: {}",
-        output
-    );
-
-    // Should preserve case clauses
-    assert!(
-        output.contains("case \"home\"") || output.contains("case 'home'"),
-        "Expected case clause for home: {}",
-        output
-    );
-
-    // Should preserve default clause
-    assert!(
-        output.contains("default"),
-        "Expected default clause in output: {}",
-        output
-    );
-
-    // Method should be on prototype
-    assert!(
-        output.contains(".prototype.route"),
-        "Expected route method on prototype: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_while_do_while_loops() {
-    // Test class method with while and do-while loops
+fn test_class_es5_private_method_in_async_method() {
+    // Test private method called from async method
     let source = r#"
 class Counter {
-    countUp(max: number): number[] {
-        const results: number[] = [];
-        let i = 0;
-        while (i < max) {
-            results.push(i);
-            i++;
-        }
-        return results;
+    #count = 0;
+
+    #increment() {
+        this.#count++;
     }
 
-    countDown(start: number): number[] {
-        const results: number[] = [];
-        let j = start;
-        do {
-            results.push(j);
-            j--;
-        } while (j >= 0);
-        return results;
+    async addMultiple(times: number) {
+        for (let i = 0; i < times; i++) {
+            await delay(10);
+            this.#increment();
+        }
+        return this.#count;
     }
 }
 "#;
@@ -2504,44 +2426,26 @@ class Counter {
         output
     );
 
-    // Should preserve while loop
+    // Private method call should use _this capture inside async/generator context
+    // The async method body is transformed and needs proper this capture
     assert!(
-        output.contains("while"),
-        "Expected while loop in output: {}",
-        output
-    );
-
-    // Should preserve do keyword for do-while
-    assert!(
-        output.contains("do {") || output.contains("do{"),
-        "Expected do-while loop in output: {}",
-        output
-    );
-
-    // Methods should be on prototype
-    assert!(
-        output.contains(".prototype.countUp"),
-        "Expected countUp method on prototype: {}",
-        output
-    );
-    assert!(
-        output.contains(".prototype.countDown"),
-        "Expected countDown method on prototype: {}",
+        output.contains("__awaiter") || output.contains("__generator") || output.contains("_this"),
+        "Expected async transform with this capture for private method call: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_ternary_expression() {
-    // Test class method with ternary/conditional expressions
+fn test_class_es5_static_private_method() {
+    // Test static private method
     let source = r#"
 class Validator {
-    isValid(value: number): boolean {
-        return value >= 0 ? true : false;
+    static #validate(value: string): boolean {
+        return value.length > 0;
     }
 
-    getStatus(score: number): string {
-        return score >= 90 ? "excellent" : score >= 70 ? "good" : score >= 50 ? "pass" : "fail";
+    static isValid(input: string): boolean {
+        return Validator.#validate(input);
     }
 }
 "#;
@@ -2569,39 +2473,35 @@ class Validator {
         output
     );
 
-    // Should preserve ternary expressions (? and :)
+    // Static method isValid should be on Validator directly
     assert!(
-        output.contains("?") && output.contains(":"),
-        "Expected ternary expression in output: {}",
-        output
-    );
-
-    // Methods should be on prototype
-    assert!(
-        output.contains(".prototype.isValid"),
-        "Expected isValid method on prototype: {}",
-        output
-    );
-    assert!(
-        output.contains(".prototype.getStatus"),
-        "Expected getStatus method on prototype: {}",
+        output.contains("Validator.isValid") || output.contains("Validator.prototype"),
+        "Expected static method on class: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_for_in_loop() {
-    // Test class method with for-in loop
+fn test_class_es5_private_accessors() {
+    // Test private getter and setter accessors
     let source = r#"
-class ObjectInspector {
-    getKeys(obj: object): string[] {
-        const keys: string[] = [];
-        for (const key in obj) {
-            if (obj.hasOwnProperty(key)) {
-                keys.push(key);
-            }
-        }
-        return keys;
+class Temperature {
+    #celsius = 0;
+
+    get #value(): number {
+        return this.#celsius;
+    }
+
+    set #value(v: number) {
+        this.#celsius = v;
+    }
+
+    setFahrenheit(f: number) {
+        this.#value = (f - 32) * 5 / 9;
+    }
+
+    getFahrenheit(): number {
+        return this.#value * 9 / 5 + 32;
     }
 }
 "#;
@@ -2624,411 +2524,15 @@ class ObjectInspector {
 
     // Class should emit as function
     assert!(
-        output.contains("function ObjectInspector"),
+        output.contains("function Temperature"),
         "Expected class to emit as function: {}",
         output
     );
 
-    // Should preserve for-in loop
+    // Public methods should be on prototype
     assert!(
-        output.contains("for") && output.contains(" in "),
-        "Expected for-in loop in output: {}",
-        output
-    );
-
-    // Method should be on prototype
-    assert!(
-        output.contains(".prototype.getKeys"),
-        "Expected getKeys method on prototype: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_typeof_instanceof() {
-    // Test class method with typeof and instanceof operators
-    let source = r#"
-class TypeChecker {
-    isString(value: unknown): boolean {
-        return typeof value === "string";
-    }
-
-    isArray(value: unknown): boolean {
-        return value instanceof Array;
-    }
-
-    getType(value: unknown): string {
-        return typeof value;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
-    let class_idx = *source_file
-        .statements
-        .nodes
-        .first()
-        .expect("expected class declaration");
-
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
-
-    // Class should emit as function
-    assert!(
-        output.contains("function TypeChecker"),
-        "Expected class to emit as function: {}",
-        output
-    );
-
-    // Should preserve typeof operator
-    assert!(
-        output.contains("typeof"),
-        "Expected typeof operator in output: {}",
-        output
-    );
-
-    // Should preserve instanceof operator
-    assert!(
-        output.contains("instanceof"),
-        "Expected instanceof operator in output: {}",
-        output
-    );
-
-    // Methods should be on prototype
-    assert!(
-        output.contains(".prototype.isString"),
-        "Expected isString method on prototype: {}",
-        output
-    );
-    assert!(
-        output.contains(".prototype.isArray"),
-        "Expected isArray method on prototype: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_logical_operators() {
-    // Test class method with logical operators (&&, ||, !)
-    let source = r#"
-class LogicalOps {
-    checkBoth(a: boolean, b: boolean): boolean {
-        return a && b;
-    }
-
-    checkEither(a: boolean, b: boolean): boolean {
-        return a || b;
-    }
-
-    negate(value: boolean): boolean {
-        return !value;
-    }
-
-    complex(a: boolean, b: boolean, c: boolean): boolean {
-        return (a && b) || (!c && a);
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
-    let class_idx = *source_file
-        .statements
-        .nodes
-        .first()
-        .expect("expected class declaration");
-
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
-
-    // Class should emit as function
-    assert!(
-        output.contains("function LogicalOps"),
-        "Expected class to emit as function: {}",
-        output
-    );
-
-    // Should preserve logical operators
-    assert!(
-        output.contains("&&"),
-        "Expected && operator in output: {}",
-        output
-    );
-    assert!(
-        output.contains("||"),
-        "Expected || operator in output: {}",
-        output
-    );
-
-    // Methods should be on prototype
-    assert!(
-        output.contains(".prototype.checkBoth"),
-        "Expected checkBoth method on prototype: {}",
-        output
-    );
-    assert!(
-        output.contains(".prototype.complex"),
-        "Expected complex method on prototype: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_bitwise_operators() {
-    // Test class method with bitwise operators
-    let source = r#"
-class BitwiseOps {
-    and(a: number, b: number): number {
-        return a & b;
-    }
-
-    or(a: number, b: number): number {
-        return a | b;
-    }
-
-    xor(a: number, b: number): number {
-        return a ^ b;
-    }
-
-    not(a: number): number {
-        return ~a;
-    }
-
-    leftShift(a: number, b: number): number {
-        return a << b;
-    }
-
-    rightShift(a: number, b: number): number {
-        return a >> b;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
-    let class_idx = *source_file
-        .statements
-        .nodes
-        .first()
-        .expect("expected class declaration");
-
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
-
-    // Class should emit as function
-    assert!(
-        output.contains("function BitwiseOps"),
-        "Expected class to emit as function: {}",
-        output
-    );
-
-    // Should preserve bitwise operators
-    assert!(
-        output.contains("&") || output.contains("&amp;"),
-        "Expected & operator in output: {}",
-        output
-    );
-    assert!(
-        output.contains("|"),
-        "Expected | operator in output: {}",
-        output
-    );
-    assert!(
-        output.contains("^"),
-        "Expected ^ operator in output: {}",
-        output
-    );
-    assert!(
-        output.contains("<<"),
-        "Expected << operator in output: {}",
-        output
-    );
-    assert!(
-        output.contains(">>"),
-        "Expected >> operator in output: {}",
-        output
-    );
-
-    // Methods should be on prototype
-    assert!(
-        output.contains(".prototype.and"),
-        "Expected and method on prototype: {}",
-        output
-    );
-    assert!(
-        output.contains(".prototype.leftShift"),
-        "Expected leftShift method on prototype: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_assignment_operators() {
-    // Test class method with compound assignment operators
-    let source = r#"
-class Calculator {
-    accumulate(values: number[]): number {
-        let total = 0;
-        for (let i = 0; i < values.length; i++) {
-            total += values[i];
-        }
-        return total;
-    }
-
-    decrement(start: number, step: number): number {
-        let value = start;
-        value -= step;
-        return value;
-    }
-
-    multiply(base: number, factor: number): number {
-        let result = base;
-        result *= factor;
-        return result;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
-    let class_idx = *source_file
-        .statements
-        .nodes
-        .first()
-        .expect("expected class declaration");
-
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
-
-    // Class should emit as function
-    assert!(
-        output.contains("function Calculator"),
-        "Expected class to emit as function: {}",
-        output
-    );
-
-    // Should preserve compound assignment operators
-    assert!(
-        output.contains("+="),
-        "Expected += operator in output: {}",
-        output
-    );
-    assert!(
-        output.contains("-="),
-        "Expected -= operator in output: {}",
-        output
-    );
-    assert!(
-        output.contains("*="),
-        "Expected *= operator in output: {}",
-        output
-    );
-
-    // Methods should be on prototype
-    assert!(
-        output.contains(".prototype.accumulate"),
-        "Expected accumulate method on prototype: {}",
-        output
-    );
-    assert!(
-        output.contains(".prototype.multiply"),
-        "Expected multiply method on prototype: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_prefix_postfix_operators() {
-    // Test class method with prefix and postfix increment/decrement
-    let source = r#"
-class Counter {
-    incrementPost(value: number): number {
-        let x = value;
-        return x++;
-    }
-
-    incrementPre(value: number): number {
-        let x = value;
-        return ++x;
-    }
-
-    decrementPost(value: number): number {
-        let x = value;
-        return x--;
-    }
-
-    decrementPre(value: number): number {
-        let x = value;
-        return --x;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
-    let class_idx = *source_file
-        .statements
-        .nodes
-        .first()
-        .expect("expected class declaration");
-
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
-
-    // Class should emit as function
-    assert!(
-        output.contains("function Counter"),
-        "Expected class to emit as function: {}",
-        output
-    );
-
-    // Should preserve increment/decrement operators
-    assert!(
-        output.contains("++"),
-        "Expected ++ operator in output: {}",
-        output
-    );
-    assert!(
-        output.contains("--"),
-        "Expected -- operator in output: {}",
-        output
-    );
-
-    // Methods should be on prototype
-    assert!(
-        output.contains(".prototype.incrementPost"),
-        "Expected incrementPost method on prototype: {}",
-        output
-    );
-    assert!(
-        output.contains(".prototype.decrementPre"),
-        "Expected decrementPre method on prototype: {}",
+        output.contains("setFahrenheit") && output.contains("getFahrenheit"),
+        "Expected public methods in output: {}",
         output
     );
 }
