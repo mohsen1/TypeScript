@@ -13,6 +13,7 @@ Priority: 2
 - [ ] [EM: Add queued tasks]
 
 ## Completed
+- [x] Added parity test for static property initialization ES5 downlevel in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (31 tests).
 - [x] Added parity test for CommonJS named exports ES5 downlevel in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (30 tests).
 - [x] Added parity test for const declaration ES5 downlevel in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (29 tests).
 - [x] Added parity test for let in for loop ES5 downlevel in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (28 tests).
