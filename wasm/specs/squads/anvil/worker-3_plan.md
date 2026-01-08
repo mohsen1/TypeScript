@@ -54,6 +54,7 @@ Priority: 3
 - [x] Added CommonJS export-name test for string literal destructuring; `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 - [x] Added CommonJS export-name test for nested destructuring; `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 - [x] Added CommonJS export-name test for array destructuring with rest; `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
+- [x] Added CommonJS export-name test for object destructuring with rest; `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 
 ## Ready for Merge
 Yes
