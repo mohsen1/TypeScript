@@ -77,6 +77,8 @@ Priority: 5
       Tests: `./wasm/test.sh test_source_map_es5_transform_async_try_catch_return_await_mapping`.
 - [x] Added ES5 async try/catch throw await source map mapping test in `wasm/src/source_map_tests.rs`.
       Tests: `./wasm/test.sh test_source_map_es5_transform_async_try_catch_throw_await_mapping`.
+- [x] Added ES5 async switch fallthrough await source map mapping test in `wasm/src/source_map_tests.rs`.
+      Tests: `./wasm/test.sh test_source_map_es5_transform_async_switch_fallthrough_await_mapping`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
