@@ -7,10 +7,12 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [EM: Assign initial task]
+- Validate source map `sourcesContent`/`file` fields are set for JS + d.ts outputs when source text is available; adjust `wasm/src/source_writer.rs`, `wasm/src/thin_emitter/mod.rs`, or `wasm/src/declaration_emitter.rs` if needed; add regression in `wasm/src/cli/driver_tests.rs`; run `./wasm/test.sh`.
 
 ## Task Queue
-- [ ] [EM: Add queued tasks]
+- [ ] Add a `wasm/src/cli/driver_tests.rs` assertion that `sourcesContent` is present and matches the input when `sourceMap`/`declarationMap` are enabled.
+- [ ] Add a `wasm/src/source_map_tests.rs` check that transformed output still records `names` entries for identifiers.
+- [ ] Verify `sourceRoot` and `file` fields remain stable (non-empty `file`, empty `sourceRoot`) and lock with a test.
 
 ## Completed
 - [x] (Move finished items here with brief notes and tests run)
@@ -19,6 +21,7 @@ Priority: 3
 No
 
 ## Notes
+- Project Direction: integration and conformance-first; prioritize emitter fidelity (ES5 downleveling/source maps) before new features.
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
 - Commit format: `[wasm] emitter: <description>` or `[wasm] cli: <description>`

@@ -7,11 +7,11 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [ ] End-to-end validation: add a compile-and-check regression for a non-trivial generic library snippet in `wasm/src/parallel_tests.rs` (or `wasm/src/thin_checker_tests.rs`) and fix the first panic or mismatch in `wasm/src/checker/mod.rs` or `wasm/src/solver/mod.rs`; run `./wasm/test.sh`.
+- [ ] End-to-end validation: add a compile-and-check regression for a non-trivial generic library snippet in `wasm/src/thin_checker_tests.rs` and fix the first panic or mismatch in `wasm/src/checker/mod.rs` or `wasm/src/solver/mod.rs`; run `./wasm/test.sh`.
 
 ## Task Queue
 - [ ] Add a multi-file generic library test case (redux/lodash-style types) and assert no panics + expected diagnostics.
-- [ ] If a panic arises, minimize to a focused solver/checker regression test.
+- [ ] If a panic arises, minimize to a focused solver/checker regression test in `wasm/src/solver/*_tests.rs` or `wasm/src/checker/*_tests.rs`.
 - [ ] Validate the new test still passes with `./wasm/test.sh`.
 
 ## Completed
@@ -21,6 +21,7 @@ Priority: 4
 No
 
 ## Notes
+- Project Direction: integration and conformance-first; prioritize solver correctness (inference/conditional/subtype) before new features.
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
 - Commit format: `[wasm] solver: <description>` or `[wasm] checker: <description>`
