@@ -7,12 +7,10 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [x] Investigate `DeepPartial<T>` and `PickValue<T, V>` mapped type patterns from `test_check_redux_lodash_style_generics`. Test these patterns in isolation in `wasm/src/solver/evaluate_tests.rs` to identify if they contribute to the 6 diagnostics. **Result:** The 6 diagnostics issue is now fixed (test passes with 0 diagnostics). Added solver tests for both patterns.
-- [x] Add solver tests for Exclude, Extract, NonNullable, and ReturnType utility types. **Done:** Added 6 new tests covering these patterns.
+- [x] Add solver tests for Parameters<T>, ConstructorParameters<T>, and InstanceType<T> utility types. **Done:** Added 5 tests covering these patterns with optional and rest param variations.
 
 ## Task Queue
-- [x] Add additional end-to-end tests for other lodash-style utility types (Omit, Pick, Required, Readonly). **Done:** Added Required and Pick pattern tests. Omit covered by existing `test_mapped_type_key_remap_filters_keys`. Readonly covered by existing `test_mapped_type_with_readonly_modifier`.
-- [x] Verify mapped type + conditional type nesting works correctly. **Done:** Added `test_mapped_type_with_nested_conditionals`.
+(empty - awaiting next assignment)
 
 ## Completed
 - [x] Added generic library regression + fixed declare function overload handling. Tests: `./wasm/test.sh test_generic_library_snippet_compiles_and_checks` (full suite fails on existing `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
@@ -57,6 +55,11 @@ Priority: 4
 - [x] Added solver coverage for Extract utility type pattern. Tests: `./wasm/test.sh`.
 - [x] Added solver coverage for NonNullable utility type pattern. Tests: `./wasm/test.sh`.
 - [x] Added solver coverage for ReturnType utility type pattern. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for Parameters utility type pattern. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for ConstructorParameters utility type pattern. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for InstanceType utility type pattern. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for Parameters with optional params. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for Parameters with rest params. Tests: `./wasm/test.sh`.
 
 ## Ready for Merge
 Yes
