@@ -4236,3 +4236,167 @@ fn test_parity_es5_logical_assignment_property() {
         output
     );
 }
+
+/// Parity test for ES5 exponentiation operator with type erasure.
+/// Verifies type annotations are erased alongside exponentiation usage.
+#[test]
+fn test_parity_es5_exponentiation_type_erasure() {
+    let source = "function power(base: number, exp: number): number { return base ** exp; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify function is preserved
+    assert!(
+        output.contains("function power"),
+        "ES5 output should contain function power: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+    // Parameters should be preserved
+    assert!(
+        output.contains("base") && output.contains("exp"),
+        "ES5 output should preserve parameter names: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 exponentiation with const to var.
+/// const with exponentiation should convert to var in ES5.
+#[test]
+fn test_parity_es5_exponentiation_const_to_var() {
+    let source = "const squared = 5 ** 2;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify const is converted to var
+    assert!(
+        output.contains("var squared"),
+        "ES5 output should convert const to var: {}",
+        output
+    );
+    // No const keyword in ES5
+    assert!(
+        !output.contains("const "),
+        "ES5 output should not contain const keyword: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 exponentiation with let to var.
+/// let with exponentiation should convert to var in ES5.
+#[test]
+fn test_parity_es5_exponentiation_let_to_var() {
+    let source = "let result = 2 ** 10; result = result ** 2;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify let is converted to var
+    assert!(
+        output.contains("var result"),
+        "ES5 output should convert let to var: {}",
+        output
+    );
+    // No let keyword in ES5
+    assert!(
+        !output.contains("let "),
+        "ES5 output should not contain let keyword: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 exponentiation in arrow function.
+/// Arrow function with exponentiation should downlevel correctly.
+#[test]
+fn test_parity_es5_exponentiation_arrow() {
+    let source = "const cube = (n: number) => n ** 3;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify const is converted to var
+    assert!(
+        output.contains("var cube"),
+        "ES5 output should convert const to var: {}",
+        output
+    );
+    // Type annotation should be erased
+    assert!(
+        !output.contains(": number"),
+        "ES5 output should erase type annotation: {}",
+        output
+    );
+    // Arrow function should be converted to regular function
+    assert!(
+        output.contains("function"),
+        "ES5 output should convert arrow to function: {}",
+        output
+    );
+}
