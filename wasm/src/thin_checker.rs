@@ -500,6 +500,9 @@ impl<'a> ThinCheckerState<'a> {
                         self.error_value_only_type_at(&name, type_name_idx);
                         return TypeId::ERROR;
                     }
+                    // Ensure the base type symbol is resolved first so its type params
+                    // are available in the type_env for Application expansion
+                    let _ = self.get_type_of_symbol(sym_id);
                     let type_resolver = |node_idx: NodeIndex| self.resolve_type_symbol_for_lowering(node_idx);
                     let value_resolver = |node_idx: NodeIndex| self.resolve_value_symbol_for_lowering(node_idx);
                     let lowering = crate::solver::TypeLowering::with_resolvers(
@@ -534,6 +537,9 @@ impl<'a> ThinCheckerState<'a> {
                                 self.error_value_only_type_at(name, type_name_idx);
                                 return TypeId::ERROR;
                             }
+                            // Ensure the base type symbol is resolved first so its type params
+                            // are available in the type_env for Application expansion
+                            let _ = self.get_type_of_symbol(sym_id);
                         }
                     }
                     let type_resolver = |node_idx: NodeIndex| self.resolve_type_symbol_for_lowering(node_idx);
