@@ -28,9 +28,10 @@ WORKER_IDLE_SECONDS="${WORKER_IDLE_SECONDS:-180}"
 WORKER_POKE="${WORKER_POKE:-continue with your plan.}"
 
 # Startup - longer delays to ensure codex is fully loaded
-WORKER_START_PROMPT="${WORKER_START_PROMPT:-continue with your plan.}"
-EM_START_PROMPT="${EM_START_PROMPT:-continue}"
-DIRECTOR_START_PROMPT="${DIRECTOR_START_PROMPT:-continue}"
+# Note: Prompts are sent to codex, not shell - they appear after codex loads
+WORKER_START_PROMPT="${WORKER_START_PROMPT:-Read your plan file and start working on your current assignment.}"
+EM_START_PROMPT="${EM_START_PROMPT:-Read your squad GOALS.md and assign tasks to your workers.}"
+DIRECTOR_START_PROMPT="${DIRECTOR_START_PROMPT:-Read the Project Direction and update squad goals.}"
 START_PAUSE="${START_PAUSE:-45}"
 SEND_ENTER_PAUSE="${SEND_ENTER_PAUSE:-3}"
 STAGGER_PAUSE="${STAGGER_PAUSE:-5}"
@@ -329,53 +330,25 @@ setup_squad_window() {
   # Create window for squad
   tmux new-window -t "$SESSION" -n "$window" -c "$ROOT_DIR"
 
-  # Pane 0: EM (top-left)
-  # Export SQUAD_NAME so EM knows which squad it manages
+  # Pane 0: EM
   tmux send-keys -t "$SESSION:$window.0" "export SQUAD_NAME=$squad && bash -lc '$em_cmd'" C-m
   tmux select-pane -t "$SESSION:$window.0" -T "em-$squad" 2>/dev/null || true
 
-  # Create layout: EM + 5 workers (3x2 grid)
-  # Split horizontally: creates pane 1 (right)
-  local worker1_dir
-  worker1_dir="$(get_worktree_dir "$squad" 1)"
-  [ -z "$worker1_dir" ] && worker1_dir="$ROOT_DIR"
-  tmux split-window -h -t "$SESSION:$window.0" -c "$worker1_dir"
-  tmux send-keys -t "$SESSION:$window.1" "bash -lc '$worker_cmd'" C-m
-  tmux select-pane -t "$SESSION:$window.1" -T "${squad}-1" 2>/dev/null || true
+  # Create 5 worker panes, rebalancing after each split to ensure space
+  local worker_dir
+  for n in 1 2 3 4 5; do
+    worker_dir="$(get_worktree_dir "$squad" "$n")"
+    [ -z "$worker_dir" ] && worker_dir="$ROOT_DIR"
 
-  # Split pane 0 vertically: creates pane 2 (bottom-left)
-  local worker2_dir
-  worker2_dir="$(get_worktree_dir "$squad" 2)"
-  [ -z "$worker2_dir" ] && worker2_dir="$ROOT_DIR"
-  tmux split-window -v -t "$SESSION:$window.0" -c "$worker2_dir"
-  tmux send-keys -t "$SESSION:$window.2" "bash -lc '$worker_cmd'" C-m
-  tmux select-pane -t "$SESSION:$window.2" -T "${squad}-2" 2>/dev/null || true
+    # Split from pane 0 and immediately rebalance
+    tmux split-window -t "$SESSION:$window.0" -c "$worker_dir"
+    tmux select-layout -t "$SESSION:$window" tiled
+    # Export SQUAD_NAME and WORKER_NUM so worker knows its identity
+    tmux send-keys -t "$SESSION:$window.$n" "export SQUAD_NAME=$squad WORKER_NUM=$n && bash -lc '$worker_cmd'" C-m
+    tmux select-pane -t "$SESSION:$window.$n" -T "${squad}-${n}" 2>/dev/null || true
+  done
 
-  # Split pane 1 vertically: creates pane 3
-  local worker3_dir
-  worker3_dir="$(get_worktree_dir "$squad" 3)"
-  [ -z "$worker3_dir" ] && worker3_dir="$ROOT_DIR"
-  tmux split-window -v -t "$SESSION:$window.1" -c "$worker3_dir"
-  tmux send-keys -t "$SESSION:$window.3" "bash -lc '$worker_cmd'" C-m
-  tmux select-pane -t "$SESSION:$window.3" -T "${squad}-3" 2>/dev/null || true
-
-  # Split pane 2 vertically: creates pane 4
-  local worker4_dir
-  worker4_dir="$(get_worktree_dir "$squad" 4)"
-  [ -z "$worker4_dir" ] && worker4_dir="$ROOT_DIR"
-  tmux split-window -v -t "$SESSION:$window.2" -c "$worker4_dir"
-  tmux send-keys -t "$SESSION:$window.4" "bash -lc '$worker_cmd'" C-m
-  tmux select-pane -t "$SESSION:$window.4" -T "${squad}-4" 2>/dev/null || true
-
-  # Split pane 3 vertically: creates pane 5
-  local worker5_dir
-  worker5_dir="$(get_worktree_dir "$squad" 5)"
-  [ -z "$worker5_dir" ] && worker5_dir="$ROOT_DIR"
-  tmux split-window -v -t "$SESSION:$window.3" -c "$worker5_dir"
-  tmux send-keys -t "$SESSION:$window.5" "bash -lc '$worker_cmd'" C-m
-  tmux select-pane -t "$SESSION:$window.5" -T "${squad}-5" 2>/dev/null || true
-
-  # Balance the layout
+  # Final layout balance
   tmux select-layout -t "$SESSION:$window" tiled
 
   # Send start prompts to EM and workers
