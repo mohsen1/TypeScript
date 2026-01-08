@@ -599,6 +599,77 @@ fn test_source_map_es5_transform_async_await_element_access_mapping() {
 }
 
 #[test]
+fn test_source_map_es5_transform_async_await_call_mapping() {
+    let source = "async function run(value) { return await compute(value); }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    assert!(
+        output.contains("__awaiter(") && output.contains("__generator("),
+        "expected async downlevel output, got: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+    let (call_line, call_col) = find_line_col(source, "compute");
+
+    let mapping = decoded
+        .iter()
+        .find(|entry| {
+            entry.original_line == call_line
+                && entry.original_column == call_col
+        })
+        .unwrap_or_else(|| {
+            panic!(
+                "expected mapping for compute. mappings: {mappings} output: {output}"
+            )
+        });
+
+    assert_eq!(mapping.source_index, 0);
+    let output_line_text = output
+        .lines()
+        .nth(mapping.generated_line as usize)
+        .unwrap_or_else(|| {
+            panic!(
+                "missing output line {} in output: {output}",
+                mapping.generated_line
+            )
+        });
+    let output_slice = output_line_text
+        .get(mapping.generated_column as usize..)
+        .unwrap_or_else(|| {
+            panic!(
+                "missing output column {} in line: {output_line_text}",
+                mapping.generated_column
+            )
+        });
+    assert!(
+        output_slice.starts_with("compute"),
+        "expected mapped output to start with compute. line: {output_line_text} column: {} output: {output}",
+        mapping.generated_column
+    );
+}
+
+#[test]
 fn test_source_map_es5_transform_async_arrow_mapping() {
     let source = "const run = async (value) => { return await value; };";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
