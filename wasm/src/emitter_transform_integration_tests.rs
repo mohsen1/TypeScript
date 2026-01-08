@@ -875,6 +875,52 @@ class Derived extends Base {
 }
 
 #[test]
+fn test_two_phase_emission_es5_class_async_nested_arrow_super_arguments() {
+    let source = r#"
+class Base { m(x) { return x; } }
+class Derived extends Base {
+    async method() {
+        const f = () => () => super.m(arguments[0]);
+        return await f()();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("return __awaiter"),
+        "ES5 output should emit __awaiter for async method: {}",
+        output
+    );
+    assert!(
+        output.contains("_super.prototype.m.call(_this, arguments[0])"),
+        "ES5 output should lower super call with lexical this: {}",
+        output
+    );
+    assert!(
+        !output.contains("super.m"),
+        "ES5 output should not contain super method access: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel nested arrow: {}",
+        output
+    );
+}
+
+#[test]
 fn test_two_phase_emission_es5_class_async_super_nested_arrow() {
     let source = r#"
 class Base { m(x) { return x; } }
