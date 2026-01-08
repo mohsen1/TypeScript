@@ -2339,6 +2339,7 @@ fn test_commonjs_export_const_destructuring() {
     printer.emit(root);
 
     let output = printer.get_output();
+    assert!(output.contains("__esModule"), "Expected __esModule marker in CommonJS output: {}", output);
     assert!(
         output.contains("exports.a = exports.c = void 0;"),
         "Expected CommonJS exports init for destructured names: {}",
