@@ -247,10 +247,9 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 return self.interner.conditional(cond.clone());
             }
 
-            let mut subst = TypeSubstitution::new();
-            subst.insert(info.name, check_type);
-
             if check_type == TypeId::ANY {
+                let mut subst = TypeSubstitution::new();
+                subst.insert(info.name, check_type);
                 let true_eval = self.evaluate(instantiate_type_with_infer(
                     self.interner,
                     cond.true_type,
@@ -264,17 +263,25 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 return self.interner.union2(true_eval, false_eval);
             }
 
+            let mut subst = TypeSubstitution::new();
+            subst.insert(info.name, check_type);
+            let mut inferred = check_type;
             if let Some(constraint) = info.constraint {
                 let mut checker = SubtypeChecker::with_resolver(self.interner, self.resolver);
-                if !checker.is_subtype_of(check_type, constraint) {
+                let Some(filtered) =
+                    self.filter_inferred_by_constraint(inferred, constraint, &mut checker)
+                else {
                     let false_inst = instantiate_type_with_infer(
                         self.interner,
                         cond.false_type,
                         &subst,
                     );
                     return self.evaluate(false_inst);
-                }
+                };
+                inferred = filtered;
             }
+
+            subst.insert(info.name, inferred);
 
             let true_inst = instantiate_type_with_infer(
                 self.interner,
@@ -332,6 +339,13 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                         for &member in members.iter() {
                             match self.interner.lookup(member) {
                                 Some(TypeKey::Array(elem)) => parts.push(elem),
+                                Some(TypeKey::ReadonlyType(inner)) => {
+                                    let Some(TypeKey::Array(elem)) = self.interner.lookup(inner)
+                                    else {
+                                        return self.evaluate(cond.false_type);
+                                    };
+                                    parts.push(elem);
+                                }
                                 _ => return self.evaluate(cond.false_type),
                             }
                         }
@@ -346,7 +360,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     _ => None,
                 };
 
-                let Some(inferred) = inferred else {
+                let Some(mut inferred) = inferred else {
                     return self.evaluate(cond.false_type);
                 };
 
@@ -355,14 +369,18 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
 
                 if let Some(constraint) = info.constraint {
                     let mut checker = SubtypeChecker::with_resolver(self.interner, self.resolver);
-                    if !checker.is_subtype_of(inferred, constraint) {
+                    let Some(filtered) =
+                        self.filter_inferred_by_constraint(inferred, constraint, &mut checker)
+                    else {
                         let false_inst = instantiate_type_with_infer(
                             self.interner,
                             cond.false_type,
                             &subst,
                         );
                         return self.evaluate(false_inst);
-                    }
+                    };
+                    inferred = filtered;
+                    subst.insert(info.name, inferred);
                 }
 
                 let true_inst = instantiate_type_with_infer(
@@ -390,24 +408,50 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     let inferred = match self.interner.lookup(check_unwrapped) {
                         Some(TypeKey::Tuple(check_elements)) => {
                             let check_elements = self.interner.tuple_list(check_elements);
-                            if check_elements.len() == 1 && !check_elements[0].rest {
-                                Some(check_elements[0].type_id)
+                            if check_elements.is_empty() {
+                                extends_elements[0]
+                                    .optional
+                                    .then_some(TypeId::UNDEFINED)
+                            } else if check_elements.len() == 1 && !check_elements[0].rest {
+                                let elem = &check_elements[0];
+                                Some(if elem.optional {
+                                    self.interner.union2(elem.type_id, TypeId::UNDEFINED)
+                                } else {
+                                    elem.type_id
+                                })
                             } else {
                                 None
                             }
                         }
-                        Some(TypeKey::Union(members)) if extends_elements[0].optional => {
+                        Some(TypeKey::Union(members)) => {
                             let members = self.interner.type_list(members);
                             let mut inferred_members = Vec::new();
                             for &member in members.iter() {
-                                match self.interner.lookup(member) {
+                                let member_type = match self.interner.lookup(member) {
+                                    Some(TypeKey::ReadonlyType(inner)) => inner,
+                                    _ => member,
+                                };
+                                match self.interner.lookup(member_type) {
                                     Some(TypeKey::Tuple(check_elements)) => {
                                         let check_elements = self.interner.tuple_list(check_elements);
                                         if check_elements.is_empty() {
-                                            continue;
+                                            if extends_elements[0].optional {
+                                                inferred_members.push(TypeId::UNDEFINED);
+                                                continue;
+                                            }
+                                            return self.evaluate(cond.false_type);
                                         }
                                         if check_elements.len() == 1 && !check_elements[0].rest {
-                                            inferred_members.push(check_elements[0].type_id);
+                                            let elem = &check_elements[0];
+                                            let elem_type = if elem.optional {
+                                                self.interner.union2(
+                                                    elem.type_id,
+                                                    TypeId::UNDEFINED,
+                                                )
+                                            } else {
+                                                elem.type_id
+                                            };
+                                            inferred_members.push(elem_type);
                                         } else {
                                             return self.evaluate(cond.false_type);
                                         }
@@ -426,7 +470,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                         _ => None,
                     };
 
-                    let Some(inferred) = inferred else {
+                    let Some(mut inferred) = inferred else {
                         return self.evaluate(cond.false_type);
                     };
 
@@ -436,14 +480,18 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     if let Some(constraint) = info.constraint {
                         let mut checker =
                             SubtypeChecker::with_resolver(self.interner, self.resolver);
-                        if !checker.is_subtype_of(inferred, constraint) {
+                        let Some(filtered) =
+                            self.filter_inferred_by_constraint(inferred, constraint, &mut checker)
+                        else {
                             let false_inst = instantiate_type_with_infer(
                                 self.interner,
                                 cond.false_type,
                                 &subst,
                             );
                             return self.evaluate(false_inst);
-                        }
+                        };
+                        inferred = filtered;
+                        subst.insert(info.name, inferred);
                     }
 
                     let true_inst = instantiate_type_with_infer(
@@ -562,7 +610,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     _ => None,
                 };
 
-                let Some(inferred) = inferred else {
+                let Some(mut inferred) = inferred else {
                     return self.evaluate(cond.false_type);
                 };
 
@@ -572,14 +620,18 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 if let Some(constraint) = info.constraint {
                     let mut checker =
                         SubtypeChecker::with_resolver(self.interner, self.resolver);
-                    if !checker.is_subtype_of(inferred, constraint) {
+                    let Some(filtered) =
+                        self.filter_inferred_by_constraint(inferred, constraint, &mut checker)
+                    else {
                         let false_inst = instantiate_type_with_infer(
                             self.interner,
                             cond.false_type,
                             &subst,
                         );
                         return self.evaluate(false_inst);
-                    }
+                    };
+                    inferred = filtered;
+                    subst.insert(info.name, inferred);
                 }
 
                 let true_inst = instantiate_type_with_infer(
@@ -628,7 +680,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     _ => None,
                 };
 
-                let Some(inferred) = inferred else {
+                let Some(mut inferred) = inferred else {
                     return self.evaluate(cond.false_type);
                 };
 
@@ -638,14 +690,18 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 if let Some(constraint) = info.constraint {
                     let mut checker =
                         SubtypeChecker::with_resolver(self.interner, self.resolver);
-                    if !checker.is_subtype_of(inferred, constraint) {
+                    let Some(filtered) =
+                        self.filter_inferred_by_constraint(inferred, constraint, &mut checker)
+                    else {
                         let false_inst = instantiate_type_with_infer(
                             self.interner,
                             cond.false_type,
                             &subst,
                         );
                         return self.evaluate(false_inst);
-                    }
+                    };
+                    inferred = filtered;
+                    subst.insert(info.name, inferred);
                 }
 
                 let true_inst = instantiate_type_with_infer(
@@ -1900,6 +1956,101 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         }
     }
 
+    fn filter_inferred_by_constraint(
+        &self,
+        inferred: TypeId,
+        constraint: TypeId,
+        checker: &mut SubtypeChecker<'_, R>,
+    ) -> Option<TypeId> {
+        if inferred == constraint {
+            return Some(inferred);
+        }
+
+        if let Some(TypeKey::Union(members)) = self.interner.lookup(inferred) {
+            let members = self.interner.type_list(members);
+            let mut filtered = Vec::new();
+            for &member in members.iter() {
+                if checker.is_subtype_of(member, constraint) {
+                    filtered.push(member);
+                }
+            }
+            return match filtered.len() {
+                0 => None,
+                1 => Some(filtered[0]),
+                _ => Some(self.interner.union(filtered)),
+            };
+        }
+
+        if checker.is_subtype_of(inferred, constraint) {
+            Some(inferred)
+        } else {
+            None
+        }
+    }
+
+    fn match_tuple_elements(
+        &self,
+        source_elems: &[TupleElement],
+        pattern_elems: &[TupleElement],
+        bindings: &mut FxHashMap<Atom, TypeId>,
+        visited: &mut FxHashSet<(TypeId, TypeId)>,
+        checker: &mut SubtypeChecker<'_, R>,
+    ) -> bool {
+        let source_len = source_elems.len();
+        let pattern_len = pattern_elems.len();
+
+        if source_len > pattern_len {
+            return false;
+        }
+
+        let shared = std::cmp::min(source_len, pattern_len);
+        for i in 0..shared {
+            let source_elem = &source_elems[i];
+            let pattern_elem = &pattern_elems[i];
+            if source_elem.rest || pattern_elem.rest {
+                return false;
+            }
+            let source_type = if source_elem.optional {
+                self.interner.union2(source_elem.type_id, TypeId::UNDEFINED)
+            } else {
+                source_elem.type_id
+            };
+            if !self.match_infer_pattern(
+                source_type,
+                pattern_elem.type_id,
+                bindings,
+                visited,
+                checker,
+            ) {
+                return false;
+            }
+        }
+
+        if source_len < pattern_len {
+            for pattern_elem in &pattern_elems[source_len..] {
+                if pattern_elem.rest {
+                    return false;
+                }
+                if !pattern_elem.optional {
+                    return false;
+                }
+                if self.type_contains_infer(pattern_elem.type_id)
+                    && !self.match_infer_pattern(
+                        TypeId::UNDEFINED,
+                        pattern_elem.type_id,
+                        bindings,
+                        visited,
+                        checker,
+                    )
+                {
+                    return false;
+                }
+            }
+        }
+
+        true
+    }
+
     fn match_infer_pattern(
         &self,
         source: TypeId,
@@ -1922,10 +2073,14 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
 
         match pattern_key {
             TypeKey::Infer(info) => {
+                let mut source = source;
                 if let Some(constraint) = info.constraint {
-                    if !checker.is_subtype_of(source, constraint) {
+                    let Some(filtered) =
+                        self.filter_inferred_by_constraint(source, constraint, checker)
+                    else {
                         return false;
-                    }
+                    };
+                    source = filtered;
                 }
 
                 if let Some(existing) = bindings.get(&info.name) {
@@ -2050,23 +2205,13 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 Some(TypeKey::Tuple(source_elems)) => {
                     let source_elems = self.interner.tuple_list(source_elems);
                     let pattern_elems = self.interner.tuple_list(pattern_elems);
-                    if source_elems.len() != pattern_elems.len() {
-                        return false;
-                    }
-                    for (source_elem, pattern_elem) in
-                        source_elems.iter().zip(pattern_elems.iter())
-                    {
-                        if !self.match_infer_pattern(
-                            source_elem.type_id,
-                            pattern_elem.type_id,
-                            bindings,
-                            visited,
-                            checker,
-                        ) {
-                            return false;
-                        }
-                    }
-                    true
+                    self.match_tuple_elements(
+                        &source_elems,
+                        &pattern_elems,
+                        bindings,
+                        visited,
+                        checker,
+                    )
                 }
                 Some(TypeKey::Union(members)) => {
                     let members = self.interner.type_list(members);
@@ -2078,23 +2223,16 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                         };
                         let source_elems = self.interner.tuple_list(source_elems);
                         let pattern_elems = self.interner.tuple_list(pattern_elems);
-                        if source_elems.len() != pattern_elems.len() {
-                            return false;
-                        }
                         let mut member_bindings = FxHashMap::default();
                         let mut local_visited = FxHashSet::default();
-                        for (source_elem, pattern_elem) in
-                            source_elems.iter().zip(pattern_elems.iter())
-                        {
-                            if !self.match_infer_pattern(
-                                source_elem.type_id,
-                                pattern_elem.type_id,
-                                &mut member_bindings,
-                                &mut local_visited,
-                                checker,
-                            ) {
-                                return false;
-                            }
+                        if !self.match_tuple_elements(
+                            &source_elems,
+                            &pattern_elems,
+                            &mut member_bindings,
+                            &mut local_visited,
+                            checker,
+                        ) {
+                            return false;
                         }
                         for (name, ty) in member_bindings {
                             combined
@@ -2134,10 +2272,25 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                             .iter()
                             .find(|prop| prop.name == pattern_prop.name);
                         let Some(source_prop) = source_prop else {
+                            if pattern_prop.optional {
+                                if self.type_contains_infer(pattern_prop.type_id)
+                                    && !self.match_infer_pattern(
+                                        TypeId::UNDEFINED,
+                                        pattern_prop.type_id,
+                                        bindings,
+                                        visited,
+                                        checker,
+                                    )
+                                {
+                                    return false;
+                                }
+                                continue;
+                            }
                             return false;
                         };
+                        let source_type = self.optional_property_type(source_prop);
                         if !self.match_infer_pattern(
-                            source_prop.type_id,
+                            source_type,
                             pattern_prop.type_id,
                             bindings,
                             visited,
@@ -2188,10 +2341,25 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                             .iter()
                             .find(|prop| prop.name == pattern_prop.name);
                         let Some(source_prop) = source_prop else {
+                            if pattern_prop.optional {
+                                if self.type_contains_infer(pattern_prop.type_id)
+                                    && !self.match_infer_pattern(
+                                        TypeId::UNDEFINED,
+                                        pattern_prop.type_id,
+                                        bindings,
+                                        visited,
+                                        checker,
+                                    )
+                                {
+                                    return false;
+                                }
+                                continue;
+                            }
                             return false;
                         };
+                        let source_type = self.optional_property_type(source_prop);
                         if !self.match_infer_pattern(
-                            source_prop.type_id,
+                            source_type,
                             pattern_prop.type_id,
                             bindings,
                             visited,

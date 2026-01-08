@@ -457,7 +457,9 @@ fn test_conditional_infer_array_element_non_array_union_branch() {
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::STRING);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -712,7 +714,9 @@ fn test_conditional_infer_array_element_with_constraint() {
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::STRING);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -939,7 +943,9 @@ fn test_conditional_infer_object_property_with_constraint() {
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::STRING);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -2920,7 +2926,9 @@ fn test_conditional_infer_nested_object_property_with_constraint() {
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::STRING);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -3181,8 +3189,9 @@ fn test_conditional_infer_nested_object_property_non_matching_branch() {
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
 
-    assert_eq!(result, TypeId::STRING);
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -3304,8 +3313,9 @@ fn test_conditional_infer_object_property_non_object_union_branch() {
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
 
-    assert_eq!(result, TypeId::STRING);
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -4958,8 +4968,9 @@ fn test_conditional_infer_tuple_optional_element_distributive() {
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
 
-    assert_eq!(result, TypeId::STRING);
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -5008,8 +5019,9 @@ fn test_conditional_infer_tuple_optional_element_non_distributive_union_input() 
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
 
-    assert_eq!(result, TypeId::STRING);
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -5199,7 +5211,6 @@ fn test_conditional_infer_optional_tuple_element_with_constraint() {
     }));
 
     // T extends [infer R extends string] ? R : never, with T = [string?] | [number?].
-    // TODO: Optional tuple inference currently ignores optionality; current behavior yields string.
     let extends_tuple = interner.tuple(vec![TupleElement {
         type_id: infer_r,
         name: None,
@@ -5554,7 +5565,6 @@ fn test_conditional_infer_readonly_array_element_non_distributive_union_input() 
     }));
 
     // T extends readonly (infer R)[] ? R : never, with T = readonly string[] | readonly number[] (no distribution).
-    // TODO: Non-distributive readonly array inference over union inputs yields never.
     let extends_array =
         interner.intern(TypeKey::ReadonlyType(interner.array(infer_r)));
     let cond = ConditionalType {
@@ -5575,8 +5585,9 @@ fn test_conditional_infer_readonly_array_element_non_distributive_union_input() 
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
 
-    assert_eq!(result, TypeId::NEVER);
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -5701,7 +5712,6 @@ fn test_conditional_infer_readonly_tuple_element_non_distributive_union_input() 
     }));
 
     // T extends readonly [infer R] ? R : never, with T = readonly [string] | readonly [number] (no distribution).
-    // TODO: Non-distributive readonly tuple inference over union inputs yields never.
     let extends_tuple = interner.intern(TypeKey::ReadonlyType(interner.tuple(vec![
         TupleElement {
             type_id: infer_r,
@@ -5740,8 +5750,9 @@ fn test_conditional_infer_readonly_tuple_element_non_distributive_union_input() 
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
 
-    assert_eq!(result, TypeId::NEVER);
+    assert_eq!(result, expected);
 }
 
 #[test]
