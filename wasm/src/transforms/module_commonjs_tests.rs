@@ -237,6 +237,27 @@ fn test_collect_export_names_with_destructuring_defaults() {
 }
 
 #[test]
+fn test_collect_export_names_with_array_destructuring_defaults() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = "export const [a = 1, b] = arr;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let Some(source_file) = parser.arena.get_source_file(parser.arena.get(root).unwrap()) else {
+        panic!("Failed to get source file");
+    };
+
+    let export_names = collect_export_names(&parser.arena, &source_file.statements.nodes);
+
+    assert_eq!(
+        export_names,
+        vec!["a", "b"],
+        "Expected binding names from array destructuring with defaults"
+    );
+}
+
+#[test]
 fn test_collect_export_names_with_default_export() {
     use crate::thin_parser::ThinParserState;
 
