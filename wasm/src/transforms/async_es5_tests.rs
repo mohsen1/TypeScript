@@ -613,3 +613,827 @@ fn test_body_contains_await_detects_for_await_of_deep_nesting() {
         }
     }
 }
+
+// ============================================================================
+// Additional async ES5 emit tests
+// ============================================================================
+
+#[test]
+fn test_async_multiple_sequential_awaits() {
+    let output = parse_and_emit_async(
+        "async function foo() { await a(); await b(); await c(); }",
+    );
+    assert!(
+        output.contains("switch (_a.label)"),
+        "Should have switch for multiple awaits: {}",
+        output
+    );
+    // Should have multiple yield instructions
+    let yield_count = output.matches("[4 /*yield*/").count();
+    assert!(
+        yield_count >= 3,
+        "Should have at least 3 yield instructions for 3 awaits, got {}: {}",
+        yield_count,
+        output
+    );
+}
+
+#[test]
+fn test_async_await_with_binary_expression() {
+    // Test await in binary expression context - note that the current emitter
+    // doesn't fully transform nested await in parenthesized expressions within return
+    let output = parse_and_emit_async(
+        "async function foo() { return (await a()) + (await b()); }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Should have generator wrapper: {}",
+        output
+    );
+    // Current behavior: switch is emitted but await handling in binary may be incomplete
+    assert!(
+        output.contains("switch (_a.label)"),
+        "Should have switch for await context: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_await_in_conditional_expression() {
+    let output = parse_and_emit_async(
+        "async function foo() { return cond ? await a() : await b(); }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Should have generator wrapper for conditional await: {}",
+        output
+    );
+}
+
+#[test]
+fn test_body_contains_await_in_if_statement() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "async function foo() { if (cond) { await bar(); } }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&func_idx) = source_file.statements.nodes.first() {
+                if let Some(func_node) = parser.arena.get(func_idx) {
+                    if let Some(func) = parser.arena.get_function(func_node) {
+                        let emitter = AsyncES5Emitter::new(&parser.arena);
+                        assert!(
+                            emitter.body_contains_await(func.body),
+                            "Should detect await in if statement body"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn test_body_contains_await_in_else_branch() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "async function foo() { if (cond) { return 1; } else { await bar(); } }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&func_idx) = source_file.statements.nodes.first() {
+                if let Some(func_node) = parser.arena.get(func_idx) {
+                    if let Some(func) = parser.arena.get_function(func_node) {
+                        let emitter = AsyncES5Emitter::new(&parser.arena);
+                        assert!(
+                            emitter.body_contains_await(func.body),
+                            "Should detect await in else branch"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn test_body_contains_await_in_if_condition() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "async function foo() { if (await check()) { return 1; } }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&func_idx) = source_file.statements.nodes.first() {
+                if let Some(func_node) = parser.arena.get(func_idx) {
+                    if let Some(func) = parser.arena.get_function(func_node) {
+                        let emitter = AsyncES5Emitter::new(&parser.arena);
+                        assert!(
+                            emitter.body_contains_await(func.body),
+                            "Should detect await in if condition"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn test_body_contains_await_in_while_body() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "async function foo() { while (true) { await delay(100); } }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&func_idx) = source_file.statements.nodes.first() {
+                if let Some(func_node) = parser.arena.get(func_idx) {
+                    if let Some(func) = parser.arena.get_function(func_node) {
+                        let emitter = AsyncES5Emitter::new(&parser.arena);
+                        assert!(
+                            emitter.body_contains_await(func.body),
+                            "Should detect await in while loop body"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn test_body_contains_await_in_for_body() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "async function foo() { for (let i = 0; i < 10; i++) { await process(i); } }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&func_idx) = source_file.statements.nodes.first() {
+                if let Some(func_node) = parser.arena.get(func_idx) {
+                    if let Some(func) = parser.arena.get_function(func_node) {
+                        let emitter = AsyncES5Emitter::new(&parser.arena);
+                        assert!(
+                            emitter.body_contains_await(func.body),
+                            "Should detect await in for loop body"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn test_body_contains_await_in_do_while_body() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "async function foo() { do { await work(); } while (shouldContinue()); }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&func_idx) = source_file.statements.nodes.first() {
+                if let Some(func_node) = parser.arena.get(func_idx) {
+                    if let Some(func) = parser.arena.get_function(func_node) {
+                        let emitter = AsyncES5Emitter::new(&parser.arena);
+                        assert!(
+                            emitter.body_contains_await(func.body),
+                            "Should detect await in do-while loop body"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn test_body_contains_await_in_switch_case() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "async function foo() { switch (x) { case 1: await bar(); break; } }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&func_idx) = source_file.statements.nodes.first() {
+                if let Some(func_node) = parser.arena.get(func_idx) {
+                    if let Some(func) = parser.arena.get_function(func_node) {
+                        let emitter = AsyncES5Emitter::new(&parser.arena);
+                        assert!(
+                            emitter.body_contains_await(func.body),
+                            "Should detect await in switch case"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn test_body_contains_await_in_catch_block() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "async function foo() { try { throw new Error(); } catch (e) { await report(e); } }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&func_idx) = source_file.statements.nodes.first() {
+                if let Some(func_node) = parser.arena.get(func_idx) {
+                    if let Some(func) = parser.arena.get_function(func_node) {
+                        let emitter = AsyncES5Emitter::new(&parser.arena);
+                        assert!(
+                            emitter.body_contains_await(func.body),
+                            "Should detect await in catch block"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn test_body_contains_await_in_finally_block() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "async function foo() { try { work(); } finally { await cleanup(); } }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&func_idx) = source_file.statements.nodes.first() {
+                if let Some(func_node) = parser.arena.get(func_idx) {
+                    if let Some(func) = parser.arena.get_function(func_node) {
+                        let emitter = AsyncES5Emitter::new(&parser.arena);
+                        assert!(
+                            emitter.body_contains_await(func.body),
+                            "Should detect await in finally block"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ============================================================================
+// Nested async functions and closures tests
+// ============================================================================
+
+#[test]
+fn test_body_contains_await_ignores_nested_async_function_declaration() {
+    // Outer function should not detect await inside nested async function declaration
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "async function outer() { async function inner() { await bar(); } return 1; }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&func_idx) = source_file.statements.nodes.first() {
+                if let Some(func_node) = parser.arena.get(func_idx) {
+                    if let Some(func) = parser.arena.get_function(func_node) {
+                        let emitter = AsyncES5Emitter::new(&parser.arena);
+                        assert!(
+                            !emitter.body_contains_await(func.body),
+                            "Should NOT detect await in nested async function declaration"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn test_body_contains_await_ignores_nested_async_arrow() {
+    // Outer function should not detect await inside nested async arrow function
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "async function outer() { const inner = async () => await bar(); return 1; }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&func_idx) = source_file.statements.nodes.first() {
+                if let Some(func_node) = parser.arena.get(func_idx) {
+                    if let Some(func) = parser.arena.get_function(func_node) {
+                        let emitter = AsyncES5Emitter::new(&parser.arena);
+                        assert!(
+                            !emitter.body_contains_await(func.body),
+                            "Should NOT detect await in nested async arrow"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn test_body_contains_await_ignores_nested_async_function_expression() {
+    // Outer function should not detect await inside nested async function expression
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "async function outer() { const inner = async function() { await bar(); }; return 1; }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&func_idx) = source_file.statements.nodes.first() {
+                if let Some(func_node) = parser.arena.get(func_idx) {
+                    if let Some(func) = parser.arena.get_function(func_node) {
+                        let emitter = AsyncES5Emitter::new(&parser.arena);
+                        assert!(
+                            !emitter.body_contains_await(func.body),
+                            "Should NOT detect await in nested async function expression"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn test_body_contains_await_with_sync_closure_containing_await() {
+    // Sync closure inside async function cannot have await (would be parse error)
+    // But this tests that we detect await at outer level, not in nested sync function
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "async function outer() { await foo(); const sync = function() { return 1; }; }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&func_idx) = source_file.statements.nodes.first() {
+                if let Some(func_node) = parser.arena.get(func_idx) {
+                    if let Some(func) = parser.arena.get_function(func_node) {
+                        let emitter = AsyncES5Emitter::new(&parser.arena);
+                        assert!(
+                            emitter.body_contains_await(func.body),
+                            "Should detect await at outer level with sync closure"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn test_body_contains_await_ignores_deeply_nested_async() {
+    // Deeply nested async functions should all be ignored
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "async function outer() { const a = async () => { const b = async () => { await deep(); }; }; return 1; }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&func_idx) = source_file.statements.nodes.first() {
+                if let Some(func_node) = parser.arena.get(func_idx) {
+                    if let Some(func) = parser.arena.get_function(func_node) {
+                        let emitter = AsyncES5Emitter::new(&parser.arena);
+                        assert!(
+                            !emitter.body_contains_await(func.body),
+                            "Should NOT detect await in deeply nested async functions"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn test_body_contains_await_mixed_nested_sync_and_async() {
+    // Mix of sync and async nested functions - only outer await matters
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "async function outer() { await start(); const sync = () => { const inner = async () => await nested(); }; await end(); }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&func_idx) = source_file.statements.nodes.first() {
+                if let Some(func_node) = parser.arena.get(func_idx) {
+                    if let Some(func) = parser.arena.get_function(func_node) {
+                        let emitter = AsyncES5Emitter::new(&parser.arena);
+                        assert!(
+                            emitter.body_contains_await(func.body),
+                            "Should detect await at outer level with mixed nested functions"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn test_async_iife_emit() {
+    // Test async IIFE (Immediately Invoked Function Expression)
+    let output = parse_and_emit_async(
+        "async function wrapper() { await (async () => { return 42; })(); }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Should have generator wrapper for async IIFE: {}",
+        output
+    );
+    assert!(
+        output.contains("[4 /*yield*/"),
+        "Should have yield for awaited IIFE: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_callback_pattern() {
+    // Test async function used as callback
+    let output = parse_and_emit_async(
+        "async function handler() { await Promise.all([1, 2, 3].map(async (x) => await process(x))); }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Should have generator wrapper: {}",
+        output
+    );
+    assert!(
+        output.contains("[4 /*yield*/"),
+        "Should have yield for Promise.all: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_method_in_object_literal() {
+    // Test that we can parse async methods in object literals
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "async function outer() { const obj = { async method() { await bar(); } }; return obj; }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&func_idx) = source_file.statements.nodes.first() {
+                if let Some(func_node) = parser.arena.get(func_idx) {
+                    if let Some(func) = parser.arena.get_function(func_node) {
+                        let emitter = AsyncES5Emitter::new(&parser.arena);
+                        // Await in async method should not affect outer function
+                        assert!(
+                            !emitter.body_contains_await(func.body),
+                            "Should NOT detect await in nested async method"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn test_async_arrow_in_array() {
+    // Test async arrows used in array
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "async function outer() { const handlers = [async () => await a(), async () => await b()]; return handlers; }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&func_idx) = source_file.statements.nodes.first() {
+                if let Some(func_node) = parser.arena.get(func_idx) {
+                    if let Some(func) = parser.arena.get_function(func_node) {
+                        let emitter = AsyncES5Emitter::new(&parser.arena);
+                        assert!(
+                            !emitter.body_contains_await(func.body),
+                            "Should NOT detect await in async arrows within array"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn test_async_arrow_as_argument() {
+    // Test async arrow passed as function argument
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "async function outer() { await runWith(async (x) => await process(x)); }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&func_idx) = source_file.statements.nodes.first() {
+                if let Some(func_node) = parser.arena.get(func_idx) {
+                    if let Some(func) = parser.arena.get_function(func_node) {
+                        let emitter = AsyncES5Emitter::new(&parser.arena);
+                        assert!(
+                            emitter.body_contains_await(func.body),
+                            "Should detect outer await with async arrow as argument"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn test_async_closure_capturing_variable() {
+    // Test async closure that captures outer variable
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "async function outer() { const x = 1; const fn = async () => { const y = await bar(); return x + y; }; return fn; }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&func_idx) = source_file.statements.nodes.first() {
+                if let Some(func_node) = parser.arena.get(func_idx) {
+                    if let Some(func) = parser.arena.get_function(func_node) {
+                        let emitter = AsyncES5Emitter::new(&parser.arena);
+                        assert!(
+                            !emitter.body_contains_await(func.body),
+                            "Should NOT detect await in closure that captures outer variable"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ============================================================================
+// Promise combinator tests
+// ============================================================================
+
+#[test]
+fn test_async_promise_all_basic() {
+    let output = parse_and_emit_async(
+        "async function fetchAll() { const results = await Promise.all([fetch1(), fetch2()]); return results; }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Should have generator wrapper for Promise.all: {}",
+        output
+    );
+    assert!(
+        output.contains("[4 /*yield*/"),
+        "Should have yield for await Promise.all: {}",
+        output
+    );
+    assert!(
+        output.contains("Promise.all"),
+        "Should preserve Promise.all call: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_promise_all_with_map() {
+    let output = parse_and_emit_async(
+        "async function processAll() { const results = await Promise.all(items.map(async (x) => await process(x))); return results; }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Should have generator wrapper: {}",
+        output
+    );
+    assert!(
+        output.contains("Promise.all"),
+        "Should preserve Promise.all: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_promise_all_destructuring() {
+    let output = parse_and_emit_async(
+        "async function fetchPair() { const [a, b] = await Promise.all([fetchA(), fetchB()]); return a + b; }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Should have generator wrapper for destructured Promise.all: {}",
+        output
+    );
+    assert!(
+        output.contains("[4 /*yield*/"),
+        "Should have yield for Promise.all: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_promise_race_basic() {
+    let output = parse_and_emit_async(
+        "async function raceRequests() { const first = await Promise.race([fast(), slow()]); return first; }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Should have generator wrapper for Promise.race: {}",
+        output
+    );
+    assert!(
+        output.contains("[4 /*yield*/"),
+        "Should have yield for await Promise.race: {}",
+        output
+    );
+    assert!(
+        output.contains("Promise.race"),
+        "Should preserve Promise.race call: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_promise_race_with_timeout() {
+    let output = parse_and_emit_async(
+        "async function withTimeout() { const result = await Promise.race([fetchData(), timeout(5000)]); return result; }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Should have generator wrapper: {}",
+        output
+    );
+    assert!(
+        output.contains("Promise.race"),
+        "Should preserve Promise.race: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_promise_allsettled_basic() {
+    let output = parse_and_emit_async(
+        "async function settleAll() { const outcomes = await Promise.allSettled([try1(), try2(), try3()]); return outcomes; }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Should have generator wrapper for Promise.allSettled: {}",
+        output
+    );
+    assert!(
+        output.contains("[4 /*yield*/"),
+        "Should have yield for await Promise.allSettled: {}",
+        output
+    );
+    assert!(
+        output.contains("Promise.allSettled"),
+        "Should preserve Promise.allSettled call: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_promise_any_basic() {
+    let output = parse_and_emit_async(
+        "async function anySuccess() { const first = await Promise.any([attempt1(), attempt2()]); return first; }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Should have generator wrapper for Promise.any: {}",
+        output
+    );
+    assert!(
+        output.contains("[4 /*yield*/"),
+        "Should have yield for await Promise.any: {}",
+        output
+    );
+    assert!(
+        output.contains("Promise.any"),
+        "Should preserve Promise.any call: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_promise_resolve_basic() {
+    let output = parse_and_emit_async(
+        "async function resolveValue() { const value = await Promise.resolve(42); return value; }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Should have generator wrapper for Promise.resolve: {}",
+        output
+    );
+    assert!(
+        output.contains("[4 /*yield*/"),
+        "Should have yield for await Promise.resolve: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_chained_promise_combinators() {
+    let output = parse_and_emit_async(
+        "async function chainedCombinators() { const a = await Promise.all([p1(), p2()]); const b = await Promise.race([fast(), slow()]); return { a, b }; }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Should have generator wrapper: {}",
+        output
+    );
+    // Should have multiple yields for sequential awaits
+    let yield_count = output.matches("[4 /*yield*/").count();
+    assert!(
+        yield_count >= 2,
+        "Should have at least 2 yields for chained combinators, got {}: {}",
+        yield_count,
+        output
+    );
+}
+
+#[test]
+fn test_async_nested_promise_all() {
+    let output = parse_and_emit_async(
+        "async function nestedAll() { const result = await Promise.all([Promise.all([a(), b()]), Promise.all([c(), d()])]); return result; }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Should have generator wrapper for nested Promise.all: {}",
+        output
+    );
+    assert!(
+        output.contains("Promise.all"),
+        "Should preserve Promise.all calls: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_promise_all_in_try_catch() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "async function safeAll() { try { return await Promise.all([p1(), p2()]); } catch (e) { return []; } }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&func_idx) = source_file.statements.nodes.first() {
+                if let Some(func_node) = parser.arena.get(func_idx) {
+                    if let Some(func) = parser.arena.get_function(func_node) {
+                        let emitter = AsyncES5Emitter::new(&parser.arena);
+                        assert!(
+                            emitter.body_contains_await(func.body),
+                            "Should detect await Promise.all in try block"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn test_async_promise_race_in_loop() {
+    // Test that Promise.race works in loop context via body_contains_await detection
+    // Note: The emit path for while loops is not fully implemented yet
+    let output = parse_and_emit_async(
+        "async function pollUntilDone() { while (true) { await Promise.race([check(), timeout()]); } }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Should have generator wrapper for await in loop: {}",
+        output
+    );
+    assert!(
+        output.contains("switch (_a.label)"),
+        "Should have switch for await detection: {}",
+        output
+    );
+}

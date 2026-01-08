@@ -7,12 +7,15 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] Add ES5 emitter parity tests for private class fields (`#field`) in `wasm/src/emitter_parity_tests.rs`. Run `./wasm/test.sh emitter_parity`.
+- [ ] Add ES5 emitter parity tests for decorators in `wasm/src/emitter_parity_tests.rs`. Run `./wasm/test.sh emitter_parity`.
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 async generator parity tests (type erasure, method, await+yield) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (59 tests).
+- [x] Added ES5 generator function parity tests (type erasure, method, yield type erasure) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (56 tests).
+- [x] Added ES5 private class field parity tests (instance field, static access, method, getter, setter) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (51 tests).
 - [x] Added ES5 static block parity tests (`test_parity_es5_static_block`, `test_parity_es5_static_block_multi_stmt`) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (44 tests).
 - [x] Added parity test for function param type erasure in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (39 tests).
 - [x] Added parity test for type alias erasure in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (38 tests).
