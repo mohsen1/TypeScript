@@ -34,6 +34,7 @@ Priority: 1
 - [x] Circular extends constraints resolve to unknown; added `test_resolve_all_with_circular_extends_unknown`. Tests: `./wasm/test.sh test_resolve_all_with_circular_extends_unknown`.
 - [x] Contextual generic return uses union context for `any`; added `test_contextual_generic_return_union_any_uses_context`. Tests: `./wasm/test.sh test_contextual_generic_return_union_any_uses_context`.
 - [x] Mutual circular upper bounds with concrete bound resolves to concrete; added `test_resolve_mutual_circular_upper_bounds_with_concrete`. Tests: `./wasm/test.sh test_resolve_mutual_circular_upper_bounds_with_concrete`.
+- [x] Error lower bound with literal prefers literal; added `test_resolve_error_lower_with_literal_prefers_literal`. Tests: `./wasm/test.sh test_resolve_error_lower_with_literal_prefers_literal`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
