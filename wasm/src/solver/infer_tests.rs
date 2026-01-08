@@ -108,6 +108,32 @@ fn test_inference_occurs_check() {
     assert!(matches!(result, Err(InferenceError::OccursCheck { .. })));
 }
 
+#[test]
+fn test_inference_occurs_check_function_this_type() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let func_t = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: Vec::new(),
+        this_type: Some(t_type),
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let result = ctx.unify_var_type(var_t, func_t);
+    assert!(matches!(result, Err(InferenceError::OccursCheck { .. })));
+}
+
 // =============================================================================
 // Constraint Collection Tests
 // =============================================================================
