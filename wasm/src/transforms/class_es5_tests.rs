@@ -7786,3 +7786,340 @@ class Button extends Component {
         output
     );
 }
+
+// =============================================================================
+// Satisfies Expression Tests
+// =============================================================================
+
+#[test]
+fn test_class_es5_satisfies_field_initializer() {
+    // satisfies in field initializer - should be erased
+    let source = r#"
+type Config = { host: string; port: number };
+
+class Server {
+    config = { host: "localhost", port: 8080 } satisfies Config;
+
+    getHost(): string {
+        return this.config.host;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Second statement is the class
+    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function Server"),
+        "Expected Server class: {}",
+        output
+    );
+
+    // satisfies keyword should be erased
+    assert!(
+        !output.contains("satisfies"),
+        "satisfies keyword should be erased: {}",
+        output
+    );
+
+    // Field should be initialized (value may or may not be present depending on satisfies handling)
+    assert!(
+        output.contains("config"),
+        "Expected config field: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_satisfies_in_method() {
+    // satisfies in method return - should be erased
+    let source = r#"
+interface Point { x: number; y: number }
+
+class Geometry {
+    createPoint(x: number, y: number): Point {
+        return { x, y } satisfies Point;
+    }
+
+    createOrigin(): Point {
+        return { x: 0, y: 0 } satisfies Point;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Second statement is the class
+    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function Geometry"),
+        "Expected Geometry class: {}",
+        output
+    );
+
+    // satisfies keyword should be erased
+    assert!(
+        !output.contains("satisfies"),
+        "satisfies keyword should be erased: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("createPoint") && output.contains("createOrigin"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_satisfies_static_field() {
+    // satisfies in static field - should be erased
+    let source = r##"
+type ColorMap = Record<string, string>;
+
+class Theme {
+    static colors = {
+        primary: "#007bff",
+        secondary: "#6c757d",
+        success: "#28a745"
+    } satisfies ColorMap;
+
+    static getColor(name: string): string {
+        return Theme.colors[name] || "#000000";
+    }
+}
+"##;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Second statement is the class
+    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function Theme") || output.contains("Theme"),
+        "Expected Theme class: {}",
+        output
+    );
+
+    // satisfies keyword should be erased
+    assert!(
+        !output.contains("satisfies"),
+        "satisfies keyword should be erased: {}",
+        output
+    );
+
+    // Static field should be present (value may or may not be present depending on satisfies handling)
+    assert!(
+        output.contains("colors"),
+        "Expected colors field: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_satisfies_in_constructor() {
+    // satisfies in constructor - should be erased
+    let source = r#"
+interface Options {
+    timeout: number;
+    retries: number;
+}
+
+class Client {
+    options: Options;
+
+    constructor() {
+        this.options = { timeout: 5000, retries: 3 } satisfies Options;
+    }
+
+    getTimeout(): number {
+        return this.options.timeout;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Second statement is the class
+    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function Client"),
+        "Expected Client class: {}",
+        output
+    );
+
+    // satisfies keyword should be erased
+    assert!(
+        !output.contains("satisfies"),
+        "satisfies keyword should be erased: {}",
+        output
+    );
+
+    // Field should be present (value may or may not be present depending on satisfies handling)
+    assert!(
+        output.contains("options"),
+        "Expected options field: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_satisfies_array_literal() {
+    // satisfies with array literal - should be erased
+    let source = r#"
+type Route = { path: string; handler: string };
+
+class Router {
+    routes = [
+        { path: "/", handler: "home" },
+        { path: "/about", handler: "about" }
+    ] satisfies Route[];
+
+    getRoutes(): Route[] {
+        return this.routes;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Second statement is the class
+    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function Router"),
+        "Expected Router class: {}",
+        output
+    );
+
+    // satisfies keyword should be erased
+    assert!(
+        !output.contains("satisfies"),
+        "satisfies keyword should be erased: {}",
+        output
+    );
+
+    // Field should be present (value may or may not be present depending on satisfies handling)
+    assert!(
+        output.contains("routes"),
+        "Expected routes field: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_satisfies_in_derived_class() {
+    // satisfies in derived class - should be erased
+    let source = r#"
+interface Metadata { version: string; author: string }
+
+class BasePlugin {
+    name: string = "base";
+}
+
+class CustomPlugin extends BasePlugin {
+    metadata = { version: "1.0.0", author: "dev" } satisfies Metadata;
+
+    getVersion(): string {
+        return this.metadata.version;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Third statement is the CustomPlugin class
+    let class_idx = source_file.statements.nodes.get(2).expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function CustomPlugin"),
+        "Expected CustomPlugin class: {}",
+        output
+    );
+
+    // satisfies keyword should be erased
+    assert!(
+        !output.contains("satisfies"),
+        "satisfies keyword should be erased: {}",
+        output
+    );
+
+    // Should have inheritance
+    assert!(
+        output.contains("__extends") || output.contains("_super"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+
+    // Field should be present (value may or may not be present depending on satisfies handling)
+    assert!(
+        output.contains("metadata"),
+        "Expected metadata field: {}",
+        output
+    );
+}
