@@ -205,7 +205,10 @@ impl<'a> AsyncES5Emitter<'a> {
         }
 
         // Check block statements
-        if node.kind == syntax_kind_ext::BLOCK {
+        if node.kind == syntax_kind_ext::BLOCK
+            || node.kind == syntax_kind_ext::CASE_BLOCK
+            || node.kind == syntax_kind_ext::CLASS_STATIC_BLOCK_DECLARATION
+        {
             if let Some(block) = self.arena.get_block(node) {
                 for &stmt_idx in &block.statements.nodes {
                     if self.contains_await_recursive(stmt_idx) {
@@ -256,6 +259,36 @@ impl<'a> AsyncES5Emitter<'a> {
                 }
                 if self.contains_await_recursive(if_stmt.else_statement) {
                     return true;
+                }
+            }
+        }
+
+        // Check switch statements
+        if node.kind == syntax_kind_ext::SWITCH_STATEMENT {
+            if let Some(switch_stmt) = self.arena.get_switch(node) {
+                if self.contains_await_recursive(switch_stmt.expression) {
+                    return true;
+                }
+                if self.contains_await_recursive(switch_stmt.case_block) {
+                    return true;
+                }
+            }
+        }
+
+        // Check case/default clauses
+        if node.kind == syntax_kind_ext::CASE_CLAUSE
+            || node.kind == syntax_kind_ext::DEFAULT_CLAUSE
+        {
+            if let Some(clause) = self.arena.get_case_clause(node) {
+                if clause.expression.is_some()
+                    && self.contains_await_recursive(clause.expression)
+                {
+                    return true;
+                }
+                for &stmt_idx in &clause.statements.nodes {
+                    if self.contains_await_recursive(stmt_idx) {
+                        return true;
+                    }
                 }
             }
         }
