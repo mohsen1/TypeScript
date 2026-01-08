@@ -3866,3 +3866,197 @@ fn test_parity_es5_template_nested() {
         output
     );
 }
+
+/// Parity test for ES5 for-of with array destructuring.
+/// for (const [a, b] of pairs) should downlevel both for-of and destructuring.
+#[test]
+fn test_parity_es5_for_of_array_destructuring() {
+    let source = "const pairs = [[1,2],[3,4]]; for (const [a, b] of pairs) { console.log(a + b); }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 for-of with array destructuring downlevel
+    assert!(
+        output.contains("var pairs"),
+        "ES5 output should define pairs: {}",
+        output
+    );
+    // Should have for loop structure
+    assert!(
+        output.contains("for (") || output.contains("for("),
+        "ES5 output should contain for loop: {}",
+        output
+    );
+    // No for...of syntax
+    assert!(
+        !output.contains(" of pairs") && !output.contains(" of pairs)"),
+        "ES5 output should not contain for...of syntax: {}",
+        output
+    );
+    // No destructuring pattern in loop header
+    assert!(
+        !output.contains("const [a, b]") && !output.contains("var [a, b]"),
+        "ES5 output should not contain destructuring pattern: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 for-of with object destructuring.
+/// for (const {x, y} of points) should downlevel both for-of and destructuring.
+#[test]
+fn test_parity_es5_for_of_object_destructuring() {
+    let source = "const points = [{x:1,y:2},{x:3,y:4}]; for (const {x, y} of points) { console.log(x, y); }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 for-of with object destructuring downlevel
+    assert!(
+        output.contains("var points"),
+        "ES5 output should define points: {}",
+        output
+    );
+    // Should have for loop structure
+    assert!(
+        output.contains("for (") || output.contains("for("),
+        "ES5 output should contain for loop: {}",
+        output
+    );
+    // No for...of syntax
+    assert!(
+        !output.contains(" of points") && !output.contains(" of points)"),
+        "ES5 output should not contain for...of syntax: {}",
+        output
+    );
+    // No destructuring pattern in loop header
+    assert!(
+        !output.contains("const {x, y}") && !output.contains("var {x, y}"),
+        "ES5 output should not contain object destructuring pattern: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 nested for-of loops.
+/// Nested for-of should both be downleveled correctly.
+#[test]
+fn test_parity_es5_for_of_nested() {
+    let source = "const matrix = [[1,2],[3,4]]; for (const row of matrix) { for (const cell of row) { console.log(cell); } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 nested for-of downlevel
+    assert!(
+        output.contains("var matrix"),
+        "ES5 output should define matrix: {}",
+        output
+    );
+    // Should have console.log preserved
+    assert!(
+        output.contains("console.log"),
+        "ES5 output should contain console.log: {}",
+        output
+    );
+    // No for...of syntax
+    assert!(
+        !output.contains(" of matrix") && !output.contains(" of row"),
+        "ES5 output should not contain for...of syntax: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 for-of with let binding.
+/// for (let x of arr) should downlevel to var in ES5.
+#[test]
+fn test_parity_es5_for_of_let() {
+    let source = "const items = [1, 2, 3]; for (let item of items) { item++; console.log(item); }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 for-of with let downlevel
+    assert!(
+        output.contains("var items"),
+        "ES5 output should define items with var: {}",
+        output
+    );
+    // Should have for loop structure
+    assert!(
+        output.contains("for (") || output.contains("for("),
+        "ES5 output should contain for loop: {}",
+        output
+    );
+    // No for...of syntax
+    assert!(
+        !output.contains(" of items") && !output.contains(" of items)"),
+        "ES5 output should not contain for...of syntax: {}",
+        output
+    );
+    // No let keyword in ES5
+    assert!(
+        !output.contains("let "),
+        "ES5 output should not contain let keyword: {}",
+        output
+    );
+}
