@@ -52,6 +52,15 @@ if [ "${1:-}" = "--kill" ]; then
 fi
 
 # =============================================================================
+# Fresh mode - reset all branches to origin/rust
+# =============================================================================
+FRESH_MODE=0
+if [ "${1:-}" = "--fresh" ]; then
+  FRESH_MODE=1
+  echo "Fresh mode: will reset all branches to origin/rust"
+fi
+
+# =============================================================================
 # Path setup
 # =============================================================================
 BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -107,7 +116,7 @@ fi
 # Ensure rust branch exists
 # =============================================================================
 if [ "$AUTO_FETCH" = "1" ]; then
-  git -C "$ROOT_DIR" fetch --prune origin rust >/dev/null 2>&1 || true
+  git -C "$ROOT_DIR" fetch --prune origin >/dev/null 2>&1 || true
 fi
 
 if ! git -C "$ROOT_DIR" show-ref --verify --quiet refs/heads/rust; then
@@ -116,6 +125,37 @@ if ! git -C "$ROOT_DIR" show-ref --verify --quiet refs/heads/rust; then
   else
     git -C "$ROOT_DIR" branch rust >/dev/null 2>&1 || true
   fi
+fi
+
+# =============================================================================
+# Fresh mode: Reset all branches to origin/rust
+# =============================================================================
+if [ "$FRESH_MODE" = "1" ]; then
+  echo "Resetting all branches to origin/rust..."
+
+  # Reset squad branches
+  for squad in forge anvil; do
+    branch="squad/$squad"
+    if git -C "$ROOT_DIR" show-ref --verify --quiet "refs/heads/$branch"; then
+      git -C "$ROOT_DIR" branch -D "$branch" >/dev/null 2>&1 || true
+    fi
+    git -C "$ROOT_DIR" branch "$branch" origin/rust >/dev/null 2>&1 || true
+    echo "  Reset $branch -> origin/rust"
+  done
+
+  # Reset worker branches
+  for squad in forge anvil; do
+    for n in 1 2 3 4 5; do
+      branch="worker/${squad}-${n}"
+      if git -C "$ROOT_DIR" show-ref --verify --quiet "refs/heads/$branch"; then
+        git -C "$ROOT_DIR" branch -D "$branch" >/dev/null 2>&1 || true
+      fi
+      git -C "$ROOT_DIR" branch "$branch" origin/rust >/dev/null 2>&1 || true
+      echo "  Reset $branch -> origin/rust"
+    done
+  done
+
+  echo "All branches reset to origin/rust"
 fi
 
 # =============================================================================
@@ -234,11 +274,20 @@ is_worktree() {
 ensure_worktree() {
   local name="$1"
   local dir="$WORKTREE_BASE/TypeScript-${name}-track"
+  local branch="worker/$name"
 
   if [ -d "$dir" ]; then
     if ! is_worktree "$dir"; then
       echo "warning: $dir exists but is not a git worktree; skipping" >&2
       return 1
+    fi
+    # Fresh mode: reset worktree to origin/rust
+    if [ "$FRESH_MODE" = "1" ]; then
+      git -C "$dir" fetch origin >/dev/null 2>&1 || true
+      git -C "$dir" reset --hard origin/rust >/dev/null 2>&1 || true
+      git -C "$dir" clean -fd >/dev/null 2>&1 || true
+      git -C "$dir" checkout -B "$branch" origin/rust >/dev/null 2>&1 || true
+      echo "  Reset worktree $name -> origin/rust"
     fi
   else
     git -C "$ROOT_DIR" worktree add --force "$dir" rust >/dev/null 2>&1 || {
@@ -590,6 +639,7 @@ echo "  tmux select-window -t $SESSION:anvil"
 echo ""
 echo "Attach: tmux attach -t $SESSION"
 echo "Kill:   $0 --kill"
+echo "Fresh:  $0 --fresh  (reset all branches to origin/rust)"
 echo "=============================================="
 
 # =============================================================================
