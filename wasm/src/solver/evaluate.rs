@@ -16,6 +16,7 @@ use crate::solver::types::*;
 use crate::solver::{apparent_primitive_members, ApparentMemberKind, TypeDatabase};
 use crate::solver::infer::InferenceContext;
 use crate::solver::instantiate::{
+    instantiate_generic,
     instantiate_type,
     instantiate_type_with_infer,
     TypeSubstitution,
@@ -206,7 +207,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 }
             }
             TypeKey::Application(app_id) => {
-                self.evaluate_application(*app_id, type_id)
+                self.evaluate_application(*app_id)
             }
             // Resolve Ref types to their structural form
             TypeKey::Ref(symbol) => {
@@ -221,160 +222,43 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         }
     }
 
-    /// Evaluate an Application type: Base<Args>
+    /// Evaluate a generic type application: Base<Args>
     ///
-    /// For generic interfaces like `Store<S, A>`, this resolves the base type
-    /// and instantiates it with the provided type arguments.
-    fn evaluate_application(&self, app_id: TypeApplicationId, original: TypeId) -> TypeId {
-        use crate::solver::instantiate::instantiate_type;
-
+    /// Algorithm:
+    /// 1. Look up the base type - if it's a Ref, resolve it
+    /// 2. Get the type parameters for the base symbol
+    /// 3. If we have type params, instantiate the resolved type with args
+    /// 4. Recursively evaluate the result
+    fn evaluate_application(&self, app_id: TypeApplicationId) -> TypeId {
         let app = self.interner.type_application(app_id);
 
-        // First, try to resolve the base type if it's a Ref
-        let resolved_base = match self.interner.lookup(app.base) {
-            Some(TypeKey::Ref(symbol)) => {
-                self.resolver.resolve_ref(symbol, self.interner)
-            }
-            _ => None,
+        // Look up the base type
+        let base_key = match self.interner.lookup(app.base) {
+            Some(k) => k,
+            None => return self.interner.application(app.base, app.args.clone()),
         };
 
-        let base = resolved_base.unwrap_or(app.base);
-
-        // Look up the base type to get its type parameters
-        let type_params = match self.interner.lookup(base) {
-            Some(TypeKey::Object(shape_id)) | Some(TypeKey::ObjectWithIndex(shape_id)) => {
-                // For Object types, we need to find TypeParameter types and map them
-                // to the provided arguments. This requires finding the type parameters
-                // that were used when the interface was lowered.
-                //
-                // Since Object types don't store type parameter metadata, we need to
-                // extract it from the TypeParameter types found within the object's
-                // properties. We collect them in the order they appear and match
-                // them to the arguments by position.
-                let type_param_names = self.extract_type_param_names_from_object(shape_id);
-                if type_param_names.is_empty() || type_param_names.len() != app.args.len() {
-                    // Can't match - return application with resolved base
-                    if resolved_base.is_some() {
-                        return self.interner.application(base, app.args.clone());
-                    }
-                    return original;
+        // If the base is a Ref, try to resolve and instantiate
+        if let TypeKey::Ref(symbol) = base_key {
+            // Try to get the type parameters for this symbol
+            if let Some(type_params) = self.resolver.get_type_params(symbol) {
+                // Resolve the base type to get the body
+                if let Some(resolved) = self.resolver.resolve_ref(symbol, self.interner) {
+                    // Instantiate the resolved type with the type arguments
+                    let instantiated = instantiate_generic(
+                        self.interner,
+                        resolved,
+                        &type_params,
+                        &app.args,
+                    );
+                    // Recursively evaluate the result
+                    return self.evaluate(instantiated);
                 }
-
-                // Create type param infos from names
-                type_param_names
-                    .into_iter()
-                    .map(|name| TypeParamInfo {
-                        name,
-                        constraint: None,
-                        default: None,
-                    })
-                    .collect::<Vec<_>>()
-            }
-            Some(TypeKey::Callable(shape_id)) => {
-                // Get type params from first call signature
-                let shape = self.interner.callable_shape(shape_id);
-                if let Some(sig) = shape.call_signatures.first() {
-                    sig.type_params.clone()
-                } else if let Some(sig) = shape.construct_signatures.first() {
-                    sig.type_params.clone()
-                } else {
-                    return original;
-                }
-            }
-            Some(TypeKey::Function(shape_id)) => {
-                let shape = self.interner.function_shape(shape_id);
-                shape.type_params.clone()
-            }
-            _ => {
-                // For other types (including unresolved Ref), return an application with resolved base
-                if resolved_base.is_some() {
-                    return self.interner.application(base, app.args.clone());
-                }
-                return original;
-            }
-        };
-
-        // If no type parameters, just return the base
-        if type_params.is_empty() {
-            return base;
-        }
-
-        // Create substitution and instantiate
-        let subst = crate::solver::instantiate::TypeSubstitution::from_args(&type_params, &app.args);
-        instantiate_type(self.interner, base, &subst)
-    }
-
-    /// Extract type parameter names from an Object type by scanning its properties
-    /// for TypeParameter types. Returns them in a deterministic order.
-    fn extract_type_param_names_from_object(&self, shape_id: ObjectShapeId) -> Vec<Atom> {
-        let shape = self.interner.object_shape(shape_id);
-        let mut seen = std::collections::HashSet::new();
-        let mut names = Vec::new();
-
-        for prop in &shape.properties {
-            self.collect_type_param_names_from_type(prop.type_id, &mut seen, &mut names);
-            if prop.write_type != prop.type_id {
-                self.collect_type_param_names_from_type(prop.write_type, &mut seen, &mut names);
             }
         }
 
-        names
-    }
-
-    /// Recursively collect TypeParameter names from a type in order of first occurrence.
-    fn collect_type_param_names_from_type(
-        &self,
-        type_id: TypeId,
-        seen: &mut std::collections::HashSet<Atom>,
-        names: &mut Vec<Atom>,
-    ) {
-        if type_id.is_intrinsic() {
-            return;
-        }
-
-        let Some(key) = self.interner.lookup(type_id) else {
-            return;
-        };
-
-        match key {
-            TypeKey::TypeParameter(ref info) => {
-                if !seen.contains(&info.name) {
-                    seen.insert(info.name);
-                    names.push(info.name);
-                }
-            }
-            TypeKey::Function(shape_id) => {
-                let shape = self.interner.function_shape(shape_id);
-                for param in &shape.params {
-                    self.collect_type_param_names_from_type(param.type_id, seen, names);
-                }
-                self.collect_type_param_names_from_type(shape.return_type, seen, names);
-            }
-            TypeKey::Union(members) | TypeKey::Intersection(members) => {
-                let members = self.interner.type_list(members);
-                for &member in members.iter() {
-                    self.collect_type_param_names_from_type(member, seen, names);
-                }
-            }
-            TypeKey::Array(elem) => {
-                self.collect_type_param_names_from_type(elem, seen, names);
-            }
-            TypeKey::Conditional(cond_id) => {
-                let cond = self.interner.conditional_type(cond_id);
-                self.collect_type_param_names_from_type(cond.check_type, seen, names);
-                self.collect_type_param_names_from_type(cond.extends_type, seen, names);
-                self.collect_type_param_names_from_type(cond.true_type, seen, names);
-                self.collect_type_param_names_from_type(cond.false_type, seen, names);
-            }
-            TypeKey::Application(app_id) => {
-                let app = self.interner.type_application(app_id);
-                self.collect_type_param_names_from_type(app.base, seen, names);
-                for &arg in &app.args {
-                    self.collect_type_param_names_from_type(arg, seen, names);
-                }
-            }
-            _ => {}
-        }
+        // If we can't expand, return the original application
+        self.interner.application(app.base, app.args.clone())
     }
 
     /// Evaluate a conditional type: T extends U ? X : Y

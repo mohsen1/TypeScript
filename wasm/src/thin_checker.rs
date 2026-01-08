@@ -528,6 +528,9 @@ impl<'a> ThinCheckerState<'a> {
                         self.error_value_only_type_at(&name, type_name_idx);
                         return TypeId::ERROR;
                     }
+                    // Ensure the base type symbol is resolved first so its type params
+                    // are available in the type_env for Application expansion
+                    let _ = self.get_type_of_symbol(sym_id);
                     if let Some(instantiated) = self.instantiate_type_alias(sym_id, &type_args) {
                         return self.expand_type_alias_applications(instantiated);
                     }
@@ -568,12 +571,14 @@ impl<'a> ThinCheckerState<'a> {
                         self.error_cannot_find_name_at(name, type_name_idx);
                         return TypeId::ERROR;
                     }
-
                     if let Some(sym_id) = sym_id {
                         if self.alias_resolves_to_value_only(sym_id) || self.symbol_is_value_only(sym_id) {
                             self.error_value_only_type_at(name, type_name_idx);
                             return TypeId::ERROR;
                         }
+                        // Ensure the base type symbol is resolved first so its type params
+                        // are available in the type_env for Application expansion
+                        let _ = self.get_type_of_symbol(sym_id);
                         if let Some(instantiated) = self.instantiate_type_alias(sym_id, &type_args) {
                             return self.expand_type_alias_applications(instantiated);
                         }
@@ -3732,6 +3737,8 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Get type of a symbol.
     pub fn get_type_of_symbol(&mut self, sym_id: SymbolId) -> TypeId {
+        use crate::solver::SymbolRef;
+
         self.record_symbol_dependency(sym_id);
 
         // Check cache first
@@ -3786,6 +3793,17 @@ impl<'a> ThinCheckerState<'a> {
 
         // Cache result
         self.ctx.symbol_types.insert(sym_id, result);
+
+        // Also populate the type environment for Application expansion
+        if result != TypeId::ANY && result != TypeId::ERROR {
+            let type_params = self.get_type_params_for_symbol(sym_id);
+            let mut env = self.ctx.type_env.borrow_mut();
+            if type_params.is_empty() {
+                env.insert(SymbolRef(sym_id.0), result);
+            } else {
+                env.insert_with_params(SymbolRef(sym_id.0), result, type_params);
+            }
+        }
 
         result
     }
@@ -5912,24 +5930,16 @@ impl<'a> ThinCheckerState<'a> {
     /// Check if `source` type is assignable to `target` type.
     ///
     /// Uses the solver's SubtypeChecker with coinductive cycle detection.
-    /// Note: Does not resolve Ref types (use `is_assignable_to_with_resolution` for that).
-    pub fn is_assignable_to(&mut self, source: TypeId, target: TypeId) -> bool {
+    /// Uses the context's TypeEnvironment for resolving type references and expanding Applications.
+    pub fn is_assignable_to(&self, source: TypeId, target: TypeId) -> bool {
         use crate::solver::CompatChecker;
 
-        if let Some(result) = self.enum_assignability_override(source, target, None) {
+        let env = self.ctx.type_env.borrow();
+        if let Some(result) = self.enum_assignability_override(source, target, Some(&*env)) {
             return result;
         }
 
-        let needs_env = self.ctx.type_environment.borrow().is_none();
-        if needs_env {
-            let env = self.build_type_environment();
-            *self.ctx.type_environment.borrow_mut() = Some(env);
-        }
-        let env_ref = std::cell::Ref::map(
-            self.ctx.type_environment.borrow(),
-            |env| env.as_ref().expect("type environment"),
-        );
-        let mut checker = CompatChecker::with_resolver(self.ctx.types, &*env_ref);
+        let mut checker = CompatChecker::with_resolver(self.ctx.types, &*env);
         checker.is_assignable(source, target)
     }
 
@@ -5955,18 +5965,11 @@ impl<'a> ThinCheckerState<'a> {
     /// Check if `source` type is a subtype of `target` type.
     ///
     /// Stricter than assignability. Uses coinductive semantics for recursive types.
-    pub fn is_subtype_of(&mut self, source: TypeId, target: TypeId) -> bool {
+    /// Uses the context's TypeEnvironment for resolving type references and expanding Applications.
+    pub fn is_subtype_of(&self, source: TypeId, target: TypeId) -> bool {
         use crate::solver::SubtypeChecker;
-        let needs_env = self.ctx.type_environment.borrow().is_none();
-        if needs_env {
-            let env = self.build_type_environment();
-            *self.ctx.type_environment.borrow_mut() = Some(env);
-        }
-        let env_ref = std::cell::Ref::map(
-            self.ctx.type_environment.borrow(),
-            |env| env.as_ref().expect("type environment"),
-        );
-        let mut checker = SubtypeChecker::with_resolver(self.ctx.types, &*env_ref);
+        let env = self.ctx.type_env.borrow();
+        let mut checker = SubtypeChecker::with_resolver(self.ctx.types, &*env);
         checker.is_subtype_of(source, target)
     }
 
@@ -5992,9 +5995,11 @@ impl<'a> ThinCheckerState<'a> {
     }
 
     /// Check if a type is assignable to a union of types.
+    /// Uses the context's TypeEnvironment for resolving type references and expanding Applications.
     pub fn is_assignable_to_union(&self, source: TypeId, targets: &[TypeId]) -> bool {
         use crate::solver::CompatChecker;
-        let mut checker = CompatChecker::new(self.ctx.types);
+        let env = self.ctx.type_env.borrow();
+        let mut checker = CompatChecker::with_resolver(self.ctx.types, &*env);
         for &target in targets {
             if checker.is_assignable(source, target) {
                 return true;
@@ -6025,12 +6030,65 @@ impl<'a> ThinCheckerState<'a> {
             // Get the type for this symbol
             let type_id = self.get_type_of_symbol(sym_id);
             if type_id != TypeId::ANY && type_id != TypeId::ERROR {
-                // Use symbol's raw ID as the SymbolRef
-                env.insert(SymbolRef(sym_id.0), type_id);
+                // Get type parameters if this is a generic type
+                let type_params = self.get_type_params_for_symbol(sym_id);
+                if type_params.is_empty() {
+                    env.insert(SymbolRef(sym_id.0), type_id);
+                } else {
+                    env.insert_with_params(SymbolRef(sym_id.0), type_id, type_params);
+                }
             }
         }
 
         env
+    }
+
+    /// Get type parameters for a symbol (for generic type aliases and interfaces).
+    fn get_type_params_for_symbol(&mut self, sym_id: SymbolId) -> Vec<crate::solver::TypeParamInfo> {
+        let Some(symbol) = self.ctx.binder.get_symbol(sym_id) else {
+            return Vec::new();
+        };
+
+        let flags = symbol.flags;
+        let value_decl = symbol.value_declaration;
+
+        // Type alias - get type parameters from declaration
+        if flags & symbol_flags::TYPE_ALIAS != 0 {
+            let decl_idx = if !value_decl.is_none() {
+                value_decl
+            } else {
+                symbol.declarations.first().copied().unwrap_or(NodeIndex::NONE)
+            };
+            if !decl_idx.is_none() {
+                if let Some(node) = self.ctx.arena.get(decl_idx) {
+                    if let Some(type_alias) = self.ctx.arena.get_type_alias(node) {
+                        let (params, updates) = self.push_type_parameters(&type_alias.type_parameters);
+                        self.pop_type_parameters(updates);
+                        return params;
+                    }
+                }
+            }
+        }
+
+        // Interface - get type parameters from first declaration
+        if flags & symbol_flags::INTERFACE != 0 {
+            let decl_idx = if !value_decl.is_none() {
+                value_decl
+            } else {
+                symbol.declarations.first().copied().unwrap_or(NodeIndex::NONE)
+            };
+            if !decl_idx.is_none() {
+                if let Some(node) = self.ctx.arena.get(decl_idx) {
+                    if let Some(iface) = self.ctx.arena.get_interface(node) {
+                        let (params, updates) = self.push_type_parameters(&iface.type_parameters);
+                        self.pop_type_parameters(updates);
+                        return params;
+                    }
+                }
+            }
+        }
+
+        Vec::new()
     }
 
     /// Create a union type from multiple types.
