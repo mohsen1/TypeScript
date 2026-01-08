@@ -13051,67 +13051,66 @@ const merged = { ...coords, z: 30 };"#;
 }
 
 #[test]
-fn test_source_map_typescript_interfaces_and_types() {
-    // Test TypeScript interfaces and type aliases source map coverage
-    let source = r#"interface User {
-    id: number;
-    name: string;
-    email?: string;
-}
-
-type Point = {
-    x: number;
-    y: number;
+fn test_source_map_method_definitions_mapping() {
+    // Test source-map accuracy for method definition syntax
+    let source = r#"const calculator = {
+    add(a: number, b: number): number {
+        return a + b;
+    },
+    subtract(a: number, b: number): number {
+        return a - b;
+    },
+    *generator() {
+        yield 1;
+        yield 2;
+    },
+    async fetchData() {
+        return await Promise.resolve(42);
+    },
+    get value() {
+        return this._value;
+    },
+    set value(v: number) {
+        this._value = v;
+    }
 };
 
-type StringOrNumber = string | number;
+class Counter {
+    private count = 0;
 
-type Callback<T> = (value: T) => void;
-
-interface Animal {
-    name: string;
-    speak(): void;
-}
-
-class Dog implements Animal {
-    name: string;
-
-    constructor(name: string) {
-        this.name = name;
+    increment(): void {
+        this.count++;
     }
 
-    speak() {
-        console.log("Woof!");
+    decrement(): void {
+        this.count--;
     }
-}
 
-function processUser(user: User): string {
-    return user.name;
-}
-
-const point: Point = { x: 10, y: 20 };
-const dog = new Dog("Buddy");
-const result = processUser({ id: 1, name: "Alice" });"#;
-
+    async loadAsync(): Promise<number> {
+        return this.count;
+    }
+}"#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
+    let options = PrinterOptions::default();
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
     let mut printer =
         ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
     printer.emit(root);
 
     let output = printer.get_output().to_string();
+    assert!(
+        output.contains("calculator") && output.contains("Counter") && output.contains("add"),
+        "expected object and class names in output: {output}"
+    );
+
     let map_json = printer.generate_source_map_json().expect("source map");
     let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
-
     let mappings = map_value
         .get("mappings")
         .and_then(|v| v.as_str())
@@ -13119,97 +13118,85 @@ const result = processUser({ id: 1, name: "Alice" });"#;
 
     let decoded = decode_mappings(mappings);
 
-    // Verify we have mappings for the class declaration
-    let (dog_line, dog_col) = find_line_col(source, "class Dog");
-    let has_dog_mapping = decoded.iter().any(|entry| {
-        entry.original_line == dog_line
-            && entry.original_column >= dog_col
-            && entry.original_column <= dog_col + 9
+    let (calc_line, _) = find_line_col(source, "const calculator");
+    let has_calc_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == calc_line
     });
 
-    // Verify we have mappings for the function declaration
-    let (fn_line, fn_col) = find_line_col(source, "function processUser");
-    let has_fn_mapping = decoded.iter().any(|entry| {
-        entry.original_line == fn_line
-            && entry.original_column >= fn_col
-            && entry.original_column <= fn_col + 20
+    let (counter_line, _) = find_line_col(source, "class Counter");
+    let has_counter_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == counter_line
     });
 
-    // At minimum, we should have mappings for runtime declarations
     assert!(
-        has_dog_mapping || has_fn_mapping || !decoded.is_empty(),
-        "expected mappings for TypeScript interfaces/types. mappings: {mappings}"
+        has_calc_mapping || has_counter_mapping,
+        "expected mappings for method definitions. mappings: {mappings}"
     );
 
-    // Verify output contains expected runtime identifiers (not type-only)
-    assert!(
-        output.contains("Dog") && output.contains("processUser"),
-        "expected output to contain class and function names. output: {output}"
-    );
-
-    // Verify type-only declarations are stripped
-    assert!(
-        !output.contains("interface User") && !output.contains("type Point"),
-        "expected type declarations to be stripped. output: {output}"
-    );
-
-    // Verify source map has non-empty mappings
     assert!(
         !decoded.is_empty(),
-        "expected non-empty source mappings for TypeScript interfaces/types"
+        "expected non-empty source mappings for method definitions"
+    );
+
+    let unique_source_lines: std::collections::HashSet<_> =
+        decoded.iter().map(|m| m.original_line).collect();
+    assert!(
+        unique_source_lines.len() >= 5,
+        "expected mappings from at least 5 different source lines, got: {:?}",
+        unique_source_lines
     );
 }
 
 #[test]
-fn test_source_map_es_module_exports() {
-    // Test ES module export declarations source map coverage
-    let source = r#"export const PI = 3.14159;
+fn test_source_map_for_of_for_in_loops_mapping() {
+    // Test source-map accuracy for for-of and for-in loops
+    let source = r#"const numbers = [1, 2, 3, 4, 5];
+const obj = { a: 1, b: 2, c: 3 };
 
-export function add(a: number, b: number): number {
-    return a + b;
+for (const num of numbers) {
+    console.log(num);
 }
 
-export class Calculator {
-    value = 0;
-
-    add(n: number) {
-        this.value += n;
-        return this;
-    }
-
-    subtract(n: number) {
-        this.value -= n;
-        return this;
-    }
+for (const key in obj) {
+    console.log(key, obj[key]);
 }
 
-const privateValue = 42;
+for (let i of [10, 20, 30]) {
+    i *= 2;
+    console.log(i);
+}
 
-export { privateValue as publicValue };
+const iterable = new Map([["x", 1], ["y", 2]]);
+for (const [key, value] of iterable) {
+    console.log(key, value);
+}
 
-export default function main() {
-    return new Calculator();
+async function processItems(items: number[]) {
+    for await (const item of items) {
+        console.log(item);
+    }
 }"#;
-
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
+    let options = PrinterOptions::default();
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
     let mut printer =
         ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
     printer.emit(root);
 
     let output = printer.get_output().to_string();
+    assert!(
+        output.contains("numbers") && output.contains("obj"),
+        "expected variable names in output: {output}"
+    );
+
     let map_json = printer.generate_source_map_json().expect("source map");
     let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
-
     let mappings = map_value
         .get("mappings")
         .and_then(|v| v.as_str())
@@ -13217,136 +13204,32 @@ export default function main() {
 
     let decoded = decode_mappings(mappings);
 
-    // Verify we have mappings for the const declaration
-    let (pi_line, pi_col) = find_line_col(source, "export const PI");
-    let has_pi_mapping = decoded.iter().any(|entry| {
-        entry.original_line == pi_line
-            && entry.original_column >= pi_col
-            && entry.original_column <= pi_col + 15
+    let (numbers_line, _) = find_line_col(source, "const numbers");
+    let has_numbers_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == numbers_line
     });
 
-    // Verify we have mappings for the function declaration
-    let (fn_line, fn_col) = find_line_col(source, "export function add");
-    let has_fn_mapping = decoded.iter().any(|entry| {
-        entry.original_line == fn_line
-            && entry.original_column >= fn_col
-            && entry.original_column <= fn_col + 19
+    let (for_of_line, _) = find_line_col(source, "for (const num of");
+    let has_for_of_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == for_of_line
     });
 
-    // At minimum, we should have mappings for declarations
     assert!(
-        has_pi_mapping || has_fn_mapping || !decoded.is_empty(),
-        "expected mappings for ES module exports. mappings: {mappings}"
+        has_numbers_mapping || has_for_of_mapping,
+        "expected mappings for for-of/for-in loops. mappings: {mappings}"
     );
 
-    // Verify output contains expected identifiers
-    assert!(
-        output.contains("Calculator") && output.contains("add"),
-        "expected output to contain class and function names. output: {output}"
-    );
-
-    // Verify source map has non-empty mappings
     assert!(
         !decoded.is_empty(),
-        "expected non-empty source mappings for ES module exports"
-    );
-}
-
-#[test]
-fn test_source_map_conditional_and_switch() {
-    // Test conditional expressions and switch statements source map coverage
-    let source = r#"const age = 25;
-
-const status = age >= 18 ? "adult" : "minor";
-
-const category = age < 13 ? "child" : age < 20 ? "teen" : "adult";
-
-function getDiscount(type: string): number {
-    switch (type) {
-        case "student":
-            return 0.2;
-        case "senior":
-            return 0.3;
-        case "member":
-            return 0.15;
-        default:
-            return 0;
-    }
-}
-
-const discount = getDiscount("student");
-
-const nested = true ? (false ? "a" : "b") : "c";
-
-function handleValue(value: number | string | null) {
-    switch (typeof value) {
-        case "number":
-            return value * 2;
-        case "string":
-            return value.toUpperCase();
-        default:
-            return null;
-    }
-}"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.set_source_map_text(parser.get_source_text());
-    printer.enable_source_map("test.js", "test.ts");
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-    let map_json = printer.generate_source_map_json().expect("source map");
-    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
-
-    let mappings = map_value
-        .get("mappings")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
-
-    let decoded = decode_mappings(mappings);
-
-    // Verify we have mappings for the const declarations
-    let (age_line, age_col) = find_line_col(source, "const age");
-    let has_age_mapping = decoded.iter().any(|entry| {
-        entry.original_line == age_line
-            && entry.original_column >= age_col
-            && entry.original_column <= age_col + 9
-    });
-
-    // Verify we have mappings for the function declaration
-    let (fn_line, fn_col) = find_line_col(source, "function getDiscount");
-    let has_fn_mapping = decoded.iter().any(|entry| {
-        entry.original_line == fn_line
-            && entry.original_column >= fn_col
-            && entry.original_column <= fn_col + 20
-    });
-
-    // At minimum, we should have mappings for declarations
-    assert!(
-        has_age_mapping || has_fn_mapping || !decoded.is_empty(),
-        "expected mappings for conditional/switch. mappings: {mappings}"
+        "expected non-empty source mappings for for-of/for-in loops"
     );
 
-    // Verify output contains expected identifiers
+    let unique_source_lines: std::collections::HashSet<_> =
+        decoded.iter().map(|m| m.original_line).collect();
     assert!(
-        output.contains("getDiscount") && output.contains("handleValue"),
-        "expected output to contain function names. output: {output}"
-    );
-
-    // Verify source map has non-empty mappings
-    assert!(
-        !decoded.is_empty(),
-        "expected non-empty source mappings for conditional/switch"
+        unique_source_lines.len() >= 5,
+        "expected mappings from at least 5 different source lines, got: {:?}",
+        unique_source_lines
     );
 }
 
