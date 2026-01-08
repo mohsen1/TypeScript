@@ -4609,6 +4609,41 @@ fn test_infer_union_target_with_placeholder_member() {
 }
 
 #[test]
+fn test_infer_union_target_with_placeholder_and_never_member() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let param_type = interner.union(vec![t_type, TypeId::NEVER]);
+
+    let func = FunctionShape {
+        type_params: vec![TypeParamInfo {
+            name: t_name,
+            constraint: None,
+            default: None,
+        }],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: param_type,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: t_type,
+        type_predicate: None,
+        is_constructor: false,
+    };
+
+    let result = infer_generic_function(&interner, &mut checker, &func, &[TypeId::NUMBER]);
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
 fn test_resolve_circular_extends_with_concrete_bound() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);

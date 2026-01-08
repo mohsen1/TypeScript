@@ -199,8 +199,23 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             TypeKey::KeyOf(operand) => {
                 self.evaluate_keyof(*operand)
             }
+            TypeKey::TypeQuery(symbol) => {
+                if let Some(resolved) = self.resolver.resolve_ref(*symbol, self.interner) {
+                    resolved
+                } else {
+                    type_id
+                }
+            }
             TypeKey::Application(app_id) => {
                 self.evaluate_application(*app_id)
+            }
+            // Resolve Ref types to their structural form
+            TypeKey::Ref(symbol) => {
+                if let Some(resolved) = self.resolver.resolve_ref(*symbol, self.interner) {
+                    resolved
+                } else {
+                    type_id
+                }
             }
             // Other types pass through unchanged
             _ => type_id,
@@ -226,9 +241,12 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         // If the base is a Ref, try to resolve and instantiate
         if let TypeKey::Ref(symbol) = base_key {
             // Try to get the type parameters for this symbol
-            if let Some(type_params) = self.resolver.get_type_params(symbol) {
+            let type_params = self.resolver.get_type_params(symbol);
+            let resolved = self.resolver.resolve_ref(symbol, self.interner);
+
+            if let Some(type_params) = type_params {
                 // Resolve the base type to get the body
-                if let Some(resolved) = self.resolver.resolve_ref(symbol, self.interner) {
+                if let Some(resolved) = resolved {
                     // Instantiate the resolved type with the type arguments
                     let instantiated = instantiate_generic(
                         self.interner,
@@ -239,11 +257,107 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     // Recursively evaluate the result
                     return self.evaluate(instantiated);
                 }
+            } else if let Some(resolved) = resolved {
+                // Fallback: try to extract type params from the resolved type's properties
+                let extracted_params = self.extract_type_params_from_type(resolved);
+                if !extracted_params.is_empty() && extracted_params.len() == app.args.len() {
+                    let instantiated = instantiate_generic(
+                        self.interner,
+                        resolved,
+                        &extracted_params,
+                        &app.args,
+                    );
+                    return self.evaluate(instantiated);
+                }
             }
         }
 
         // If we can't expand, return the original application
         self.interner.application(app.base, app.args.clone())
+    }
+
+    /// Extract type parameter infos from a type by scanning for TypeParameter types.
+    fn extract_type_params_from_type(&self, type_id: TypeId) -> Vec<TypeParamInfo> {
+        let mut seen = std::collections::HashSet::new();
+        let mut params = Vec::new();
+        self.collect_type_params(type_id, &mut seen, &mut params);
+        params
+    }
+
+    /// Recursively collect TypeParameter types from a type.
+    fn collect_type_params(
+        &self,
+        type_id: TypeId,
+        seen: &mut std::collections::HashSet<Atom>,
+        params: &mut Vec<TypeParamInfo>,
+    ) {
+        if type_id.is_intrinsic() {
+            return;
+        }
+
+        let Some(key) = self.interner.lookup(type_id) else {
+            return;
+        };
+
+        match key {
+            TypeKey::TypeParameter(ref info) => {
+                if !seen.contains(&info.name) {
+                    seen.insert(info.name);
+                    params.push(info.clone());
+                }
+            }
+            TypeKey::Object(shape_id) | TypeKey::ObjectWithIndex(shape_id) => {
+                let shape = self.interner.object_shape(shape_id);
+                for prop in &shape.properties {
+                    self.collect_type_params(prop.type_id, seen, params);
+                }
+            }
+            TypeKey::Function(shape_id) => {
+                let shape = self.interner.function_shape(shape_id);
+                for param in &shape.params {
+                    self.collect_type_params(param.type_id, seen, params);
+                }
+                self.collect_type_params(shape.return_type, seen, params);
+            }
+            TypeKey::Union(members) | TypeKey::Intersection(members) => {
+                let members = self.interner.type_list(members);
+                for &member in members.iter() {
+                    self.collect_type_params(member, seen, params);
+                }
+            }
+            TypeKey::Array(elem) => {
+                self.collect_type_params(elem, seen, params);
+            }
+            TypeKey::Conditional(cond_id) => {
+                let cond = self.interner.conditional_type(cond_id);
+                self.collect_type_params(cond.check_type, seen, params);
+                self.collect_type_params(cond.extends_type, seen, params);
+                self.collect_type_params(cond.true_type, seen, params);
+                self.collect_type_params(cond.false_type, seen, params);
+            }
+            TypeKey::Application(app_id) => {
+                let app = self.interner.type_application(app_id);
+                self.collect_type_params(app.base, seen, params);
+                for &arg in &app.args {
+                    self.collect_type_params(arg, seen, params);
+                }
+            }
+            TypeKey::Mapped(mapped_id) => {
+                let mapped = self.interner.mapped_type(mapped_id);
+                // The mapped type's type_param IS a type parameter!
+                if !seen.contains(&mapped.type_param.name) {
+                    seen.insert(mapped.type_param.name);
+                    params.push(mapped.type_param.clone());
+                }
+                // Also check constraint and template for nested type params
+                self.collect_type_params(mapped.constraint, seen, params);
+                self.collect_type_params(mapped.template, seen, params);
+                if let Some(name_type) = mapped.name_type {
+                    self.collect_type_params(name_type, seen, params);
+                }
+            }
+            _ => {}
+        }
     }
 
     /// Evaluate a conditional type: T extends U ? X : Y
@@ -255,17 +369,15 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
     /// 4. If false (disjoint) -> return false_type
     /// 5. If ambiguous (unresolved type param) -> return deferred conditional
     pub fn evaluate_conditional(&self, cond: &ConditionalType) -> TypeId {
-        let check_type = cond.check_type;
-        let extends_type = cond.extends_type;
+        let check_type = self.evaluate(cond.check_type);
+        let extends_type = self.evaluate(cond.extends_type);
 
         if cond.is_distributive && check_type == TypeId::NEVER {
             return TypeId::NEVER;
         }
 
         if check_type == TypeId::ANY {
-            let true_eval = self.evaluate(cond.true_type);
-            let false_eval = self.evaluate(cond.false_type);
-            return self.interner.union2(true_eval, false_eval);
+            return TypeId::ANY;
         }
 
         // Step 1: Check for distributivity
@@ -881,6 +993,12 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
     ///
     /// This resolves property access on object types.
     pub fn evaluate_index_access(&self, object_type: TypeId, index_type: TypeId) -> TypeId {
+        let evaluated_object = self.evaluate(object_type);
+        let evaluated_index = self.evaluate(index_type);
+        if evaluated_object != object_type || evaluated_index != index_type {
+            return self.evaluate_index_access(evaluated_object, evaluated_index);
+        }
+
         // Get the object structure
         let obj_key = match self.interner.lookup(object_type) {
             Some(k) => k,
@@ -1495,7 +1613,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             subst.insert(mapped.type_param.name, key_literal);
 
             // Substitute into the template
-            let property_type = instantiate_type(self.interner, mapped.template, &subst);
+            let property_type = self.evaluate(instantiate_type(self.interner, mapped.template, &subst));
 
             properties.push(PropertyInfo {
                 name: remapped_name,
@@ -1516,7 +1634,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     let key_type = TypeId::STRING;
                     let mut subst = TypeSubstitution::new();
                     subst.insert(mapped.type_param.name, key_type);
-                    let mut value_type = instantiate_type(self.interner, mapped.template, &subst);
+                    let mut value_type = self.evaluate(instantiate_type(self.interner, mapped.template, &subst));
                     if optional {
                         value_type = self.interner.union2(value_type, TypeId::UNDEFINED);
                     }
@@ -1542,7 +1660,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     let key_type = TypeId::NUMBER;
                     let mut subst = TypeSubstitution::new();
                     subst.insert(mapped.type_param.name, key_type);
-                    let mut value_type = instantiate_type(self.interner, mapped.template, &subst);
+                    let mut value_type = self.evaluate(instantiate_type(self.interner, mapped.template, &subst));
                     if optional {
                         value_type = self.interner.union2(value_type, TypeId::UNDEFINED);
                     }
@@ -2110,6 +2228,396 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         true
     }
 
+    fn bind_infer_defaults(
+        &self,
+        pattern: TypeId,
+        inferred: TypeId,
+        bindings: &mut FxHashMap<Atom, TypeId>,
+        checker: &mut SubtypeChecker<'_, R>,
+    ) -> bool {
+        let mut visited = FxHashSet::default();
+        self.bind_infer_defaults_inner(pattern, inferred, bindings, checker, &mut visited)
+    }
+
+    fn bind_infer_defaults_inner(
+        &self,
+        pattern: TypeId,
+        inferred: TypeId,
+        bindings: &mut FxHashMap<Atom, TypeId>,
+        checker: &mut SubtypeChecker<'_, R>,
+        visited: &mut FxHashSet<TypeId>,
+    ) -> bool {
+        if !visited.insert(pattern) {
+            return true;
+        }
+
+        let Some(key) = self.interner.lookup(pattern) else {
+            return true;
+        };
+
+        match key {
+            TypeKey::Infer(info) => self.bind_infer(&info, inferred, bindings, checker),
+            TypeKey::Array(elem) => {
+                self.bind_infer_defaults_inner(elem, inferred, bindings, checker, visited)
+            }
+            TypeKey::Tuple(elements) => {
+                let elements = self.interner.tuple_list(elements);
+                for element in elements.iter() {
+                    if !self.bind_infer_defaults_inner(
+                        element.type_id,
+                        inferred,
+                        bindings,
+                        checker,
+                        visited,
+                    ) {
+                        return false;
+                    }
+                }
+                true
+            }
+            TypeKey::Union(members) | TypeKey::Intersection(members) => {
+                let members = self.interner.type_list(members);
+                for &member in members.iter() {
+                    if !self.bind_infer_defaults_inner(
+                        member,
+                        inferred,
+                        bindings,
+                        checker,
+                        visited,
+                    ) {
+                        return false;
+                    }
+                }
+                true
+            }
+            TypeKey::Object(shape_id) => {
+                let shape = self.interner.object_shape(shape_id);
+                for prop in shape.properties.iter() {
+                    if !self.bind_infer_defaults_inner(
+                        prop.type_id,
+                        inferred,
+                        bindings,
+                        checker,
+                        visited,
+                    ) {
+                        return false;
+                    }
+                }
+                true
+            }
+            TypeKey::ObjectWithIndex(shape_id) => {
+                let shape = self.interner.object_shape(shape_id);
+                for prop in shape.properties.iter() {
+                    if !self.bind_infer_defaults_inner(
+                        prop.type_id,
+                        inferred,
+                        bindings,
+                        checker,
+                        visited,
+                    ) {
+                        return false;
+                    }
+                }
+                if let Some(index) = &shape.string_index {
+                    if !self.bind_infer_defaults_inner(
+                        index.key_type,
+                        inferred,
+                        bindings,
+                        checker,
+                        visited,
+                    ) || !self.bind_infer_defaults_inner(
+                        index.value_type,
+                        inferred,
+                        bindings,
+                        checker,
+                        visited,
+                    ) {
+                        return false;
+                    }
+                }
+                if let Some(index) = &shape.number_index {
+                    if !self.bind_infer_defaults_inner(
+                        index.key_type,
+                        inferred,
+                        bindings,
+                        checker,
+                        visited,
+                    ) || !self.bind_infer_defaults_inner(
+                        index.value_type,
+                        inferred,
+                        bindings,
+                        checker,
+                        visited,
+                    ) {
+                        return false;
+                    }
+                }
+                true
+            }
+            TypeKey::Function(shape_id) => {
+                let shape = self.interner.function_shape(shape_id);
+                for param in shape.params.iter() {
+                    if !self.bind_infer_defaults_inner(
+                        param.type_id,
+                        inferred,
+                        bindings,
+                        checker,
+                        visited,
+                    ) {
+                        return false;
+                    }
+                }
+                if let Some(this_type) = shape.this_type {
+                    if !self.bind_infer_defaults_inner(
+                        this_type,
+                        inferred,
+                        bindings,
+                        checker,
+                        visited,
+                    ) {
+                        return false;
+                    }
+                }
+                self.bind_infer_defaults_inner(
+                    shape.return_type,
+                    inferred,
+                    bindings,
+                    checker,
+                    visited,
+                )
+            }
+            TypeKey::Callable(shape_id) => {
+                let shape = self.interner.callable_shape(shape_id);
+                for sig in shape.call_signatures.iter() {
+                    for param in sig.params.iter() {
+                        if !self.bind_infer_defaults_inner(
+                            param.type_id,
+                            inferred,
+                            bindings,
+                            checker,
+                            visited,
+                        ) {
+                            return false;
+                        }
+                    }
+                    if let Some(this_type) = sig.this_type {
+                        if !self.bind_infer_defaults_inner(
+                            this_type,
+                            inferred,
+                            bindings,
+                            checker,
+                            visited,
+                        ) {
+                            return false;
+                        }
+                    }
+                    if !self.bind_infer_defaults_inner(
+                        sig.return_type,
+                        inferred,
+                        bindings,
+                        checker,
+                        visited,
+                    ) {
+                        return false;
+                    }
+                }
+                for sig in shape.construct_signatures.iter() {
+                    for param in sig.params.iter() {
+                        if !self.bind_infer_defaults_inner(
+                            param.type_id,
+                            inferred,
+                            bindings,
+                            checker,
+                            visited,
+                        ) {
+                            return false;
+                        }
+                    }
+                    if let Some(this_type) = sig.this_type {
+                        if !self.bind_infer_defaults_inner(
+                            this_type,
+                            inferred,
+                            bindings,
+                            checker,
+                            visited,
+                        ) {
+                            return false;
+                        }
+                    }
+                    if !self.bind_infer_defaults_inner(
+                        sig.return_type,
+                        inferred,
+                        bindings,
+                        checker,
+                        visited,
+                    ) {
+                        return false;
+                    }
+                }
+                for prop in shape.properties.iter() {
+                    if !self.bind_infer_defaults_inner(
+                        prop.type_id,
+                        inferred,
+                        bindings,
+                        checker,
+                        visited,
+                    ) {
+                        return false;
+                    }
+                }
+                true
+            }
+            TypeKey::TypeParameter(info) => {
+                if let Some(constraint) = info.constraint {
+                    if !self.bind_infer_defaults_inner(
+                        constraint,
+                        inferred,
+                        bindings,
+                        checker,
+                        visited,
+                    ) {
+                        return false;
+                    }
+                }
+                if let Some(default) = info.default {
+                    if !self.bind_infer_defaults_inner(
+                        default,
+                        inferred,
+                        bindings,
+                        checker,
+                        visited,
+                    ) {
+                        return false;
+                    }
+                }
+                true
+            }
+            TypeKey::Application(app_id) => {
+                let app = self.interner.type_application(app_id);
+                if !self.bind_infer_defaults_inner(app.base, inferred, bindings, checker, visited) {
+                    return false;
+                }
+                for &arg in app.args.iter() {
+                    if !self.bind_infer_defaults_inner(arg, inferred, bindings, checker, visited) {
+                        return false;
+                    }
+                }
+                true
+            }
+            TypeKey::Conditional(cond_id) => {
+                let cond = self.interner.conditional_type(cond_id);
+                self.bind_infer_defaults_inner(
+                    cond.check_type,
+                    inferred,
+                    bindings,
+                    checker,
+                    visited,
+                ) && self.bind_infer_defaults_inner(
+                    cond.extends_type,
+                    inferred,
+                    bindings,
+                    checker,
+                    visited,
+                ) && self.bind_infer_defaults_inner(
+                    cond.true_type,
+                    inferred,
+                    bindings,
+                    checker,
+                    visited,
+                ) && self.bind_infer_defaults_inner(
+                    cond.false_type,
+                    inferred,
+                    bindings,
+                    checker,
+                    visited,
+                )
+            }
+            TypeKey::Mapped(mapped_id) => {
+                let mapped = self.interner.mapped_type(mapped_id);
+                if let Some(constraint) = mapped.type_param.constraint {
+                    if !self.bind_infer_defaults_inner(
+                        constraint,
+                        inferred,
+                        bindings,
+                        checker,
+                        visited,
+                    ) {
+                        return false;
+                    }
+                }
+                if let Some(default) = mapped.type_param.default {
+                    if !self.bind_infer_defaults_inner(
+                        default,
+                        inferred,
+                        bindings,
+                        checker,
+                        visited,
+                    ) {
+                        return false;
+                    }
+                }
+                if !self.bind_infer_defaults_inner(
+                    mapped.constraint,
+                    inferred,
+                    bindings,
+                    checker,
+                    visited,
+                ) {
+                    return false;
+                }
+                if let Some(name_type) = mapped.name_type {
+                    if !self.bind_infer_defaults_inner(
+                        name_type,
+                        inferred,
+                        bindings,
+                        checker,
+                        visited,
+                    ) {
+                        return false;
+                    }
+                }
+                self.bind_infer_defaults_inner(
+                    mapped.template,
+                    inferred,
+                    bindings,
+                    checker,
+                    visited,
+                )
+            }
+            TypeKey::IndexAccess(obj, idx) => {
+                self.bind_infer_defaults_inner(obj, inferred, bindings, checker, visited)
+                    && self.bind_infer_defaults_inner(idx, inferred, bindings, checker, visited)
+            }
+            TypeKey::KeyOf(inner) | TypeKey::ReadonlyType(inner) => {
+                self.bind_infer_defaults_inner(inner, inferred, bindings, checker, visited)
+            }
+            TypeKey::TemplateLiteral(spans) => {
+                let spans = self.interner.template_list(spans);
+                for span in spans.iter() {
+                    if let TemplateSpan::Type(inner) = span {
+                        if !self.bind_infer_defaults_inner(
+                            *inner,
+                            inferred,
+                            bindings,
+                            checker,
+                            visited,
+                        ) {
+                            return false;
+                        }
+                    }
+                }
+                true
+            }
+            TypeKey::Intrinsic(_)
+            | TypeKey::Literal(_)
+            | TypeKey::Ref(_)
+            | TypeKey::TypeQuery(_)
+            | TypeKey::UniqueSymbol(_)
+            | TypeKey::ThisType
+            | TypeKey::Error => true,
+        }
+    }
+
     fn match_tuple_elements(
         &self,
         source_elems: &[TupleElement],
@@ -2284,6 +2792,10 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
     ) -> bool {
         if !visited.insert((source, pattern)) {
             return true;
+        }
+
+        if source == TypeId::NEVER {
+            return self.bind_infer_defaults(pattern, TypeId::NEVER, bindings, checker);
         }
 
         if source == pattern {
@@ -3377,6 +3889,114 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                         )
                     }
                     _ => false,
+                }
+            }
+            // Handle union pattern containing infer types
+            // Pattern: infer S | T | U where S is infer and T, U are not
+            // Source: A | T | U or a single type A
+            // Algorithm: Match source members against non-infer pattern members,
+            // then bind the infer to the remaining source members
+            TypeKey::Union(pattern_members) => {
+                let pattern_members = self.interner.type_list(pattern_members);
+
+                // Find infer members and non-infer members in the pattern
+                let mut infer_members: Vec<(Atom, Option<TypeId>)> = Vec::new();
+                let mut non_infer_pattern_members: Vec<TypeId> = Vec::new();
+
+                for &pattern_member in pattern_members.iter() {
+                    if let Some(TypeKey::Infer(info)) = self.interner.lookup(pattern_member) {
+                        infer_members.push((info.name, info.constraint));
+                    } else {
+                        non_infer_pattern_members.push(pattern_member);
+                    }
+                }
+
+                // If no infer members, just do subtype check
+                if infer_members.is_empty() {
+                    return checker.is_subtype_of(source, pattern);
+                }
+
+                // Currently only handle single infer in union pattern
+                if infer_members.len() != 1 {
+                    return checker.is_subtype_of(source, pattern);
+                }
+
+                let (infer_name, infer_constraint) = infer_members[0].clone();
+
+                // Handle both union and non-union sources
+                match self.interner.lookup(source) {
+                    Some(TypeKey::Union(source_members)) => {
+                        let source_members = self.interner.type_list(source_members);
+
+                        // Find source members that DON'T match non-infer pattern members
+                        let mut remaining_source_members: Vec<TypeId> = Vec::new();
+
+                        for &source_member in source_members.iter() {
+                            let mut matched = false;
+                            for &non_infer in &non_infer_pattern_members {
+                                if checker.is_subtype_of(source_member, non_infer)
+                                    && checker.is_subtype_of(non_infer, source_member)
+                                {
+                                    matched = true;
+                                    break;
+                                }
+                            }
+                            if !matched {
+                                remaining_source_members.push(source_member);
+                            }
+                        }
+
+                        // Bind infer to the remaining source members
+                        let inferred_type = if remaining_source_members.is_empty() {
+                            TypeId::NEVER
+                        } else if remaining_source_members.len() == 1 {
+                            remaining_source_members[0]
+                        } else {
+                            self.interner.union(remaining_source_members)
+                        };
+
+                        self.bind_infer(
+                            &TypeParamInfo {
+                                name: infer_name,
+                                constraint: infer_constraint,
+                                default: None,
+                            },
+                            inferred_type,
+                            bindings,
+                            checker,
+                        )
+                    }
+                    _ => {
+                        // Source is not a union - check if source matches any non-infer pattern member
+                        for &non_infer in &non_infer_pattern_members {
+                            if checker.is_subtype_of(source, non_infer)
+                                && checker.is_subtype_of(non_infer, source)
+                            {
+                                // Source is exactly a non-infer member, so infer gets never
+                                return self.bind_infer(
+                                    &TypeParamInfo {
+                                        name: infer_name,
+                                        constraint: infer_constraint,
+                                        default: None,
+                                    },
+                                    TypeId::NEVER,
+                                    bindings,
+                                    checker,
+                                );
+                            }
+                        }
+                        // Source doesn't match non-infer members, so infer = source
+                        self.bind_infer(
+                            &TypeParamInfo {
+                                name: infer_name,
+                                constraint: infer_constraint,
+                                default: None,
+                            },
+                            source,
+                            bindings,
+                            checker,
+                        )
+                    }
                 }
             }
             _ => checker.is_subtype_of(source, pattern),
