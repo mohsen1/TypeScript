@@ -458,6 +458,35 @@ fn test_contextual_generic_return_union_preserves_literal() {
 }
 
 #[test]
+fn test_contextual_union_function_return_preserves_literal() {
+    let interner = TypeInterner::new();
+
+    let fn_string = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let fn_number = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::NUMBER,
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let union = interner.union(vec![fn_string, fn_number]);
+
+    let ctx = ContextualTypeContext::with_expected(&interner, union);
+    let return_ctx = ctx.for_return();
+    let literal = interner.literal_string("ready");
+    let result = apply_contextual_type(&interner, literal, return_ctx.expected());
+    assert_eq!(result, literal);
+}
+
+#[test]
 fn test_apply_contextual_same_type() {
     let interner = TypeInterner::new();
 
