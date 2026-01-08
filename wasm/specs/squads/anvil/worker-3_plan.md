@@ -7,12 +7,13 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] Add source map tests for ES5 class transforms in `wasm/src/source_map_tests.rs`. Run `./wasm/test.sh source_map`.
+- [ ] (awaiting assignment)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 class transform source map tests (basic IIFE, constructor, instance methods, static methods, accessors, inheritance, super method calls, computed properties, multi-level inheritance, class expressions); `./wasm/test.sh source_map` passes.
 - [x] Added async/await transform source map tests (multiple awaits, try/catch, for-of loop, IIFE, rest/default params, destructuring, nested functions, static method, while loop); `./wasm/test.sh source_map` passes.
 - [x] Added decorator transform source map tests (class, method, parameter, property, accessor, factory, mixed decorators); `./wasm/test.sh source_map` passes.
 - [x] Lowered async ES5 computed `super[...]` calls (async emitter + ThinPrinter) and updated integration tests; `./wasm/test.sh` fails at `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`.
