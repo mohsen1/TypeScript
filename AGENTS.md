@@ -79,6 +79,7 @@ Commit frequently and atomically
 5. **Commit and push** to your worker branch frequently; do not push to `origin/rust`.
 6. **Sync before EVERY task**: `git fetch origin && git merge origin/rust --no-edit` - this is mandatory, not optional.
 7. **Signal readiness**: After pushing, add `Ready for merge` to your plan so manager knows to merge.
+8. **NEVER edit management files**: Do not touch `DIRECTOR_AGENT.md`, `SQUAD_LEAD_AGENT.md`, `MANAGER_AGENT.md`, `AGENTS.md`, or `start_*.sh` scripts. These are human-owned.
 
 ## 🎯 If Blocked
 
