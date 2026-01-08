@@ -85,6 +85,7 @@ Priority: 3
 - [x] Solver unsoundness: object trifecta null/undefined rejection in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_object_trifecta_nullish_rejection`.
 - [x] Solver unsoundness: mapped type over string keys with key remap omits length property in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_over_string_keys_key_remap_omit_length`.
 - [x] Solver unsoundness: mapped type over string keys includes number index signature in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_over_string_keys_number_index_subtyping`.
+- [x] Solver unsoundness: apparent string number index signature in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_apparent_string_number_index_subtyping`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
