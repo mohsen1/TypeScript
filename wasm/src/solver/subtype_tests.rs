@@ -3507,6 +3507,48 @@ fn test_mapped_type_over_string_keys_subtyping() {
 }
 
 #[test]
+fn test_mapped_type_over_boolean_keys_subtyping() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let constraint = interner.intern(TypeKey::KeyOf(TypeId::BOOLEAN));
+    let mapped = interner.mapped(MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint,
+        name_type: None,
+        template: TypeId::NUMBER,
+        readonly_modifier: None,
+        optional_modifier: None,
+    });
+
+    let value_of = interner.intern_string("valueOf");
+    let expected = interner.object(vec![PropertyInfo {
+        name: value_of,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let mismatch = interner.object(vec![PropertyInfo {
+        name: value_of,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(checker.is_subtype_of(mapped, expected));
+    assert!(!checker.is_subtype_of(mapped, mismatch));
+    assert!(!checker.is_subtype_of(expected, mapped));
+}
+
+#[test]
 fn test_mapped_type_key_remap_subtyping() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
