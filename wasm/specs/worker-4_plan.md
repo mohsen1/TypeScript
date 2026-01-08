@@ -11,8 +11,8 @@ Priority: 4
 
 ## Task Queue
 - [ ] Stand by for next emitter fidelity task.
-- [ ] TODO (blocked by Docker package.json in test.sh): re-apply stash "wip async nested super" and run `./wasm/test.sh class_async_nested_arrow_super_computed_key_this_arguments_capture`.
-- [ ] TODO: add async arrow with computed super key + this + arguments in nested return (once test.sh is fixed).
+- [ ] TODO (blocked by `cli/driver.rs` E0515 in Docker): re-apply stash "wip async nested super" and run `./wasm/test.sh class_async_nested_arrow_super_computed_key_this_arguments_capture`.
+- [ ] TODO: add async arrow with computed super key + this + arguments in nested return (after E0515 fix).
 
 ## Completed
 - [x] ES5 async class computed super with this + arguments (current behavior); test `./wasm/test.sh class_async_super_computed_method_this_arguments`.
