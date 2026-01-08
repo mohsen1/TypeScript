@@ -13,6 +13,7 @@ Priority: 2
 - [ ] [EM: Add queued tasks]
 
 ## Completed
+- [x] Added coverage for triple-nested arrow functions with async this/arguments capture in `emitter_transform_integration_tests.rs`; `./wasm/test.sh triple_nested` passed (3 tests).
 - [x] Added CommonJS coverage asserting `__esModule` for exported class in `thin_emitter_tests.rs`; `./wasm/test.sh test_commonjs_export_class` passed.
 - [x] Added CommonJS coverage asserting `__esModule` for exported namespace in `thin_emitter_tests.rs`; `./wasm/test.sh test_commonjs_export_namespace` passed.
 - [x] Added CommonJS coverage asserting default export uses `exports.default` in `thin_emitter_tests.rs`; `./wasm/test.sh test_commonjs_export_default_function` passed.
