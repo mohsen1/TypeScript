@@ -11,6 +11,8 @@ Priority: 4
 
 ## Task Queue
 - [ ] Stand by for next emitter fidelity task.
+- [ ] TODO (blocked by Docker package.json in test.sh): re-apply stash "wip async nested super" and run `./wasm/test.sh class_async_nested_arrow_super_computed_key_this_arguments_capture`.
+- [ ] TODO: add async arrow with computed super key + this + arguments in nested return (once test.sh is fixed).
 
 ## Completed
 - [x] ES5 async class computed super with this + arguments (current behavior); test `./wasm/test.sh class_async_super_computed_method_this_arguments`.
@@ -73,4 +75,5 @@ Priority: 4
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
 - Use Docker for Rust tests (`./wasm/test.sh`), never `cargo test` directly.
 - Update this plan after each task and keep it accurate.
+- Blocked: `./wasm/test.sh` fails in Docker due to missing `/app/package.json` after merge; waiting on test.sh fix.
 - Ready for merge.
