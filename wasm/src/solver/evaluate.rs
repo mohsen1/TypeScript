@@ -205,9 +205,79 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     type_id
                 }
             }
+            TypeKey::Application(app_id) => {
+                self.evaluate_application(*app_id, type_id)
+            }
+            // Resolve Ref types to their structural form
+            TypeKey::Ref(symbol) => {
+                if let Some(resolved) = self.resolver.resolve_ref(*symbol, self.interner) {
+                    resolved
+                } else {
+                    type_id
+                }
+            }
             // Other types pass through unchanged
             _ => type_id,
         }
+    }
+
+    /// Evaluate an Application type: Base<Args>
+    ///
+    /// For generic interfaces like `Store<S, A>`, this resolves the base type
+    /// and instantiates it with the provided type arguments.
+    fn evaluate_application(&self, app_id: TypeApplicationId, original: TypeId) -> TypeId {
+        use crate::solver::instantiate::instantiate_type;
+
+        let app = self.interner.type_application(app_id);
+
+        // First, try to resolve the base type if it's a Ref
+        let resolved_base = match self.interner.lookup(app.base) {
+            Some(TypeKey::Ref(symbol)) => {
+                self.resolver.resolve_ref(symbol, self.interner)
+            }
+            _ => None,
+        };
+
+        let base = resolved_base.unwrap_or(app.base);
+
+        // Look up the base type to get its type parameters
+        let type_params = match self.interner.lookup(base) {
+            Some(TypeKey::Object(shape_id)) => {
+                // Object types don't have type params - return original
+                return original;
+            }
+            Some(TypeKey::Callable(shape_id)) => {
+                // Get type params from first call signature
+                let shape = self.interner.callable_shape(shape_id);
+                if let Some(sig) = shape.call_signatures.first() {
+                    sig.type_params.clone()
+                } else if let Some(sig) = shape.construct_signatures.first() {
+                    sig.type_params.clone()
+                } else {
+                    return original;
+                }
+            }
+            Some(TypeKey::Function(shape_id)) => {
+                let shape = self.interner.function_shape(shape_id);
+                shape.type_params.clone()
+            }
+            _ => {
+                // For other types (including unresolved Ref), return an application with resolved base
+                if resolved_base.is_some() {
+                    return self.interner.application(base, app.args.clone());
+                }
+                return original;
+            }
+        };
+
+        // If no type parameters, just return the base
+        if type_params.is_empty() {
+            return base;
+        }
+
+        // Create substitution and instantiate
+        let subst = crate::solver::instantiate::TypeSubstitution::from_args(&type_params, &app.args);
+        instantiate_type(self.interner, base, &subst)
     }
 
     /// Evaluate a conditional type: T extends U ? X : Y
