@@ -9921,3 +9921,159 @@ const b: Box = new NumberBox();
         "Expected errors for class extends (not yet implemented)"
     );
 }
+
+/// TS Unsoundness #9: Legacy Null/Undefined
+///
+/// If `strictNullChecks` is OFF, `null` and `undefined` behave like `never` (Bottom)
+/// and are assignable to everything. By default (with strictNullChecks ON), they
+/// are only assignable to their own types.
+#[test]
+fn test_strict_null_checks_on() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// With strictNullChecks on (default), null/undefined are not assignable to other types
+const str: string = "hello";
+const num: number = 42;
+
+// These would be errors with strictNullChecks
+// const bad1: string = null;
+// const bad2: number = undefined;
+
+// null and undefined are their own types
+const n: null = null;
+const u: undefined = undefined;
+
+// Union types that include null/undefined
+const maybeStr: string | null = null;
+const maybeNum: number | undefined = undefined;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    if !checker.ctx.diagnostics.is_empty() {
+        eprintln!("=== Strict Null Checks On Diagnostics ===");
+        for diag in &checker.ctx.diagnostics {
+            eprintln!("[{}] {}", diag.start, diag.message_text);
+        }
+    }
+
+    // Valid code with strictNullChecks should have no errors
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Valid strictNullChecks code should pass: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// TS Unsoundness #9: Legacy Null/Undefined - null/undefined rejected when strict
+///
+/// With strictNullChecks ON, assigning null to string should error.
+#[test]
+fn test_strict_null_checks_rejects_null() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// Assigning null to string should error
+const str: string = null;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Should produce an error
+    assert!(
+        !checker.ctx.diagnostics.is_empty(),
+        "Assigning null to string should error with strictNullChecks"
+    );
+}
+
+/// TS Unsoundness #9: Legacy Null/Undefined - undefined rejected when strict
+///
+/// With strictNullChecks ON, assigning undefined to number should error.
+#[test]
+fn test_strict_null_checks_rejects_undefined() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// Assigning undefined to number should error
+const num: number = undefined;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Should produce an error
+    assert!(
+        !checker.ctx.diagnostics.is_empty(),
+        "Assigning undefined to number should error with strictNullChecks"
+    );
+}
+
+/// TS Unsoundness #9: Legacy Null/Undefined - union with null/undefined
+///
+/// Union types can explicitly include null/undefined.
+#[test]
+fn test_null_undefined_union_types() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// Union types that include null/undefined work fine
+const maybeStr: string | null = null;
+const maybeNum: number | undefined = undefined;
+
+// Can also be assigned the non-null type
+const str: string | null = "hello";
+const num: number | undefined = 42;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    if !checker.ctx.diagnostics.is_empty() {
+        eprintln!("=== Null/Undefined Union Diagnostics ===");
+        for diag in &checker.ctx.diagnostics {
+            eprintln!("[{}] {}", diag.start, diag.message_text);
+        }
+    }
+
+    // Union types with null/undefined should work
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Union types with null/undefined should work: {:?}",
+        checker.ctx.diagnostics
+    );
+}
