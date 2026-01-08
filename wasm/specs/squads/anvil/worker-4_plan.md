@@ -51,6 +51,7 @@ Priority: 4
 - [x] Add async await detection for switch case statements. Tests: `./wasm/test.sh body_contains_await_in_switch_case_statement`
 - [x] Add async await detection for for loop conditions. Tests: `./wasm/test.sh body_contains_await_in_for_loop_condition`
 - [x] Add async await detection for while conditions. Tests: `./wasm/test.sh body_contains_await_in_while_condition`
+- [x] Add async await detection for do-while conditions. Tests: `./wasm/test.sh body_contains_await_in_do_while_condition`
 - [x] Add async await detection for for-of expressions. Tests: `./wasm/test.sh body_contains_await_in_for_of_expression`
 - [x] Add async await detection for for-in expressions. Tests: `./wasm/test.sh body_contains_await_in_for_in_expression`
 - [x] Add derived ctor param property ordering test. Tests: `./wasm/test.sh derived_constructor_orders_param_property`
