@@ -13,6 +13,9 @@ Priority: 4
 - [ ] Stand by for next emitter fidelity task.
 - [ ] TODO (blocked by `cli/driver.rs` E0515 in Docker): re-apply stash "wip async nested super" and run `./wasm/test.sh class_async_nested_arrow_super_computed_key_this_arguments_capture`.
 - [ ] TODO: add async arrow with computed super key + this + arguments in nested return (after E0515 fix).
+- [ ] TODO: add async method arrow with computed super key + this + arguments (non-nested). Expected: no `=>`, `_this` capture, `arguments[0]` preserved, computed super likely left as `super[key]` (current behavior).
+- [ ] TODO: add async nested arrow with computed super key + arguments only. Expected: no `=>`, `arguments[0]` preserved, computed super likely left as `super[key]` (current behavior).
+- [ ] TODO: add async method returning arrow with `super.m(arguments[0])` (non-computed). Expected: no `=>`, `_super.prototype.m.call(_this, arguments[0])` (if return-arrow lowering matches other arrow cases).
 
 ## Completed
 - [x] ES5 async class computed super with this + arguments (current behavior); test `./wasm/test.sh class_async_super_computed_method_this_arguments`.
