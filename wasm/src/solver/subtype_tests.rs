@@ -366,6 +366,19 @@ fn test_array_subtyping() {
 }
 
 #[test]
+fn test_array_covariant_mutable_unsoundness() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let string_array = interner.array(TypeId::STRING);
+    let string_or_number = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let union_array = interner.array(string_or_number);
+
+    assert!(checker.is_subtype_of(string_array, union_array));
+    assert!(!checker.is_subtype_of(union_array, string_array));
+}
+
+#[test]
 fn test_type_environment() {
     let interner = TypeInterner::new();
     let mut env = TypeEnvironment::new();

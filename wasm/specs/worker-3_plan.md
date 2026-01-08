@@ -21,6 +21,7 @@ Priority: 3
 - [x] Solver unsoundness: void return exception coverage in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_void_return_exception_subtype`.
 - [x] Solver unsoundness: method bivariance regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_method_bivariant_required_param`.
 - [x] Solver unsoundness: Function top assignability regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_function_top_assignability`.
+- [x] Solver unsoundness: covariant mutable arrays regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_array_covariant_mutable_unsoundness`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
