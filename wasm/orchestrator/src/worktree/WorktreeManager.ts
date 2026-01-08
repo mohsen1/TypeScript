@@ -8,16 +8,38 @@
 import { existsSync, mkdirSync, copyFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { runCommand, runCommandStrict } from '../utils/index.js';
-import type { OrchestratorConfig, SquadName, WorktreeInfo } from '../types.js';
-
-const SQUADS: SquadName[] = ['forge', 'anvil'];
-const WORKER_NUMS = [1, 2, 3, 4, 5];
+import type { OrchestratorConfig, SquadName, WorktreeInfo, SquadConfig } from '../types.js';
 
 export class WorktreeManager {
   private readonly config: OrchestratorConfig;
 
   constructor(config: OrchestratorConfig) {
     this.config = config;
+  }
+
+  /**
+   * Get configured squads
+   */
+  get squads(): readonly SquadConfig[] {
+    return this.config.squads;
+  }
+
+  /**
+   * Get squad names
+   */
+  getSquadNames(): string[] {
+    return this.config.squads.map((s) => s.name);
+  }
+
+  /**
+   * Get worker numbers for a squad
+   */
+  getWorkerNums(squad: SquadName): number[] {
+    const squadConfig = this.config.squads.find((s) => s.name === squad);
+    if (!squadConfig) {
+      return [];
+    }
+    return Array.from({ length: squadConfig.workerCount }, (_, i) => i + 1);
   }
 
   /**
@@ -194,16 +216,16 @@ export class WorktreeManager {
     const worktrees = new Map<string, WorktreeInfo>();
 
     // Create EM worktrees
-    for (const squad of SQUADS) {
-      const info = await this.ensureEmWorktree(squad, fresh);
-      worktrees.set(`em-${squad}`, info);
+    for (const squad of this.config.squads) {
+      const info = await this.ensureEmWorktree(squad.name, fresh);
+      worktrees.set(`em-${squad.name}`, info);
     }
 
     // Create worker worktrees
-    for (const squad of SQUADS) {
-      for (const num of WORKER_NUMS) {
-        const info = await this.ensureWorkerWorktree(squad, num, fresh);
-        worktrees.set(`${squad}-${num}`, info);
+    for (const squad of this.config.squads) {
+      for (const num of this.getWorkerNums(squad.name)) {
+        const info = await this.ensureWorkerWorktree(squad.name, num, fresh);
+        worktrees.set(`${squad.name}-${num}`, info);
       }
     }
 
@@ -217,16 +239,16 @@ export class WorktreeManager {
     const { rootDir } = this.config;
 
     // Reset squad branches
-    for (const squad of SQUADS) {
-      const branch = this.getSquadBranch(squad);
+    for (const squad of this.config.squads) {
+      const branch = this.getSquadBranch(squad.name);
       await runCommand(`git branch -D "${branch}"`, { cwd: rootDir });
       await runCommand(`git branch "${branch}" origin/rust`, { cwd: rootDir });
     }
 
     // Reset worker branches
-    for (const squad of SQUADS) {
-      for (const num of WORKER_NUMS) {
-        const branch = this.getWorkerBranch(squad, num);
+    for (const squad of this.config.squads) {
+      for (const num of this.getWorkerNums(squad.name)) {
+        const branch = this.getWorkerBranch(squad.name, num);
         await runCommand(`git branch -D "${branch}"`, { cwd: rootDir });
         await runCommand(`git branch "${branch}" origin/rust`, { cwd: rootDir });
       }
@@ -249,8 +271,8 @@ export class WorktreeManager {
     }
 
     // EM worktrees: .role/AGENTS.md = SQUAD_LEAD_AGENT.md
-    for (const squad of SQUADS) {
-      const emDir = this.getEmWorktreePath(squad);
+    for (const squad of this.config.squads) {
+      const emDir = this.getEmWorktreePath(squad.name);
       if (existsSync(emDir)) {
         const roleDir = join(emDir, '.role');
         mkdirSync(roleDir, { recursive: true });
@@ -263,9 +285,9 @@ export class WorktreeManager {
     }
 
     // Worker worktrees: .role/AGENTS.md = AGENTS.md
-    for (const squad of SQUADS) {
-      for (const num of WORKER_NUMS) {
-        const workerDir = this.getWorkerWorktreePath(squad, num);
+    for (const squad of this.config.squads) {
+      for (const num of this.getWorkerNums(squad.name)) {
+        const workerDir = this.getWorkerWorktreePath(squad.name, num);
         if (existsSync(workerDir)) {
           const roleDir = join(workerDir, '.role');
           mkdirSync(roleDir, { recursive: true });
@@ -286,21 +308,21 @@ export class WorktreeManager {
     const { rootDir } = this.config;
     const squadDir = join(rootDir, 'wasm', 'specs', 'squads');
 
-    for (const squad of SQUADS) {
-      const dir = join(squadDir, squad);
+    for (const squad of this.config.squads) {
+      const dir = join(squadDir, squad.name);
       mkdirSync(dir, { recursive: true });
 
       // Create GOALS.md if it doesn't exist
       const goalsFile = join(dir, 'GOALS.md');
       if (!existsSync(goalsFile)) {
-        await this.createGoalsFile(squad, goalsFile);
+        await this.createGoalsFile(squad.name, goalsFile);
       }
 
       // Create worker plans if they don't exist
-      for (const num of WORKER_NUMS) {
+      for (const num of this.getWorkerNums(squad.name)) {
         const planFile = join(dir, `worker-${num}_plan.md`);
         if (!existsSync(planFile)) {
-          await this.createWorkerPlan(squad, num, planFile);
+          await this.createWorkerPlan(squad.name, num, planFile);
         }
       }
     }

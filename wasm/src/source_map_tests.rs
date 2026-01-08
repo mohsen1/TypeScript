@@ -11897,3 +11897,179 @@ sum(1, 2, 3, 4, 5);"#;
         "expected non-empty source mappings for rest/default parameters"
     );
 }
+
+#[test]
+fn test_source_map_async_es5_offset_accuracy() {
+    // Test source-map offset accuracy for async function ES5 downleveling
+    // The __awaiter/__generator transform should preserve correct source mappings
+    let source = r#"async function fetchData(url: string) {
+    const response = await fetch(url);
+    const data = await response.json();
+    return data;
+}
+
+async function processItems(items: string[]) {
+    for (const item of items) {
+        await processItem(item);
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Verify ES5 async transform was applied
+    assert!(
+        output.contains("__awaiter") || output.contains("__generator"),
+        "expected async ES5 helpers in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for both async function declarations
+    let (fetch_line, _) = find_line_col(source, "async function fetchData");
+    let has_fetch_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == fetch_line
+    });
+
+    let (process_line, _) = find_line_col(source, "async function processItems");
+    let has_process_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == process_line
+    });
+
+    // Verify we have mappings for await expressions
+    let (await_fetch_line, _) = find_line_col(source, "await fetch");
+    let has_await_fetch_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == await_fetch_line
+    });
+
+    let (await_json_line, _) = find_line_col(source, "await response.json");
+    let has_await_json_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == await_json_line
+    });
+
+    // We should have mappings for both function declarations
+    assert!(
+        has_fetch_mapping && has_process_mapping,
+        "expected mappings for both async function declarations. mappings: {mappings}"
+    );
+
+    // We should have mappings for await expression lines
+    assert!(
+        has_await_fetch_mapping || has_await_json_mapping,
+        "expected mappings for await expression lines. mappings: {mappings}"
+    );
+
+    // Verify non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for async ES5 code"
+    );
+
+    // Verify mappings span multiple source lines (not all on line 0)
+    let unique_source_lines: std::collections::HashSet<_> =
+        decoded.iter().map(|m| m.original_line).collect();
+    assert!(
+        unique_source_lines.len() >= 3,
+        "expected mappings from at least 3 different source lines, got: {:?}",
+        unique_source_lines
+    );
+}
+
+#[test]
+fn test_source_map_typescript_enums() {
+    // Test TypeScript enum declarations (downleveled to IIFE)
+    let source = r#"enum Color {
+    Red,
+    Green,
+    Blue
+}
+
+enum Status {
+    Active = 1,
+    Inactive = 2,
+    Pending = 3
+}
+
+const myColor = Color.Red;
+const myStatus = Status.Active;"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the enum declaration
+    let (color_line, color_col) = find_line_col(source, "enum Color");
+    let has_color_mapping = decoded.iter().any(|entry| {
+        entry.original_line == color_line
+            && entry.original_column >= color_col
+            && entry.original_column <= color_col + 10
+    });
+
+    // Verify we have mappings for the variable declaration
+    let (var_line, var_col) = find_line_col(source, "const myColor");
+    let has_var_mapping = decoded.iter().any(|entry| {
+        entry.original_line == var_line
+            && entry.original_column >= var_col
+            && entry.original_column <= var_col + 13
+    });
+
+    // At minimum, we should have mappings for enum or variable
+    assert!(
+        has_color_mapping || has_var_mapping,
+        "expected mappings for enum declarations. mappings: {mappings}"
+    );
+
+    // Verify output contains the enum names
+    assert!(
+        output.contains("Color") && output.contains("Status"),
+        "expected output to contain enum names. output: {output}"
+    );
+
+    // Verify source map has non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for TypeScript enums"
+    );
+}
