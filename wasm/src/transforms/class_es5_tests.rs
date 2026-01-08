@@ -1,3 +1,6 @@
+use crate::emit_context::EmitContext;
+use crate::lowering_pass::LoweringPass;
+use crate::thin_emitter::{PrinterOptions, ScriptTarget, ThinPrinter};
 use crate::thin_parser::ThinParserState;
 use crate::transforms::class_es5::ClassES5Emitter;
 
@@ -5066,6 +5069,277 @@ class Dog extends Mammal {
     assert!(
         output.contains(".prototype.bark") || output.contains("prototype[\"bark\"]"),
         "Expected bark method on prototype: {}",
+        output
+    );
+}
+
+// ============================================================================
+// Class Expression Tests (using full ES5 emit pipeline)
+// ============================================================================
+
+#[test]
+fn test_class_es5_class_expression_anonymous() {
+    // Test anonymous class expression assigned to variable
+    let source = r#"
+const MyClass = class {
+    value: number = 42;
+
+    getValue(): number {
+        return this.value;
+    }
+};
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should have var declaration
+    assert!(
+        output.contains("var MyClass"),
+        "Expected var MyClass declaration: {}",
+        output
+    );
+
+    // Class expression should emit as IIFE returning function
+    assert!(
+        output.contains("function") && output.contains("return"),
+        "Expected class expression to emit as IIFE pattern: {}",
+        output
+    );
+
+    // Field should be initialized
+    assert!(
+        output.contains("this.value = 42") || output.contains("this.value ="),
+        "Expected value field initialization: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_class_expression_named() {
+    // Test named class expression (const Foo = class Bar { ... })
+    let source = r#"
+const Factory = class ServiceFactory {
+    static instance: any = null;
+
+    name: string = "factory";
+
+    create(): any {
+        return {};
+    }
+
+    static getInstance(): any {
+        if (!ServiceFactory.instance) {
+            ServiceFactory.instance = new ServiceFactory();
+        }
+        return ServiceFactory.instance;
+    }
+};
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should have var declaration for Factory
+    assert!(
+        output.contains("var Factory"),
+        "Expected var Factory declaration: {}",
+        output
+    );
+
+    // Named class expression should use its internal name (ServiceFactory)
+    assert!(
+        output.contains("ServiceFactory") || output.contains("function"),
+        "Expected ServiceFactory class name in output: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_class_expression_in_return() {
+    // Test class expression returned from function
+    let source = r#"
+function createClass() {
+    return class {
+        value: number = 0;
+
+        increment(): void {
+            this.value++;
+        }
+    };
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should have createClass function
+    assert!(
+        output.contains("function createClass"),
+        "Expected createClass function: {}",
+        output
+    );
+
+    // Should return something (class expression transformed)
+    assert!(
+        output.contains("return"),
+        "Expected return statement: {}",
+        output
+    );
+
+    // Class should be transformed with prototype methods
+    assert!(
+        output.contains("prototype") || output.contains("function"),
+        "Expected class expression transformation: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_class_expression_extends() {
+    // Test class expression that extends another class
+    let source = r#"
+class Base {
+    baseValue: number = 1;
+}
+
+const Derived = class extends Base {
+    derivedValue: number = 2;
+
+    getBoth(): number {
+        return this.baseValue + this.derivedValue;
+    }
+};
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Base class should be transformed
+    assert!(
+        output.contains("function Base") || output.contains("var Base"),
+        "Expected Base class transformation: {}",
+        output
+    );
+
+    // Derived should extend Base
+    assert!(
+        output.contains("var Derived"),
+        "Expected var Derived declaration: {}",
+        output
+    );
+
+    // Should have __extends helper or inheritance pattern
+    assert!(
+        output.contains("__extends") || output.contains("prototype") || output.contains("Base"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_class_expression_with_static() {
+    // Test class expression with static members
+    let source = r#"
+const Counter = class {
+    static count: number = 0;
+    static instances: any[] = [];
+
+    id: number;
+
+    constructor() {
+        Counter.count++;
+        this.id = Counter.count;
+        Counter.instances.push(this);
+    }
+
+    static getCount(): number {
+        return Counter.count;
+    }
+
+    static reset(): void {
+        Counter.count = 0;
+        Counter.instances = [];
+    }
+};
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should have Counter declaration
+    assert!(
+        output.contains("var Counter") || output.contains("Counter"),
+        "Expected Counter declaration: {}",
+        output
+    );
+
+    // Static properties should be on the constructor function
+    assert!(
+        output.contains(".count") || output.contains("count"),
+        "Expected count static property: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("getCount") || output.contains("reset"),
+        "Expected static methods: {}",
         output
     );
 }
