@@ -212,6 +212,8 @@ Priority: 5
       Tests: `./wasm/test.sh test_source_map_es5_transform_async_nullish_coalescing_await_mapping`.
 - [x] Added ES5 async compound assignment multiply await source map mapping test in `wasm/src/source_map_tests.rs`.
       Tests: `./wasm/test.sh test_source_map_es5_transform_async_compound_assignment_multiply_mapping`.
+- [x] Added ES5 async compound assignment divide await source map mapping test in `wasm/src/source_map_tests.rs`.
+      Tests: `./wasm/test.sh test_source_map_es5_transform_async_compound_assignment_divide_mapping`.
 - [x] Added ES5 async ternary consequent await source map mapping test in `wasm/src/source_map_tests.rs`.
       Tests: `./wasm/test.sh test_source_map_es5_transform_async_ternary_consequent_await_mapping`.
 
@@ -223,4 +225,5 @@ Priority: 5
 - Re-ran `./wasm/test.sh test_source_map_es5_transform_async_await_conditional_mapping`.
 - Re-ran `./wasm/test.sh test_source_map_es5_transform_async_arrow_captures_this_mapping`.
 - Re-ran `./wasm/test.sh test_source_map_es5_transform_async_binary_modulo_mapping`.
+- Ready for merge.
 - Ready for merge.
