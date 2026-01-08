@@ -324,6 +324,41 @@ class Derived extends Base {
 }
 
 #[test]
+fn test_two_phase_emission_es5_class_field_arrow_super_computed() {
+    let source = r#"
+const key = "m";
+class Base { [key]() {} }
+class Derived extends Base {
+    field = () => super[key]();
+    constructor() { super(); }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("_super.prototype[key].call(_this"),
+        "ES5 output should lower computed super call with lexical this: {}",
+        output
+    );
+    assert!(
+        !output.contains("super["),
+        "ES5 output should not contain computed super element access: {}",
+        output
+    );
+}
+
+#[test]
 fn test_two_phase_emission_es5_class_super_arrow_this_capture() {
     let source = r#"
 class Base {}

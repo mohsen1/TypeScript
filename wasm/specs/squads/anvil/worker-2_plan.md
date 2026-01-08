@@ -7,13 +7,13 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- Verify ES5 output for computed `super[...]` calls does not leak `super[` in class fields (add emitter transform integration test if needed).
+- Confirm handling of `super()` ordering relative to field initializers when computed property names are present.
 
 ## Task Queue
-- [ ] Confirm handling of `super()` ordering relative to field initializers when computed property names are present.
+- [ ] Expand integration coverage if ordering regression is found.
 
 ## Completed
-- [x] Added regression for computed `super[...]` in field arrow initializers; `./wasm/test.sh` failed at `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports` (unrelated).
+- [x] Added integration coverage for computed `super[...]` in class field arrow initializers; `./wasm/test.sh` failed at `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports` (unrelated).
 
 ## Ready for Merge
 No
