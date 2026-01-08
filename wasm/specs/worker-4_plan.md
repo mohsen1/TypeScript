@@ -13,6 +13,7 @@ Priority: 4
 - [ ] Stand by for next emitter fidelity task.
 
 ## Completed
+- [x] ES5 static field arrow does not capture instance this; test `./wasm/test.sh class_static_field_no_this_capture`.
 - [x] ES5 class field multiple arrow this capture; test `./wasm/test.sh class_field_multi_arrow_this_capture`.
 - [x] ES5 derived default ctor arrow field capture; test `./wasm/test.sh derived_default_arrow_field_capture`.
 - [x] ES5 class field nested arrow this capture emits constructor _this; test `./wasm/test.sh class_field_nested_arrow_this_capture`.

@@ -725,6 +725,48 @@ class Foo {
 }
 
 #[test]
+fn test_two_phase_emission_es5_class_static_field_no_this_capture() {
+    let source = r#"
+class Foo {
+    static field = () => this.x;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        !output.contains("var _this = this"),
+        "ES5 output should not capture this for static field: {}",
+        output
+    );
+    assert!(
+        output.contains("Foo.field = function"),
+        "ES5 output should emit static field initializer: {}",
+        output
+    );
+    assert!(
+        output.contains("this.x"),
+        "ES5 output should preserve this usage in static arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel arrow: {}",
+        output
+    );
+}
+
+#[test]
 fn test_two_phase_emission_es6_class_no_transform() {
     // Parse source
     let source = "class Point { constructor(x, y) { this.x = x; this.y = y; } }";
