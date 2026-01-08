@@ -11637,6 +11637,499 @@ fn test_mapped_type_deferred() {
     assert_eq!(result, mapped_type);
 }
 
+/// Test mapped type with remove readonly modifier (-readonly).
+///
+/// `{ -readonly [K in keyof T]: T[K] }` should remove readonly from properties.
+#[test]
+fn test_mapped_type_remove_readonly_modifier() {
+    let interner = TypeInterner::new();
+
+    // Iterate over "a" | "b" keys with -readonly modifier
+    let key_a = interner.literal_string("a");
+    let key_b = interner.literal_string("b");
+    let keys = interner.union(vec![key_a, key_b]);
+
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint: keys,
+        name_type: None,
+        template: TypeId::STRING,
+        readonly_modifier: Some(MappedModifier::Remove),  // -readonly
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Expected: { a: string; b: string } with readonly removed
+    let a_name = interner.intern_string("a");
+    let b_name = interner.intern_string("b");
+    let expected = interner.object(vec![
+        PropertyInfo {
+            name: a_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,  // readonly removed
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    assert_eq!(result, expected);
+}
+
+/// Test mapped type with remove optional modifier (-?).
+///
+/// `{ [K in keyof T]-?: T[K] }` should remove optional from properties.
+#[test]
+fn test_mapped_type_remove_optional_modifier() {
+    let interner = TypeInterner::new();
+
+    // Iterate over "a" | "b" keys with -? modifier
+    let key_a = interner.literal_string("a");
+    let key_b = interner.literal_string("b");
+    let keys = interner.union(vec![key_a, key_b]);
+
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint: keys,
+        name_type: None,
+        template: TypeId::NUMBER,
+        readonly_modifier: None,
+        optional_modifier: Some(MappedModifier::Remove),  // -?
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Expected: { a: number; b: number } with optional removed
+    let a_name = interner.intern_string("a");
+    let b_name = interner.intern_string("b");
+    let expected = interner.object(vec![
+        PropertyInfo {
+            name: a_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,  // optional removed
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    assert_eq!(result, expected);
+}
+
+/// Test mapped type with add readonly modifier (+readonly).
+///
+/// `{ +readonly [K in keyof T]: T[K] }` should add readonly to properties.
+#[test]
+fn test_mapped_type_add_readonly_modifier() {
+    let interner = TypeInterner::new();
+
+    // Iterate over "x" | "y" keys with +readonly modifier
+    let key_x = interner.literal_string("x");
+    let key_y = interner.literal_string("y");
+    let keys = interner.union(vec![key_x, key_y]);
+
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint: keys,
+        name_type: None,
+        template: TypeId::BOOLEAN,
+        readonly_modifier: Some(MappedModifier::Add),  // +readonly
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Expected: { readonly x: boolean; readonly y: boolean }
+    let x_name = interner.intern_string("x");
+    let y_name = interner.intern_string("y");
+    let expected = interner.object(vec![
+        PropertyInfo {
+            name: x_name,
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: true,  // readonly added
+            is_method: false,
+        },
+        PropertyInfo {
+            name: y_name,
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: true,
+            is_method: false,
+        },
+    ]);
+
+    assert_eq!(result, expected);
+}
+
+/// Test mapped type with add optional modifier (+?).
+///
+/// `{ [K in keyof T]+?: T[K] }` should add optional to properties.
+#[test]
+fn test_mapped_type_add_optional_modifier() {
+    let interner = TypeInterner::new();
+
+    // Iterate over "foo" | "bar" keys with +? modifier
+    let key_foo = interner.literal_string("foo");
+    let key_bar = interner.literal_string("bar");
+    let keys = interner.union(vec![key_foo, key_bar]);
+
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint: keys,
+        name_type: None,
+        template: TypeId::STRING,
+        readonly_modifier: None,
+        optional_modifier: Some(MappedModifier::Add),  // +?
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Expected: { foo?: string; bar?: string }
+    let foo_name = interner.intern_string("foo");
+    let bar_name = interner.intern_string("bar");
+    let expected = interner.object(vec![
+        PropertyInfo {
+            name: bar_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: true,  // optional added
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: foo_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: true,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    assert_eq!(result, expected);
+}
+
+/// Test mapped type with both readonly and optional modifiers.
+///
+/// `{ +readonly [K in keyof T]+?: T[K] }` should add both modifiers.
+#[test]
+fn test_mapped_type_both_modifiers() {
+    let interner = TypeInterner::new();
+
+    // Iterate over "id" key with both +readonly and +? modifiers
+    let key_id = interner.literal_string("id");
+
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint: key_id,
+        name_type: None,
+        template: TypeId::NUMBER,
+        readonly_modifier: Some(MappedModifier::Add),  // +readonly
+        optional_modifier: Some(MappedModifier::Add),  // +?
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Expected: { readonly id?: number }
+    let id_name = interner.intern_string("id");
+    let expected = interner.object(vec![PropertyInfo {
+        name: id_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: true,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    assert_eq!(result, expected);
+}
+
+/// Test conditional with void check type.
+///
+/// `void extends undefined ? true : false` should be false.
+#[test]
+fn test_conditional_void_check_type() {
+    let interner = TypeInterner::new();
+
+    let lit_true = interner.literal_boolean(true);
+    let lit_false = interner.literal_boolean(false);
+
+    // void extends undefined ? true : false
+    let cond = ConditionalType {
+        check_type: TypeId::VOID,
+        extends_type: TypeId::UNDEFINED,
+        true_type: lit_true,
+        false_type: lit_false,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+
+    // void is not assignable to undefined (they are different types)
+    assert_eq!(result, lit_false, "void extends undefined should be false");
+}
+
+/// Test conditional with null check type.
+///
+/// `null extends object ? true : false` should be false.
+#[test]
+fn test_conditional_null_check_type() {
+    let interner = TypeInterner::new();
+
+    let lit_true = interner.literal_boolean(true);
+    let lit_false = interner.literal_boolean(false);
+
+    // null extends object ? true : false
+    let cond = ConditionalType {
+        check_type: TypeId::NULL,
+        extends_type: TypeId::OBJECT,
+        true_type: lit_true,
+        false_type: lit_false,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+
+    // null is not assignable to object in strict mode
+    assert_eq!(result, lit_false, "null extends object should be false");
+}
+
+/// Test conditional with function extends function.
+///
+/// `() => void extends () => void ? true : false` should be true.
+#[test]
+fn test_conditional_function_extends_function() {
+    let interner = TypeInterner::new();
+
+    let lit_true = interner.literal_boolean(true);
+    let lit_false = interner.literal_boolean(false);
+
+    // () => void
+    let void_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // () => void extends () => void ? true : false
+    let cond = ConditionalType {
+        check_type: void_fn,
+        extends_type: void_fn,
+        true_type: lit_true,
+        false_type: lit_false,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+
+    assert_eq!(result, lit_true, "() => void extends () => void should be true");
+}
+
+/// Test conditional with array extends array.
+///
+/// `string[] extends any[] ? true : false` should be true.
+#[test]
+fn test_conditional_array_extends_array() {
+    let interner = TypeInterner::new();
+
+    let lit_true = interner.literal_boolean(true);
+    let lit_false = interner.literal_boolean(false);
+
+    let string_array = interner.array(TypeId::STRING);
+    let any_array = interner.array(TypeId::ANY);
+
+    // string[] extends any[] ? true : false
+    let cond = ConditionalType {
+        check_type: string_array,
+        extends_type: any_array,
+        true_type: lit_true,
+        false_type: lit_false,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+
+    assert_eq!(result, lit_true, "string[] extends any[] should be true");
+}
+
+/// Test conditional with tuple extends array.
+///
+/// `[string, number] extends any[] ? true : false` should be true.
+#[test]
+fn test_conditional_tuple_extends_array() {
+    let interner = TypeInterner::new();
+
+    let lit_true = interner.literal_boolean(true);
+    let lit_false = interner.literal_boolean(false);
+
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+    let any_array = interner.array(TypeId::ANY);
+
+    // [string, number] extends any[] ? true : false
+    let cond = ConditionalType {
+        check_type: tuple,
+        extends_type: any_array,
+        true_type: lit_true,
+        false_type: lit_false,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+
+    assert_eq!(result, lit_true, "[string, number] extends any[] should be true");
+}
+
+/// Test conditional with object structural subtyping.
+///
+/// `{a: string, b: number} extends {a: string} ? true : false` should be true.
+#[test]
+fn test_conditional_object_structural_subtype() {
+    let interner = TypeInterner::new();
+
+    let lit_true = interner.literal_boolean(true);
+    let lit_false = interner.literal_boolean(false);
+
+    let a_name = interner.intern_string("a");
+    let b_name = interner.intern_string("b");
+
+    // {a: string, b: number}
+    let obj_ab = interner.object(vec![
+        PropertyInfo {
+            name: a_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // {a: string}
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // {a: string, b: number} extends {a: string} ? true : false
+    let cond = ConditionalType {
+        check_type: obj_ab,
+        extends_type: obj_a,
+        true_type: lit_true,
+        false_type: lit_false,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+
+    assert_eq!(result, lit_true, "{{a: string, b: number}} extends {{a: string}} should be true");
+}
+
+/// Test conditional with bigint type.
+///
+/// `bigint extends number ? true : false` should be false.
+#[test]
+fn test_conditional_bigint_extends_number() {
+    let interner = TypeInterner::new();
+
+    let lit_true = interner.literal_boolean(true);
+    let lit_false = interner.literal_boolean(false);
+
+    // bigint extends number ? true : false
+    let cond = ConditionalType {
+        check_type: TypeId::BIGINT,
+        extends_type: TypeId::NUMBER,
+        true_type: lit_true,
+        false_type: lit_false,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+
+    assert_eq!(result, lit_false, "bigint extends number should be false");
+}
+
+/// Test conditional with symbol type.
+///
+/// `symbol extends string ? true : false` should be false.
+#[test]
+fn test_conditional_symbol_extends_string() {
+    let interner = TypeInterner::new();
+
+    let lit_true = interner.literal_boolean(true);
+    let lit_false = interner.literal_boolean(false);
+
+    // symbol extends string ? true : false
+    let cond = ConditionalType {
+        check_type: TypeId::SYMBOL,
+        extends_type: TypeId::STRING,
+        true_type: lit_true,
+        false_type: lit_false,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+
+    assert_eq!(result, lit_false, "symbol extends string should be false");
+}
+
 // ExtractState/ExtractAction pattern tests (Redux-style utility types)
 // These test conditional infer patterns like:
 //   type ExtractState<R> = R extends Reducer<infer S, AnyAction> ? S : never;

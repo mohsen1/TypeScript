@@ -58,6 +58,20 @@ Priority: 5
   - `test_application_ref_expansion_with_callable_body` - Callback<T, R> = { (arg: T): R }
   - `test_application_ref_expansion_with_construct_signature` - Constructor<T> = { new (): T }
   - `test_application_ref_expansion_with_deeply_nested_param` - Wrapper<T> = { inner: { value: T } }
+- [x] Added 13 conditional/mapped type edge case tests in `evaluate_tests.rs`:
+  - `test_mapped_type_remove_readonly_modifier` - { -readonly [K in T]: V }
+  - `test_mapped_type_remove_optional_modifier` - { [K in T]-?: V }
+  - `test_mapped_type_add_readonly_modifier` - { +readonly [K in T]: V }
+  - `test_mapped_type_add_optional_modifier` - { [K in T]+?: V }
+  - `test_mapped_type_both_modifiers` - { +readonly [K in T]+?: V }
+  - `test_conditional_void_check_type` - void extends undefined
+  - `test_conditional_null_check_type` - null extends object
+  - `test_conditional_function_extends_function` - () => void extends () => void
+  - `test_conditional_array_extends_array` - string[] extends any[]
+  - `test_conditional_tuple_extends_array` - [string, number] extends any[]
+  - `test_conditional_object_structural_subtype` - {a, b} extends {a}
+  - `test_conditional_bigint_extends_number` - bigint extends number
+  - `test_conditional_symbol_extends_string` - symbol extends string
 
 ### Circular Reference Root Cause (for Worker 1)
 
