@@ -61,6 +61,7 @@ Priority: 1
 - [x] Number index ignores -0 exponent form; added `test_resolve_bounds_number_index_ignores_negative_exponent_zero`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_negative_exponent_zero`.
 - [x] Number index treats negative decimal boundary as numeric; added `test_resolve_bounds_number_index_accepts_negative_decimal_boundary_name`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_accepts_negative_decimal_boundary_name`.
 - [x] Number index ignores trailing decimal name; added `test_resolve_bounds_number_index_ignores_trailing_decimal_name`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_trailing_decimal_name`.
+- [x] Number index ignores leading plus name; added `test_resolve_bounds_number_index_ignores_leading_plus_name`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_leading_plus_name`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
