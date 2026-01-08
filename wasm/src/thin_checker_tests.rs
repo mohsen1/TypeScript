@@ -5096,6 +5096,37 @@ if (typeof x === "string") {
 }
 
 #[test]
+fn test_flow_narrowing_not_applied_in_closure() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let x: string | number;
+if (typeof x === "string") {
+    const run = () => {
+        x.toUpperCase();
+    };
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        codes.contains(&2339),
+        "Expected error 2339 for closure without narrowing, got: {:?}",
+        codes
+    );
+}
+
+#[test]
 fn test_flow_narrowing_applies_in_while() {
     use crate::thin_parser::ThinParserState;
     use crate::parser::syntax_kind_ext;
