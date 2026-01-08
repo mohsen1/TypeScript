@@ -36,10 +36,13 @@ use crate::parser::thin_node::{
 use crate::parser::{NodeIndex, NodeList};
 use crate::parser::syntax_kind_ext;
 use crate::scanner::SyntaxKind;
+use crate::source_map::Mapping;
+use crate::source_writer::source_position_from_offset;
 use crate::transforms::arrow_es5::contains_this_reference;
 use crate::transforms::async_es5::AsyncES5Emitter;
 use crate::transforms::emit_utils;
 use crate::transforms::private_fields_es5::{PrivateFieldInfo, collect_private_fields, is_private_identifier};
+use memchr;
 
 struct ParamTransform {
     name: String,
@@ -76,6 +79,10 @@ pub struct ClassES5Emitter<'a> {
     output: String,
     indent_level: u32,
     source_text: Option<&'a str>,
+    source_index: u32,
+    mappings: Vec<Mapping>,
+    line: u32,
+    column: u32,
     /// Whether we're emitting inside a scope that uses _this capture
     use_this_capture: bool,
     /// Whether a `_this` capture is available in the current scope
@@ -95,6 +102,10 @@ impl<'a> ClassES5Emitter<'a> {
             output: String::with_capacity(4096),
             indent_level: 0,
             source_text: None,
+            source_index: 0,
+            mappings: Vec::new(),
+            line: 0,
+            column: 0,
             use_this_capture: false,
             this_capture_available: false,
             temp_var_counter: 0,
@@ -113,6 +124,38 @@ impl<'a> ClassES5Emitter<'a> {
         self.source_text = Some(source_text);
     }
 
+    pub fn set_source_map_context(&mut self, source_text: &'a str, source_index: u32) {
+        self.source_text = Some(source_text);
+        self.source_index = source_index;
+    }
+
+    pub fn take_mappings(&mut self) -> Vec<Mapping> {
+        std::mem::take(&mut self.mappings)
+    }
+
+    fn reset_output(&mut self) {
+        self.output.clear();
+        self.mappings.clear();
+        self.line = 0;
+        self.column = 0;
+    }
+
+    fn record_mapping_for_node(&mut self, node: &ThinNode) {
+        let Some(text) = self.source_text else {
+            return;
+        };
+
+        let source_pos = source_position_from_offset(text, node.pos);
+        self.mappings.push(Mapping {
+            generated_line: self.line,
+            generated_column: self.column,
+            source_index: self.source_index,
+            original_line: source_pos.line,
+            original_column: source_pos.column,
+            name_index: None,
+        });
+    }
+
     /// Emit trailing comments after a position in the source text
     fn emit_trailing_comments(&mut self, end_pos: u32) {
         use crate::thin_emitter::get_trailing_comment_ranges;
@@ -124,10 +167,10 @@ impl<'a> ClassES5Emitter<'a> {
         let comments = get_trailing_comment_ranges(text, end_pos as usize);
         for comment in comments {
             // Add space before trailing comment
-            self.output.push(' ');
+            self.write(" ");
             // Emit the comment text
             let comment_text = &text[comment.pos as usize..comment.end as usize];
-            self.output.push_str(comment_text);
+            self.write(comment_text);
         }
     }
 
@@ -140,7 +183,7 @@ impl<'a> ClassES5Emitter<'a> {
     }
 
     fn emit_class_internal(&mut self, class_idx: NodeIndex, override_name: Option<&str>) -> String {
-        self.output.clear();
+        self.reset_output();
 
         let Some(class_node) = self.arena.get(class_idx) else {
             return String::new();
@@ -155,6 +198,11 @@ impl<'a> ClassES5Emitter<'a> {
             name.to_string()
         } else {
             self.get_identifier_text(class_data.name)
+        };
+        let class_mapping_node = if override_name.is_none() {
+            Some(class_node)
+        } else {
+            None
         };
         self.class_name = class_name.clone();
 
@@ -178,6 +226,9 @@ impl<'a> ClassES5Emitter<'a> {
         }
 
         // var ClassName = /** @class */ (function (_super) {
+        if let Some(node) = class_mapping_node {
+            self.record_mapping_for_node(node);
+        }
         self.write("var ");
         self.write(&class_name);
         self.write(" = /** @class */ (function (");
@@ -485,6 +536,7 @@ impl<'a> ClassES5Emitter<'a> {
             }
 
             self.write_indent();
+            self.record_mapping_for_node(prop_node);
             self.write("this.");
             self.write_identifier_text(prop_data.name);
             self.write(" = ");
@@ -724,6 +776,7 @@ impl<'a> ClassES5Emitter<'a> {
             }
 
             self.write_indent();
+            self.record_mapping_for_node(prop_node);
             self.write("_this.");
             self.write_identifier_text(prop_data.name);
             self.write(" = ");
@@ -3735,20 +3788,31 @@ impl<'a> ClassES5Emitter<'a> {
     // Helper methods
     fn write(&mut self, s: &str) {
         self.output.push_str(s);
+        self.advance_position(s);
     }
 
     fn write_usize(&mut self, value: usize) {
         emit_utils::push_usize(&mut self.output, value);
+        let mut remaining = value;
+        let mut digits = 1;
+        while remaining >= 10 {
+            remaining /= 10;
+            digits += 1;
+        }
+        self.column += digits as u32;
     }
 
     fn write_line(&mut self) {
         self.output.push('\n');
+        self.line += 1;
+        self.column = 0;
     }
 
     fn write_indent(&mut self) {
         for _ in 0..self.indent_level {
             self.output.push_str("    ");
         }
+        self.column += self.indent_level * 4;
     }
 
     fn increase_indent(&mut self) {
@@ -3758,6 +3822,39 @@ impl<'a> ClassES5Emitter<'a> {
     fn decrease_indent(&mut self) {
         if self.indent_level > 0 {
             self.indent_level -= 1;
+        }
+    }
+
+    fn advance_position(&mut self, text: &str) {
+        let bytes = text.as_bytes();
+        let mut i = 0;
+
+        while i < bytes.len() {
+            match memchr::memchr(b'\n', &bytes[i..]) {
+                Some(offset) => {
+                    let segment_end = i + offset;
+                    let segment = &text[i..segment_end];
+
+                    if segment.is_ascii() {
+                        self.column += segment.len() as u32;
+                    } else {
+                        self.column += segment.chars().map(|c| c.len_utf16() as u32).sum::<u32>();
+                    }
+
+                    self.line += 1;
+                    self.column = 0;
+                    i = segment_end + 1;
+                }
+                None => {
+                    let segment = &text[i..];
+                    if segment.is_ascii() {
+                        self.column += segment.len() as u32;
+                    } else {
+                        self.column += segment.chars().map(|c| c.len_utf16() as u32).sum::<u32>();
+                    }
+                    break;
+                }
+            }
         }
     }
 }

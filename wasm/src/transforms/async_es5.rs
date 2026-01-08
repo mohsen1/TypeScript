@@ -56,13 +56,16 @@
 //! }); };
 //! ```
 
-use crate::parser::thin_node::ThinNodeArena;
+use crate::parser::thin_node::{ThinNode, ThinNodeArena};
 use crate::parser::{syntax_kind_ext, NodeIndex, NodeList};
 use crate::scanner::SyntaxKind;
+use crate::source_map::Mapping;
+use crate::source_writer::source_position_from_offset;
 use crate::thin_emitter::ThinPrinter;
 use crate::transform_context::{TransformContext, TransformDirective};
 use crate::transforms::arrow_es5::contains_this_reference;
 use crate::transforms::emit_utils;
+use memchr;
 
 /// State for tracking async function transformation
 #[derive(Debug, Default)]
@@ -100,6 +103,11 @@ pub struct AsyncES5Emitter<'a> {
     arena: &'a ThinNodeArena,
     output: String,
     indent_level: u32,
+    source_text: Option<&'a str>,
+    source_index: u32,
+    mappings: Vec<Mapping>,
+    line: u32,
+    column: u32,
     state: AsyncTransformState,
     this_capture_depth: u32,
 }
@@ -110,6 +118,11 @@ impl<'a> AsyncES5Emitter<'a> {
             arena,
             output: String::with_capacity(1024),
             indent_level: 0,
+            source_text: None,
+            source_index: 0,
+            mappings: Vec::new(),
+            line: 0,
+            column: 0,
             state: AsyncTransformState::new(),
             this_capture_depth: 0,
         }
@@ -117,6 +130,38 @@ impl<'a> AsyncES5Emitter<'a> {
 
     pub fn set_indent_level(&mut self, level: u32) {
         self.indent_level = level;
+    }
+
+    pub fn set_source_map_context(&mut self, source_text: &'a str, source_index: u32) {
+        self.source_text = Some(source_text);
+        self.source_index = source_index;
+    }
+
+    pub fn take_mappings(&mut self) -> Vec<Mapping> {
+        std::mem::take(&mut self.mappings)
+    }
+
+    fn reset_output(&mut self) {
+        self.output.clear();
+        self.mappings.clear();
+        self.line = 0;
+        self.column = 0;
+    }
+
+    fn record_mapping(&mut self, node: &ThinNode) {
+        let Some(text) = self.source_text else {
+            return;
+        };
+
+        let source_pos = source_position_from_offset(text, node.pos);
+        self.mappings.push(Mapping {
+            generated_line: self.line,
+            generated_column: self.column,
+            source_index: self.source_index,
+            original_line: source_pos.line,
+            original_column: source_pos.column,
+            name_index: None,
+        });
     }
 
     /// Check if a function body contains any await expressions
@@ -278,7 +323,7 @@ impl<'a> AsyncES5Emitter<'a> {
     /// Returns: "return __generator(this, function (_a) { return [2 /*return*/]; })"
     /// or with return value: "return __generator(this, function (_a) { return [2 /*return*/, expr]; })"
     pub fn emit_simple_generator_body(&mut self, body_idx: NodeIndex) -> String {
-        self.output.clear();
+        self.reset_output();
 
         self.write("return __generator(this, function (_a) {");
 
@@ -336,7 +381,7 @@ impl<'a> AsyncES5Emitter<'a> {
 
     /// Emit a generator body with await (switch/case format)
     pub fn emit_generator_body_with_await(&mut self, body_idx: NodeIndex) -> String {
-        self.output.clear();
+        self.reset_output();
         self.state.reset();
         self.state.has_await = true;
 
@@ -625,11 +670,13 @@ impl<'a> AsyncES5Emitter<'a> {
         match node.kind {
             k if k == SyntaxKind::NumericLiteral as u16 => {
                 if let Some(lit) = self.arena.get_literal(node) {
+                    self.record_mapping(node);
                     self.write(&lit.text);
                 }
             }
             k if k == SyntaxKind::StringLiteral as u16 => {
                 if let Some(lit) = self.arena.get_literal(node) {
+                    self.record_mapping(node);
                     self.write("\"");
                     self.write(&lit.text);
                     self.write("\"");
@@ -637,22 +684,28 @@ impl<'a> AsyncES5Emitter<'a> {
             }
             k if k == SyntaxKind::Identifier as u16 => {
                 if let Some(ident) = self.arena.get_identifier(node) {
+                    self.record_mapping(node);
                     self.write(&ident.escaped_text);
                 }
             }
             k if k == SyntaxKind::TrueKeyword as u16 => {
+                self.record_mapping(node);
                 self.write("true");
             }
             k if k == SyntaxKind::FalseKeyword as u16 => {
+                self.record_mapping(node);
                 self.write("false");
             }
             k if k == SyntaxKind::NullKeyword as u16 => {
+                self.record_mapping(node);
                 self.write("null");
             }
             k if k == SyntaxKind::UndefinedKeyword as u16 => {
+                self.record_mapping(node);
                 self.write("undefined");
             }
             k if k == SyntaxKind::ThisKeyword as u16 => {
+                self.record_mapping(node);
                 if self.this_capture_depth > 0 {
                     self.write("_this");
                 } else {
@@ -670,6 +723,18 @@ impl<'a> AsyncES5Emitter<'a> {
                         self.write("(");
                         if let Some(args) = &call.arguments {
                             let mut first = true;
+                            for &arg_idx in &args.nodes {
+                                if !first {
+                                    self.write(", ");
+                                }
+                                first = false;
+                                self.emit_expression(arg_idx);
+                            }
+                        }
+                        self.write(")");
+                    }
+                }
+            }
                             for &arg_idx in &args.nodes {
                                 if !first {
                                     self.write(", ");
@@ -1117,20 +1182,31 @@ impl<'a> AsyncES5Emitter<'a> {
 
     fn write(&mut self, s: &str) {
         self.output.push_str(s);
+        self.advance_position(s);
     }
 
     fn write_u32(&mut self, value: u32) {
         emit_utils::push_u32(&mut self.output, value);
+        let mut remaining = value;
+        let mut digits = 1;
+        while remaining >= 10 {
+            remaining /= 10;
+            digits += 1;
+        }
+        self.column += digits;
     }
 
     fn write_line(&mut self) {
         self.output.push('\n');
+        self.line += 1;
+        self.column = 0;
     }
 
     fn write_indent(&mut self) {
         for _ in 0..self.indent_level {
             self.output.push_str("    ");
         }
+        self.column += self.indent_level * 4;
     }
 
     fn increase_indent(&mut self) {
@@ -1140,6 +1216,39 @@ impl<'a> AsyncES5Emitter<'a> {
     fn decrease_indent(&mut self) {
         if self.indent_level > 0 {
             self.indent_level -= 1;
+        }
+    }
+
+    fn advance_position(&mut self, text: &str) {
+        let bytes = text.as_bytes();
+        let mut i = 0;
+
+        while i < bytes.len() {
+            match memchr::memchr(b'\n', &bytes[i..]) {
+                Some(offset) => {
+                    let segment_end = i + offset;
+                    let segment = &text[i..segment_end];
+
+                    if segment.is_ascii() {
+                        self.column += segment.len() as u32;
+                    } else {
+                        self.column += segment.chars().map(|c| c.len_utf16() as u32).sum::<u32>();
+                    }
+
+                    self.line += 1;
+                    self.column = 0;
+                    i = segment_end + 1;
+                }
+                None => {
+                    let segment = &text[i..];
+                    if segment.is_ascii() {
+                        self.column += segment.len() as u32;
+                    } else {
+                        self.column += segment.chars().map(|c| c.len_utf16() as u32).sum::<u32>();
+                    }
+                    break;
+                }
+            }
         }
     }
 }
