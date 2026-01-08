@@ -49,6 +49,8 @@ Priority: 4
 - [x] Added checker coverage for namespace merge across declarations with value access. Tests: `./wasm/test.sh`.
 - [x] Added checker coverage for namespace merge across declarations with type access. Tests: `./wasm/test.sh`.
 - [x] Added checker coverage for typeof namespace alias member type queries. Tests: `./wasm/test.sh`.
+- [x] Added checker coverage for class/namespace merged element access. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for mapped type with conditional value filter (PickValue pattern). Tests: `./wasm/test.sh`.
 
 ## Ready for Merge
 Yes
