@@ -7,10 +7,10 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [x] Support Worker 2 on `test_check_redux_lodash_style_generics` by isolating which specific generic patterns in `wasm/src/parallel_tests.rs:321-438` produce the 6 diagnostics. Create minimal repro tests in `wasm/src/thin_checker_tests.rs` for each failing pattern.
+- [x] Fix string enum opaque assignability (TS unsoundness #34): string literals should NOT be assignable to string enum types.
 
 ## Task Queue
-- [ ] Once Worker 2 fixes the core issue, verify all minimal repros pass (5 of 6 currently fail).
+- [ ] Once Worker 2 fixes the core issue, verify all minimal repros pass (4 of 6 currently fail).
 - [ ] Once constraint property lookup is implemented, update `test_cross_scope_generic_constraints` to expect 0 errors.
 - [ ] Once setter type checking is implemented, update `test_split_accessors_write_error` to expect 1 error.
 - [ ] Once typeof class types work, update `test_abstract_constructor_assignability` to expect 0 errors.
@@ -78,6 +78,7 @@ Priority: 3
 - [x] Legacy Null/Undefined (TS unsoundness #9): added 4 tests for strictNullChecks behavior. Tests cover valid code with null/undefined types (passes), null-to-string rejection (passes), undefined-to-number rejection (passes), and union types with null/undefined (passes). Tests: `./wasm/test.sh -- test_strict_null_checks\|test_null_undefined_union`.
 - [x] Correlated Unions (TS unsoundness #38): added 4 tests for cross-product limitation. Tests cover basic union property access (passes), discriminant narrowing (passes), index access with union key (passes), and common property access on union (passes). Tests: `./wasm/test.sh -- test_correlated_unions`.
 - [x] CFA Invalidation in Closures (TS unsoundness #42): added 4 tests for narrowing reset in closures. Tests cover mutable variable invalidation (passes), const narrowing maintenance (expected improvement once implemented), arrow function closure (passes), and callback parameter (passes). Tests: `./wasm/test.sh -- test_cfa_`.
+- [x] String enum opaque assignability fix (TS unsoundness #34): added string enum rejection in enum_assignability_override. String literals cannot be assigned to string enum types (test_string_enum_rejects_string_literal now passes). Tests: `./wasm/test.sh` (52 failures, down from 53).
 
 ## Ready for Merge
 Yes

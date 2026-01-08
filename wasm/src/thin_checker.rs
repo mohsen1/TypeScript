@@ -5013,6 +5013,13 @@ impl<'a> ThinCheckerState<'a> {
                 let mut checker = crate::solver::CompatChecker::new(self.ctx.types);
                 return Some(checker.is_assignable(source, TypeId::NUMBER));
             }
+            // String enum: only accepts the same enum type (nominal/opaque)
+            // Per TS unsoundness #34: String literals cannot be assigned to string enum types
+            if self.enum_kind(target_enum) == Some(EnumKind::String) {
+                // source_enum is None at this point (checked above)
+                // so a non-enum source cannot be assigned to a string enum
+                return Some(false);
+            }
         }
 
         None
