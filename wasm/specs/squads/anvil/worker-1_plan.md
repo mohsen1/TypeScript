@@ -20,7 +20,7 @@ Priority: 1
 - [x] Ensured derived constructors initialize private fields after `super` and added async arrow field regression; ran `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
 
 ## Ready for Merge
-No
+Yes
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
