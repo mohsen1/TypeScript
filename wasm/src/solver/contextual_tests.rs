@@ -487,6 +487,43 @@ fn test_contextual_union_function_return_preserves_literal() {
 }
 
 #[test]
+fn test_contextual_generic_return_union_any_uses_context() {
+    let interner = TypeInterner::new();
+    let t_name = interner.intern_string("T");
+
+    let fn_string = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let fn_number = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::NUMBER,
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let union = interner.union(vec![fn_string, fn_number]);
+
+    let ctx = ContextualTypeContext::with_expected(&interner, union);
+    let return_ctx = ctx.for_return();
+
+    let mut infer_ctx = InferenceContext::new(&interner);
+    let var_t = infer_ctx.fresh_type_param(t_name);
+    infer_ctx.add_lower_bound(var_t, TypeId::ANY);
+    let inferred = infer_ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(inferred, TypeId::ANY);
+
+    let expected_return = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let result = apply_contextual_type(&interner, inferred, return_ctx.expected());
+    assert_eq!(result, expected_return);
+}
+
+#[test]
 fn test_apply_contextual_same_type() {
     let interner = TypeInterner::new();
 
