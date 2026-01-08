@@ -6,6 +6,8 @@
 //! - Module transforms
 //! - Helper emission ordering
 
+use crate::emit_context::EmitContext;
+use crate::lowering_pass::LoweringPass;
 use crate::thin_parser::ThinParserState;
 use crate::thin_emitter::{ThinPrinter, PrinterOptions, ModuleKind};
 
@@ -224,9 +226,13 @@ class Derived extends Base {}
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
+    let arena = parser.arena;
 
-    let mut printer = ThinPrinter::new(&parser.arena);
-    printer.set_source_text(parser.get_source_text());
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
     printer.set_target_es5(true);
     printer.emit(root);
     let output = printer.get_output();

@@ -20,6 +20,7 @@ Priority: 4
 - [x] Re-verified async ES5 parity after cleanup; test `./wasm/test.sh test_parity_async_es5`.
 - [x] ES5 class async method parity: emit __awaiter wrapper in class methods; test `./wasm/test.sh class_es5`.
 - [x] ES5 class edge case: preserve pre-super statements before initializer emission in derived constructors; test `./wasm/test.sh class_es5`.
+- [x] Emitter extends helper edge case: route test through LoweringPass transforms; test `./wasm/test.sh test_class_extends_helper`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
