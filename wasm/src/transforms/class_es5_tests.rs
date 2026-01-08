@@ -5873,3 +5873,408 @@ class ExtendedService extends BaseService {
         output
     );
 }
+
+// =============================================================================
+// Index Signature Tests
+// =============================================================================
+
+#[test]
+fn test_class_es5_index_signature_string_key() {
+    // Test class with string index signature
+    let source = r#"
+class Dictionary {
+    [key: string]: string;
+
+    set(key: string, value: string): void {
+        this[key] = value;
+    }
+
+    get(key: string): string {
+        return this[key];
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function (index signature erased)
+    assert!(
+        output.contains("function Dictionary"),
+        "Expected Dictionary to emit as function: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("set"),
+        "Expected set method: {}",
+        output
+    );
+    assert!(
+        output.contains("get"),
+        "Expected get method: {}",
+        output
+    );
+
+    // Index signature should NOT appear in output
+    assert!(
+        !output.contains("[key: string]"),
+        "Index signature should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_index_signature_number_key() {
+    // Test class with number index signature
+    let source = r#"
+class NumberMap {
+    [index: number]: string;
+    private length: number = 0;
+
+    push(value: string): void {
+        this[this.length] = value;
+        this.length++;
+    }
+
+    getAt(index: number): string {
+        return this[index];
+    }
+
+    size(): number {
+        return this.length;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function NumberMap"),
+        "Expected NumberMap to emit as function: {}",
+        output
+    );
+
+    // Private field should be initialized
+    assert!(
+        output.contains("this.length") || output.contains("length"),
+        "Expected length field: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("push"),
+        "Expected push method: {}",
+        output
+    );
+    assert!(
+        output.contains("getAt"),
+        "Expected getAt method: {}",
+        output
+    );
+    assert!(
+        output.contains("size"),
+        "Expected size method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_index_signature_with_properties() {
+    // Test class with index signature and explicit properties
+    let source = r#"
+class Config {
+    [key: string]: any;
+    name: string;
+    version: number;
+
+    constructor(name: string, version: number) {
+        this.name = name;
+        this.version = version;
+    }
+
+    setOption(key: string, value: any): void {
+        this[key] = value;
+    }
+
+    getOption(key: string): any {
+        return this[key];
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function Config"),
+        "Expected Config to emit as function: {}",
+        output
+    );
+
+    // Constructor should set properties
+    assert!(
+        output.contains("this.name") || output.contains("name"),
+        "Expected name assignment: {}",
+        output
+    );
+    assert!(
+        output.contains("this.version") || output.contains("version"),
+        "Expected version assignment: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("setOption"),
+        "Expected setOption method: {}",
+        output
+    );
+    assert!(
+        output.contains("getOption"),
+        "Expected getOption method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_index_signature_readonly() {
+    // Test class with readonly index signature
+    let source = r#"
+class ReadonlyCache {
+    readonly [key: string]: number;
+    private data: Map<string, number> = new Map();
+
+    constructor(initial: Record<string, number>) {
+        for (const key in initial) {
+            this.data.set(key, initial[key]);
+        }
+    }
+
+    getValue(key: string): number | undefined {
+        return this.data.get(key);
+    }
+
+    hasKey(key: string): boolean {
+        return this.data.has(key);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function ReadonlyCache"),
+        "Expected ReadonlyCache to emit as function: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("getValue"),
+        "Expected getValue method: {}",
+        output
+    );
+    assert!(
+        output.contains("hasKey"),
+        "Expected hasKey method: {}",
+        output
+    );
+
+    // readonly keyword should NOT appear in output
+    assert!(
+        !output.contains("readonly"),
+        "readonly should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_index_signature_with_inheritance() {
+    // Test derived class with index signature
+    let source = r#"
+class BaseStore {
+    name: string;
+
+    constructor(name: string) {
+        this.name = name;
+    }
+}
+
+class KeyValueStore extends BaseStore {
+    [key: string]: any;
+
+    constructor(name: string) {
+        super(name);
+    }
+
+    set(key: string, value: any): void {
+        this[key] = value;
+    }
+
+    get(key: string): any {
+        return this[key];
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    // Get KeyValueStore class (second statement)
+    let class_idx = *source_file.statements.nodes.get(1).expect("expected KeyValueStore class");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function KeyValueStore"),
+        "Expected KeyValueStore to emit as function: {}",
+        output
+    );
+
+    // Should have inheritance setup
+    assert!(
+        output.contains("_super") || output.contains("BaseStore") || output.contains("__extends"),
+        "Expected inheritance handling: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("set"),
+        "Expected set method: {}",
+        output
+    );
+    assert!(
+        output.contains("get"),
+        "Expected get method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_index_signature_with_static_members() {
+    // Test class with index signature and static members
+    let source = r#"
+class Registry {
+    [id: string]: object;
+    static instances: Registry[] = [];
+    static defaultId: string = "default";
+
+    constructor() {
+        Registry.instances.push(this);
+    }
+
+    static getInstanceCount(): number {
+        return Registry.instances.length;
+    }
+
+    register(id: string, item: object): void {
+        this[id] = item;
+    }
+
+    lookup(id: string): object | undefined {
+        return this[id];
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function Registry"),
+        "Expected Registry to emit as function: {}",
+        output
+    );
+
+    // Static fields should be on constructor
+    assert!(
+        output.contains("Registry.instances") || output.contains("instances"),
+        "Expected instances static field: {}",
+        output
+    );
+    assert!(
+        output.contains("Registry.defaultId") || output.contains("defaultId"),
+        "Expected defaultId static field: {}",
+        output
+    );
+
+    // Static method should be present
+    assert!(
+        output.contains("getInstanceCount"),
+        "Expected getInstanceCount static method: {}",
+        output
+    );
+
+    // Instance methods should be present
+    assert!(
+        output.contains("register"),
+        "Expected register method: {}",
+        output
+    );
+    assert!(
+        output.contains("lookup"),
+        "Expected lookup method: {}",
+        output
+    );
+}
