@@ -81,6 +81,7 @@ Priority: 2
 - [x] Added template literal two-infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_two_infers_distributive`.
 - [x] Added template literal constrained infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_with_constrained_infer_distributive`.
 - [x] Added non-distributive template literal constrained infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_with_constrained_infer_non_distributive_union_input`.
+- [x] Added non-distributive template literal middle infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_with_middle_infer_non_distributive_union_input`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
