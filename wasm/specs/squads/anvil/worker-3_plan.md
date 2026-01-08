@@ -7,13 +7,14 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [EM: Assign initial task]
+- Fix async ES5 computed super element access (async emitter + ThinPrinter), update emitter integration tests, run `./wasm/test.sh`.
 
 ## Task Queue
-- [ ] [EM: Add queued tasks]
+- [ ] Audit remaining async ES5 computed-super cases for source map coverage.
+- [ ] Confirm ES5 output matches `tsc` for computed `super[...]` in nested arrows.
 
 ## Completed
-- [x] (Move finished items here with brief notes and tests run)
+- [x] Lowered async ES5 computed `super[...]` calls (async emitter + ThinPrinter) and updated integration tests; `./wasm/test.sh` fails at `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`.
 
 ## Ready for Merge
 No
