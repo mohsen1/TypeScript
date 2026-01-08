@@ -260,8 +260,10 @@ impl<'a> AsyncES5Emitter<'a> {
             }
         }
 
-        // Check call expressions
-        if node.kind == syntax_kind_ext::CALL_EXPRESSION {
+        // Check call/new expressions
+        if node.kind == syntax_kind_ext::CALL_EXPRESSION
+            || node.kind == syntax_kind_ext::NEW_EXPRESSION
+        {
             if let Some(call) = self.arena.get_call_expr(node) {
                 if self.contains_await_recursive(call.expression) {
                     return true;
