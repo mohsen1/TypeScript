@@ -649,6 +649,222 @@ var x: Alias;
 }
 
 #[test]
+fn test_namespace_exports_merge_across_decls() {
+    use crate::thin_parser::ThinParserState;
+    use crate::thin_binder::ThinBinderState;
+
+    let source = r#"
+namespace Merge {
+    export const a = 1;
+    const hidden = 2;
+}
+namespace Merge {
+    export function foo() {}
+    export const b = 3;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let merge_sym_id = binder.file_locals.get("Merge").expect("'Merge' should be in file_locals");
+    let merge_symbol = binder.get_symbol(merge_sym_id).expect("Merge symbol should exist");
+
+    let exports = merge_symbol.exports.as_ref().expect("Merge should have exports");
+    assert!(exports.get("a").is_some(), "a should be in Merge exports");
+    assert!(exports.get("b").is_some(), "b should be in Merge exports");
+    assert!(exports.get("foo").is_some(), "foo should be in Merge exports");
+    assert!(exports.get("hidden").is_none(), "hidden should not be in Merge exports");
+    assert_eq!(exports.len(), 3, "Merge should have exactly 3 exports");
+}
+
+#[test]
+fn test_class_namespace_merge_exports() {
+    use crate::thin_parser::ThinParserState;
+    use crate::thin_binder::ThinBinderState;
+
+    let source = r#"
+class Merge {
+    constructor() {}
+}
+namespace Merge {
+    export const extra = 1;
+    const hidden = 2;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let merge_sym_id = binder.file_locals.get("Merge").expect("'Merge' should be in file_locals");
+    let merge_symbol = binder.get_symbol(merge_sym_id).expect("Merge symbol should exist");
+
+    let exports = merge_symbol.exports.as_ref().expect("Merge should have exports");
+    assert!(exports.get("extra").is_some(), "extra should be in Merge exports");
+    assert!(exports.get("hidden").is_none(), "hidden should not be in Merge exports");
+    assert_eq!(exports.len(), 1, "Merge should have exactly 1 export");
+}
+
+#[test]
+fn test_namespace_class_merge_exports_reverse_order() {
+    use crate::thin_parser::ThinParserState;
+    use crate::thin_binder::ThinBinderState;
+
+    let source = r#"
+namespace Merge {
+    export const extra = 1;
+    const hidden = 2;
+}
+class Merge {
+    constructor() {}
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let merge_sym_id = binder.file_locals.get("Merge").expect("'Merge' should be in file_locals");
+    let merge_symbol = binder.get_symbol(merge_sym_id).expect("Merge symbol should exist");
+
+    let exports = merge_symbol.exports.as_ref().expect("Merge should have exports");
+    assert!(exports.get("extra").is_some(), "extra should be in Merge exports");
+    assert!(exports.get("hidden").is_none(), "hidden should not be in Merge exports");
+    assert_eq!(exports.len(), 1, "Merge should have exactly 1 export");
+}
+
+#[test]
+fn test_function_namespace_merge_exports() {
+    use crate::thin_parser::ThinParserState;
+    use crate::thin_binder::ThinBinderState;
+
+    let source = r#"
+function Merge() {}
+namespace Merge {
+    export const extra = 1;
+    const hidden = 2;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let merge_sym_id = binder.file_locals.get("Merge").expect("'Merge' should be in file_locals");
+    let merge_symbol = binder.get_symbol(merge_sym_id).expect("Merge symbol should exist");
+
+    let exports = merge_symbol.exports.as_ref().expect("Merge should have exports");
+    assert!(exports.get("extra").is_some(), "extra should be in Merge exports");
+    assert!(exports.get("hidden").is_none(), "hidden should not be in Merge exports");
+    assert_eq!(exports.len(), 1, "Merge should have exactly 1 export");
+}
+
+#[test]
+fn test_namespace_function_merge_exports_reverse_order() {
+    use crate::thin_parser::ThinParserState;
+    use crate::thin_binder::ThinBinderState;
+
+    let source = r#"
+namespace Merge {
+    export const extra = 1;
+    const hidden = 2;
+}
+function Merge() {}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let merge_sym_id = binder.file_locals.get("Merge").expect("'Merge' should be in file_locals");
+    let merge_symbol = binder.get_symbol(merge_sym_id).expect("Merge symbol should exist");
+
+    let exports = merge_symbol.exports.as_ref().expect("Merge should have exports");
+    assert!(exports.get("extra").is_some(), "extra should be in Merge exports");
+    assert!(exports.get("hidden").is_none(), "hidden should not be in Merge exports");
+    assert_eq!(exports.len(), 1, "Merge should have exactly 1 export");
+}
+
+#[test]
+fn test_enum_namespace_merge_exports() {
+    use crate::thin_parser::ThinParserState;
+    use crate::thin_binder::ThinBinderState;
+
+    let source = r#"
+enum Merge {
+    A,
+}
+namespace Merge {
+    export const extra = 1;
+    const hidden = 2;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let merge_sym_id = binder.file_locals.get("Merge").expect("'Merge' should be in file_locals");
+    let merge_symbol = binder.get_symbol(merge_sym_id).expect("Merge symbol should exist");
+
+    let exports = merge_symbol.exports.as_ref().expect("Merge should have exports");
+    assert!(exports.get("extra").is_some(), "extra should be in Merge exports");
+    assert!(exports.get("hidden").is_none(), "hidden should not be in Merge exports");
+    assert_eq!(exports.len(), 1, "Merge should have exactly 1 export");
+}
+
+#[test]
+fn test_namespace_enum_merge_exports_reverse_order() {
+    use crate::thin_parser::ThinParserState;
+    use crate::thin_binder::ThinBinderState;
+
+    let source = r#"
+namespace Merge {
+    export const extra = 1;
+    const hidden = 2;
+}
+enum Merge {
+    A,
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let merge_sym_id = binder.file_locals.get("Merge").expect("'Merge' should be in file_locals");
+    let merge_symbol = binder.get_symbol(merge_sym_id).expect("Merge symbol should exist");
+
+    let exports = merge_symbol.exports.as_ref().expect("Merge should have exports");
+    assert!(exports.get("extra").is_some(), "extra should be in Merge exports");
+    assert!(exports.get("hidden").is_none(), "hidden should not be in Merge exports");
+    assert_eq!(exports.len(), 1, "Merge should have exactly 1 export");
+}
+
+#[test]
 fn test_thin_binder_deep_binary_expression() {
     const COUNT: usize = 50000;
     let mut source = String::with_capacity(COUNT * 4);
