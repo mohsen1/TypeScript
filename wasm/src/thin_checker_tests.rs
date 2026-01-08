@@ -78,6 +78,15 @@ fn test_thin_checker_union_normalization() {
     let with_never = checker.ctx.types.union(vec![TypeId::STRING, TypeId::NEVER]);
     assert_eq!(with_never, TypeId::STRING);
 
+    // Union with `unknown` should be `unknown`
+    let with_unknown = checker.ctx.types.union(vec![TypeId::STRING, TypeId::UNKNOWN]);
+    assert_eq!(with_unknown, TypeId::UNKNOWN);
+
+    // Nested unions should be flattened and deduplicated
+    let inner = checker.ctx.types.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let outer = checker.ctx.types.union(vec![inner, TypeId::STRING]);
+    assert_eq!(outer, inner);
+
     // Single-element union should return the element
     let single = checker.ctx.types.union(vec![TypeId::STRING]);
     assert_eq!(single, TypeId::STRING);
