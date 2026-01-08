@@ -221,6 +221,38 @@ const log2: Logger = (id: number, extra: string) => {};
 }
 
 #[test]
+fn test_weak_type_detection_in_checker() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface Weak {
+    a?: number;
+}
+const ok = { a: 1 };
+const bad = { b: "nope" };
+
+const okAssign: Weak = ok;
+const badAssign: Weak = bad;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let no_common_count = codes.iter().filter(|&&code| code == 2559).count();
+    assert_eq!(no_common_count, 1,
+        "Expected one 2559 error for weak type with no overlap, got: {:?}", codes);
+}
+
+#[test]
 fn test_literal_widening_for_mutable_bindings() {
     use crate::thin_parser::ThinParserState;
 
