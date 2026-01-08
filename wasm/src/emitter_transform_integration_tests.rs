@@ -422,6 +422,44 @@ class Derived extends Base {
 }
 
 #[test]
+fn test_two_phase_emission_es5_class_derived_prop_init_after_super() {
+    let source = r#"
+class Base {}
+class Derived extends Base {
+    foo = 1;
+    constructor() {
+        super();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    let super_pos = output.find("var _this = _super.call(this");
+    let prop_pos = output.find("_this.foo = 1");
+    assert!(
+        super_pos.is_some() && prop_pos.is_some(),
+        "ES5 output should include super call and property initializer: {}",
+        output
+    );
+    assert!(
+        super_pos.unwrap() < prop_pos.unwrap(),
+        "ES5 output should emit property initializer after super: {}",
+        output
+    );
+}
+
+#[test]
 fn test_two_phase_emission_es6_class_no_transform() {
     // Parse source
     let source = "class Point { constructor(x, y) { this.x = x; this.y = y; } }";
