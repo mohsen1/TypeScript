@@ -7,13 +7,13 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-- Solver hardening: focus on inference from contextual types in `wasm/src/solver/infer.rs`. Add a focused test in `wasm/src/solver/infer_tests.rs` that currently fails (contextual function inference or circular constraint) and implement the minimal fix.
+- Awaiting next assignment.
 
 ## Task Queue
-- [ ] If contextual inference is already correct, target circular `extends` constraints and add a regression test.
+- [ ] None.
 
 ## Completed
-- [x] (Move finished items here with brief notes and tests run.)
+- [x] Prefer upper bounds when lower bounds are only `any`/`unknown`; added `test_resolve_any_lower_prefers_upper_bound`. Tests: `./wasm/test.sh test_resolve_any_lower_prefers_upper_bound`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.

@@ -552,16 +552,26 @@ impl<'a> InferenceContext<'a> {
         let root = self.table.find(var);
         let constraints = self.constraints[root.0 as usize].clone();
         let upper_bounds = constraints.upper_bounds.clone();
+        let mut lower_bounds = constraints.lower_bounds;
 
-        let result = if !constraints.lower_bounds.is_empty() {
+        if !lower_bounds.is_empty() && !upper_bounds.is_empty() {
+            let has_informative = lower_bounds.iter().any(|ty| {
+                !matches!(*ty, TypeId::ANY | TypeId::UNKNOWN)
+            });
+            if !has_informative {
+                lower_bounds.clear();
+            }
+        }
+
+        let result = if !lower_bounds.is_empty() {
             // Best common type: union of all lower bounds
-            self.best_common_type(&constraints.lower_bounds)
-        } else if !constraints.upper_bounds.is_empty() {
+            self.best_common_type(&lower_bounds)
+        } else if !upper_bounds.is_empty() {
             // No lower bounds, use intersection of upper bounds
-            if constraints.upper_bounds.len() == 1 {
-                constraints.upper_bounds[0]
+            if upper_bounds.len() == 1 {
+                upper_bounds[0]
             } else {
-                self.interner.intersection(constraints.upper_bounds)
+                self.interner.intersection(upper_bounds.clone())
             }
         } else {
             // No constraints at all - return unknown

@@ -236,6 +236,20 @@ fn test_resolve_upper_bound_only() {
 }
 
 #[test]
+fn test_resolve_any_lower_prefers_upper_bound() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+
+    ctx.add_lower_bound(var, TypeId::ANY);
+    ctx.add_upper_bound(var, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
 fn test_resolve_multiple_upper_bounds_intersection() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);
