@@ -42,6 +42,7 @@ Priority: 3
 - [x] Solver unsoundness: apparent symbol member regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_apparent_symbol_member_subtyping`.
 - [x] Solver unsoundness: apparent bigint member regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_apparent_bigint_member_subtyping`.
 - [x] Solver unsoundness: mapped type over primitive boolean keys regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_over_boolean_keys_subtyping`.
+- [x] Solver unsoundness: apparent object member regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_apparent_object_member_subtyping`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
