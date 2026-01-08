@@ -2759,6 +2759,45 @@ fn test_void_return_exception_subtype() {
 }
 
 #[test]
+fn test_constructor_void_exception_subtype() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let instance = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let returns_instance = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: instance,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    let returns_void = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    assert!(!checker.is_subtype_of(returns_instance, returns_void));
+
+    checker.allow_void_return = true;
+    assert!(checker.is_subtype_of(returns_instance, returns_void));
+    assert!(!checker.is_subtype_of(returns_void, returns_instance));
+}
+
+#[test]
 fn test_function_top_assignability() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
