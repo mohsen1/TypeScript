@@ -7,7 +7,7 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [x] Add solver tests for NoInfer<T> and template literal intrinsics (Capitalize, Uncapitalize, Uppercase, Lowercase). **Done:** Added 18 tests covering template literal operations, NoInfer patterns, and string manipulation intrinsic patterns.
+- [x] Add solver tests for infer in template literal positions (`${infer Head}${infer Tail}` patterns). **Done:** Added 11 tests covering string parsing patterns with template literal infer.
 
 ## Task Queue
 (empty - awaiting next assignment)
@@ -88,6 +88,15 @@ Priority: 4
 - [x] Added solver coverage for Capitalize<T> intrinsic pattern. Tests: `./wasm/test.sh`.
 - [x] Added solver coverage for Uncapitalize<T> intrinsic pattern. Tests: `./wasm/test.sh`.
 - [x] Added solver coverage for chained string intrinsics. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for template literal Head/Tail split pattern. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for template literal three-segment split. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for template literal prefix extraction. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for template literal suffix extraction. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for template literal middle extraction. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for template literal path split pattern. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for template literal union distribution with infer. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for template literal kebab-to-camel pattern. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for template literal dot notation parse. Tests: `./wasm/test.sh`.
 
 ## Ready for Merge
 Yes
