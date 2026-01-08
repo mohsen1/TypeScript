@@ -15,8 +15,12 @@ use crate::interner::Atom;
 use crate::solver::types::*;
 use crate::solver::{apparent_primitive_members, ApparentMemberKind, TypeDatabase};
 use crate::solver::infer::InferenceContext;
-use crate::solver::subtype::{SubtypeChecker, TypeResolver, NoopResolver};
-use crate::solver::instantiate::{TypeSubstitution, instantiate_type};
+use crate::solver::instantiate::{
+    instantiate_type,
+    instantiate_type_with_infer,
+    TypeSubstitution,
+};
+use crate::solver::subtype::{NoopResolver, SubtypeChecker, TypeResolver};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 #[cfg(test)]
@@ -232,6 +236,345 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     cond.true_type,
                     cond.false_type,
                 );
+            }
+        }
+
+        if let Some(TypeKey::Infer(info)) = self.interner.lookup(extends_type) {
+            if matches!(
+                self.interner.lookup(check_type),
+                Some(TypeKey::TypeParameter(_)) | Some(TypeKey::Infer(_))
+            ) {
+                return self.interner.conditional(cond.clone());
+            }
+
+            let mut subst = TypeSubstitution::new();
+            subst.insert(info.name, check_type);
+
+            if check_type == TypeId::ANY {
+                let true_eval = self.evaluate(instantiate_type_with_infer(
+                    self.interner,
+                    cond.true_type,
+                    &subst,
+                ));
+                let false_eval = self.evaluate(instantiate_type_with_infer(
+                    self.interner,
+                    cond.false_type,
+                    &subst,
+                ));
+                return self.interner.union2(true_eval, false_eval);
+            }
+
+            if let Some(constraint) = info.constraint {
+                let mut checker = SubtypeChecker::with_resolver(self.interner, self.resolver);
+                if !checker.is_subtype_of(check_type, constraint) {
+                    let false_inst = instantiate_type_with_infer(
+                        self.interner,
+                        cond.false_type,
+                        &subst,
+                    );
+                    return self.evaluate(false_inst);
+                }
+            }
+
+            let true_inst = instantiate_type_with_infer(
+                self.interner,
+                cond.true_type,
+                &subst,
+            );
+            return self.evaluate(true_inst);
+        }
+
+        let extends_unwrapped = match self.interner.lookup(extends_type) {
+            Some(TypeKey::ReadonlyType(inner)) => inner,
+            _ => extends_type,
+        };
+        let check_unwrapped = match self.interner.lookup(check_type) {
+            Some(TypeKey::ReadonlyType(inner)) => inner,
+            _ => check_type,
+        };
+
+        if let Some(TypeKey::Array(ext_elem)) = self.interner.lookup(extends_unwrapped) {
+            if let Some(TypeKey::Infer(info)) = self.interner.lookup(ext_elem) {
+                if matches!(
+                    self.interner.lookup(check_unwrapped),
+                    Some(TypeKey::TypeParameter(_)) | Some(TypeKey::Infer(_))
+                ) {
+                    return self.interner.conditional(cond.clone());
+                }
+
+                let inferred = match self.interner.lookup(check_unwrapped) {
+                    Some(TypeKey::Array(elem)) => Some(elem),
+                    Some(TypeKey::Tuple(elements)) => {
+                        let elements = self.interner.tuple_list(elements);
+                        let mut parts = Vec::new();
+                        for element in elements.iter() {
+                            if element.rest {
+                                let rest_type = match self.interner.lookup(element.type_id) {
+                                    Some(TypeKey::Array(rest_elem)) => rest_elem,
+                                    _ => element.type_id,
+                                };
+                                parts.push(rest_type);
+                            } else {
+                                parts.push(element.type_id);
+                            }
+                        }
+                        if parts.is_empty() {
+                            None
+                        } else {
+                            Some(self.interner.union(parts))
+                        }
+                    }
+                    _ => None,
+                };
+
+                let Some(inferred) = inferred else {
+                    return self.evaluate(cond.false_type);
+                };
+
+                let mut subst = TypeSubstitution::new();
+                subst.insert(info.name, inferred);
+
+                if let Some(constraint) = info.constraint {
+                    let mut checker = SubtypeChecker::with_resolver(self.interner, self.resolver);
+                    if !checker.is_subtype_of(inferred, constraint) {
+                        let false_inst = instantiate_type_with_infer(
+                            self.interner,
+                            cond.false_type,
+                            &subst,
+                        );
+                        return self.evaluate(false_inst);
+                    }
+                }
+
+                let true_inst = instantiate_type_with_infer(
+                    self.interner,
+                    cond.true_type,
+                    &subst,
+                );
+                return self.evaluate(true_inst);
+            }
+        }
+
+        if let Some(TypeKey::Tuple(extends_elements)) = self.interner.lookup(extends_unwrapped) {
+            let extends_elements = self.interner.tuple_list(extends_elements);
+            if extends_elements.len() == 1 && !extends_elements[0].rest {
+                if let Some(TypeKey::Infer(info)) =
+                    self.interner.lookup(extends_elements[0].type_id)
+                {
+                    if matches!(
+                        self.interner.lookup(check_unwrapped),
+                        Some(TypeKey::TypeParameter(_)) | Some(TypeKey::Infer(_))
+                    ) {
+                        return self.interner.conditional(cond.clone());
+                    }
+
+                    let inferred = match self.interner.lookup(check_unwrapped) {
+                        Some(TypeKey::Tuple(check_elements)) => {
+                            let check_elements = self.interner.tuple_list(check_elements);
+                            if check_elements.len() == 1 && !check_elements[0].rest {
+                                Some(check_elements[0].type_id)
+                            } else {
+                                None
+                            }
+                        }
+                        _ => None,
+                    };
+
+                    let Some(inferred) = inferred else {
+                        return self.evaluate(cond.false_type);
+                    };
+
+                    let mut subst = TypeSubstitution::new();
+                    subst.insert(info.name, inferred);
+
+                    if let Some(constraint) = info.constraint {
+                        let mut checker =
+                            SubtypeChecker::with_resolver(self.interner, self.resolver);
+                        if !checker.is_subtype_of(inferred, constraint) {
+                            let false_inst = instantiate_type_with_infer(
+                                self.interner,
+                                cond.false_type,
+                                &subst,
+                            );
+                            return self.evaluate(false_inst);
+                        }
+                    }
+
+                    let true_inst = instantiate_type_with_infer(
+                        self.interner,
+                        cond.true_type,
+                        &subst,
+                    );
+                    return self.evaluate(true_inst);
+                }
+            }
+        }
+
+        if let Some(extends_shape_id) = match self.interner.lookup(extends_unwrapped) {
+            Some(TypeKey::Object(shape_id) | TypeKey::ObjectWithIndex(shape_id)) => Some(shape_id),
+            _ => None,
+        } {
+            let extends_shape = self.interner.object_shape(extends_shape_id);
+            let mut infer_prop = None;
+            let mut infer_nested = None;
+
+            for prop in extends_shape.properties.iter() {
+                if let Some(TypeKey::Infer(info)) = self.interner.lookup(prop.type_id) {
+                    if infer_prop.is_some() || infer_nested.is_some() {
+                        infer_prop = None;
+                        infer_nested = None;
+                        break;
+                    }
+                    infer_prop = Some((prop.name, info));
+                    continue;
+                }
+
+                let nested_type = match self.interner.lookup(prop.type_id) {
+                    Some(TypeKey::ReadonlyType(inner)) => inner,
+                    _ => prop.type_id,
+                };
+                if let Some(nested_shape_id) = match self.interner.lookup(nested_type) {
+                    Some(TypeKey::Object(shape_id) | TypeKey::ObjectWithIndex(shape_id)) => {
+                        Some(shape_id)
+                    }
+                    _ => None,
+                } {
+                    let nested_shape = self.interner.object_shape(nested_shape_id);
+                    let mut nested_infer = None;
+                    for nested_prop in nested_shape.properties.iter() {
+                        if let Some(TypeKey::Infer(info)) =
+                            self.interner.lookup(nested_prop.type_id)
+                        {
+                            if nested_infer.is_some() {
+                                nested_infer = None;
+                                break;
+                            }
+                            nested_infer = Some((nested_prop.name, info));
+                        }
+                    }
+                    if let Some((nested_name, info)) = nested_infer {
+                        if infer_prop.is_some() || infer_nested.is_some() {
+                            infer_prop = None;
+                            infer_nested = None;
+                            break;
+                        }
+                        infer_nested = Some((prop.name, nested_name, info));
+                    }
+                }
+            }
+
+            if let Some((prop_name, info)) = infer_prop {
+                if matches!(
+                    self.interner.lookup(check_unwrapped),
+                    Some(TypeKey::TypeParameter(_)) | Some(TypeKey::Infer(_))
+                ) {
+                    return self.interner.conditional(cond.clone());
+                }
+
+                let inferred = match self.interner.lookup(check_unwrapped) {
+                    Some(TypeKey::Object(shape_id) | TypeKey::ObjectWithIndex(shape_id)) => {
+                        let shape = self.interner.object_shape(shape_id);
+                        shape
+                            .properties
+                            .iter()
+                            .find(|prop| prop.name == prop_name)
+                            .map(|prop| prop.type_id)
+                    }
+                    _ => None,
+                };
+
+                let Some(inferred) = inferred else {
+                    return self.evaluate(cond.false_type);
+                };
+
+                let mut subst = TypeSubstitution::new();
+                subst.insert(info.name, inferred);
+
+                if let Some(constraint) = info.constraint {
+                    let mut checker =
+                        SubtypeChecker::with_resolver(self.interner, self.resolver);
+                    if !checker.is_subtype_of(inferred, constraint) {
+                        let false_inst = instantiate_type_with_infer(
+                            self.interner,
+                            cond.false_type,
+                            &subst,
+                        );
+                        return self.evaluate(false_inst);
+                    }
+                }
+
+                let true_inst = instantiate_type_with_infer(
+                    self.interner,
+                    cond.true_type,
+                    &subst,
+                );
+                return self.evaluate(true_inst);
+            } else if let Some((outer_name, inner_name, info)) = infer_nested {
+                if matches!(
+                    self.interner.lookup(check_unwrapped),
+                    Some(TypeKey::TypeParameter(_)) | Some(TypeKey::Infer(_))
+                ) {
+                    return self.interner.conditional(cond.clone());
+                }
+
+                let inferred = match self.interner.lookup(check_unwrapped) {
+                    Some(TypeKey::Object(shape_id) | TypeKey::ObjectWithIndex(shape_id)) => {
+                        let shape = self.interner.object_shape(shape_id);
+                        shape
+                            .properties
+                            .iter()
+                            .find(|prop| prop.name == outer_name)
+                            .and_then(|prop| {
+                                let inner_type = match self.interner.lookup(prop.type_id) {
+                                    Some(TypeKey::ReadonlyType(inner)) => inner,
+                                    _ => prop.type_id,
+                                };
+                                match self.interner.lookup(inner_type) {
+                                    Some(
+                                        TypeKey::Object(inner_shape_id)
+                                        | TypeKey::ObjectWithIndex(inner_shape_id),
+                                    ) => {
+                                        let inner_shape =
+                                            self.interner.object_shape(inner_shape_id);
+                                        inner_shape
+                                            .properties
+                                            .iter()
+                                            .find(|prop| prop.name == inner_name)
+                                            .map(|prop| prop.type_id)
+                                    }
+                                    _ => None,
+                                }
+                            })
+                    }
+                    _ => None,
+                };
+
+                let Some(inferred) = inferred else {
+                    return self.evaluate(cond.false_type);
+                };
+
+                let mut subst = TypeSubstitution::new();
+                subst.insert(info.name, inferred);
+
+                if let Some(constraint) = info.constraint {
+                    let mut checker =
+                        SubtypeChecker::with_resolver(self.interner, self.resolver);
+                    if !checker.is_subtype_of(inferred, constraint) {
+                        let false_inst = instantiate_type_with_infer(
+                            self.interner,
+                            cond.false_type,
+                            &subst,
+                        );
+                        return self.evaluate(false_inst);
+                    }
+                }
+
+                let true_inst = instantiate_type_with_infer(
+                    self.interner,
+                    cond.true_type,
+                    &subst,
+                );
+                return self.evaluate(true_inst);
             }
         }
 
