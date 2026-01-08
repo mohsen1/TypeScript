@@ -263,6 +263,44 @@ impl<'a> AsyncES5Emitter<'a> {
             }
         }
 
+        // Check loops
+        if node.kind == syntax_kind_ext::WHILE_STATEMENT
+            || node.kind == syntax_kind_ext::DO_STATEMENT
+            || node.kind == syntax_kind_ext::FOR_STATEMENT
+        {
+            if let Some(loop_data) = self.arena.get_loop(node) {
+                if self.contains_await_recursive(loop_data.initializer) {
+                    return true;
+                }
+                if self.contains_await_recursive(loop_data.condition) {
+                    return true;
+                }
+                if self.contains_await_recursive(loop_data.incrementor) {
+                    return true;
+                }
+                if self.contains_await_recursive(loop_data.statement) {
+                    return true;
+                }
+            }
+        }
+
+        // Check for-in/for-of loops
+        if node.kind == syntax_kind_ext::FOR_IN_STATEMENT
+            || node.kind == syntax_kind_ext::FOR_OF_STATEMENT
+        {
+            if let Some(for_in_of) = self.arena.get_for_in_of(node) {
+                if self.contains_await_recursive(for_in_of.initializer) {
+                    return true;
+                }
+                if self.contains_await_recursive(for_in_of.expression) {
+                    return true;
+                }
+                if self.contains_await_recursive(for_in_of.statement) {
+                    return true;
+                }
+            }
+        }
+
         // Check switch statements
         if node.kind == syntax_kind_ext::SWITCH_STATEMENT {
             if let Some(switch_stmt) = self.arena.get_switch(node) {
