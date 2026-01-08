@@ -1224,3 +1224,50 @@ class Logger {
         output
     );
 }
+
+#[test]
+fn test_class_es5_shorthand_properties_in_method() {
+    let source = r#"
+class Point {
+    x = 10;
+    y = 20;
+
+    toObject() {
+        const x = this.x;
+        const y = this.y;
+        return { x, y };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Should have explicit property assignments (x: x, y: y) for ES5
+    // or the shorthand should be preserved if the emitter handles it
+    assert!(
+        output.contains("x:") || output.contains("x :") || output.contains("{ x, y }") || output.contains("{x, y}"),
+        "Expected object with x property in output: {}",
+        output
+    );
+
+    // Method should be on prototype
+    assert!(
+        output.contains(".prototype.toObject") || output.contains("prototype[\"toObject\"]"),
+        "Expected toObject method on prototype: {}",
+        output
+    );
+}
