@@ -124,6 +124,8 @@ pub struct Symbol {
     pub members: Option<Box<SymbolTable>>,
     /// Whether this symbol is exported from its container (namespace/module)
     pub is_exported: bool,
+    /// Whether this symbol is type-only (e.g., `import type`).
+    pub is_type_only: bool,
 }
 
 impl Symbol {
@@ -139,6 +141,7 @@ impl Symbol {
             exports: None,
             members: None,
             is_exported: false,
+            is_type_only: false,
         }
     }
 
