@@ -5108,8 +5108,13 @@ impl<'a> ThinCheckerState<'a> {
     ///
     /// Uses the solver's SubtypeChecker with coinductive cycle detection.
     /// Uses the context's TypeEnvironment for resolving type references and expanding Applications.
-    pub fn is_assignable_to(&self, source: TypeId, target: TypeId) -> bool {
+    /// Pre-resolves all Ref symbols in both types before checking assignability.
+    pub fn is_assignable_to(&mut self, source: TypeId, target: TypeId) -> bool {
         use crate::solver::CompatChecker;
+
+        // Pre-resolve all Ref symbols in both types to populate TypeEnvironment
+        self.resolve_refs_in_type(source);
+        self.resolve_refs_in_type(target);
 
         let env = self.ctx.type_env.borrow();
         if let Some(result) = self.enum_assignability_override(source, target, Some(&*env)) {
@@ -5143,8 +5148,14 @@ impl<'a> ThinCheckerState<'a> {
     ///
     /// Stricter than assignability. Uses coinductive semantics for recursive types.
     /// Uses the context's TypeEnvironment for resolving type references and expanding Applications.
-    pub fn is_subtype_of(&self, source: TypeId, target: TypeId) -> bool {
+    /// Pre-resolves all Ref symbols in both types before checking.
+    pub fn is_subtype_of(&mut self, source: TypeId, target: TypeId) -> bool {
         use crate::solver::SubtypeChecker;
+
+        // Pre-resolve all Ref symbols in both types to populate TypeEnvironment
+        self.resolve_refs_in_type(source);
+        self.resolve_refs_in_type(target);
+
         let env = self.ctx.type_env.borrow();
         let mut checker = SubtypeChecker::with_resolver(self.ctx.types, &*env);
         checker.is_subtype_of(source, target)
@@ -5173,8 +5184,16 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Check if a type is assignable to a union of types.
     /// Uses the context's TypeEnvironment for resolving type references and expanding Applications.
-    pub fn is_assignable_to_union(&self, source: TypeId, targets: &[TypeId]) -> bool {
+    /// Pre-resolves all Ref symbols in all types before checking.
+    pub fn is_assignable_to_union(&mut self, source: TypeId, targets: &[TypeId]) -> bool {
         use crate::solver::CompatChecker;
+
+        // Pre-resolve all Ref symbols in source and all targets
+        self.resolve_refs_in_type(source);
+        for &target in targets {
+            self.resolve_refs_in_type(target);
+        }
+
         let env = self.ctx.type_env.borrow();
         let mut checker = CompatChecker::with_resolver(self.ctx.types, &*env);
         for &target in targets {
@@ -5218,6 +5237,142 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         env
+    }
+
+    /// Resolve all Ref symbols in a type to populate the TypeEnvironment.
+    ///
+    /// This should be called before assignability checks involving types that may
+    /// contain unresolved Ref symbols (especially Application types like `Ref<Args>`).
+    pub fn resolve_refs_in_type(&mut self, type_id: TypeId) {
+        use crate::solver::TypeKey;
+        use std::collections::HashSet;
+
+        let mut visited = HashSet::new();
+        self.resolve_refs_in_type_recursive(type_id, &mut visited);
+    }
+
+    /// Recursive helper for resolve_refs_in_type.
+    fn resolve_refs_in_type_recursive(&mut self, type_id: TypeId, visited: &mut std::collections::HashSet<TypeId>) {
+        use crate::solver::TypeKey;
+
+        if !visited.insert(type_id) {
+            return;
+        }
+
+        let Some(key) = self.ctx.types.lookup(type_id) else {
+            return;
+        };
+
+        match &key {
+            TypeKey::Ref(sym_ref) => {
+                // Resolve this symbol to populate the TypeEnvironment
+                let sym_id = SymbolId(sym_ref.0);
+                let _ = self.get_type_of_symbol(sym_id);
+            }
+            TypeKey::Application(app_id) => {
+                let app = self.ctx.types.type_application(*app_id);
+                let base = app.base;
+                let args: Vec<TypeId> = app.args.iter().copied().collect();
+                self.resolve_refs_in_type_recursive(base, visited);
+                for arg in args {
+                    self.resolve_refs_in_type_recursive(arg, visited);
+                }
+            }
+            TypeKey::Union(list_id) => {
+                let members: Vec<TypeId> = self.ctx.types.type_list(*list_id).iter().copied().collect();
+                for member in members {
+                    self.resolve_refs_in_type_recursive(member, visited);
+                }
+            }
+            TypeKey::Intersection(list_id) => {
+                let members: Vec<TypeId> = self.ctx.types.type_list(*list_id).iter().copied().collect();
+                for member in members {
+                    self.resolve_refs_in_type_recursive(member, visited);
+                }
+            }
+            TypeKey::Array(elem) | TypeKey::ReadonlyType(elem) => {
+                let elem = *elem;
+                self.resolve_refs_in_type_recursive(elem, visited);
+            }
+            TypeKey::Tuple(tuple_id) => {
+                let tuple = self.ctx.types.tuple_list(*tuple_id);
+                let elems: Vec<TypeId> = tuple.iter().map(|e| e.type_id).collect();
+                for elem in elems {
+                    self.resolve_refs_in_type_recursive(elem, visited);
+                }
+            }
+            TypeKey::Function(func_id) => {
+                let func = self.ctx.types.function_shape(*func_id);
+                let return_type = func.return_type;
+                let params: Vec<TypeId> = func.params.iter().map(|p| p.type_id).collect();
+                self.resolve_refs_in_type_recursive(return_type, visited);
+                for param in params {
+                    self.resolve_refs_in_type_recursive(param, visited);
+                }
+            }
+            TypeKey::Object(shape_id) | TypeKey::ObjectWithIndex(shape_id) => {
+                let shape = self.ctx.types.object_shape(*shape_id);
+                let props: Vec<TypeId> = shape.properties.iter().map(|p| p.type_id).collect();
+                let string_idx = shape.string_index.map(|s| s.type_id);
+                let number_idx = shape.number_index.map(|s| s.type_id);
+                for prop in props {
+                    self.resolve_refs_in_type_recursive(prop, visited);
+                }
+                if let Some(idx) = string_idx {
+                    self.resolve_refs_in_type_recursive(idx, visited);
+                }
+                if let Some(idx) = number_idx {
+                    self.resolve_refs_in_type_recursive(idx, visited);
+                }
+            }
+            TypeKey::Conditional(cond_id) => {
+                let cond = self.ctx.types.conditional_type(*cond_id);
+                let check = cond.check_type;
+                let extends = cond.extends_type;
+                let true_type = cond.true_type;
+                let false_type = cond.false_type;
+                self.resolve_refs_in_type_recursive(check, visited);
+                self.resolve_refs_in_type_recursive(extends, visited);
+                self.resolve_refs_in_type_recursive(true_type, visited);
+                self.resolve_refs_in_type_recursive(false_type, visited);
+            }
+            TypeKey::IndexAccess(obj, idx) => {
+                let obj = *obj;
+                let idx = *idx;
+                self.resolve_refs_in_type_recursive(obj, visited);
+                self.resolve_refs_in_type_recursive(idx, visited);
+            }
+            TypeKey::Mapped(map_id) => {
+                let mapped = self.ctx.types.mapped_type(*map_id);
+                let constraint = mapped.constraint;
+                let template = mapped.template_type;
+                self.resolve_refs_in_type_recursive(constraint, visited);
+                if let Some(t) = template {
+                    self.resolve_refs_in_type_recursive(t, visited);
+                }
+            }
+            TypeKey::TypeParameter(param) | TypeKey::Infer(param) => {
+                if let Some(constraint) = param.constraint {
+                    self.resolve_refs_in_type_recursive(constraint, visited);
+                }
+                if let Some(default) = param.default {
+                    self.resolve_refs_in_type_recursive(default, visited);
+                }
+            }
+            TypeKey::Callable(call_id) => {
+                let callable = self.ctx.types.callable_shape(*call_id);
+                for sig in &callable.call_signatures {
+                    let ret = sig.return_type;
+                    let params: Vec<TypeId> = sig.parameters.iter().map(|p| p.param_type).collect();
+                    self.resolve_refs_in_type_recursive(ret, visited);
+                    for param in params {
+                        self.resolve_refs_in_type_recursive(param, visited);
+                    }
+                }
+            }
+            // Primitives and other types don't contain refs
+            _ => {}
+        }
     }
 
     /// Get type parameters for a symbol (for generic type aliases and interfaces).
