@@ -212,8 +212,77 @@ fn test_class_es5_derived_constructor_orders_super_props_and_body() {
         output
     );
     assert!(
-        !output.contains("this.y = 2"),
+        output.contains("_this.y = 2;"),
         "Expected constructor body to use _this: {}",
+        output
+    );
+    assert!(
+        !output.contains(" this.y = 2;"),
+        "Expected constructor body to avoid raw this: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_derived_constructor_preserves_pre_super_and_orders_body() {
+    let source = "class Base {} class Derived extends Base { field = () => this.x; constructor() { prep(); super(); this.y = 2; post(); } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected derived class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    let prep_pos = output.find("prep()").expect("expected prep() call");
+    let super_pos = output
+        .find("var _this = _super.call(this")
+        .expect("expected super call assignment");
+    let field_pos = output
+        .find("_this.field = function")
+        .expect("expected field initializer");
+    let body_pos = output
+        .find("_this.y = 2")
+        .expect("expected constructor body assignment");
+    let post_pos = output.find("post()").expect("expected post() call");
+
+    assert!(
+        prep_pos < super_pos,
+        "Expected prep() before super call: {}",
+        output
+    );
+    assert!(
+        super_pos < field_pos,
+        "Expected field initializer after super call: {}",
+        output
+    );
+    assert!(
+        field_pos < body_pos,
+        "Expected field initializer before constructor body: {}",
+        output
+    );
+    assert!(
+        body_pos < post_pos,
+        "Expected post() after constructor body: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.y = 2;"),
+        "Expected constructor body to use _this: {}",
+        output
+    );
+    assert!(
+        !output.contains(" this.y = 2;"),
+        "Expected constructor body to avoid raw this: {}",
         output
     );
 }

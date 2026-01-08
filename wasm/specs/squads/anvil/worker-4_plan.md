@@ -21,6 +21,7 @@ Priority: 4
 - [x] Add async await initializer assignment coverage. Tests: `./wasm/test.sh async_es5`
 - [x] Restore async ES5 emitter this-capture setter for new call sites. Tests: `./wasm/test.sh async_es5`
 - [x] Add async ES5 this-capture test. Tests: `./wasm/test.sh async_es5`
+- [x] Add derived ctor pre-super ordering test with field init. Tests: `./wasm/test.sh derived_constructor_preserves_pre_super`
 
 ## Ready for Merge
 Yes
