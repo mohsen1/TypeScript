@@ -8,12 +8,13 @@ Priority: 1
 Blocked: Awaiting next EM-Anvil assignment.
 
 ## Current Assignment
-- Complete: Added async static field initializer tests; ran `./wasm/test.sh class_es5_tests` (all 69 pass).
+- Complete: Added ES5 coverage tests (6 more tests); ran `./wasm/test.sh class_es5_tests` (all 75 pass).
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added additional ES5 coverage tests (6 tests): multiple private fields, mixed static/instance async, property initializers with method calls, labeled statements, new.target meta property, fluent method (this type). Ran `./wasm/test.sh class_es5_tests` (all 75 pass).
 - [x] Added async static field initializer ES5 tests (8 tests): await chain, conditional, try/catch, Promise.all, loop/await, object destructuring, nested async calls, switch/case. Ran `./wasm/test.sh class_es5_tests` (all 69 pass). Also fixed duplicate test names in source_map_tests.rs from merge.
 - [x] Fixed private field access in async methods (was emitting `this.void 0` instead of `__classPrivateFieldGet`); added `class_name` tracking to AsyncES5Emitter; added 2 tests. Ran `./wasm/test.sh emitter_transform_integration_tests` (all 124 pass).
 - [x] Added static async arrow field tests (3 tests for static field with async arrow: basic, integration, nested arrow). Verified correct __awaiter usage and this preservation. Ran `./wasm/test.sh emitter_transform_integration_tests` (all 123 pass).
