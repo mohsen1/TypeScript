@@ -78,6 +78,7 @@ Priority: 2
 - [x] Added template literal middle infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_with_middle_infer_distributive`.
 - [x] Added optional property infer test with constraint. Tests: `./wasm/test.sh test_conditional_infer_optional_property_with_constraint`.
 - [x] Added optional tuple infer test with constraint (current behavior ignores optionality). Tests: `./wasm/test.sh test_conditional_infer_optional_tuple_element_with_constraint`.
+- [x] Added template literal two-infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_two_infers_distributive`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
