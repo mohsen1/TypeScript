@@ -1019,3 +1019,53 @@ fn test_parity_es5_default_parameters() {
         output
     );
 }
+
+/// Parity test for ES5 for...of loop.
+/// for...of should be downleveled to iterator pattern or indexed loop.
+#[test]
+fn test_parity_es5_for_of_loop() {
+    let source = "const arr = [1, 2, 3]; for (const x of arr) { console.log(x); }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 for...of downlevel
+    assert!(
+        output.contains("var arr"),
+        "ES5 output should define arr variable: {}",
+        output
+    );
+    // for...of should be converted to iterator pattern or for loop
+    // Should use __values helper or indexed for loop
+    assert!(
+        output.contains("for (") || output.contains("for("),
+        "ES5 output should contain for loop: {}",
+        output
+    );
+    assert!(
+        output.contains("console.log"),
+        "ES5 output should contain console.log: {}",
+        output
+    );
+    // No for...of syntax
+    assert!(
+        !output.contains("of arr") && !output.contains("of arr)"),
+        "ES5 output should not contain for...of syntax: {}",
+        output
+    );
+}
