@@ -204,3 +204,170 @@ fn test_declaration_source_map_basic() {
         "expected non-trivial mappings, got: {mappings}"
     );
 }
+
+#[test]
+fn test_declaration_source_map_type_alias() {
+    let source = "export type Result<T, E> = { ok: true; value: T } | { ok: false; error: E };";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut emitter = DeclarationEmitter::new(&parser.arena);
+    emitter.set_source_map_text(parser.get_source_text());
+    emitter.enable_source_map("test.d.ts", "test.ts");
+    let output = emitter.emit(root);
+
+    // Verify output contains type alias
+    assert!(
+        output.contains("type Result"),
+        "expected type alias in output: {output}"
+    );
+
+    let map_json = emitter.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+    assert!(
+        !mappings.is_empty(),
+        "expected non-empty mappings for type alias, got: {mappings}"
+    );
+}
+
+#[test]
+fn test_declaration_source_map_function() {
+    let source = "export function greet(name: string): string { return 'Hello ' + name; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut emitter = DeclarationEmitter::new(&parser.arena);
+    emitter.set_source_map_text(parser.get_source_text());
+    emitter.enable_source_map("test.d.ts", "test.ts");
+    let output = emitter.emit(root);
+
+    // Verify output contains function declaration
+    assert!(
+        output.contains("function greet"),
+        "expected function declaration in output: {output}"
+    );
+
+    let map_json = emitter.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+    assert!(
+        !mappings.is_empty(),
+        "expected non-empty mappings for function declaration, got: {mappings}"
+    );
+}
+
+#[test]
+fn test_declaration_source_map_class() {
+    let source = r#"export class Container<T> {
+    private value: T;
+    constructor(value: T) { this.value = value; }
+    getValue(): T { return this.value; }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut emitter = DeclarationEmitter::new(&parser.arena);
+    emitter.set_source_map_text(parser.get_source_text());
+    emitter.enable_source_map("test.d.ts", "test.ts");
+    let output = emitter.emit(root);
+
+    // Verify output contains class declaration
+    assert!(
+        output.contains("class Container"),
+        "expected class declaration in output: {output}"
+    );
+
+    let map_json = emitter.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+    assert!(
+        !mappings.is_empty(),
+        "expected non-empty mappings for class declaration, got: {mappings}"
+    );
+
+    // Verify source map structure
+    let sources = map_value.get("sources").and_then(|v| v.as_array());
+    assert!(
+        sources.is_some() && !sources.unwrap().is_empty(),
+        "expected sources array in source map"
+    );
+}
+
+#[test]
+fn test_declaration_source_map_enum() {
+    let source = "export enum Status { Active = 'active', Inactive = 'inactive' }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut emitter = DeclarationEmitter::new(&parser.arena);
+    emitter.set_source_map_text(parser.get_source_text());
+    emitter.enable_source_map("test.d.ts", "test.ts");
+    let output = emitter.emit(root);
+
+    // Verify output contains enum declaration
+    assert!(
+        output.contains("enum Status"),
+        "expected enum declaration in output: {output}"
+    );
+
+    let map_json = emitter.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+    assert!(
+        !mappings.is_empty(),
+        "expected non-empty mappings for enum declaration, got: {mappings}"
+    );
+}
+
+#[test]
+fn test_declaration_source_map_multiple_declarations() {
+    let source = r#"export interface Point { x: number; y: number; }
+export type Distance = number;
+export function distance(a: Point, b: Point): Distance { return 0; }
+export const origin: Point = { x: 0, y: 0 };"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut emitter = DeclarationEmitter::new(&parser.arena);
+    emitter.set_source_map_text(parser.get_source_text());
+    emitter.enable_source_map("test.d.ts", "test.ts");
+    let output = emitter.emit(root);
+
+    // Verify multiple declarations in output
+    assert!(
+        output.contains("interface Point"),
+        "expected interface in output: {output}"
+    );
+    assert!(
+        output.contains("type Distance"),
+        "expected type alias in output: {output}"
+    );
+
+    let map_json = emitter.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+
+    // With multiple declarations, we should have mappings spanning multiple lines
+    let line_count = mappings.split(';').count();
+    assert!(
+        line_count >= 2,
+        "expected mappings for multiple lines, got {} lines in: {mappings}",
+        line_count
+    );
+}
