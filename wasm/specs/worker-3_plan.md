@@ -34,6 +34,7 @@ Priority: 3
 - [x] Solver unsoundness: intersection reduction (disjoint intrinsics) regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_intersection_reduction_disjoint_intrinsics`.
 - [x] Solver unsoundness: primitive boxing (`number` to `Number` interface) regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_primitive_boxing_assignability`.
 - [x] Solver unsoundness: any top/bottom regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_any_top_bottom_subtyping`.
+- [x] Solver unsoundness: apparent string member regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_apparent_string_member_subtyping`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
