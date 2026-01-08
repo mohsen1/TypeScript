@@ -1275,6 +1275,16 @@ impl<'a> ClassES5Emitter<'a> {
                 self.suppress_this_capture = prev_suppress;
                 self.write(";");
                 self.write_line();
+            } else if member_node.kind == syntax_kind_ext::CLASS_STATIC_BLOCK_DECLARATION {
+                // Static block: emit contents directly
+                let Some(block_data) = self.arena.get_block(member_node) else { continue };
+
+                // Emit each statement in the static block
+                for &stmt_idx in &block_data.statements.nodes {
+                    self.write_indent();
+                    self.emit_statement(stmt_idx);
+                    self.write_line();
+                }
             }
         }
 
@@ -2824,6 +2834,10 @@ impl<'a> ClassES5Emitter<'a> {
                 } else {
                     self.write("this")
                 }
+            }
+            k if k == SyntaxKind::SuperKeyword as u16 => {
+                // In static context, super refers to the base class directly
+                self.write("_super");
             }
             k if k == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION => {
                 if let Some(access) = self.arena.get_access_expr(expr_node) {

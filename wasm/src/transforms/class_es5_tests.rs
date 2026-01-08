@@ -608,3 +608,47 @@ class Foo {
         output
     );
 }
+
+#[test]
+fn test_class_es5_super_property_in_static_block() {
+    let source = r#"
+class Base {
+    static value = 1;
+}
+class Derived extends Base {
+    static {
+        console.log(super.value);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected derived class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Static block should be emitted as an IIFE after the class
+    assert!(
+        output.contains("console.log"),
+        "Expected static block content to be emitted: {}",
+        output
+    );
+
+    // Super property access should be transformed to Base.value or similar
+    assert!(
+        output.contains("Base.value") || output.contains("_super.value"),
+        "Expected super.value to be transformed: {}",
+        output
+    );
+}
