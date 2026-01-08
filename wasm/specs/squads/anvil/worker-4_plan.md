@@ -80,6 +80,7 @@ Priority: 4
 - [x] Add ES5 class super() with spread args edge case test. Tests: `./wasm/test.sh super_with_spread_args_and_field_init`
 - [x] Add async ES5 downlevel source-map offset accuracy test. Tests: `./wasm/test.sh async_es5_offset_accuracy`
 - [x] Add generator function ES5 source-map offset accuracy test. Tests: `./wasm/test.sh generator_es5_offset_accuracy`
+- [x] Add optional chaining source-map test. Tests: `./wasm/test.sh optional_chaining_mapping`
 
 ## Ready for Merge
 Yes
