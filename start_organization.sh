@@ -39,11 +39,14 @@ AGENT_AUTO_UPDATE="${AGENT_AUTO_UPDATE:-1}"
 
 # Idle monitoring (Director should be mostly idle - hands-off management)
 DIRECTOR_IDLE_SECONDS="${DIRECTOR_IDLE_SECONDS:-600}"
-DIRECTOR_POKE="${DIRECTOR_POKE:-Check if any intervention is needed. Merge EM branches if ready. If EMs are working, do nothing.}"
-EM_IDLE_SECONDS="${EM_IDLE_SECONDS:-120}"
-EM_POKE="${EM_POKE:-FIRST: Run ./wasm/test.sh 2>&1 | head -50 to check build health. If build fails, fix it yourself. Then check worker panes for stuck workers.}"
+DIRECTOR_POKE="${DIRECTOR_POKE:-MERGE TIME! Tell both EMs to pause work and push branches. Wait 4 minutes for them to finish, then merge squad/forge and squad/anvil into rust. After merging, tell EMs to sync workers from origin/rust.}"
+EM_IDLE_SECONDS="${EM_IDLE_SECONDS:-60}"
+EM_POKE="${EM_POKE:-Check worker panes for stuck workers. If all workers are busy, check for Ready for Merge branches and merge them into squad branch.}"
 WORKER_IDLE_SECONDS="${WORKER_IDLE_SECONDS:-300}"
 WORKER_POKE="${WORKER_POKE:-How is your task going? If you need help, describe what you are stuck on.}"
+
+# Merge coordination - Director signals EMs to pause for coordinated merge
+MERGE_PAUSE_SECONDS="${MERGE_PAUSE_SECONDS:-240}"  # 4 minutes for EMs to finish and push
 
 # Startup timing (agent boots in ~5s)
 WORKER_START_PROMPT="${WORKER_START_PROMPT:-You are worker \$WORKER_NUM in squad \$SQUAD_NAME. Read .role/AGENTS.md then your plan at wasm/specs/squads/\$SQUAD_NAME/worker-\${WORKER_NUM}_plan.md. Switch to branch worker/\$SQUAD_NAME-\$WORKER_NUM and work on your current assignment.}"

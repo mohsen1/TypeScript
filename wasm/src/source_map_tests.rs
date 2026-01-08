@@ -11279,3 +11279,56 @@ fn test_source_map_es5_transform_generator_yield_mapping() {
         "expected at least one mapping for yield expressions. mappings: {mappings}"
     );
 }
+
+#[test]
+fn test_source_map_names_array_multiple_identifiers() {
+    let source = "function greet(name) { const message = 'Hello ' + name; return message; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    // Verify the names array exists
+    let names = map_value
+        .get("names")
+        .and_then(|value| value.as_array())
+        .expect("expected names array in source map");
+
+    // Check that expected identifiers are in the names array
+    let expected_names = ["greet", "name", "message"];
+    for expected in expected_names {
+        assert!(
+            names.iter().any(|n| n.as_str() == Some(expected)),
+            "expected names array to include '{}'. names: {:?}",
+            expected,
+            names
+        );
+    }
+
+    // Verify mappings reference the names
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+    let decoded = decode_mappings(mappings);
+
+    // At least some mappings should have name indices
+    let mappings_with_names = decoded.iter().filter(|m| m.name_index.is_some()).count();
+    assert!(
+        mappings_with_names > 0,
+        "expected some mappings to have name indices. mappings: {mappings}"
+    );
+}

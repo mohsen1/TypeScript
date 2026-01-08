@@ -398,3 +398,77 @@ fn test_parity_es5_class_expression_extends() {
         output
     );
 }
+
+/// Parity test for ES5 derived class with both instance and static fields.
+/// Instance fields should be initialized in constructor after super().
+/// Static fields should be assigned on class constructor after IIFE.
+#[test]
+fn test_parity_es5_derived_class_instance_static_fields() {
+    let source = r#"
+class Derived extends Base {
+    instanceField = 42;
+    static staticField = "hello";
+    constructor() {
+        super();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 derived class with fields
+    assert!(
+        output.contains("__extends"),
+        "ES5 output should include __extends helper: {}",
+        output
+    );
+
+    // Instance field should be initialized in constructor
+    assert!(
+        output.contains("this.instanceField = 42") || output.contains("_this.instanceField = 42"),
+        "ES5 output should initialize instance field in constructor: {}",
+        output
+    );
+
+    // Static field should be assigned on class constructor
+    assert!(
+        output.contains("Derived.staticField = \"hello\""),
+        "ES5 output should assign static field on class constructor: {}",
+        output
+    );
+
+    // super() should be converted
+    assert!(
+        output.contains("_super.call(this)") || output.contains("_super.apply(this"),
+        "ES5 output should convert super() call: {}",
+        output
+    );
+
+    // No ES6 class syntax
+    assert!(
+        !output.contains("extends Base"),
+        "ES5 output should not contain extends keyword: {}",
+        output
+    );
+    assert!(
+        !output.contains("instanceField =") || output.contains("this.instanceField =") || output.contains("_this.instanceField ="),
+        "ES5 output should not have class field syntax outside constructor: {}",
+        output
+    );
+}

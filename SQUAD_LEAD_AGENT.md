@@ -225,6 +225,44 @@ Update the "Squad Status" section in GOALS.md:
 - Blockers: None
 ```
 
+### 8. Respond to MERGE TIME! (Coordinated Merge)
+
+When Director sends "MERGE TIME!", immediately:
+
+**Step 1: Pause New Assignments**
+- Don't assign new tasks to workers
+- Let workers finish their current commits
+
+**Step 2: Merge All Ready Worker Branches (2-3 minutes)**
+```bash
+cd ~/code/TypeScript-em-<squad>
+git fetch origin
+git checkout squad/<squad>
+git merge origin/rust --no-edit  # Sync with latest
+
+# Merge all ready worker branches
+for n in 1 2 3 4 5; do
+  git merge origin/worker/<squad>-$n --no-edit 2>/dev/null || true
+done
+
+# Push squad branch
+git push origin squad/<squad>
+```
+
+**Step 3: Signal Ready**
+Reply to Director: "Squad <squad> ready - pushed to origin/squad/<squad>"
+
+**Step 4: After Director Merges - Sync Workers**
+When Director says "Merge complete!", tell all workers to sync:
+```bash
+for pane in 0 1 2 3 4; do
+  tmux send-keys -t zang-org:<squad>.$pane "Sync from rust: git fetch origin && git merge origin/rust --no-edit" C-m
+done
+```
+
+**Step 5: Resume Normal Operations**
+Continue assigning tasks and monitoring workers.
+
 ## Branching Policy
 
 **Hierarchy:**

@@ -13,6 +13,7 @@ Priority: 2
 - [ ] [EM: Add queued tasks]
 
 ## Completed
+- [x] Added parity test for derived class with instance+static fields in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (10 tests).
 - [x] Added parity test for class expression with extends in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (9 tests).
 - [x] Added parity test for static async method with this capture in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (8 tests).
 - [x] Added parity tests for getter/setter ES5 downleveling in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (7 tests).

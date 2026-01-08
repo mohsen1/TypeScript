@@ -165,10 +165,24 @@ After each cycle, update the "Executive Summary" section in `wasm/README.md`:
 - Risks and blockers
 - Next focus areas
 
-### 7. Merge EM Blocker Fixes FIRST (Priority)
-EMs can now fix team-wide blockers themselves. They push to `em/<squad>` branches.
-**Merge these immediately** - they unblock entire squads.
+### 7. Coordinated Merge Cycle (MERGE TIME!)
 
+When you're poked with "MERGE TIME!", follow this coordinated workflow:
+
+**Step 1: Signal EMs to Pause (30 seconds)**
+```bash
+# Tell both EMs to pause and push
+tmux send-keys -t zang-org:director.1 "MERGE TIME! Pause new assignments. Merge any ready worker branches into squad/forge and push. You have 4 minutes." C-m
+tmux send-keys -t zang-org:director.2 "MERGE TIME! Pause new assignments. Merge any ready worker branches into squad/anvil and push. You have 4 minutes." C-m
+```
+
+**Step 2: Wait for EMs (4 minutes)**
+Wait 4 minutes for EMs to:
+- Finish current merges
+- Push squad branches to origin
+- Signal they're ready
+
+**Step 3: Merge Everything into Rust**
 ```bash
 cd /path/to/TypeScript  # main repo, rust branch
 git fetch origin
@@ -184,6 +198,14 @@ git merge origin/squad/anvil --no-edit
 # Push to origin/rust
 git push origin rust
 ```
+
+**Step 4: Signal EMs to Resume**
+```bash
+tmux send-keys -t zang-org:director.1 "Merge complete! Tell all workers to sync: git fetch origin && git merge origin/rust --no-edit. Resume normal operations." C-m
+tmux send-keys -t zang-org:director.2 "Merge complete! Tell all workers to sync: git fetch origin && git merge origin/rust --no-edit. Resume normal operations." C-m
+```
+
+This coordinated cycle keeps everyone in sync and prevents merge conflicts.
 
 ### 8. Handle Merge Conflicts
 If merge conflicts occur:

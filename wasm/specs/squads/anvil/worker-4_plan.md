@@ -69,6 +69,7 @@ Priority: 4
 - [x] Add arrow function default param source-map coverage. Tests: `./wasm/test.sh arrow_default_param_mapping`
 - [x] Add destructuring assignment source-map coverage. Tests: `./wasm/test.sh destructuring_assignment_mapping`
 - [x] Add template literal source-map coverage. Tests: `./wasm/test.sh template_literal_mapping`
+- [x] Add source map roundtrip accuracy test. Tests: `./wasm/test.sh roundtrip_accuracy`
 
 ## Ready for Merge
 Yes
