@@ -1782,6 +1782,206 @@ fn test_strict_function_variance() {
 }
 
 #[test]
+fn test_variance_optional_rest_method_optional_bivariant() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+    let method_name = interner.intern_string("m");
+
+    let wide_param = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let narrow_param = TypeId::STRING;
+
+    let wide_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: wide_param,
+            optional: true,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let narrow_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: narrow_param,
+            optional: true,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let wide_obj = interner.object(vec![PropertyInfo {
+        name: method_name,
+        type_id: wide_method,
+        write_type: wide_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+    let narrow_obj = interner.object(vec![PropertyInfo {
+        name: method_name,
+        type_id: narrow_method,
+        write_type: narrow_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    assert!(checker.is_subtype_of(wide_obj, narrow_obj));
+    assert!(checker.is_subtype_of(narrow_obj, wide_obj));
+}
+
+#[test]
+fn test_variance_optional_rest_method_rest_bivariant() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+    let method_name = interner.intern_string("m");
+
+    let wide_elem = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let narrow_elem = TypeId::STRING;
+    let wide_rest = interner.array(wide_elem);
+    let narrow_rest = interner.array(narrow_elem);
+
+    let wide_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: wide_rest,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let narrow_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: narrow_rest,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let wide_obj = interner.object(vec![PropertyInfo {
+        name: method_name,
+        type_id: wide_method,
+        write_type: wide_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+    let narrow_obj = interner.object(vec![PropertyInfo {
+        name: method_name,
+        type_id: narrow_method,
+        write_type: narrow_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    assert!(checker.is_subtype_of(wide_obj, narrow_obj));
+    assert!(checker.is_subtype_of(narrow_obj, wide_obj));
+}
+
+#[test]
+fn test_variance_optional_rest_constructor_optional_contravariant() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let wide_param = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let narrow_param = TypeId::STRING;
+
+    let wide_ctor = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: wide_param,
+            optional: true,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    let narrow_ctor = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: narrow_param,
+            optional: true,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    assert!(checker.is_subtype_of(wide_ctor, narrow_ctor));
+    assert!(!checker.is_subtype_of(narrow_ctor, wide_ctor));
+}
+
+#[test]
+fn test_variance_optional_rest_constructor_rest_contravariant() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let wide_elem = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let narrow_elem = TypeId::STRING;
+    let wide_rest = interner.array(wide_elem);
+    let narrow_rest = interner.array(narrow_elem);
+
+    let wide_ctor = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: wide_rest,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    let narrow_ctor = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: narrow_rest,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    assert!(checker.is_subtype_of(wide_ctor, narrow_ctor));
+    assert!(!checker.is_subtype_of(narrow_ctor, wide_ctor));
+}
+
+#[test]
 fn test_function_variance_param_contravariance() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
