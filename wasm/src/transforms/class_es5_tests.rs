@@ -1428,6 +1428,162 @@ class MathUtils {
 }
 
 #[test]
+fn test_class_es5_computed_property_in_object_literal() {
+    let source = r#"
+class DynamicObject {
+    createObject(key: string, value: number) {
+        return { [key]: value };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Should NOT contain computed property syntax in object literal (ES5 doesn't support it)
+    assert!(
+        !output.contains("[key]:") && !output.contains("[key] :"),
+        "Expected computed property to be transformed, not raw [key]: syntax: {}",
+        output
+    );
+
+    // Should use bracket notation assignment or temp variable pattern
+    assert!(
+        output.contains("[key]") || output.contains("_a"),
+        "Expected ES5 computed property to use bracket notation or temp var: {}",
+        output
+    );
+
+    // Method should be on prototype
+    assert!(
+        output.contains(".prototype.createObject") || output.contains("prototype[\"createObject\"]"),
+        "Expected createObject method on prototype: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_inheritance_extends() {
+    let source = r#"
+class Animal {
+    name: string;
+    constructor(name: string) {
+        this.name = name;
+    }
+    speak() {
+        return this.name;
+    }
+}
+class Dog extends Animal {
+    constructor(name: string) {
+        super(name);
+    }
+    speak() {
+        return "Woof! " + super.speak();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected Dog class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Should use __extends helper for inheritance
+    assert!(
+        output.contains("__extends") || output.contains("extends"),
+        "Expected __extends helper for ES5 inheritance: {}",
+        output
+    );
+
+    // Should call super constructor
+    assert!(
+        output.contains("_super") || output.contains(".call("),
+        "Expected super constructor call pattern: {}",
+        output
+    );
+
+    // Should have Dog function
+    assert!(
+        output.contains("function Dog") || output.contains("Dog ="),
+        "Expected Dog constructor function: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_nullish_coalescing() {
+    let source = r#"
+class Config {
+    getValue(input: string | null | undefined) {
+        return input ?? "default";
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Should NOT contain ?? operator (ES5 doesn't support it)
+    assert!(
+        !output.contains("??"),
+        "Expected nullish coalescing to be transformed, not raw ?? syntax: {}",
+        output
+    );
+
+    // Should preserve the default value
+    assert!(
+        output.contains("default"),
+        "Expected default value to be preserved: {}",
+        output
+    );
+
+    // Method should be on prototype
+    assert!(
+        output.contains(".prototype.getValue") || output.contains("prototype[\"getValue\"]"),
+        "Expected getValue method on prototype: {}",
+        output
+    );
+}
+
+#[test]
 fn test_class_es5_class_expression() {
     let source = r#"
 const MyClass = class {
