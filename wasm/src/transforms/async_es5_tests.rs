@@ -1888,3 +1888,249 @@ fn test_async_class_method_conditional_await() {
         output
     );
 }
+
+// =============================================================================
+// Async arrow function tests
+// =============================================================================
+
+/// Helper to parse an async arrow function and emit its body
+fn parse_and_emit_async_arrow(source: &str) -> String {
+    use crate::parser::syntax_kind_ext;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&stmt_idx) = source_file.statements.nodes.first() {
+                if let Some(stmt_node) = parser.arena.get(stmt_idx) {
+                    // Variable statement -> declaration list -> declaration -> initializer (arrow)
+                    if stmt_node.kind == syntax_kind_ext::VARIABLE_STATEMENT {
+                        if let Some(var_stmt) = parser.arena.get_variable(stmt_node) {
+                            // First level: declarations contains VariableDeclarationList
+                            if let Some(&decl_list_idx) = var_stmt.declarations.nodes.first() {
+                                if let Some(decl_list_node) = parser.arena.get(decl_list_idx) {
+                                    if let Some(decl_list) = parser.arena.get_variable(decl_list_node) {
+                                        // Second level: get the actual VariableDeclaration
+                                        if let Some(&decl_idx) = decl_list.declarations.nodes.first() {
+                                            if let Some(decl_node) = parser.arena.get(decl_idx) {
+                                                if let Some(var_decl) = parser.arena.get_variable_declaration(decl_node) {
+                                                    if let Some(init_node) = parser.arena.get(var_decl.initializer) {
+                                                        if init_node.kind == syntax_kind_ext::ARROW_FUNCTION {
+                                                            if let Some(func) = parser.arena.get_function(init_node) {
+                                                                let emitter = AsyncES5Emitter::new(&parser.arena);
+                                                                let has_await = emitter.body_contains_await(func.body);
+                                                                let mut emitter = AsyncES5Emitter::new(&parser.arena);
+                                                                if has_await {
+                                                                    return emitter.emit_generator_body_with_await(func.body);
+                                                                } else {
+                                                                    return emitter.emit_simple_generator_body(func.body);
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    String::new()
+}
+
+/// Helper to check if async arrow function body contains await
+fn arrow_body_contains_await(source: &str) -> bool {
+    use crate::parser::syntax_kind_ext;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&stmt_idx) = source_file.statements.nodes.first() {
+                if let Some(stmt_node) = parser.arena.get(stmt_idx) {
+                    if stmt_node.kind == syntax_kind_ext::VARIABLE_STATEMENT {
+                        if let Some(var_stmt) = parser.arena.get_variable(stmt_node) {
+                            // First level: declarations contains VariableDeclarationList
+                            if let Some(&decl_list_idx) = var_stmt.declarations.nodes.first() {
+                                if let Some(decl_list_node) = parser.arena.get(decl_list_idx) {
+                                    if let Some(decl_list) = parser.arena.get_variable(decl_list_node) {
+                                        // Second level: get the actual VariableDeclaration
+                                        if let Some(&decl_idx) = decl_list.declarations.nodes.first() {
+                                            if let Some(decl_node) = parser.arena.get(decl_idx) {
+                                                if let Some(var_decl) = parser.arena.get_variable_declaration(decl_node) {
+                                                    if let Some(init_node) = parser.arena.get(var_decl.initializer) {
+                                                        if init_node.kind == syntax_kind_ext::ARROW_FUNCTION {
+                                                            if let Some(func) = parser.arena.get_function(init_node) {
+                                                                let emitter = AsyncES5Emitter::new(&parser.arena);
+                                                                return emitter.body_contains_await(func.body);
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+#[test]
+fn test_async_arrow_basic_block_body() {
+    let output = parse_and_emit_async_arrow(
+        "const foo = async () => { await bar(); };",
+    );
+    assert!(
+        output.contains("switch (_a.label)"),
+        "Async arrow with block body should have switch: {}",
+        output
+    );
+    assert!(
+        output.contains("[4 /*yield*/"),
+        "Async arrow should have yield instruction: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_arrow_expression_body() {
+    let output = parse_and_emit_async_arrow(
+        "const foo = async () => await bar();",
+    );
+    assert!(
+        output.contains("[4 /*yield*/"),
+        "Async arrow expression body should yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_arrow_no_await() {
+    let output = parse_and_emit_async_arrow(
+        "const foo = async () => { return 42; };",
+    );
+    assert!(
+        output.contains("[2 /*return*/, 42]"),
+        "Simple async arrow should return 42: {}",
+        output
+    );
+    assert!(
+        !output.contains("switch"),
+        "No await should skip switch emission: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_arrow_with_parameters() {
+    let output = parse_and_emit_async_arrow(
+        "const add = async (a, b) => { return await compute(a, b); };",
+    );
+    assert!(
+        output.contains("return [4 /*yield*/, compute(a, b)]"),
+        "Arrow should yield compute with params: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_arrow_multiple_awaits() {
+    let output = parse_and_emit_async_arrow(
+        "const seq = async () => { const x = await first(); const y = await second(); return x + y; };",
+    );
+    assert!(
+        output.contains("case 1:") && output.contains("case 2:"),
+        "Multiple awaits should have case labels: {}",
+        output
+    );
+    assert!(
+        output.contains("x = _a.sent()"),
+        "Should assign first await to x: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_arrow_body_contains_await() {
+    assert!(
+        arrow_body_contains_await("const foo = async () => { await x; };"),
+        "Should detect await in async arrow body"
+    );
+}
+
+#[test]
+fn test_async_arrow_body_no_await() {
+    assert!(
+        !arrow_body_contains_await("const foo = async () => { return 1; };"),
+        "Should not detect await when none present"
+    );
+}
+
+#[test]
+fn test_async_arrow_ignores_nested_async() {
+    assert!(
+        !arrow_body_contains_await(
+            "const foo = async () => { const inner = async () => { await x; }; return 1; };"
+        ),
+        "Should ignore await in nested async arrow"
+    );
+}
+
+#[test]
+fn test_async_arrow_with_rest_params() {
+    let output = parse_and_emit_async_arrow(
+        "const collect = async (...items) => { return await process(items); };",
+    );
+    assert!(
+        output.contains("return [4 /*yield*/, process(items)]"),
+        "Arrow with rest params should yield process: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_arrow_with_destructuring_params() {
+    let output = parse_and_emit_async_arrow(
+        "const extract = async ({ name, id }) => { return await lookup(name, id); };",
+    );
+    assert!(
+        output.contains("[4 /*yield*/"),
+        "Arrow with destructuring should have yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_arrow_in_try_catch() {
+    assert!(
+        arrow_body_contains_await(
+            "const safe = async () => { try { return await risky(); } catch (e) { return null; } };"
+        ),
+        "Should detect await in try block of arrow"
+    );
+}
+
+#[test]
+fn test_async_arrow_conditional_expression() {
+    let output = parse_and_emit_async_arrow(
+        "const maybe = async (flag) => { return flag ? await yes() : await no(); };",
+    );
+    assert!(
+        output.contains("switch (_a.label)"),
+        "Conditional awaits should emit switch: {}",
+        output
+    );
+}
