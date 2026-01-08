@@ -15,6 +15,46 @@ Priority: 5
 - [ ] [EM: Add queued tasks]
 
 ## Completed
+- [x] **Circular Reference Analysis for Worker 1**: Investigated SymbolId(0) circular reference issue with type predicates. Root cause identified below.
+
+### Circular Reference Root Cause (for Worker 1)
+
+**Problem**: When computing the type of a function symbol with a type predicate, circular reference detection triggers if the predicate's type resolves back to the same symbol.
+
+**Call Chain**:
+1. `get_type_of_symbol(SymbolId(0))` - e.g., computing type of first function in file
+2. `compute_type_of_symbol` → `call_signature_from_function` (line 2838)
+3. `call_signature_from_function` → `return_type_and_predicate` (line 2159)
+4. `return_type_and_predicate` → `get_type_from_type_node(data.type_node)` (line 2093) for type predicate's type
+5. `get_type_from_type_node` → `get_type_from_type_reference` (line 4888)
+6. `get_type_from_type_reference` → `resolve_named_type_reference` (line 586)
+7. `resolve_named_type_reference` → `get_type_of_symbol(sym_id)` (line 602)
+8. If `sym_id == SymbolId(0)`, circular detection triggers → returns `TypeId::ANY`
+
+**Example Triggering Code**:
+```typescript
+// Function isT is SymbolId(0) - first symbol in file
+function isT(x: any): x is T { return true; }  // T resolves to something involving SymbolId(0)
+
+// Or self-referential type guard:
+type Guard = (x: any) => x is Guard;  // Guard references itself in predicate
+```
+
+**Key Difference from Interfaces**:
+- **Interfaces**: Use `TypeLowering.lower_interface_declarations` which creates `TypeKey::Ref(SymbolRef)` (deferred) - no immediate circular issue
+- **Functions**: Use ThinChecker's `return_type_and_predicate` which calls `get_type_from_type_node` → `get_type_of_symbol` (immediate) - triggers circular detection
+
+**Fix Location**:
+- `thin_checker.rs:2093` - `return_type_and_predicate` should possibly use deferred type references for predicate types
+- Alternatively, the type predicate's type should be lowered using TypeLowering (like interfaces) instead of `get_type_from_type_node`
+
+**Files Analyzed**:
+- `thin_checker.rs:2770-2799` - `get_type_of_symbol` with circular detection
+- `thin_checker.rs:2060-2103` - `return_type_and_predicate`
+- `thin_checker.rs:2153-2170` - `call_signature_from_function`
+- `thin_checker.rs:597-605` - `resolve_named_type_reference` calls `get_type_of_symbol`
+- `solver/lower.rs:2065-2099` - `lower_type_predicate_return` (uses deferred Ref types)
+
 - [x] Added minimal repro tests for cross-file type alias resolution in `wasm/src/thin_checker_tests.rs`: simple alias works, generic alias fails due to type params not being imported (shows `Ref(0)<number>` instead of `{ value: number }`).
 - [x] Added TypeId utility method tests (is_error, is_any, is_unknown, is_never) and IntrinsicKind.to_type_id tests in `wasm/src/solver/types_tests.rs`; all tests pass.
 - [x] Added ExtractState/ExtractAction conditional infer pattern tests in `wasm/src/solver/evaluate_tests.rs` documenting current behavior for Redux-style utility types; all tests pass.
