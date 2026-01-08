@@ -53,3 +53,14 @@ fn test_emit_create_binding_helper() {
     let output = emit_helpers(&helpers);
     assert!(output.contains("__createBinding"));
 }
+
+#[test]
+fn test_emit_export_star_orders_create_binding() {
+    let mut helpers = HelpersNeeded::default();
+    helpers.create_binding = true;
+    helpers.export_star = true;
+    let output = emit_helpers(&helpers);
+    let create_binding_pos = output.find("__createBinding").expect("Expected __createBinding helper");
+    let export_star_pos = output.find("__exportStar").expect("Expected __exportStar helper");
+    assert!(create_binding_pos < export_star_pos, "__createBinding should precede __exportStar");
+}
