@@ -325,6 +325,55 @@ fn test_conditional_distributive_infer_extends_nested() {
 }
 
 #[test]
+fn test_conditional_infer_true_branch_substitution() {
+    let interner = TypeInterner::new();
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    // "a" extends infer R extends string ? R : never
+    let lit_a = interner.literal_string("a");
+    let cond = ConditionalType {
+        check_type: lit_a,
+        extends_type: infer_r,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, lit_a);
+}
+
+#[test]
+fn test_conditional_infer_false_branch_substitution() {
+    let interner = TypeInterner::new();
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    // number extends infer R extends string ? string : R
+    let cond = ConditionalType {
+        check_type: TypeId::NUMBER,
+        extends_type: infer_r,
+        true_type: TypeId::STRING,
+        false_type: infer_r,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
 fn test_conditional_instantiated_param_tuple_wrapper_no_distribution() {
     let interner = TypeInterner::new();
 
