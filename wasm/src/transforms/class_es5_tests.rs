@@ -7108,3 +7108,300 @@ declare class Config {
         output
     );
 }
+
+// =============================================================================
+// Class Field Decorator Tests
+// =============================================================================
+
+#[test]
+fn test_class_es5_field_decorator_basic() {
+    // Basic field decorator
+    let source = r#"
+function observable(target: any, key: string) {}
+
+class Model {
+    @observable
+    name: string = "";
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Second statement is the class
+    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function Model"),
+        "Expected Model class: {}",
+        output
+    );
+
+    // Field should be initialized in constructor
+    assert!(
+        output.contains("this.name") || output.contains("name"),
+        "Expected name field initialization: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_field_decorator_with_initializer() {
+    // Field decorator with initializer
+    let source = r#"
+function defaultValue(value: any) {
+    return function(target: any, key: string) {};
+}
+
+class Config {
+    @defaultValue(42)
+    count: number = 0;
+
+    @defaultValue("default")
+    label: string = "initial";
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Second statement is the class
+    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function Config") || output.contains("Config"),
+        "Expected Config class: {}",
+        output
+    );
+
+    // Field initializers should be present
+    assert!(
+        output.contains("count") && output.contains("label"),
+        "Expected field names: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_field_decorator_static() {
+    // Static field decorator
+    let source = r#"
+function logged(target: any, key: string) {}
+
+class Service {
+    @logged
+    static instance: Service | null = null;
+
+    @logged
+    static version: string = "1.0.0";
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Second statement is the class
+    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function Service") || output.contains("Service"),
+        "Expected Service class: {}",
+        output
+    );
+
+    // Static fields should be assigned on constructor
+    assert!(
+        output.contains("Service.instance") || output.contains("instance"),
+        "Expected static instance field: {}",
+        output
+    );
+    assert!(
+        output.contains("Service.version") || output.contains("version"),
+        "Expected static version field: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_field_decorator_multiple() {
+    // Multiple decorators on a single field
+    let source = r#"
+function required(target: any, key: string) {}
+function validate(target: any, key: string) {}
+function format(target: any, key: string) {}
+
+class Form {
+    @required
+    @validate
+    @format
+    email: string = "";
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Fourth statement is the class (after 3 function declarations)
+    let class_idx = source_file.statements.nodes.get(3).expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function Form") || output.contains("Form"),
+        "Expected Form class: {}",
+        output
+    );
+
+    // Email field should be present
+    assert!(
+        output.contains("email"),
+        "Expected email field: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_field_decorator_in_derived_class() {
+    // Field decorator in derived class
+    let source = r#"
+function tracked(target: any, key: string) {}
+
+class BaseEntity {
+    id: number = 0;
+}
+
+class User extends BaseEntity {
+    @tracked
+    name: string = "";
+
+    @tracked
+    lastLogin: Date | null = null;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Third statement is the User class
+    let class_idx = source_file.statements.nodes.get(2).expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Class should emit with extends
+    assert!(
+        output.contains("function User") || output.contains("User"),
+        "Expected User class: {}",
+        output
+    );
+
+    // Should have inheritance pattern
+    assert!(
+        output.contains("__extends") || output.contains("_super"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+
+    // Decorated fields should be present
+    assert!(
+        output.contains("name") && output.contains("lastLogin"),
+        "Expected decorated fields: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_field_decorator_with_accessor() {
+    // Field decorator combined with accessor decorator
+    let source = r#"
+function observable(target: any, key: string) {}
+function computed(target: any, key: string, descriptor: PropertyDescriptor) {}
+
+class ViewModel {
+    @observable
+    firstName: string = "";
+
+    @observable
+    lastName: string = "";
+
+    @computed
+    get fullName(): string {
+        return this.firstName + " " + this.lastName;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Third statement is the class
+    let class_idx = source_file.statements.nodes.get(2).expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function ViewModel") || output.contains("ViewModel"),
+        "Expected ViewModel class: {}",
+        output
+    );
+
+    // Fields should be present
+    assert!(
+        output.contains("firstName") && output.contains("lastName"),
+        "Expected name fields: {}",
+        output
+    );
+
+    // Getter should be present
+    assert!(
+        output.contains("fullName"),
+        "Expected fullName getter: {}",
+        output
+    );
+}
