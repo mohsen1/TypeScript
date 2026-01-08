@@ -7,7 +7,7 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] (awaiting assignment)
+- [ ] Add source map tests for template literal transforms in `wasm/src/source_map_tests.rs`. Run `./wasm/test.sh source_map`.
 
 ## Task Queue
 - [ ] (empty)
