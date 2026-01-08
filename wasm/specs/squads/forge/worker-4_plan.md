@@ -7,17 +7,18 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [ ] Fix the `FunctionId` build error in `wasm/src/solver/evaluate.rs` and re-run `./wasm/test.sh`.
+- [x] Fix the `FunctionId` build error in `wasm/src/solver/evaluate.rs` and re-run `./wasm/test.sh`.
 
 ## Task Queue
-- [ ] Verify the fix passes `./wasm/test.sh` and note any unrelated failures.
+- [x] Verify the fix passes `./wasm/test.sh` and note any unrelated failures.
 
 ## Completed
 - [x] Added generic library regression + fixed declare function overload handling. Tests: `./wasm/test.sh test_generic_library_snippet_compiles_and_checks` (full suite fails on existing `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
 - [x] Added multi-file generic regression across two files. Tests: `./wasm/test.sh test_multi_file_generic_library_snippet_compiles_and_checks`.
+- [x] Synced with `origin/rust`; `FunctionId` build error not reproducible in `wasm/src/solver/evaluate.rs`. Tests: `./wasm/test.sh` (fails on existing `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
 
 ## Ready for Merge
-No
+Yes
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize solver correctness (inference/conditional/subtype) before new features.
