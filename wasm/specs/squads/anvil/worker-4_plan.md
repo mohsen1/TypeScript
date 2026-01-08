@@ -104,6 +104,8 @@ Priority: 4
 - [x] Add ES5 generator methods test. Tests: `./wasm/test.sh generator_methods`
 - [x] Add ES5 deep inheritance chain test. Tests: `./wasm/test.sh deep_inheritance_chain`
 - [x] Add ES5 mixin pattern test. Tests: `./wasm/test.sh mixin_pattern`
+- [x] Add ES5 method overloads test. Tests: `./wasm/test.sh method_overloads`
+- [x] Add ES5 computed method names test. Tests: `./wasm/test.sh computed_method_names`
 
 ## Ready for Merge
 Yes
