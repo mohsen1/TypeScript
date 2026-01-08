@@ -2301,3 +2301,250 @@ fn test_parity_es5_array_spread() {
         output
     );
 }
+
+/// Parity test for ES5 private class field downlevel.
+/// Private fields (#name) should be converted to WeakMap-based emulation.
+#[test]
+fn test_parity_es5_private_field() {
+    let source = r#"class Person {
+    #name: string;
+    constructor(name: string) {
+        this.#name = name;
+    }
+    getName() {
+        return this.#name;
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 class structure
+    assert!(
+        output.contains("var Person") || output.contains("function Person"),
+        "ES5 output should define Person class: {}",
+        output
+    );
+    // Private field syntax should not appear in ES5 output
+    assert!(
+        !output.contains("#name"),
+        "ES5 output should not contain private field syntax #name: {}",
+        output
+    );
+    // Type annotation should be erased
+    assert!(
+        !output.contains(": string"),
+        "Type annotation should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 private static field access downlevel.
+/// Static private field access should use __classPrivateFieldGet helper.
+#[test]
+fn test_parity_es5_private_static_field_access() {
+    let source = r#"class Counter {
+    static #count = 0;
+    static getCount() {
+        return Counter.#count;
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 class structure
+    assert!(
+        output.contains("var Counter") || output.contains("function Counter"),
+        "ES5 output should define Counter class: {}",
+        output
+    );
+    // Should use __classPrivateFieldGet helper for static private access
+    assert!(
+        output.contains("__classPrivateFieldGet"),
+        "ES5 output should use __classPrivateFieldGet helper: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 private method downlevel.
+/// Private methods should be converted to WeakSet-based emulation.
+#[test]
+fn test_parity_es5_private_method() {
+    let source = r#"class Calculator {
+    #validate(x: number) {
+        return x >= 0;
+    }
+    compute(x: number) {
+        if (this.#validate(x)) {
+            return x * 2;
+        }
+        return 0;
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 class structure
+    assert!(
+        output.contains("var Calculator") || output.contains("function Calculator"),
+        "ES5 output should define Calculator class: {}",
+        output
+    );
+    // Private method syntax should not appear in ES5 output
+    assert!(
+        !output.contains("#validate"),
+        "ES5 output should not contain private method syntax #validate: {}",
+        output
+    );
+    // Type annotation should be erased
+    assert!(
+        !output.contains(": number"),
+        "Type annotation should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 private getter downlevel.
+/// Private getters should be converted using helper functions.
+#[test]
+fn test_parity_es5_private_getter() {
+    let source = r#"class Box {
+    #value = 0;
+    get #contents() {
+        return this.#value;
+    }
+    read() {
+        return this.#contents;
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 class structure
+    assert!(
+        output.contains("var Box") || output.contains("function Box"),
+        "ES5 output should define Box class: {}",
+        output
+    );
+    // Private getter syntax should not appear in ES5 output
+    assert!(
+        !output.contains("get #contents"),
+        "ES5 output should not contain private getter syntax: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 private setter downlevel.
+/// Private setters should be converted using helper functions.
+#[test]
+fn test_parity_es5_private_setter() {
+    let source = r#"class Container {
+    #data = "";
+    set #content(val: string) {
+        this.#data = val;
+    }
+    store(val: string) {
+        this.#content = val;
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 class structure
+    assert!(
+        output.contains("var Container") || output.contains("function Container"),
+        "ES5 output should define Container class: {}",
+        output
+    );
+    // Private setter syntax should not appear in ES5 output
+    assert!(
+        !output.contains("set #content"),
+        "ES5 output should not contain private setter syntax: {}",
+        output
+    );
+    // Type annotation should be erased
+    assert!(
+        !output.contains(": string"),
+        "Type annotation should be erased: {}",
+        output
+    );
+}
