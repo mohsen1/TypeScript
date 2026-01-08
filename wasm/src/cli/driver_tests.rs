@@ -3390,3 +3390,463 @@ fn compile_missing_tsconfig_uses_defaults() {
     // Output should be next to source when no outDir specified
     assert!(base.join("src/index.js").is_file());
 }
+
+// =============================================================================
+// E2E: Generic Utility Library Compilation
+// =============================================================================
+
+#[test]
+fn compile_generic_utility_library_array_utils() {
+    // Test compilation of generic array utility functions
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "declaration": true,
+            "strict": true
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    // Generic array utilities
+    write_file(
+        &base.join("src/array.ts"),
+        r#"
+export function map<T, U>(arr: T[], fn: (item: T, index: number) => U): U[] {
+    const result: U[] = [];
+    for (let i = 0; i < arr.length; i++) {
+        result.push(fn(arr[i], i));
+    }
+    return result;
+}
+
+export function filter<T>(arr: T[], predicate: (item: T) => boolean): T[] {
+    const result: T[] = [];
+    for (const item of arr) {
+        if (predicate(item)) {
+            result.push(item);
+        }
+    }
+    return result;
+}
+
+export function find<T>(arr: T[], predicate: (item: T) => boolean): T | undefined {
+    for (const item of arr) {
+        if (predicate(item)) {
+            return item;
+        }
+    }
+    return undefined;
+}
+
+export function reduce<T, U>(arr: T[], fn: (acc: U, item: T) => U, initial: U): U {
+    let acc = initial;
+    for (const item of arr) {
+        acc = fn(acc, item);
+    }
+    return acc;
+}
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors");
+    assert!(base.join("dist/src/array.js").is_file(), "JS output should exist");
+    assert!(base.join("dist/src/array.d.ts").is_file(), "Declaration should exist");
+
+    // Verify JS output has type annotations stripped
+    let js = std::fs::read_to_string(base.join("dist/src/array.js")).expect("read js");
+    assert!(!js.contains(": T[]"), "Type annotations should be stripped");
+    assert!(!js.contains(": U[]"), "Type annotations should be stripped");
+    assert!(js.contains("function map"), "Function should be present");
+    assert!(js.contains("function filter"), "Function should be present");
+    assert!(js.contains("function find"), "Function should be present");
+    assert!(js.contains("function reduce"), "Function should be present");
+
+    // Verify declarations preserve types
+    let dts = std::fs::read_to_string(base.join("dist/src/array.d.ts")).expect("read dts");
+    assert!(dts.contains("map<T, U>") || dts.contains("map<T,U>"), "Generic should be in declaration");
+    assert!(dts.contains("filter<T>"), "Generic should be in declaration");
+}
+
+#[test]
+fn compile_generic_utility_library_type_utilities() {
+    // Test compilation with type-level utilities (conditional types, mapped types)
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "declaration": true
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    // Type utilities with runtime helpers
+    write_file(
+        &base.join("src/types.ts"),
+        r#"
+// Type-level utilities (erased at runtime)
+export type DeepReadonly<T> = {
+    readonly [P in keyof T]: T[P] extends object ? DeepReadonly<T[P]> : T[P];
+};
+
+export type DeepPartial<T> = {
+    [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
+};
+
+export type Nullable<T> = T | null;
+
+export type NonNullableProps<T> = {
+    [P in keyof T]: NonNullable<T[P]>;
+};
+
+// Runtime function using these types
+export function deepFreeze<T extends object>(obj: T): DeepReadonly<T> {
+    Object.freeze(obj);
+    for (const key of Object.keys(obj)) {
+        const value = (obj as Record<string, unknown>)[key];
+        if (typeof value === "object" && value !== null) {
+            deepFreeze(value as object);
+        }
+    }
+    return obj as DeepReadonly<T>;
+}
+
+export function isNonNull<T>(value: T | null | undefined): value is T {
+    return value !== null && value !== undefined;
+}
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors");
+    assert!(base.join("dist/src/types.js").is_file(), "JS output should exist");
+    assert!(base.join("dist/src/types.d.ts").is_file(), "Declaration should exist");
+
+    // Verify JS output - type aliases should be completely erased
+    let js = std::fs::read_to_string(base.join("dist/src/types.js")).expect("read js");
+    assert!(!js.contains("DeepReadonly"), "Type alias should be erased");
+    assert!(!js.contains("DeepPartial"), "Type alias should be erased");
+    assert!(js.contains("function deepFreeze"), "Runtime function should be present");
+    assert!(js.contains("function isNonNull"), "Runtime function should be present");
+
+    // Verify declarations preserve type utilities
+    let dts = std::fs::read_to_string(base.join("dist/src/types.d.ts")).expect("read dts");
+    assert!(dts.contains("DeepReadonly"), "Type alias should be in declaration");
+    assert!(dts.contains("DeepPartial"), "Type alias should be in declaration");
+}
+
+#[test]
+fn compile_generic_utility_library_multi_file() {
+    // Test multi-file generic utility library with re-exports
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "declaration": true,
+            "sourceMap": true
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    // Array utilities
+    write_file(
+        &base.join("src/array.ts"),
+        r#"
+export function first<T>(arr: T[]): T | undefined {
+    return arr[0];
+}
+
+export function last<T>(arr: T[]): T | undefined {
+    return arr[arr.length - 1];
+}
+"#,
+    );
+
+    // String utilities
+    write_file(
+        &base.join("src/string.ts"),
+        r#"
+export function capitalize(str: string): string {
+    return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+export function repeat(str: string, count: number): string {
+    let result = "";
+    for (let i = 0; i < count; i++) {
+        result += str;
+    }
+    return result;
+}
+"#,
+    );
+
+    // Function utilities
+    write_file(
+        &base.join("src/function.ts"),
+        r#"
+export function identity<T>(value: T): T {
+    return value;
+}
+
+export function constant<T>(value: T): () => T {
+    return () => value;
+}
+
+export function noop(): void {}
+"#,
+    );
+
+    // Main index re-exporting everything
+    write_file(
+        &base.join("src/index.ts"),
+        r#"
+export { first, last } from "./array";
+export { capitalize, repeat } from "./string";
+export { identity, constant, noop } from "./function";
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors");
+
+    // All JS files should exist
+    assert!(base.join("dist/src/array.js").is_file());
+    assert!(base.join("dist/src/string.js").is_file());
+    assert!(base.join("dist/src/function.js").is_file());
+    assert!(base.join("dist/src/index.js").is_file());
+
+    // All declaration files should exist
+    assert!(base.join("dist/src/array.d.ts").is_file());
+    assert!(base.join("dist/src/string.d.ts").is_file());
+    assert!(base.join("dist/src/function.d.ts").is_file());
+    assert!(base.join("dist/src/index.d.ts").is_file());
+
+    // All source maps should exist
+    assert!(base.join("dist/src/array.js.map").is_file());
+    assert!(base.join("dist/src/index.js.map").is_file());
+
+    // Verify index re-exports
+    let index_js = std::fs::read_to_string(base.join("dist/src/index.js")).expect("read index");
+    assert!(
+        index_js.contains("require") || index_js.contains("export"),
+        "Index should have exports"
+    );
+
+    // Verify index declaration
+    let index_dts = std::fs::read_to_string(base.join("dist/src/index.d.ts")).expect("read dts");
+    assert!(
+        index_dts.contains("first") && index_dts.contains("last"),
+        "Index declaration should re-export array utils"
+    );
+}
+
+#[test]
+fn compile_generic_utility_library_with_constraints() {
+    // Test generic functions with complex constraints
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "declaration": true
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/constrained.ts"),
+        r#"
+// Generic with extends constraint
+export function getProperty<T, K extends keyof T>(obj: T, key: K): T[K] {
+    return obj[key];
+}
+
+// Generic with multiple constraints
+export function setProperty<T extends object, K extends keyof T>(
+    obj: T,
+    key: K,
+    value: T[K]
+): T {
+    obj[key] = value;
+    return obj;
+}
+
+// Generic with default type parameter
+export function createArray<T = string>(length: number, fill: T): T[] {
+    const result: T[] = [];
+    for (let i = 0; i < length; i++) {
+        result.push(fill);
+    }
+    return result;
+}
+
+// Function overloads with generics
+export function wrap<T>(value: T): T[];
+export function wrap<T>(value: T, count: number): T[];
+export function wrap<T>(value: T, count: number = 1): T[] {
+    const result: T[] = [];
+    for (let i = 0; i < count; i++) {
+        result.push(value);
+    }
+    return result;
+}
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors");
+
+    let js = std::fs::read_to_string(base.join("dist/src/constrained.js")).expect("read js");
+    assert!(!js.contains("extends keyof"), "Constraints should be stripped");
+    assert!(!js.contains("extends object"), "Constraints should be stripped");
+    assert!(js.contains("function getProperty"), "Function should be present");
+    assert!(js.contains("function wrap"), "Function should be present");
+
+    let dts = std::fs::read_to_string(base.join("dist/src/constrained.d.ts")).expect("read dts");
+    // Check that generic functions are present in declaration
+    assert!(dts.contains("getProperty"), "getProperty should be in declaration");
+    assert!(dts.contains("setProperty"), "setProperty should be in declaration");
+    assert!(dts.contains("createArray"), "createArray should be in declaration");
+    assert!(dts.contains("wrap"), "wrap should be in declaration");
+}
+
+#[test]
+fn compile_generic_utility_library_classes() {
+    // Test generic utility classes
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "declaration": true
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/collections.ts"),
+        r#"
+export class Stack<T> {
+    private items: T[] = [];
+
+    push(item: T): void {
+        this.items.push(item);
+    }
+
+    pop(): T | undefined {
+        return this.items.pop();
+    }
+
+    peek(): T | undefined {
+        return this.items[this.items.length - 1];
+    }
+
+    get size(): number {
+        return this.items.length;
+    }
+
+    isEmpty(): boolean {
+        return this.items.length === 0;
+    }
+}
+
+export class Queue<T> {
+    private items: T[] = [];
+
+    enqueue(item: T): void {
+        this.items.push(item);
+    }
+
+    dequeue(): T | undefined {
+        return this.items.shift();
+    }
+
+    front(): T | undefined {
+        return this.items[0];
+    }
+
+    get size(): number {
+        return this.items.length;
+    }
+}
+
+export class Result<T, E> {
+    private constructor(
+        private readonly value: T | undefined,
+        private readonly error: E | undefined,
+        private readonly isOk: boolean
+    ) {}
+
+    static ok<T, E>(value: T): Result<T, E> {
+        return new Result<T, E>(value, undefined, true);
+    }
+
+    static err<T, E>(error: E): Result<T, E> {
+        return new Result<T, E>(undefined, error, false);
+    }
+
+    isSuccess(): boolean {
+        return this.isOk;
+    }
+
+    getValue(): T | undefined {
+        return this.value;
+    }
+
+    getError(): E | undefined {
+        return this.error;
+    }
+}
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors");
+
+    let js = std::fs::read_to_string(base.join("dist/src/collections.js")).expect("read js");
+    assert!(js.contains("class Stack"), "Class should be present");
+    assert!(js.contains("class Queue"), "Class should be present");
+    assert!(js.contains("class Result"), "Class should be present");
+    assert!(!js.contains("<T>"), "Generic parameters should be stripped");
+    assert!(!js.contains("T[]"), "Type annotations should be stripped");
+    assert!(!js.contains(": void"), "Return type annotations should be stripped");
+
+    let dts = std::fs::read_to_string(base.join("dist/src/collections.d.ts")).expect("read dts");
+    assert!(dts.contains("Stack<T>"), "Generic class should be in declaration");
+    assert!(dts.contains("Queue<T>"), "Generic class should be in declaration");
+    assert!(dts.contains("Result<T, E>") || dts.contains("Result<T,E>"), "Generic class should be in declaration");
+}
