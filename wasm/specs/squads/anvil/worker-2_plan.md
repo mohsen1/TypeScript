@@ -13,6 +13,7 @@ Priority: 2
 - [ ] [EM: Add queued tasks]
 
 ## Completed
+- [x] Added CommonJS ordering coverage to ensure `__esModule` precedes export init in `thin_emitter_tests.rs`; `./wasm/test.sh test_commonjs_esmodule_marker_before_exports_init` passed.
 - [x] Added CommonJS helper ordering coverage before `__esModule` in `thin_emitter_tests.rs`; `./wasm/test.sh test_commonjs_helpers_before_esmodule_marker` passed.
 - [x] Added CommonJS helper ordering coverage for namespace import/export-star in `thin_emitter_tests.rs`; `./wasm/test.sh helper_ordering` passed.
 - [x] Added CommonJS helper emission coverage for namespace import/export-star in `thin_emitter_tests.rs`; `./wasm/test.sh emits_helpers` passed.
