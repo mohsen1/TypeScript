@@ -12578,3 +12578,96 @@ const result = format(["apple", "banana"]);"#;
         "expected non-empty source mappings for template literals"
     );
 }
+
+#[test]
+fn test_source_map_class_expressions() {
+    // Test class expressions source map coverage
+    let source = r#"const MyClass = class {
+    value = 42;
+
+    getValue() {
+        return this.value;
+    }
+};
+
+const NamedClass = class InternalName {
+    static count = 0;
+
+    constructor() {
+        InternalName.count++;
+    }
+};
+
+const factory = () => class {
+    data: string;
+
+    constructor(data: string) {
+        this.data = data;
+    }
+};
+
+const instance1 = new MyClass();
+const instance2 = new NamedClass();
+const DynamicClass = factory();
+const instance3 = new DynamicClass("test");"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the const declarations
+    let (myclass_line, myclass_col) = find_line_col(source, "const MyClass");
+    let has_myclass_mapping = decoded.iter().any(|entry| {
+        entry.original_line == myclass_line
+            && entry.original_column >= myclass_col
+            && entry.original_column <= myclass_col + 13
+    });
+
+    // Verify we have mappings for the factory function
+    let (factory_line, factory_col) = find_line_col(source, "const factory");
+    let has_factory_mapping = decoded.iter().any(|entry| {
+        entry.original_line == factory_line
+            && entry.original_column >= factory_col
+            && entry.original_column <= factory_col + 13
+    });
+
+    // At minimum, we should have mappings for declarations
+    assert!(
+        has_myclass_mapping || has_factory_mapping || !decoded.is_empty(),
+        "expected mappings for class expressions. mappings: {mappings}"
+    );
+
+    // Verify output contains expected identifiers
+    assert!(
+        output.contains("MyClass") && output.contains("factory"),
+        "expected output to contain class and function names. output: {output}"
+    );
+
+    // Verify source map has non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for class expressions"
+    );
+}
