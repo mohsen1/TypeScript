@@ -11,7 +11,10 @@ Priority: 1
 - Awaiting next assignment.
 
 ## Task Queue
-- [ ] None.
+- [ ] Add mixed-case exponent negative leading zeros test (`1Ee-0001`).
+- [ ] Add mixed-case exponent missing sign with leading zeros test (`1Ee01`).
+- [ ] Add mixed-case exponent trailing double-minus test (`1Ee--`).
+- [ ] Add uppercase exponent leading zeros with zero exponent test (`1E+00`).
 
 ## Completed
 - [x] Conditional infer object coverage in `wasm/src/solver/evaluate.rs` with tests in `wasm/src/solver/evaluate_tests.rs`. Tests: `./wasm/test.sh test_conditional_infer_object_`.
