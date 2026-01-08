@@ -7,18 +7,19 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [ ] End-to-end validation: add a compile-and-check regression for a non-trivial generic library snippet in `wasm/src/thin_checker_tests.rs` and fix the first panic or mismatch in `wasm/src/checker/mod.rs` or `wasm/src/solver/mod.rs`; run `./wasm/test.sh`.
+- [x] End-to-end validation: add a compile-and-check regression for a non-trivial generic library snippet in `wasm/src/parallel_tests.rs` (or `wasm/src/thin_checker_tests.rs`) and fix the first panic or mismatch in `wasm/src/checker/mod.rs` or `wasm/src/solver/mod.rs`; run `./wasm/test.sh`.
 
 ## Task Queue
-- [ ] Add a multi-file generic library test case (redux/lodash-style types) and assert no panics + expected diagnostics.
-- [ ] If a panic arises, minimize to a focused solver/checker regression test in `wasm/src/solver/*_tests.rs` or `wasm/src/checker/*_tests.rs`.
-- [ ] Validate the new test still passes with `./wasm/test.sh`.
+- [x] Add a multi-file generic library test case (redux/lodash-style types) and assert no panics + expected diagnostics.
+- [x] If a panic arises, minimize to a focused solver/checker regression test.
+- [x] Validate the new test still passes with `./wasm/test.sh`.
 
 ## Completed
-- [x] (Move finished items here with brief notes and tests run)
+- [x] Added generic library regression + fixed declare function overload handling. Tests: `./wasm/test.sh test_generic_library_snippet_compiles_and_checks` (full suite fails on existing `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
+- [x] Added multi-file generic regression across two files. Tests: `./wasm/test.sh test_multi_file_generic_library_snippet_compiles_and_checks`.
 
 ## Ready for Merge
-No
+Yes
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize solver correctness (inference/conditional/subtype) before new features.
