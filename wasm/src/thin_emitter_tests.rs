@@ -2390,6 +2390,7 @@ fn test_commonjs_export_import_equals() {
     printer.emit(root);
 
     let output = printer.get_output();
+    assert!(output.contains("__esModule"), "Expected __esModule marker in CommonJS output: {}", output);
     assert!(
         output.contains("exports.Foo = void 0;"),
         "Expected exports preamble for import equals: {}",
