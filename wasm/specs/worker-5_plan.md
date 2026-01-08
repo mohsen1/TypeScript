@@ -99,6 +99,8 @@ Priority: 5
       Tests: `./wasm/test.sh test_source_map_es5_transform_async_logical_or_mapping`.
 - [x] Added ES5 async if await-condition source map mapping test in `wasm/src/source_map_tests.rs`.
       Tests: `./wasm/test.sh test_source_map_es5_transform_async_if_await_condition_mapping`.
+- [x] Added ES5 async if await-and source map mapping test in `wasm/src/source_map_tests.rs`.
+      Tests: `./wasm/test.sh test_source_map_es5_transform_async_if_await_and_mapping`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
