@@ -46,7 +46,25 @@ Solution options:
 3. Modify TypeEvaluator to accept a callback for on-demand Ref resolution
 
 ## Ready for Merge
-No - still 2 diagnostics remaining
+**NO - BLOCKED**
+
+Worker 2's current commits cause a REGRESSION (5 diagnostics vs 4 on squad/forge baseline).
+
+**Root Cause**: The changes in `evaluate.rs` REMOVE the `TypeKey::Ref` and `TypeKey::TypeQuery` handlers from `evaluate()`:
+```rust
+// REMOVED - breaks Ref resolution!
+TypeKey::Ref(symbol) => {
+    if let Some(resolved) = self.resolver.resolve_ref(*symbol, self.interner) {
+        resolved
+    } else {
+        type_id
+    }
+}
+```
+
+This causes `resolve_ref returned None` debug errors during Application expansion because Ref types are no longer evaluated.
+
+**Action Required**: Worker 2 must restore the Ref/TypeQuery handling in evaluate() while keeping their other improvements
 
 ## Progress Summary
 - Started with: 6 diagnostics
