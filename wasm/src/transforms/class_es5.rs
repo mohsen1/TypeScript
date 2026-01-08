@@ -404,6 +404,12 @@ impl<'a> ClassES5Emitter<'a> {
                 self.write_line();
             } else {
                 // Non-derived class - emit private fields then instance property initializers
+                let needs_capture = self.needs_this_capture(&instance_props);
+                if needs_capture {
+                    self.write_indent();
+                    self.write("var _this = this;");
+                    self.write_line();
+                }
                 self.emit_private_field_initializations(false);
 
                 for &prop_idx in &instance_props {
