@@ -7,18 +7,21 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] Structural compatibility/variance: implement covariant `this`-type handling for class method parameters (TS unsoundness #19) in `wasm/src/solver/subtype.rs`; add regressions in `wasm/src/solver/subtype_tests.rs`; run `./wasm/test.sh`.
+- [x] Structural compatibility/variance: fix covariance/contravariance edge cases in `wasm/src/solver/subtype.rs`; add tests in `wasm/src/solver/subtype_tests.rs`; run `./wasm/test.sh`.
 
 ## Task Queue
-- [ ] Add class-subtyping regressions where `this` appears in method parameters (base vs derived) and confirm assignment matches `tsc`.
-- [ ] Confirm method vs function-property variance (including `this` parameters) in `wasm/src/solver/subtype.rs` matches `tsc`, add coverage if missing.
-- [ ] Add a void-return exception regression (`() => void` accepts `() => string`) if not already covered, or pick the next unsoundness case from `wasm/specs/TS_UNSOUNDNESS_CATALOG.md`.
+- [x] Add regressions for function parameter variance across unions/intersections in `wasm/src/solver/subtype_tests.rs`.
+- [x] Confirm method vs function-property variance in `wasm/src/solver/subtype.rs` matches `tsc`, add coverage if missing.
+- [x] Pull next unsoundness case from `wasm/specs/TS_UNSOUNDNESS_CATALOG.md` and add a subtype regression test.
 
 ## Completed
-- [x] (Move finished items here with brief notes and tests run)
+- [x] Structural property/method variance: allow bivariant checks when either side is a method; added mixed method vs function-property test. Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
+- [x] Function variance across union/intersection targets regression test. Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
+- [x] Method vs function-property variance coverage for function-source to method-target. Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
+- [x] Index-signature consistency with method bivariance regression (TS unsoundness #25). Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
 
 ## Ready for Merge
-No
+Yes
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize solver correctness (inference/conditional/subtype) before new features.

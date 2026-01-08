@@ -1145,8 +1145,9 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                     // Property exists, check type compatibility
                     let source_type = self.optional_property_type(sp);
                     let target_type = self.optional_property_type(t_prop);
+                    let allow_bivariant = sp.is_method || t_prop.is_method;
                     if !self
-                        .check_subtype_with_method_variance(source_type, target_type, t_prop.is_method)
+                        .check_subtype_with_method_variance(source_type, target_type, allow_bivariant)
                         .is_true()
                     {
                         return SubtypeResult::False;
@@ -1157,7 +1158,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                         let source_write = self.optional_property_write_type(sp);
                         let target_write = self.optional_property_write_type(t_prop);
                         if !self
-                            .check_subtype_with_method_variance(target_write, source_write, t_prop.is_method)
+                            .check_subtype_with_method_variance(target_write, source_write, allow_bivariant)
                             .is_true()
                         {
                             return SubtypeResult::False;
@@ -1275,8 +1276,9 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 }
                 let source_type = self.optional_property_type(sp);
                 let target_type = self.optional_property_type(t_prop);
+                let allow_bivariant = sp.is_method || t_prop.is_method;
                 if !self
-                    .check_subtype_with_method_variance(source_type, target_type, t_prop.is_method)
+                    .check_subtype_with_method_variance(source_type, target_type, allow_bivariant)
                     .is_true()
                 {
                     return SubtypeResult::False;
@@ -1287,7 +1289,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                     let source_write = self.optional_property_write_type(sp);
                     let target_write = self.optional_property_write_type(t_prop);
                     if !self
-                        .check_subtype_with_method_variance(target_write, source_write, t_prop.is_method)
+                        .check_subtype_with_method_variance(target_write, source_write, allow_bivariant)
                         .is_true()
                     {
                         return SubtypeResult::False;
@@ -1369,10 +1371,19 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
         for prop in source {
             let prop_type = self.optional_property_type(prop);
+            let allow_bivariant = prop.is_method;
 
             if let Some(number_idx) = number_index {
                 let is_numeric = self.is_numeric_property_name(prop.name);
-                if is_numeric && !self.check_subtype(prop_type, number_idx.value_type).is_true() {
+                if is_numeric
+                    && !self
+                        .check_subtype_with_method_variance(
+                            prop_type,
+                            number_idx.value_type,
+                            allow_bivariant,
+                        )
+                        .is_true()
+                {
                     return SubtypeResult::False;
                 }
                 if is_numeric && !number_idx.readonly && prop.readonly {
@@ -1384,7 +1395,10 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 if !string_idx.readonly && prop.readonly {
                     return SubtypeResult::False;
                 }
-                if !self.check_subtype(prop_type, string_idx.value_type).is_true() {
+                if !self
+                    .check_subtype_with_method_variance(prop_type, string_idx.value_type, allow_bivariant)
+                    .is_true()
+                {
                     return SubtypeResult::False;
                 }
             }
@@ -2264,13 +2278,14 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                     // Check property type compatibility
                     let source_type = self.optional_property_type(sp);
                     let target_type = self.optional_property_type(t_prop);
+                    let allow_bivariant = sp.is_method || t_prop.is_method;
                     if !self
-                        .check_subtype_with_method_variance(source_type, target_type, t_prop.is_method)
+                        .check_subtype_with_method_variance(source_type, target_type, allow_bivariant)
                         .is_true()
                     {
                         // Recursively explain the nested failure
                         let nested = self
-                            .explain_failure_with_method_variance(source_type, target_type, t_prop.is_method);
+                            .explain_failure_with_method_variance(source_type, target_type, allow_bivariant);
                         return Some(SubtypeFailureReason::PropertyTypeMismatch {
                             property_name: t_prop.name,
                             source_property_type: source_type,
@@ -2284,11 +2299,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                         let source_write = self.optional_property_write_type(sp);
                         let target_write = self.optional_property_write_type(t_prop);
                         if !self
-                            .check_subtype_with_method_variance(target_write, source_write, t_prop.is_method)
+                            .check_subtype_with_method_variance(target_write, source_write, allow_bivariant)
                             .is_true()
                         {
                             let nested = self
-                                .explain_failure_with_method_variance(target_write, source_write, t_prop.is_method);
+                                .explain_failure_with_method_variance(target_write, source_write, allow_bivariant);
                             return Some(SubtypeFailureReason::PropertyTypeMismatch {
                                 property_name: t_prop.name,
                                 source_property_type: source_write,
@@ -2420,12 +2435,13 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
                 let source_type = self.optional_property_type(sp);
                 let target_type = self.optional_property_type(t_prop);
+                let allow_bivariant = sp.is_method || t_prop.is_method;
                 if !self
-                    .check_subtype_with_method_variance(source_type, target_type, t_prop.is_method)
+                    .check_subtype_with_method_variance(source_type, target_type, allow_bivariant)
                     .is_true()
                 {
                     let nested =
-                        self.explain_failure_with_method_variance(source_type, target_type, t_prop.is_method);
+                        self.explain_failure_with_method_variance(source_type, target_type, allow_bivariant);
                     return Some(SubtypeFailureReason::PropertyTypeMismatch {
                         property_name: t_prop.name,
                         source_property_type: source_type,
@@ -2439,11 +2455,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                     let source_write = self.optional_property_write_type(sp);
                     let target_write = self.optional_property_write_type(t_prop);
                     if !self
-                        .check_subtype_with_method_variance(target_write, source_write, t_prop.is_method)
+                        .check_subtype_with_method_variance(target_write, source_write, allow_bivariant)
                         .is_true()
                     {
                         let nested = self
-                            .explain_failure_with_method_variance(target_write, source_write, t_prop.is_method);
+                            .explain_failure_with_method_variance(target_write, source_write, allow_bivariant);
                         return Some(SubtypeFailureReason::PropertyTypeMismatch {
                             property_name: t_prop.name,
                             source_property_type: source_write,
@@ -2532,6 +2548,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
         for prop in source {
             let prop_type = self.optional_property_type(prop);
+            let allow_bivariant = prop.is_method;
 
             if let Some(number_idx) = number_index {
                 let is_numeric = self.is_numeric_property_name(prop.name);
@@ -2541,7 +2558,14 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                             property_name: prop.name,
                         });
                     }
-                    if !self.check_subtype(prop_type, number_idx.value_type).is_true() {
+                    if !self
+                        .check_subtype_with_method_variance(
+                            prop_type,
+                            number_idx.value_type,
+                            allow_bivariant,
+                        )
+                        .is_true()
+                    {
                         return Some(SubtypeFailureReason::IndexSignatureMismatch {
                             index_kind: "number",
                             source_value_type: prop_type,
@@ -2557,7 +2581,10 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                         property_name: prop.name,
                     });
                 }
-                if !self.check_subtype(prop_type, string_idx.value_type).is_true() {
+                if !self
+                    .check_subtype_with_method_variance(prop_type, string_idx.value_type, allow_bivariant)
+                    .is_true()
+                {
                     return Some(SubtypeFailureReason::IndexSignatureMismatch {
                         index_kind: "string",
                         source_value_type: prop_type,
