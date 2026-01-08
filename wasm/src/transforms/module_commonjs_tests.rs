@@ -6,6 +6,7 @@ fn test_sanitize_module_name() {
     assert_eq!(sanitize_module_name("./foo/bar"), "foo_bar");
     assert_eq!(sanitize_module_name("../utils"), "utils");
     assert_eq!(sanitize_module_name("@scope/pkg"), "_scope_pkg");
+    assert_eq!(sanitize_module_name("./foo-bar/baz.qux"), "foo_bar_baz_qux");
 }
 
 #[test]
