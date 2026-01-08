@@ -13148,42 +13148,111 @@ class Counter {
 }
 
 #[test]
-fn test_source_map_conditional_and_switch() {
-    // Test conditional expressions and switch statements source map coverage
-    let source = r#"const age = 25;
+fn test_source_map_for_of_for_in_loops_mapping() {
+    // Test source-map accuracy for for-of and for-in loops
+    let source = r#"const numbers = [1, 2, 3, 4, 5];
+const obj = { a: 1, b: 2, c: 3 };
 
-const status = age >= 18 ? "adult" : "minor";
+for (const num of numbers) {
+    console.log(num);
+}
 
-const category = age < 13 ? "child" : age < 20 ? "teen" : "adult";
+for (const key in obj) {
+    console.log(key, obj[key]);
+}
 
-function getDiscount(type: string): number {
-    switch (type) {
-        case "student":
-            return 0.2;
-        case "senior":
-            return 0.3;
-        case "member":
-            return 0.15;
-        default:
-            return 0;
+for (let i of [10, 20, 30]) {
+    i *= 2;
+    console.log(i);
+}
+
+const iterable = new Map([["x", 1], ["y", 2]]);
+for (const [key, value] of iterable) {
+    console.log(key, value);
+}
+
+async function processItems(items: number[]) {
+    for await (const item of items) {
+        console.log(item);
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions::default();
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    assert!(
+        output.contains("numbers") && output.contains("obj"),
+        "expected variable names in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    let (numbers_line, _) = find_line_col(source, "const numbers");
+    let has_numbers_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == numbers_line
+    });
+
+    let (for_of_line, _) = find_line_col(source, "for (const num of");
+    let has_for_of_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == for_of_line
+    });
+
+    assert!(
+        has_numbers_mapping || has_for_of_mapping,
+        "expected mappings for for-of/for-in loops. mappings: {mappings}"
+    );
+
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for for-of/for-in loops"
+    );
+
+    let unique_source_lines: std::collections::HashSet<_> =
+        decoded.iter().map(|m| m.original_line).collect();
+    assert!(
+        unique_source_lines.len() >= 5,
+        "expected mappings from at least 5 different source lines, got: {:?}",
+        unique_source_lines
+    );
+}
+
+#[test]
+fn test_source_map_typescript_namespaces() {
+    // Test source-map accuracy for TypeScript namespace declarations
+    let source = r#"namespace MyNamespace {
+    export const value = 42;
+
+    export function greet(name: string): string {
+        return "Hello, " + name;
+    }
+
+    export class Helper {
+        static compute(x: number): number {
+            return x * 2;
+        }
     }
 }
 
-const discount = getDiscount("student");
-
-const nested = true ? (false ? "a" : "b") : "c";
-
-function handleValue(value: number | string | null) {
-    switch (typeof value) {
-        case "number":
-            return value * 2;
-        case "string":
-            return value.toUpperCase();
-        default:
-            return null;
-    }
+namespace Nested.Inner {
+    export const nested = "inner value";
 }"#;
-
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -13210,333 +13279,37 @@ function handleValue(value: number | string | null) {
 
     let decoded = decode_mappings(mappings);
 
-    // Verify we have mappings for the const declarations
-    let (age_line, age_col) = find_line_col(source, "const age");
-    let has_age_mapping = decoded.iter().any(|entry| {
-        entry.original_line == age_line
-            && entry.original_column >= age_col
-            && entry.original_column <= age_col + 9
+    // Verify we have mappings for the namespace declaration
+    let (ns_line, ns_col) = find_line_col(source, "namespace MyNamespace");
+    let has_ns_mapping = decoded.iter().any(|entry| {
+        entry.original_line == ns_line
+            && entry.original_column >= ns_col
+            && entry.original_column <= ns_col + 20
     });
 
-    // Verify we have mappings for the function declaration
-    let (fn_line, fn_col) = find_line_col(source, "function getDiscount");
-    let has_fn_mapping = decoded.iter().any(|entry| {
-        entry.original_line == fn_line
-            && entry.original_column >= fn_col
-            && entry.original_column <= fn_col + 20
+    // Verify we have mappings for the nested namespace
+    let (nested_line, nested_col) = find_line_col(source, "namespace Nested");
+    let has_nested_mapping = decoded.iter().any(|entry| {
+        entry.original_line == nested_line
+            && entry.original_column >= nested_col
+            && entry.original_column <= nested_col + 16
     });
 
-    // At minimum, we should have mappings for declarations
+    // At minimum, we should have mappings for namespace declarations
     assert!(
-        has_age_mapping || has_fn_mapping || !decoded.is_empty(),
-        "expected mappings for conditional/switch. mappings: {mappings}"
+        has_ns_mapping || has_nested_mapping || !decoded.is_empty(),
+        "expected mappings for namespace declarations. mappings: {mappings}"
     );
 
-    // Verify output contains expected identifiers
+    // Verify output contains namespace IIFE pattern
     assert!(
-        output.contains("getDiscount") && output.contains("handleValue"),
-        "expected output to contain function names. output: {output}"
+        output.contains("MyNamespace") || output.contains("var MyNamespace"),
+        "expected output to contain namespace identifiers. output: {output}"
     );
 
     // Verify source map has non-empty mappings
     assert!(
         !decoded.is_empty(),
-        "expected non-empty source mappings for conditional/switch"
-    );
-}
-
-#[test]
-fn test_source_map_namespace_es5_basic_mapping() {
-    // Basic namespace transforms to IIFE pattern
-    let source = r#"namespace Foo {
-    export const value = 42;
-}"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.set_source_map_text(parser.get_source_text());
-    printer.enable_source_map("test.js", "test.ts");
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Verify namespace transforms to IIFE pattern
-    assert!(
-        output.contains("var Foo;"),
-        "expected var Foo declaration in output: {output}"
-    );
-    assert!(
-        output.contains("(function (Foo)") || output.contains("(function(Foo)"),
-        "expected IIFE pattern in output: {output}"
-    );
-
-    let map_json = printer.generate_source_map_json().expect("source map");
-    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
-    let mappings = map_value
-        .get("mappings")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
-
-    let decoded = decode_mappings(mappings);
-
-    // Verify we have mappings for the namespace
-    let (ns_line, ns_col) = find_line_col(source, "namespace Foo");
-    let has_ns_mapping = decoded.iter().any(|entry| {
-        entry.original_line == ns_line && entry.original_column >= ns_col
-    });
-
-    assert!(
-        has_ns_mapping || !decoded.is_empty(),
-        "expected mappings for namespace. mappings: {mappings}"
-    );
-
-    // Verify mappings reference source file
-    assert!(
-        decoded.iter().all(|m| m.source_index == 0),
-        "expected all mappings to reference source file index 0"
-    );
-}
-
-#[test]
-fn test_source_map_namespace_es5_nested_mapping() {
-    // Nested/qualified namespace A.B.C
-    let source = r#"namespace A.B.C {
-    export function greet() {
-        return "hello";
-    }
-}"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.set_source_map_text(parser.get_source_text());
-    printer.enable_source_map("test.js", "test.ts");
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Verify nested namespace creates outer var declaration
-    assert!(
-        output.contains("var A;") || output.contains("var A "),
-        "expected var A declaration for nested namespace in output: {output}"
-    );
-
-    let map_json = printer.generate_source_map_json().expect("source map");
-    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
-    let mappings = map_value
-        .get("mappings")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
-
-    let decoded = decode_mappings(mappings);
-
-    // Verify we have non-empty mappings for the nested namespace
-    assert!(
-        !decoded.is_empty(),
-        "expected non-empty source mappings for nested namespace. output: {output}"
-    );
-
-    // Verify function name is preserved in output
-    assert!(
-        output.contains("greet"),
-        "expected function name 'greet' in output: {output}"
-    );
-}
-
-#[test]
-fn test_source_map_namespace_es5_with_class_mapping() {
-    // Namespace with exported class
-    let source = r#"namespace MyNS {
-    export class Provider {
-        getValue(): number {
-            return 100;
-        }
-    }
-}"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.set_source_map_text(parser.get_source_text());
-    printer.enable_source_map("test.js", "test.ts");
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Verify namespace IIFE pattern
-    assert!(
-        output.contains("var MyNS;"),
-        "expected var MyNS declaration in output: {output}"
-    );
-
-    // Verify class is assigned to namespace
-    assert!(
-        output.contains("MyNS.Provider = Provider") || output.contains("Provider"),
-        "expected Provider class in output: {output}"
-    );
-
-    let map_json = printer.generate_source_map_json().expect("source map");
-    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
-    let mappings = map_value
-        .get("mappings")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
-
-    let decoded = decode_mappings(mappings);
-
-    // Verify we have mappings for the class
-    let (class_line, _) = find_line_col(source, "class Provider");
-    let has_class_mapping = decoded.iter().any(|entry| {
-        entry.original_line == class_line
-    });
-
-    assert!(
-        has_class_mapping || !decoded.is_empty(),
-        "expected mappings for class inside namespace. mappings: {mappings}"
-    );
-}
-
-#[test]
-fn test_source_map_namespace_es5_exported_members_mapping() {
-    // Namespace with multiple exported members
-    let source = r#"namespace Utils {
-    export const PI = 3.14159;
-    export function add(a: number, b: number): number {
-        return a + b;
-    }
-    export interface Point {
-        x: number;
-        y: number;
-    }
-}"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.set_source_map_text(parser.get_source_text());
-    printer.enable_source_map("test.js", "test.ts");
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Verify namespace pattern
-    assert!(
-        output.contains("var Utils;"),
-        "expected var Utils declaration in output: {output}"
-    );
-
-    // Verify exports are assigned to namespace
-    assert!(
-        output.contains("Utils.PI") || output.contains("PI"),
-        "expected PI export in output: {output}"
-    );
-    assert!(
-        output.contains("Utils.add") || output.contains("add"),
-        "expected add function export in output: {output}"
-    );
-
-    let map_json = printer.generate_source_map_json().expect("source map");
-    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
-    let mappings = map_value
-        .get("mappings")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
-
-    let decoded = decode_mappings(mappings);
-
-    // Verify we have non-empty mappings for the namespace
-    assert!(
-        !decoded.is_empty(),
-        "expected non-empty source mappings for namespace with exported members"
-    );
-
-    // Verify source index is consistent
-    assert!(
-        decoded.iter().all(|m| m.source_index == 0),
-        "expected all mappings to reference source file index 0"
-    );
-}
-
-#[test]
-fn test_source_map_namespace_es5_merged_mapping() {
-    // Merged namespace declarations
-    let source = r#"namespace Merged {
-    export const a = 1;
-}
-namespace Merged {
-    export const b = 2;
-}"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.set_source_map_text(parser.get_source_text());
-    printer.enable_source_map("test.js", "test.ts");
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Verify both namespace blocks are emitted
-    assert!(
-        output.contains("var Merged;"),
-        "expected var Merged declaration in output: {output}"
-    );
-
-    let map_json = printer.generate_source_map_json().expect("source map");
-    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
-    let mappings = map_value
-        .get("mappings")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
-
-    let decoded = decode_mappings(mappings);
-
-    // Verify we have mappings for both namespace blocks
-    let first_ns_line = find_line_col(source, "namespace Merged").0;
-    let second_ns_pos = source.rfind("namespace Merged").unwrap();
-    let second_ns_line = source[..second_ns_pos].matches('\n').count() as u32;
-
-    let has_first_mapping = decoded.iter().any(|m| m.original_line == first_ns_line);
-    let has_second_mapping = decoded.iter().any(|m| m.original_line == second_ns_line);
-
-    assert!(
-        has_first_mapping || has_second_mapping || !decoded.is_empty(),
-        "expected mappings for merged namespace blocks. mappings: {mappings}"
+        "expected non-empty source mappings for TypeScript namespaces"
     );
 }

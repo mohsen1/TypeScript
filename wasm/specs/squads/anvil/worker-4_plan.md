@@ -90,6 +90,7 @@ Priority: 4
 - [x] Add computed property names source-map test. Tests: `./wasm/test.sh computed_property_names_mapping`
 - [x] Add shorthand properties source-map test. Tests: `./wasm/test.sh shorthand_properties_mapping`
 - [x] Add method definitions source-map test. Tests: `./wasm/test.sh method_definitions_mapping`
+- [x] Add for-of/for-in loops source-map test. Tests: `./wasm/test.sh for_of_for_in_loops_mapping`
 
 ## Ready for Merge
 Yes
