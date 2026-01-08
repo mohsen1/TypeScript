@@ -1271,3 +1271,56 @@ class Point {
         output
     );
 }
+
+#[test]
+fn test_class_es5_getter_setter_accessors() {
+    let source = r#"
+class Counter {
+    private _count = 0;
+
+    get count() {
+        return this._count;
+    }
+
+    set count(value: number) {
+        this._count = value;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Should use Object.defineProperty for getters/setters in ES5
+    assert!(
+        output.contains("Object.defineProperty") || output.contains("defineProperty"),
+        "Expected ES5 getter/setter to use Object.defineProperty: {}",
+        output
+    );
+
+    // Should have get and set in the property descriptor
+    assert!(
+        output.contains("get:") || output.contains("get :") || output.contains("\"get\""),
+        "Expected getter in property descriptor: {}",
+        output
+    );
+
+    assert!(
+        output.contains("set:") || output.contains("set :") || output.contains("\"set\""),
+        "Expected setter in property descriptor: {}",
+        output
+    );
+}
