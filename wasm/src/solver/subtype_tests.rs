@@ -191,6 +191,33 @@ fn test_apparent_string_member_subtyping() {
 }
 
 #[test]
+fn test_apparent_string_length_subtyping() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let length = interner.intern_string("length");
+    let target = interner.object(vec![PropertyInfo {
+        name: length,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let mismatch = interner.object(vec![PropertyInfo {
+        name: length,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(checker.is_subtype_of(TypeId::STRING, target));
+    assert!(!checker.is_subtype_of(TypeId::STRING, mismatch));
+}
+
+#[test]
 fn test_apparent_string_number_index_subtyping() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
