@@ -1429,6 +1429,38 @@ fn test_resolve_bounds_function_subtype() {
 }
 
 #[test]
+fn test_resolve_bounds_optional_property_compatible() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name_a = interner.intern_string("a");
+
+    let upper = interner.object(vec![PropertyInfo {
+        name: name_a,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+    let lower = interner.object(vec![PropertyInfo {
+        name: name_a,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    ctx.add_lower_bound(var, lower);
+    ctx.add_upper_bound(var, upper);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower);
+}
+
+#[test]
 fn test_resolve_bounds_callable_subtype() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);
