@@ -287,7 +287,7 @@ ensure_worktree() {
       git -C "$dir" reset --hard origin/rust >/dev/null 2>&1 || true
       git -C "$dir" clean -fd >/dev/null 2>&1 || true
       git -C "$dir" checkout -B "$branch" origin/rust >/dev/null 2>&1 || true
-      echo "  Reset worktree $name -> origin/rust"
+      echo "  Reset worktree $name -> origin/rust" >&2
     fi
   else
     git -C "$ROOT_DIR" worktree add --force "$dir" rust >/dev/null 2>&1 || {
