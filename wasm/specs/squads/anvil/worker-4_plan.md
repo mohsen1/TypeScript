@@ -7,12 +7,13 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [ ] Add ES5 class tests for protected members in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
+- [ ] (empty)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Add ES5 class tests for protected members. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for parameter properties. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for constructor overloads. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for method overloads. Tests: `./wasm/test.sh class_es5_tests`

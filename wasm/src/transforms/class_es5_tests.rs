@@ -6444,3 +6444,316 @@ class User {
         output
     );
 }
+
+#[test]
+fn test_class_es5_protected_property() {
+    // Test protected property
+    let source = r#"
+class Animal {
+    protected name: string;
+    protected age: number;
+
+    constructor(name: string, age: number) {
+        this.name = name;
+        this.age = age;
+    }
+
+    public describe(): string {
+        return this.name + " is " + this.age + " years old";
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should transform class to function
+    assert!(
+        output.contains("function Animal") || output.contains("var Animal"),
+        "Expected Animal class transformation: {}",
+        output
+    );
+
+    // Protected properties should be assigned
+    assert!(
+        output.contains("this.name") && output.contains("this.age"),
+        "Expected protected property assignments: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("describe"),
+        "Expected describe method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_protected_method() {
+    // Test protected method
+    let source = r#"
+class Calculator {
+    protected value: number = 0;
+
+    protected add(n: number): void {
+        this.value += n;
+    }
+
+    protected subtract(n: number): void {
+        this.value -= n;
+    }
+
+    public calculate(a: number, b: number): number {
+        this.add(a);
+        this.subtract(b);
+        return this.value;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should transform class
+    assert!(
+        output.contains("function Calculator") || output.contains("var Calculator"),
+        "Expected Calculator class transformation: {}",
+        output
+    );
+
+    // Protected methods should be present
+    assert!(
+        output.contains("add") && output.contains("subtract"),
+        "Expected protected methods: {}",
+        output
+    );
+
+    // Public method should be present
+    assert!(
+        output.contains("calculate"),
+        "Expected calculate method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_protected_inheritance() {
+    // Test protected members with inheritance
+    let source = r#"
+class Shape {
+    protected x: number;
+    protected y: number;
+
+    constructor(x: number, y: number) {
+        this.x = x;
+        this.y = y;
+    }
+
+    protected move(dx: number, dy: number): void {
+        this.x += dx;
+        this.y += dy;
+    }
+}
+
+class Circle extends Shape {
+    protected radius: number;
+
+    constructor(x: number, y: number, radius: number) {
+        super(x, y);
+        this.radius = radius;
+    }
+
+    public area(): number {
+        return 3.14159 * this.radius * this.radius;
+    }
+
+    public moveCircle(dx: number, dy: number): void {
+        this.move(dx, dy);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Both classes should be transformed
+    assert!(
+        output.contains("Shape") && output.contains("Circle"),
+        "Expected both class transformations: {}",
+        output
+    );
+
+    // Inheritance should be present
+    assert!(
+        output.contains("__extends") || output.contains("prototype"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+
+    // Protected members should be accessible in subclass
+    assert!(
+        output.contains("radius") && output.contains("move"),
+        "Expected protected members: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_protected_static() {
+    // Test protected static members
+    let source = r#"
+class Counter {
+    protected static count: number = 0;
+    protected static instances: Counter[] = [];
+
+    protected static increment(): void {
+        Counter.count++;
+    }
+
+    constructor() {
+        Counter.increment();
+        Counter.instances.push(this);
+    }
+
+    public static getCount(): number {
+        return Counter.count;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should transform class
+    assert!(
+        output.contains("function Counter") || output.contains("var Counter"),
+        "Expected Counter class transformation: {}",
+        output
+    );
+
+    // Protected static properties should be on constructor
+    assert!(
+        output.contains("count") && output.contains("instances"),
+        "Expected protected static properties: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("increment") && output.contains("getCount"),
+        "Expected static methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_protected_constructor() {
+    // Test protected constructor (abstract-like pattern)
+    let source = r#"
+class BaseService {
+    protected constructor(protected readonly name: string) {}
+
+    protected log(message: string): void {
+        console.log(this.name + ": " + message);
+    }
+
+    public getName(): string {
+        return this.name;
+    }
+}
+
+class ConcreteService extends BaseService {
+    constructor(name: string, private id: number) {
+        super(name);
+    }
+
+    public getId(): number {
+        return this.id;
+    }
+
+    public logMessage(msg: string): void {
+        this.log(msg);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Both classes should be transformed
+    assert!(
+        output.contains("BaseService") && output.contains("ConcreteService"),
+        "Expected both class transformations: {}",
+        output
+    );
+
+    // Inheritance should be present
+    assert!(
+        output.contains("__extends") || output.contains("prototype"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("getName") && output.contains("getId") && output.contains("log"),
+        "Expected methods: {}",
+        output
+    );
+}
