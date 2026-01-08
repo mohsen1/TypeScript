@@ -5221,6 +5221,7 @@ impl<'a> ThinCheckerState<'a> {
     }
 
     /// Get type parameters for a symbol (for generic type aliases and interfaces).
+    /// Uses cross-file arena lookup for multi-file type checking.
     fn get_type_params_for_symbol(&mut self, sym_id: SymbolId) -> Vec<crate::solver::TypeParamInfo> {
         let Some(symbol) = self.ctx.binder.get_symbol(sym_id) else {
             return Vec::new();
@@ -5228,41 +5229,55 @@ impl<'a> ThinCheckerState<'a> {
 
         let flags = symbol.flags;
         let value_decl = symbol.value_declaration;
+        let decl_file_idx = symbol.decl_file_idx;
+        let first_decl = symbol.declarations.first().copied().unwrap_or(NodeIndex::NONE);
 
-        // Type alias - get type parameters from declaration
-        if flags & symbol_flags::TYPE_ALIAS != 0 {
-            let decl_idx = if !value_decl.is_none() {
-                value_decl
-            } else {
-                symbol.declarations.first().copied().unwrap_or(NodeIndex::NONE)
-            };
-            if !decl_idx.is_none() {
-                if let Some(node) = self.ctx.arena.get(decl_idx) {
-                    if let Some(type_alias) = self.ctx.arena.get_type_alias(node) {
-                        let (params, updates) = self.push_type_parameters(&type_alias.type_parameters);
-                        self.pop_type_parameters(updates);
-                        return params;
-                    }
-                }
-            }
-        }
+        // Extract type_parameters info from the arena first (immutable borrow)
+        let type_params_list: Option<crate::parser::NodeList> = {
+            let arena = self.ctx.get_arena_for_file(decl_file_idx);
 
-        // Interface - get type parameters from first declaration
-        if flags & symbol_flags::INTERFACE != 0 {
-            let decl_idx = if !value_decl.is_none() {
-                value_decl
-            } else {
-                symbol.declarations.first().copied().unwrap_or(NodeIndex::NONE)
-            };
-            if !decl_idx.is_none() {
-                if let Some(node) = self.ctx.arena.get(decl_idx) {
-                    if let Some(iface) = self.ctx.arena.get_interface(node) {
-                        let (params, updates) = self.push_type_parameters(&iface.type_parameters);
-                        self.pop_type_parameters(updates);
-                        return params;
+            // Type alias - get type parameters from declaration
+            if flags & symbol_flags::TYPE_ALIAS != 0 {
+                let decl_idx = if !value_decl.is_none() { value_decl } else { first_decl };
+                if !decl_idx.is_none() {
+                    if let Some(node) = arena.get(decl_idx) {
+                        if let Some(type_alias) = arena.get_type_alias(node) {
+                            type_alias.type_parameters.clone()
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
                     }
+                } else {
+                    None
                 }
+            // Interface - get type parameters from first declaration
+            } else if flags & symbol_flags::INTERFACE != 0 {
+                let decl_idx = if !value_decl.is_none() { value_decl } else { first_decl };
+                if !decl_idx.is_none() {
+                    if let Some(node) = arena.get(decl_idx) {
+                        if let Some(iface) = arena.get_interface(node) {
+                            iface.type_parameters.clone()
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
             }
+        };
+
+        // Now use the extracted data with mutable self
+        if let Some(tp_list) = type_params_list {
+            let (params, updates) = self.push_type_parameters(&Some(tp_list));
+            self.pop_type_parameters(updates);
+            return params;
         }
 
         Vec::new()
