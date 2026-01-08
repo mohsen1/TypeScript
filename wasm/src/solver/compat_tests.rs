@@ -159,6 +159,14 @@ fn test_error_poisoning_assignability() {
 }
 
 #[test]
+fn test_error_poisoning_union_normalization() {
+    let interner = TypeInterner::new();
+
+    let union = interner.union(vec![TypeId::STRING, TypeId::ERROR]);
+    assert_eq!(union, TypeId::ERROR);
+}
+
+#[test]
 fn test_base_constraint_assignability_compat() {
     let interner = TypeInterner::new();
     let mut checker = CompatChecker::new(&interner);
