@@ -31,6 +31,7 @@ Priority: 2
 - [x] Added object property infer test with non-object union branch. Tests: `./wasm/test.sh test_conditional_infer_object_property_non_object_union_branch`.
 - [x] Added non-distributive object infer test with non-object union branch. Tests: `./wasm/test.sh test_conditional_infer_object_property_non_distributive_union_branch`.
 - [x] Added nested object infer test with readonly wrapper. Tests: `./wasm/test.sh test_conditional_infer_nested_object_property_readonly_wrapper`.
+- [x] Added nested object infer test with union inner property. Tests: `./wasm/test.sh test_conditional_infer_nested_object_property_union_value`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.

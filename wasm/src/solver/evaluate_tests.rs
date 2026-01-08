@@ -1067,6 +1067,76 @@ fn test_conditional_infer_nested_object_property_non_matching_branch() {
 }
 
 #[test]
+fn test_conditional_infer_nested_object_property_union_value() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends { a: { b: infer R } } ? R : never, with T = { a: { b: string | number } }.
+    let extends_inner = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: infer_r,
+        write_type: infer_r,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let extends_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: extends_inner,
+        write_type: extends_inner,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_obj,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let b_union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: b_union,
+        write_type: b_union,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: obj_a,
+        write_type: obj_a,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    subst.insert(t_name, obj);
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, b_union);
+}
+
+#[test]
 fn test_conditional_infer_object_property_non_object_union_branch() {
     let interner = TypeInterner::new();
 
