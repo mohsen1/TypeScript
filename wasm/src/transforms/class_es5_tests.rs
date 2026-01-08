@@ -3489,3 +3489,356 @@ class ActionHandler {
         output
     );
 }
+
+#[test]
+fn test_class_es5_multiple_private_fields() {
+    // Test class with multiple private fields of different types
+    let source = r#"
+class SecureData {
+    #id: number;
+    #name: string;
+    #active: boolean = true;
+    #metadata: object = {};
+
+    constructor(id: number, name: string) {
+        this.#id = id;
+        this.#name = name;
+    }
+
+    getId(): number {
+        return this.#id;
+    }
+
+    getName(): string {
+        return this.#name;
+    }
+
+    isActive(): boolean {
+        return this.#active;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function SecureData"),
+        "Expected SecureData class to emit as function: {}",
+        output
+    );
+
+    // Should have WeakMap for private fields
+    assert!(
+        output.contains("WeakMap") || output.contains("__classPrivateFieldSet") || output.contains("__classPrivateFieldGet"),
+        "Expected private field mechanism in output: {}",
+        output
+    );
+
+    // Methods should be on prototype
+    assert!(
+        output.contains(".prototype.getId") || output.contains("prototype[\"getId\"]"),
+        "Expected getId method on prototype: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_mixed_static_instance_async() {
+    // Test class with both static and instance async methods
+    let source = r#"
+class DataService {
+    static async fetchAll(): Promise<any[]> {
+        return await api.getAll();
+    }
+
+    async fetchOne(id: number): Promise<any> {
+        return await api.get(id);
+    }
+
+    static async create(data: any): Promise<any> {
+        return await api.post(data);
+    }
+
+    async update(id: number, data: any): Promise<any> {
+        return await api.put(id, data);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function DataService"),
+        "Expected DataService class to emit as function: {}",
+        output
+    );
+
+    // Should use __awaiter for async methods
+    assert!(
+        output.contains("__awaiter"),
+        "Expected __awaiter for async methods: {}",
+        output
+    );
+
+    // Static methods should be on class
+    assert!(
+        output.contains("DataService.fetchAll") || output.contains("DataService.create"),
+        "Expected static async methods on class: {}",
+        output
+    );
+
+    // Instance methods should be on prototype
+    assert!(
+        output.contains(".prototype.fetchOne") || output.contains(".prototype.update"),
+        "Expected instance async methods on prototype: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_property_initializers_with_method_calls() {
+    // Test class with property initializers that call methods
+    let source = r#"
+class Config {
+    baseUrl: string = this.getDefaultUrl();
+    timeout: number = Config.getDefaultTimeout();
+    headers: object = this.createHeaders();
+
+    getDefaultUrl(): string {
+        return "https://api.example.com";
+    }
+
+    static getDefaultTimeout(): number {
+        return 5000;
+    }
+
+    createHeaders(): object {
+        return { "Content-Type": "application/json" };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function Config"),
+        "Expected Config class to emit as function: {}",
+        output
+    );
+
+    // Property initializers should reference this
+    assert!(
+        output.contains("this.baseUrl") || output.contains("this.timeout") || output.contains("this.headers"),
+        "Expected property assignments in constructor: {}",
+        output
+    );
+
+    // Methods should be on prototype
+    assert!(
+        output.contains(".prototype.getDefaultUrl") || output.contains("prototype[\"getDefaultUrl\"]"),
+        "Expected getDefaultUrl method on prototype: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_labeled_statements_in_method() {
+    // Test class method with labeled statements and break/continue
+    let source = r#"
+class SearchEngine {
+    search(items: any[][], query: string): any | null {
+        outer: for (let i = 0; i < items.length; i++) {
+            inner: for (let j = 0; j < items[i].length; j++) {
+                if (items[i][j] === query) {
+                    return items[i][j];
+                }
+                if (items[i][j] === null) {
+                    continue outer;
+                }
+            }
+        }
+        return null;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function SearchEngine"),
+        "Expected SearchEngine class to emit as function: {}",
+        output
+    );
+
+    // Method should be on prototype
+    assert!(
+        output.contains(".prototype.search") || output.contains("prototype[\"search\"]"),
+        "Expected search method on prototype: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_new_target_meta_property() {
+    // Test class constructor with new.target (verifies class emits, meta property handling is a TODO)
+    let source = r#"
+class BaseClass {
+    constructor() {
+        if (new.target === BaseClass) {
+            throw new Error("Cannot instantiate abstract class");
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function BaseClass"),
+        "Expected BaseClass class to emit as function: {}",
+        output
+    );
+
+    // Throw statement should be preserved
+    assert!(
+        output.contains("throw new Error"),
+        "Expected throw statement in output: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_method_with_this_type_parameter() {
+    // Test class method returning this type
+    let source = r#"
+class Builder {
+    private value: string = "";
+
+    append(text: string): this {
+        this.value += text;
+        return this;
+    }
+
+    prepend(text: string): this {
+        this.value = text + this.value;
+        return this;
+    }
+
+    build(): string {
+        return this.value;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function Builder"),
+        "Expected Builder class to emit as function: {}",
+        output
+    );
+
+    // Methods should return this
+    assert!(
+        output.contains("return this"),
+        "Expected 'return this' in fluent methods: {}",
+        output
+    );
+
+    // All methods should be on prototype
+    assert!(
+        output.contains(".prototype.append") && output.contains(".prototype.prepend") && output.contains(".prototype.build"),
+        "Expected all methods on prototype: {}",
+        output
+    );
+}

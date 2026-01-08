@@ -7,12 +7,15 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [ ] Add ES5 class tests for class expressions with decorators in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
+- [ ] Add ES5 class tests for async method decorators in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Add ES5 component decorator pattern test. Tests: `./wasm/test.sh component_decorator_pattern`
+- [x] Add ES5 injectable service pattern test. Tests: `./wasm/test.sh injectable_service_pattern`
+- [x] Add ES5 entity decorator pattern test. Tests: `./wasm/test.sh entity_decorator_pattern`
 - [x] Add ES5 async static method test. Tests: `./wasm/test.sh async_static_method`
 - [x] Add ES5 decorators syntax test. Tests: `./wasm/test.sh decorators_syntax`
 - [x] Add ES5 parameter decorator pattern test. Tests: `./wasm/test.sh parameter_decorator_pattern`
