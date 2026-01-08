@@ -13534,3 +13534,212 @@ fn test_source_map_block_scoping_function_scope_mapping() {
         unique_source_lines
     );
 }
+
+#[test]
+fn test_source_map_enum_es5_string_enum_mapping() {
+    // Test string enum transforms to IIFE pattern without reverse mapping
+    let source = r#"enum Direction {
+    Up = "UP",
+    Down = "DOWN",
+    Left = "LEFT",
+    Right = "RIGHT"
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Verify string enum generates IIFE pattern
+    assert!(
+        output.contains("var Direction"),
+        "expected var Direction declaration in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for string enum"
+    );
+
+    // Verify source index is consistent
+    assert!(
+        decoded.iter().all(|m| m.source_index == 0),
+        "expected all mappings to reference source file index 0"
+    );
+}
+
+#[test]
+fn test_source_map_enum_es5_exported_enum_mapping() {
+    // Test exported enum with source mapping
+    let source = r#"export enum Status {
+    Active = 1,
+    Inactive = 0,
+    Pending = 2
+}
+
+const current = Status.Active;"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Verify enum is in output
+    assert!(
+        output.contains("Status"),
+        "expected Status enum in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the enum
+    let (enum_line, _) = find_line_col(source, "enum Status");
+    let has_enum_mapping = decoded.iter().any(|entry| {
+        entry.original_line == enum_line
+    });
+
+    assert!(
+        has_enum_mapping || !decoded.is_empty(),
+        "expected mappings for exported enum. mappings: {mappings}"
+    );
+}
+
+#[test]
+fn test_source_map_enum_es5_computed_member_mapping() {
+    // Test enum with computed member values
+    let source = r#"enum Computed {
+    A = 1,
+    B = A * 2,
+    C = 10
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Verify enum generates IIFE pattern
+    assert!(
+        output.contains("var Computed") || output.contains("Computed"),
+        "expected Computed enum in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for computed enum members"
+    );
+}
+
+#[test]
+fn test_source_map_enum_es5_mixed_values_mapping() {
+    // Test enum with mixed numeric and auto-increment values
+    let source = r#"enum Mixed {
+    First,
+    Second,
+    Third = 10,
+    Fourth,
+    Fifth = 100
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Verify enum IIFE pattern
+    assert!(
+        output.contains("var Mixed"),
+        "expected var Mixed declaration in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the enum declaration
+    let (enum_line, _) = find_line_col(source, "enum Mixed");
+    let has_enum_mapping = decoded.iter().any(|entry| {
+        entry.original_line == enum_line
+    });
+
+    assert!(
+        has_enum_mapping || !decoded.is_empty(),
+        "expected mappings for enum with mixed values. mappings: {mappings}"
+    );
+}

@@ -80,6 +80,7 @@ Priority: 3
 - [x] Added namespace ES5 source map tests (basic, nested, with class, exported members, merged namespaces); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 - [x] Added computed properties and ES6 syntax E2E tests (computed props, for...of, shorthand methods); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 - [x] Added block scoping ES5 source map tests (let/const, nested blocks, for loop, function scope); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
+- [x] Added enum ES5 source map tests (string enum, exported enum, computed members, mixed values); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 
 ## Ready for Merge
 Yes
