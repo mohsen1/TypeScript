@@ -66,6 +66,7 @@ Priority: 1
 - [x] Number index ignores leading-zero mantissa exponent; added `test_resolve_bounds_number_index_ignores_exponent_leading_zero_mantissa`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_exponent_leading_zero_mantissa`.
 - [x] Number index ignores leading dot decimal name; added `test_resolve_bounds_number_index_ignores_leading_dot_decimal_name`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_leading_dot_decimal_name`.
 - [x] Number index ignores multiple leading zeros; added `test_resolve_bounds_number_index_ignores_multiple_leading_zeros`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_multiple_leading_zeros`.
+- [x] Number index ignores negative hex literal; added `test_resolve_bounds_number_index_ignores_negative_hex_name`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_negative_hex_name`.
 - [x] Number index ignores -0 exponent form; added `test_resolve_bounds_number_index_ignores_negative_exponent_zero`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_negative_exponent_zero`.
 - [x] Number index treats negative decimal boundary as numeric; added `test_resolve_bounds_number_index_accepts_negative_decimal_boundary_name`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_accepts_negative_decimal_boundary_name`.
 - [x] Number index ignores trailing decimal name; added `test_resolve_bounds_number_index_ignores_trailing_decimal_name`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_trailing_decimal_name`.
