@@ -13,6 +13,7 @@ Priority: 4
 - [ ] Stand by for next emitter fidelity task.
 
 ## Completed
+- [x] ES5 class method arrow super + this capture; test `./wasm/test.sh class_method_arrow_super_this_capture`.
 - [x] ES5 async computed super method call (current async emitter behavior); test `./wasm/test.sh async_super_computed_method_arguments`.
 - [x] ES5 computed super method call in class method; test `./wasm/test.sh super_computed_method_arguments`.
 - [x] ES5 derived field arrow computed super call lowered; test `./wasm/test.sh derived_field_arrow_super_computed`.
