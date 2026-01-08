@@ -14,6 +14,8 @@ Priority: 5
 - [ ] Add async unary plus await mapping regression.
 - [ ] Add async sequence expression mapping with mixed await/non-await (e.g., `foo(), await bar()`).
 - [ ] Add async compound assignment mapping with a different operator (e.g., `*=`).
+- [ ] Add async optional chaining await regression (`await foo?.bar()`); expect mapping for `foo` or `bar` identifier.
+- [ ] Add async nullish coalescing await regression (`(await foo()) ?? bar()`); expect mapping for `foo` and fallback to function anchor.
 
 ## Completed
 - [x] Added ES5 for-of source map mapping test in `wasm/src/source_map_tests.rs`; no fixes needed in source map writer/generator.
