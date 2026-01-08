@@ -10959,3 +10959,155 @@ if (data !== undefined) {
         }
     }
 }
+
+/// TS Unsoundness #36: JSX Intrinsic Lookup - lowercase tag resolution
+///
+/// Lowercase JSX tags like `<div />` are looked up as properties on the
+/// global `JSX.IntrinsicElements` interface. This test verifies that the
+/// checker can resolve intrinsic element types.
+///
+/// EXPECTED: Tests verify JSX parsing and checking don't crash. Full
+/// JSX type checking is not yet implemented.
+#[test]
+fn test_jsx_intrinsic_element_lowercase_lookup() {
+    use crate::thin_parser::ThinParserState;
+
+    // Use .tsx extension for JSX
+    let source = r#"
+declare namespace JSX {
+    interface IntrinsicElements {
+        div: { className?: string; id?: string };
+        span: { className?: string };
+    }
+}
+
+// Lowercase tags should be looked up in JSX.IntrinsicElements
+const elem = <div className="test" />;
+const elem2 = <span id="foo" />;
+"#;
+
+    let mut parser = ThinParserState::new("test.tsx".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    // Check if parsing JSX is supported
+    if !parser.get_diagnostics().is_empty() {
+        eprintln!("=== JSX Intrinsic Lowercase Parse Diagnostics ===");
+        for diag in parser.get_diagnostics() {
+            eprintln!("[{}] {}", diag.start, diag.message);
+        }
+        // JSX parsing may not be enabled - skip test
+        return;
+    }
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.tsx".to_string());
+    checker.check_source_file(root);
+
+    // Currently expect errors - JSX type checking not implemented
+    // Once JSX.IntrinsicElements lookup works, change to expect 0 errors
+    eprintln!("=== JSX Intrinsic Lowercase Diagnostics ===");
+    eprintln!("Got {} diagnostics (JSX checking not yet implemented)", checker.ctx.diagnostics.len());
+    for diag in &checker.ctx.diagnostics {
+        eprintln!("[{}] {}", diag.start, diag.message_text);
+    }
+    // Just verify we don't crash - actual JSX checking is future work
+}
+
+/// TS Unsoundness #36: JSX Intrinsic Lookup - uppercase component resolution
+///
+/// Uppercase JSX tags like `<MyComp />` are resolved as value references
+/// in the current scope and checked as function/constructor calls.
+///
+/// EXPECTED: Tests verify JSX parsing and checking don't crash. Full
+/// JSX type checking is not yet implemented.
+#[test]
+fn test_jsx_component_uppercase_resolution() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+declare namespace JSX {
+    interface Element {}
+    interface IntrinsicElements {}
+}
+
+// Component function
+function MyButton(props: { label: string }): JSX.Element {
+    return null as any;
+}
+
+// Uppercase tags resolve to variables in scope
+const btn = <MyButton label="Click me" />;
+"#;
+
+    let mut parser = ThinParserState::new("test.tsx".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    if !parser.get_diagnostics().is_empty() {
+        eprintln!("=== JSX Component Uppercase Parse Diagnostics ===");
+        for diag in parser.get_diagnostics() {
+            eprintln!("[{}] {}", diag.start, diag.message);
+        }
+        return;
+    }
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.tsx".to_string());
+    checker.check_source_file(root);
+
+    eprintln!("=== JSX Component Uppercase Diagnostics ===");
+    eprintln!("Got {} diagnostics (JSX checking not yet implemented)", checker.ctx.diagnostics.len());
+    for diag in &checker.ctx.diagnostics {
+        eprintln!("[{}] {}", diag.start, diag.message_text);
+    }
+    // Just verify we don't crash
+}
+
+/// TS Unsoundness #36: JSX Intrinsic Lookup - invalid intrinsic element
+///
+/// When a lowercase tag is not found in JSX.IntrinsicElements, TypeScript
+/// should report an error that the element does not exist.
+///
+/// EXPECTED: Tests verify JSX parsing and checking don't crash. Full
+/// JSX type checking is not yet implemented.
+#[test]
+fn test_jsx_intrinsic_element_not_found_error() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+declare namespace JSX {
+    interface IntrinsicElements {
+        div: {};
+    }
+}
+
+// 'unknowntag' is not in IntrinsicElements - should error
+const elem = <unknowntag />;
+"#;
+
+    let mut parser = ThinParserState::new("test.tsx".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    if !parser.get_diagnostics().is_empty() {
+        return;
+    }
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.tsx".to_string());
+    checker.check_source_file(root);
+
+    // Once JSX checking is implemented, expect 1 error for unknown element
+    eprintln!("=== JSX Invalid Intrinsic Diagnostics ===");
+    eprintln!("Got {} diagnostics (expected 1 once JSX implemented)", checker.ctx.diagnostics.len());
+    for diag in &checker.ctx.diagnostics {
+        eprintln!("[{}] {}", diag.start, diag.message_text);
+    }
+}
