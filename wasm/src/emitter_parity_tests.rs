@@ -4603,3 +4603,203 @@ fn test_parity_es5_arrow_multi_params() {
         output
     );
 }
+
+/// Parity test for ES5 getter-only accessor with return type.
+/// get prop(): Type should downlevel and erase type.
+#[test]
+fn test_parity_es5_getter_only_typed() {
+    let source = "class Config { get timeout(): number { return 5000; } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify Object.defineProperty is used
+    assert!(
+        output.contains("Object.defineProperty"),
+        "ES5 output should use Object.defineProperty: {}",
+        output
+    );
+    // Type annotation should be erased
+    assert!(
+        !output.contains(": number"),
+        "ES5 output should erase return type: {}",
+        output
+    );
+    // No ES6 getter syntax
+    assert!(
+        !output.contains("get timeout()"),
+        "ES5 output should not contain ES6 getter syntax: {}",
+        output
+    );
+    // Should return 5000
+    assert!(
+        output.contains("5000"),
+        "ES5 output should contain return value: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 setter-only accessor with param type.
+/// set prop(v: Type) should downlevel and erase type.
+#[test]
+fn test_parity_es5_setter_only_typed() {
+    let source = "class Counter { private _count = 0; set count(val: number) { this._count = val; } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify Object.defineProperty is used
+    assert!(
+        output.contains("Object.defineProperty"),
+        "ES5 output should use Object.defineProperty: {}",
+        output
+    );
+    // Type annotation should be erased
+    assert!(
+        !output.contains(": number"),
+        "ES5 output should erase param type: {}",
+        output
+    );
+    // No ES6 setter syntax
+    assert!(
+        !output.contains("set count("),
+        "ES5 output should not contain ES6 setter syntax: {}",
+        output
+    );
+    // Should reference _count
+    assert!(
+        output.contains("_count"),
+        "ES5 output should reference _count: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 getter/setter pair with types.
+/// Both getter return type and setter param type should be erased.
+#[test]
+fn test_parity_es5_accessor_pair_typed() {
+    let source = "class Box<T> { private _value: T; get value(): T { return this._value; } set value(v: T) { this._value = v; } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify Object.defineProperty is used
+    assert!(
+        output.contains("Object.defineProperty"),
+        "ES5 output should use Object.defineProperty: {}",
+        output
+    );
+    // Generic type param should be erased
+    assert!(
+        !output.contains("<T>"),
+        "ES5 output should erase generic type param: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": T"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+    // No ES6 getter/setter syntax
+    assert!(
+        !output.contains("get value()") && !output.contains("set value("),
+        "ES5 output should not contain ES6 accessor syntax: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 static setter.
+/// Static setters should be defined on constructor, not prototype.
+#[test]
+fn test_parity_es5_static_setter_typed() {
+    let source = "class Logger { private static _level: string = 'info'; static set level(val: string) { Logger._level = val; } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify Object.defineProperty is used
+    assert!(
+        output.contains("Object.defineProperty"),
+        "ES5 output should use Object.defineProperty: {}",
+        output
+    );
+    // Static accessors should be on constructor (Logger), not Logger.prototype
+    assert!(
+        output.contains("Object.defineProperty(Logger,") || output.contains("Object.defineProperty(Logger, "),
+        "ES5 output should define static accessor on Logger constructor: {}",
+        output
+    );
+    // Type annotation should be erased
+    assert!(
+        !output.contains(": string"),
+        "ES5 output should erase type annotation: {}",
+        output
+    );
+    // No ES6 setter syntax
+    assert!(
+        !output.contains("static set level("),
+        "ES5 output should not contain ES6 static setter syntax: {}",
+        output
+    );
+}
