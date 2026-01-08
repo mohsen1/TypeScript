@@ -1305,6 +1305,47 @@ fn test_resolve_bounds_number_index_numeric_property_mismatch() {
 }
 
 #[test]
+fn test_resolve_bounds_number_index_readonly_property_mismatch() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name_zero = interner.intern_string("0");
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let lower_type = interner.object(vec![PropertyInfo {
+        name: name_zero,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var);
+    assert!(matches!(
+        result,
+        Err(InferenceError::BoundsViolation {
+            lower: actual_lower,
+            upper: actual_upper,
+            ..
+        }) if actual_lower == lower_type && actual_upper == upper_type
+    ));
+}
+
+#[test]
 fn test_resolve_bounds_number_index_ignores_non_canonical_numeric_name() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);
