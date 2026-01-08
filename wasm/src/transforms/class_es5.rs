@@ -37,6 +37,7 @@ use crate::parser::{NodeIndex, NodeList};
 use crate::parser::syntax_kind_ext;
 use crate::scanner::SyntaxKind;
 use crate::transforms::arrow_es5::contains_this_reference;
+use crate::transforms::async_es5::AsyncES5Emitter;
 use crate::transforms::emit_utils;
 use crate::transforms::private_fields_es5::{PrivateFieldInfo, collect_private_fields, is_private_identifier};
 
@@ -862,6 +863,7 @@ impl<'a> ClassES5Emitter<'a> {
                 self.write(" = function (");
                 let param_transforms = self.emit_parameters(&method_data.parameters);
                 self.write(") ");
+                let is_async = self.is_async(&method_data.modifiers) && !method_data.asterisk_token;
 
                 // Check if body is empty - only empty bodies go on single line
                 let body_node = self.arena.get(method_data.body);
@@ -875,7 +877,16 @@ impl<'a> ClassES5Emitter<'a> {
                     false
                 };
 
-                if is_empty_body && param_transforms.is_empty() {
+                if is_async {
+                    self.write("{");
+                    self.write_line();
+                    self.increase_indent();
+                    self.emit_param_destructuring_prologue(&param_transforms);
+                    self.emit_async_body(method_data.body);
+                    self.decrease_indent();
+                    self.write_indent();
+                    self.write("}");
+                } else if is_empty_body && param_transforms.is_empty() {
                     self.write("{ }");
                 } else {
                     self.write("{");
@@ -1286,6 +1297,28 @@ impl<'a> ClassES5Emitter<'a> {
                 }
             }
         }
+    }
+
+    fn emit_async_body(&mut self, body: NodeIndex) {
+        let mut async_emitter = AsyncES5Emitter::new(self.arena);
+        async_emitter.set_indent_level(self.indent_level + 1);
+
+        let generator_body = if async_emitter.body_contains_await(body) {
+            async_emitter.emit_generator_body_with_await(body)
+        } else {
+            async_emitter.emit_simple_generator_body(body)
+        };
+
+        self.write_indent();
+        self.write("return __awaiter(this, void 0, void 0, function () {");
+        self.write_line();
+        self.increase_indent();
+        self.write(&generator_body);
+        self.decrease_indent();
+        self.write_line();
+        self.write_indent();
+        self.write("});");
+        self.write_line();
     }
 
     fn emit_param_default_assignment(&mut self, name: &str, initializer: NodeIndex) {
@@ -3453,6 +3486,19 @@ impl<'a> ClassES5Emitter<'a> {
             for &mod_idx in &mods.nodes {
                 if let Some(mod_node) = self.arena.get(mod_idx) {
                     if mod_node.kind == SyntaxKind::StaticKeyword as u16 {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    fn is_async(&self, modifiers: &Option<NodeList>) -> bool {
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(mod_node) = self.arena.get(mod_idx) {
+                    if mod_node.kind == SyntaxKind::AsyncKeyword as u16 {
                         return true;
                     }
                 }
