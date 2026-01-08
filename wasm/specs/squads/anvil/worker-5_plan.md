@@ -7,7 +7,7 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- Complete: Added with/labeled await detection tests in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
+- Complete: Added switch-default await detection test in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 
 ## Task Queue
 - [ ] (empty)
@@ -21,6 +21,7 @@ Priority: 5
 - [x] Expanded await detection for loops, switch, try/catch/finally, and with/labeled in `wasm/src/transforms/async_es5.rs`; added tests in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
 - [x] Added switch-case await detection test in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Added with/labeled await detection tests in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
+- [x] Added switch-default await detection test in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 
 ## Ready for Merge
 Yes
