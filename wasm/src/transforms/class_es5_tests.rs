@@ -6160,3 +6160,287 @@ class Container<T> {
         output
     );
 }
+
+#[test]
+fn test_class_es5_parameter_property_public() {
+    // Test public parameter property
+    let source = r#"
+class Person {
+    constructor(public name: string, public age: number) {}
+
+    greet(): string {
+        return "Hello, " + this.name;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should transform class to function
+    assert!(
+        output.contains("function Person") || output.contains("var Person"),
+        "Expected Person class transformation: {}",
+        output
+    );
+
+    // Parameter properties should be assigned to this
+    assert!(
+        output.contains("this.name") && output.contains("this.age"),
+        "Expected parameter property assignments: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("greet"),
+        "Expected greet method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_parameter_property_private() {
+    // Test private parameter property
+    let source = r#"
+class BankAccount {
+    constructor(private balance: number, private accountId: string) {}
+
+    getBalance(): number {
+        return this.balance;
+    }
+
+    deposit(amount: number): void {
+        this.balance += amount;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should transform class
+    assert!(
+        output.contains("function BankAccount") || output.contains("var BankAccount"),
+        "Expected BankAccount class transformation: {}",
+        output
+    );
+
+    // Private parameter properties should still be assigned
+    assert!(
+        output.contains("this.balance") || output.contains("balance"),
+        "Expected balance property: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("getBalance") && output.contains("deposit"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_parameter_property_protected() {
+    // Test protected parameter property with inheritance
+    let source = r#"
+class Vehicle {
+    constructor(protected speed: number, protected fuel: number) {}
+
+    accelerate(): void {
+        this.speed += 10;
+    }
+}
+
+class Car extends Vehicle {
+    constructor(speed: number, fuel: number, private brand: string) {
+        super(speed, fuel);
+    }
+
+    getInfo(): string {
+        return this.brand + " at " + this.speed + " mph";
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Both classes should be transformed
+    assert!(
+        output.contains("Vehicle") && output.contains("Car"),
+        "Expected both class transformations: {}",
+        output
+    );
+
+    // Inheritance should be present
+    assert!(
+        output.contains("__extends") || output.contains("prototype"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+
+    // Protected properties should be assigned
+    assert!(
+        output.contains("speed") && output.contains("fuel"),
+        "Expected protected properties: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_parameter_property_readonly() {
+    // Test readonly parameter property
+    let source = r#"
+class Config {
+    constructor(
+        readonly host: string,
+        readonly port: number,
+        readonly secure: boolean = false
+    ) {}
+
+    getUrl(): string {
+        const protocol = this.secure ? "https" : "http";
+        return protocol + "://" + this.host + ":" + this.port;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should transform class
+    assert!(
+        output.contains("function Config") || output.contains("var Config"),
+        "Expected Config class transformation: {}",
+        output
+    );
+
+    // Readonly properties should be assigned
+    assert!(
+        output.contains("this.host") || output.contains("host"),
+        "Expected host property: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("getUrl"),
+        "Expected getUrl method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_parameter_property_mixed() {
+    // Test mixed parameter properties and regular parameters
+    let source = r#"
+class User {
+    email: string;
+
+    constructor(
+        public id: number,
+        private password: string,
+        readonly createdAt: Date,
+        name: string
+    ) {
+        this.email = name + "@example.com";
+    }
+
+    validatePassword(input: string): boolean {
+        return this.password === input;
+    }
+
+    getId(): number {
+        return this.id;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should transform class
+    assert!(
+        output.contains("function User") || output.contains("var User"),
+        "Expected User class transformation: {}",
+        output
+    );
+
+    // Parameter properties should be assigned
+    assert!(
+        output.contains("id") && output.contains("password"),
+        "Expected parameter properties: {}",
+        output
+    );
+
+    // Regular property from constructor body should be present
+    assert!(
+        output.contains("email"),
+        "Expected email property: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("validatePassword") && output.contains("getId"),
+        "Expected methods: {}",
+        output
+    );
+}
