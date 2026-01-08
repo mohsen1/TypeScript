@@ -7,12 +7,13 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [x] Add solver tests for type operations (applications, tuples, arrays, objects, keyof, infer, instantiation, primitives). **Done:** Added 38 tests.
+None (awaiting next assignment)
 
 ## Task Queue
 (empty - awaiting next assignment)
 
 ## Completed
+- [x] Fixed method type parameter scope in check_method_declaration. Methods with type parameters (e.g., `transform<U>(...): Builder<U>`) now correctly resolve the type parameter in return types. Tests: `./wasm/test.sh compile_class_with_generic_constructor`.
 - [x] Added generic library regression + fixed declare function overload handling. Tests: `./wasm/test.sh test_generic_library_snippet_compiles_and_checks` (full suite fails on existing `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
 - [x] Added multi-file generic regression across two files. Tests: `./wasm/test.sh test_multi_file_generic_library_snippet_compiles_and_checks`.
 - [x] Synced with `origin/rust`; `FunctionId` build error not reproducible in `wasm/src/solver/evaluate.rs`. Tests: `./wasm/test.sh` (fails on existing `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
