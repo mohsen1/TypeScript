@@ -2144,6 +2144,7 @@ fn test_commonjs_reexport() {
 
     let output = printer.get_output();
     assert!(output.contains("require(\"./module\")"), "Expected require() in CommonJS output: {}", output);
+    assert!(output.contains("__esModule"), "Expected __esModule marker in CommonJS output: {}", output);
     assert!(output.contains("Object.defineProperty(exports, \"foo\""), "Expected Object.defineProperty for re-export: {}", output);
 }
 
