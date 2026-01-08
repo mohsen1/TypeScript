@@ -7,7 +7,7 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [ ] Awaiting EM assignment.
+- [x] Add tests for ES5 class downleveling edge cases with computed super[] access.
 
 ## Task Queue
 - [ ] [EM: Add queued tasks]
@@ -91,6 +91,7 @@ Priority: 4
 - [x] Add shorthand properties source-map test. Tests: `./wasm/test.sh shorthand_properties_mapping`
 - [x] Add method definitions source-map test. Tests: `./wasm/test.sh method_definitions_mapping`
 - [x] Add for-of/for-in loops source-map test. Tests: `./wasm/test.sh for_of_for_in_loops_mapping`
+- [x] Add ES5 computed super[] edge case tests. Tests: `./wasm/test.sh computed_super`
 
 ## Ready for Merge
 Yes

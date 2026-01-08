@@ -1623,3 +1623,220 @@ class DataProcessor {
         output
     );
 }
+
+#[test]
+fn test_class_es5_computed_super_in_regular_method() {
+    // Test computed super[] access in a regular method (not arrow/field)
+    let source = r#"
+class Base {
+    greet() { return "hello"; }
+    farewell() { return "goodbye"; }
+}
+class Derived extends Base {
+    callMethod(methodName: string) {
+        return super[methodName]();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected derived class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    assert!(
+        output.contains("_super.prototype[methodName].call(this)"),
+        "Expected computed super in method to use _super.prototype[expr].call(this): {}",
+        output
+    );
+    assert!(
+        !output.contains("super["),
+        "Expected computed super to be lowered in ES5 output: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_computed_super_in_constructor() {
+    // Test computed super[] access in constructor after super() call
+    let source = r#"
+class Base {
+    init() { return "initialized"; }
+}
+class Derived extends Base {
+    constructor() {
+        super();
+        const result = super["init"]();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected derived class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    assert!(
+        output.contains("_super.prototype[\"init\"].call(this)") ||
+        output.contains("_super.prototype[\"init\"].call(_this)"),
+        "Expected computed super in constructor to be lowered: {}",
+        output
+    );
+    assert!(
+        !output.contains("super[\"init\"]"),
+        "Expected computed super to be lowered in ES5 output: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_computed_super_with_arguments() {
+    // Test computed super[] access with multiple arguments
+    let source = r#"
+class Base {
+    calculate(a: number, b: number, c: number) { return a + b + c; }
+}
+class Derived extends Base {
+    compute(op: string, x: number, y: number, z: number) {
+        return super[op](x, y, z);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected derived class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    assert!(
+        output.contains("_super.prototype[op].call(this, x, y, z)"),
+        "Expected computed super with args to include all arguments: {}",
+        output
+    );
+    assert!(
+        !output.contains("super[op]"),
+        "Expected computed super to be lowered in ES5 output: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_computed_super_with_expression_key() {
+    // Test computed super[] where the key is an expression (not just identifier)
+    let source = r#"
+class Base {
+    method1() { return 1; }
+    method2() { return 2; }
+}
+class Derived extends Base {
+    prefix = "method";
+    callDynamic(num: number) {
+        return super[this.prefix + num]();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected derived class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Should emit the expression inside the brackets
+    assert!(
+        output.contains("_super.prototype[") && output.contains("].call(this)"),
+        "Expected computed super with expression key to be lowered: {}",
+        output
+    );
+    assert!(
+        !output.contains("super["),
+        "Expected computed super to be lowered in ES5 output: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_computed_super_in_async_method() {
+    // Test computed super[] access in async method
+    let source = r#"
+class Base {
+    async fetch() { return "data"; }
+}
+class Derived extends Base {
+    async fetchData(method: string) {
+        return await super[method]();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected derived class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // For async methods, super should still be properly lowered
+    assert!(
+        output.contains("_super.prototype[method].call"),
+        "Expected computed super in async method to be lowered: {}",
+        output
+    );
+    assert!(
+        !output.contains("super[method]"),
+        "Expected computed super to be lowered in ES5 output: {}",
+        output
+    );
+}
