@@ -7,18 +7,17 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-- [x] Solver inference hardening: handle circular `extends` constraints and usage-based inference in `wasm/src/solver/infer.rs`; add regressions in `wasm/src/solver/infer_tests.rs`; run `./wasm/test.sh`.
+- [x] Fix FunctionId build error in `wasm/src/solver/evaluate.rs`; run `./wasm/test.sh`.
 
 ## Task Queue
-- [x] Add context-sensitive typing inference cases (contextual signatures + `extends` constraints) in `wasm/src/solver/infer_tests.rs`.
-- [x] Verify constraint merge order for circular bounds (e.g., `T extends U`, `U extends T`, `U extends string`) and adjust `wasm/src/solver/infer.rs`.
-- [x] Add coverage for union targets with placeholder members in `wasm/src/solver/infer_tests.rs` if still failing vs `tsc`.
+- [ ] [EM: Assign next task]
 
 ## Completed
 - [x] Solver inference hardening: add cyclic upper bound expansion + usage-based inference tests. Ran `./wasm/test.sh` (fails: emitter_edge_case_tests::test_export_assignment_suppresses_other_exports).
 - [x] Added contextual signature bounds tests for function parameter/return variance. Ran `./wasm/test.sh` (fails: emitter_edge_case_tests::test_export_assignment_suppresses_other_exports).
 - [x] Added circular upper-bound order regression test. Ran `./wasm/test.sh` (fails: emitter_edge_case_tests::test_export_assignment_suppresses_other_exports).
 - [x] Added union target placeholder inference test. Ran `./wasm/test.sh` (fails: emitter_edge_case_tests::test_export_assignment_suppresses_other_exports).
+- [x] Checked `wasm/src/solver/evaluate.rs` for FunctionId build error (not reproducible after sync). Ran `./wasm/test.sh` (fails: emitter_edge_case_tests::test_export_assignment_suppresses_other_exports).
 
 ## Ready for Merge
 Yes
