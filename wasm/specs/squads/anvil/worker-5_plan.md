@@ -7,18 +7,16 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- Expand async ES5 source-map coverage for loop/try constructs in `wasm/src/source_map_tests.rs` (e.g., `for` init/condition/increment awaits, `do/while` await condition); ensure mappings are non-trivial; run `./wasm/test.sh`.
+- Complete: Expanded async ES5 source-map coverage for loop/try constructs in `wasm/src/source_map_tests.rs` with direct mapping checks; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 
 ## Task Queue
-- [ ] Add async `for` loop mapping tests with await in init/condition/update positions.
-- [ ] Add async `do/while` or `switch` mapping test with await in the condition/discriminant.
-- [ ] Add an async `try/finally` mapping test to cover await in `finally` and verify map entries.
+- [ ] (empty)
 
 ## Completed
-- [x] (Move finished items here with brief notes and tests run)
+- [x] Added direct mapping tests for for-loop header awaits, do/while await condition, and try/finally await in `finally` in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 
 ## Ready for Merge
-No
+Yes
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize emitter fidelity (ES5 downleveling/source maps) before new features.
