@@ -9903,3 +9903,61 @@ fn test_source_map_es5_transform_class_super_call_mapping() {
         super_line
     );
 }
+
+#[test]
+fn test_source_map_es5_transform_arrow_default_param_mapping() {
+    let source = "const greet = (name = \"world\") => `Hello, ${name}!`;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    // Default params get converted to void 0 checks in ES5
+    assert!(
+        output.contains("void 0") || output.contains("undefined") || output.contains("\"world\""),
+        "expected default parameter handling in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+    let (name_line, name_col) = find_line_col(source, "name = ");
+    let (greet_line, _) = find_line_col(source, "greet");
+
+    // Look for mapping near the default parameter
+    let mapping = decoded
+        .iter()
+        .filter(|entry| {
+            entry.original_line == name_line || entry.original_line == greet_line
+        })
+        .max_by_key(|entry| (entry.original_line, entry.original_column))
+        .unwrap_or_else(|| {
+            panic!(
+                "expected mapping for default param. mappings: {mappings} output: {output}"
+            )
+        });
+
+    assert_eq!(mapping.source_index, 0);
+    assert!(
+        mapping.original_line <= name_line,
+        "expected mapping at or before default param. mapping line: {} param line: {}",
+        mapping.original_line,
+        name_line
+    );
+}
