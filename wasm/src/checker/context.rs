@@ -11,7 +11,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use crate::parser::NodeIndex;
 use crate::parser::thin_node::ThinNodeArena;
 use crate::thin_binder::ThinBinderState;
-use crate::solver::{TypeId, TypeInterner, TypeEnvironment};
+use crate::solver::{TypeEnvironment, TypeId, TypeInterner};
 use crate::checker::types::diagnostics::Diagnostic;
 use crate::binder::SymbolId;
 
@@ -119,6 +119,9 @@ pub struct CheckerContext<'a> {
     /// Cache for type relation results.
     pub relation_cache: RefCell<FxHashMap<(TypeId, TypeId, u8), bool>>,
 
+    /// Cached type environment for resolving Ref types during assignability checks.
+    pub type_environment: RefCell<Option<TypeEnvironment>>,
+
     /// Symbol dependency graph (symbol -> referenced symbols).
     pub symbol_dependencies: FxHashMap<SymbolId, FxHashSet<SymbolId>>,
 
@@ -184,6 +187,7 @@ impl<'a> CheckerContext<'a> {
             node_types: FxHashMap::default(),
             type_parameter_names: FxHashMap::default(),
             relation_cache: RefCell::new(FxHashMap::default()),
+            type_environment: RefCell::new(None),
             symbol_dependencies: FxHashMap::default(),
             symbol_dependency_stack: Vec::new(),
             diagnostics: Vec::new(),
@@ -219,6 +223,7 @@ impl<'a> CheckerContext<'a> {
             node_types: cache.node_types,
             type_parameter_names: cache.type_parameter_names,
             relation_cache: RefCell::new(cache.relation_cache),
+            type_environment: RefCell::new(None),
             symbol_dependencies: cache.symbol_dependencies,
             symbol_dependency_stack: Vec::new(),
             diagnostics: Vec::new(),

@@ -438,6 +438,23 @@ function runApp() {
 
     let (result, stats) = check_functions_with_stats(&program);
 
+    // Print diagnostics for debugging
+    if result.diagnostic_count > 0 {
+        eprintln!("\n=== DIAGNOSTICS ({}) ===", result.diagnostic_count);
+        for file_result in &result.file_results {
+            for diag in &file_result.diagnostics {
+                eprintln!(
+                    "  [{}:{}] code={}: {}",
+                    file_result.file_name,
+                    diag.start,
+                    diag.code,
+                    diag.message_text
+                );
+            }
+        }
+        eprintln!("=== END DIAGNOSTICS ===\n");
+    }
+
     assert_eq!(stats.file_count, 4);
     assert!(stats.function_count >= 5, "Expected at least 5 functions");
     assert_eq!(result.diagnostic_count, 0);

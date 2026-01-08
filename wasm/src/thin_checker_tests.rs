@@ -10,7 +10,7 @@ fn test_thin_checker_creation() {
     let arena = ThinNodeArena::new();
     let binder = ThinBinderState::new();
     let types = TypeInterner::new();
-    let checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string());
 
     // Basic sanity check
     assert!(checker.ctx.diagnostics.is_empty());
@@ -36,7 +36,7 @@ fn test_thin_checker_type_interner() {
     let arena = ThinNodeArena::new();
     let binder = ThinBinderState::new();
     let types = TypeInterner::new();
-    let checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string());
 
     // Test that TypeInterner is properly initialized
     // Intrinsics should be pre-registered
@@ -50,7 +50,7 @@ fn test_thin_checker_structural_equality() {
     let arena = ThinNodeArena::new();
     let binder = ThinBinderState::new();
     let types = TypeInterner::new();
-    let checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string());
 
     // Test structural equality via TypeInterner
     // Same string literal should get same TypeId
@@ -67,7 +67,7 @@ fn test_thin_checker_union_normalization() {
     let arena = ThinNodeArena::new();
     let binder = ThinBinderState::new();
     let types = TypeInterner::new();
-    let checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string());
 
     // Test union normalization
     // Union with `any` should be `any`
@@ -545,7 +545,7 @@ fn test_thin_checker_subtype_intrinsics() {
     let arena = ThinNodeArena::new();
     let binder = ThinBinderState::new();
     let types = TypeInterner::new();
-    let checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string());
 
     // Test intrinsic subtype relations
     // Any is assignable to everything
@@ -575,7 +575,7 @@ fn test_thin_checker_subtype_literals() {
     let arena = ThinNodeArena::new();
     let binder = ThinBinderState::new();
     let types = TypeInterner::new();
-    let checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string());
 
     // String literal is subtype of string
     let hello = checker.ctx.types.literal_string("hello");
@@ -598,7 +598,7 @@ fn test_thin_checker_subtype_unions() {
     let arena = ThinNodeArena::new();
     let binder = ThinBinderState::new();
     let types = TypeInterner::new();
-    let checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string());
 
     // Create string | number union
     let string_or_number = checker.get_union_type(vec![TypeId::STRING, TypeId::NUMBER]);
