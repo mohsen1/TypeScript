@@ -4850,7 +4850,19 @@ impl<'a> ThinCheckerState<'a> {
                 }
                 type_id
             }
-            TypeKey::Mapped(mapped_id) => {
+            TypeKey::TypeQuery(sym_ref) => {
+                // Resolve typeof X to the type of symbol X
+                let sym_id = SymbolId(sym_ref.0);
+                if let Some(&cached) = self.ctx.symbol_types.get(&sym_id) {
+                    return self.expand_type_recursive(cached, visited);
+                }
+                let resolved = self.get_type_of_symbol(sym_id);
+                if resolved != TypeId::ERROR {
+                    return self.expand_type_recursive(resolved, visited);
+                }
+                type_id
+            }
+            TypeKey::Mapped(_) => {
                 // For mapped types, try to evaluate them
                 let evaluated = evaluate_type(self.ctx.types, type_id);
                 if evaluated != type_id {
@@ -4912,11 +4924,12 @@ impl<'a> ThinCheckerState<'a> {
             return resolved;
         }
 
-        // Build substitution, resolving Ref arguments first
+        // Build substitution, fully expanding all type arguments
+        let mut visited = std::collections::HashSet::new();
         let mut substitution = TypeSubstitution::new();
         for (param_name, &arg) in type_params.iter().zip(app.args.iter()) {
-            // If arg is a Ref, try to resolve it first
-            let resolved_arg = self.try_resolve_ref(arg);
+            // Recursively expand the argument (handles Ref, TypeQuery, Application, etc.)
+            let resolved_arg = self.expand_type_recursive(arg, &mut visited);
             substitution.insert(*param_name, resolved_arg);
         }
 
