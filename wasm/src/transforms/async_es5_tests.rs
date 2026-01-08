@@ -451,3 +451,165 @@ fn test_body_contains_await_detects_for_await_of_computed_property() {
         }
     }
 }
+
+#[test]
+fn test_body_contains_await_detects_for_await_of_renamed_properties() {
+    // Test for-await-of with renamed object properties
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "async function foo() { for await (const { name: n, value: v } of stream) { use(n, v); } }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&func_idx) = source_file.statements.nodes.first() {
+                if let Some(func_node) = parser.arena.get(func_idx) {
+                    if let Some(func) = parser.arena.get_function(func_node) {
+                        let emitter = AsyncES5Emitter::new(&parser.arena);
+                        let _has_await = emitter.body_contains_await(func.body);
+                        assert!(
+                            func.body.is_some(),
+                            "Function body should be parsed for for-await-of with renamed properties"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn test_body_contains_await_detects_for_await_of_mixed_nested() {
+    // Test for-await-of with mixed array/object nested destructuring
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "async function foo() { for await (const [{ a, b }, { c }] of stream) { use(a, b, c); } }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&func_idx) = source_file.statements.nodes.first() {
+                if let Some(func_node) = parser.arena.get(func_idx) {
+                    if let Some(func) = parser.arena.get_function(func_node) {
+                        let emitter = AsyncES5Emitter::new(&parser.arena);
+                        let _has_await = emitter.body_contains_await(func.body);
+                        assert!(
+                            func.body.is_some(),
+                            "Function body should be parsed for for-await-of with mixed nested patterns"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn test_body_contains_await_detects_for_await_of_with_await_in_body() {
+    // Test for-await-of with await expression inside loop body
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "async function foo() { for await (const item of stream) { await process(item); } }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&func_idx) = source_file.statements.nodes.first() {
+                if let Some(func_node) = parser.arena.get(func_idx) {
+                    if let Some(func) = parser.arena.get_function(func_node) {
+                        let emitter = AsyncES5Emitter::new(&parser.arena);
+                        let _has_await = emitter.body_contains_await(func.body);
+                        assert!(
+                            func.body.is_some(),
+                            "Function body should be parsed for for-await-of with await in body"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn test_body_contains_await_detects_for_await_of_let_binding() {
+    // Test for-await-of with let instead of const
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "async function foo() { for await (let { x, y } of stream) { x++; use(x, y); } }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&func_idx) = source_file.statements.nodes.first() {
+                if let Some(func_node) = parser.arena.get(func_idx) {
+                    if let Some(func) = parser.arena.get_function(func_node) {
+                        let emitter = AsyncES5Emitter::new(&parser.arena);
+                        let _has_await = emitter.body_contains_await(func.body);
+                        assert!(
+                            func.body.is_some(),
+                            "Function body should be parsed for for-await-of with let binding"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn test_body_contains_await_detects_for_await_of_skipped_elements() {
+    // Test for-await-of with skipped array elements (elision)
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "async function foo() { for await (const [, second, , fourth] of stream) { use(second, fourth); } }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&func_idx) = source_file.statements.nodes.first() {
+                if let Some(func_node) = parser.arena.get(func_idx) {
+                    if let Some(func) = parser.arena.get_function(func_node) {
+                        let emitter = AsyncES5Emitter::new(&parser.arena);
+                        let _has_await = emitter.body_contains_await(func.body);
+                        assert!(
+                            func.body.is_some(),
+                            "Function body should be parsed for for-await-of with skipped elements"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn test_body_contains_await_detects_for_await_of_deep_nesting() {
+    // Test for-await-of with deeply nested destructuring
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "async function foo() { for await (const { outer: { inner: { value } } } of stream) { use(value); } }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&func_idx) = source_file.statements.nodes.first() {
+                if let Some(func_node) = parser.arena.get(func_idx) {
+                    if let Some(func) = parser.arena.get_function(func_node) {
+                        let emitter = AsyncES5Emitter::new(&parser.arena);
+                        let _has_await = emitter.body_contains_await(func.body);
+                        assert!(
+                            func.body.is_some(),
+                            "Function body should be parsed for for-await-of with deep nesting"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
