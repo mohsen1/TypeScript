@@ -54,6 +54,7 @@ Priority: 2
 - [x] Added number index signature infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_number_index_signature_distributive`.
 - [x] Added non-distributive number index signature infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_number_index_signature_non_distributive_union_input`.
 - [x] Added non-distributive object property infer test with non-object union branch (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_object_property_non_distributive_non_object_union_branch`.
+- [x] Added object property function-return infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_object_property_function_return_distributive`.
 - [x] Added readonly object property infer test. Tests: `./wasm/test.sh test_conditional_infer_object_property_readonly`.
 - [x] Added array infer test with non-array union branch. Tests: `./wasm/test.sh test_conditional_infer_array_element_non_array_union_branch`.
 
