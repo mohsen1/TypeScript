@@ -8478,6 +8478,41 @@ fn test_conditional_infer_tuple_never_input() {
 }
 
 #[test]
+fn test_conditional_infer_multi_template_never_input() {
+    let interner = TypeInterner::new();
+
+    let a_name = interner.intern_string("A");
+    let b_name = interner.intern_string("B");
+    let infer_a = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: a_name,
+        constraint: None,
+        default: None,
+    }));
+    let infer_b = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: b_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // never extends `${infer A}-${infer B}` ? A | B : string -> never
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Type(infer_a),
+        TemplateSpan::Text(interner.intern_string("-")),
+        TemplateSpan::Type(infer_b),
+    ]);
+    let cond = ConditionalType {
+        check_type: TypeId::NEVER,
+        extends_type: extends_template,
+        true_type: interner.union2(infer_a, infer_b),
+        false_type: TypeId::STRING,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
 fn test_conditional_infer_constraint_mismatch() {
     let interner = TypeInterner::new();
 
