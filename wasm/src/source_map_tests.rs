@@ -14103,3 +14103,200 @@ function processArray(arr: number[] | undefined) {
         "expected non-empty source mappings for non-null assertions"
     );
 }
+
+#[test]
+fn test_source_map_namespace_es5_basic_mapping() {
+    // Basic namespace transforms to IIFE pattern
+    let source = r#"namespace Foo {
+    export const value = 42;
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("var Foo;"),
+        "expected var Foo declaration in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for namespace"
+    );
+}
+
+#[test]
+fn test_source_map_namespace_es5_nested_mapping() {
+    // Nested/qualified namespace A.B.C
+    let source = r#"namespace A.B.C {
+    export function greet() {
+        return "hello";
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("var A;") || output.contains("var A "),
+        "expected var A declaration for nested namespace in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for nested namespace"
+    );
+}
+
+#[test]
+fn test_source_map_jsx_element_mapping() {
+    // Test JSX element source mapping
+    let source = r#"const element = <div className="container">Hello</div>;"#;
+    let mut parser = ThinParserState::new("test.tsx".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions::default();
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.tsx");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("<div") || output.contains("div"),
+        "expected JSX element in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for JSX element"
+    );
+}
+
+#[test]
+fn test_source_map_jsx_fragment_mapping() {
+    // Test JSX fragment source mapping
+    let source = r#"const fragment = <>
+    <span>First</span>
+    <span>Second</span>
+</>;"#;
+    let mut parser = ThinParserState::new("test.tsx".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions::default();
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.tsx");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("<>") || output.contains("Fragment") || output.contains("span"),
+        "expected JSX fragment in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for JSX fragment"
+    );
+}
+
+#[test]
+fn test_source_map_jsx_expression_mapping() {
+    // Test JSX with expressions source mapping
+    let source = r#"const name = "World";
+const greeting = <h1>Hello, {name}!</h1>;"#;
+    let mut parser = ThinParserState::new("test.tsx".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions::default();
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.tsx");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("name") && output.contains("h1"),
+        "expected JSX expression in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for JSX expressions"
+    );
+}
