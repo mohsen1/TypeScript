@@ -28,6 +28,7 @@ Priority: 4
 - [x] Fixed legacy module wrapper auto-lowering for AMD/UMD/System emit. Tests: `./wasm/test.sh`.
 - [x] Added union flatten/dedup regression for interner normalization. Tests: `./wasm/test.sh`.
 - [x] Added function/rest subtyping regression for required params accepting undefined. Tests: `./wasm/test.sh`.
+- [x] Added binder coverage for namespace export merges across declarations. Tests: `./wasm/test.sh`.
 
 ## Ready for Merge
 Yes
