@@ -139,6 +139,41 @@ fn test_object_trifecta_subtyping() {
 }
 
 #[test]
+fn test_object_trifecta_object_interface_accepts_primitives() {
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let to_string = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let object_interface = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("toString"),
+        type_id: to_string,
+        write_type: to_string,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let sym = SymbolRef(1);
+    env.insert(sym, object_interface);
+    let object_ref = interner.reference(sym);
+
+    let mut checker = SubtypeChecker::with_resolver(&interner, &env);
+    let empty_object = interner.object(Vec::new());
+
+    assert!(checker.is_subtype_of(TypeId::STRING, object_ref));
+    assert!(checker.is_subtype_of(TypeId::NUMBER, object_ref));
+    assert!(checker.is_subtype_of(TypeId::STRING, empty_object));
+    assert!(!checker.is_subtype_of(TypeId::STRING, TypeId::OBJECT));
+}
+
+#[test]
 fn test_unique_symbol_subtyping() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
