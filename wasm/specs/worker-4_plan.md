@@ -13,6 +13,7 @@ Priority: 4
 - [ ] Stand by for next emitter fidelity task.
 
 ## Completed
+- [x] ES5 async nested arrow super call lowered; test `./wasm/test.sh async_super_nested_arrow`.
 - [x] ES5 derived async class with arrow field initializer capture; test `./wasm/test.sh async_derived_prop_arrow`.
 - [x] ES5 derived class property initializer emitted after super; test `./wasm/test.sh derived_prop_init_after_super`.
 - [x] ES5 async derived method super call + arrow this capture; test `./wasm/test.sh async_super_this_capture`.
