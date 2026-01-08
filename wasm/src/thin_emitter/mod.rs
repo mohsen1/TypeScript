@@ -509,43 +509,6 @@ impl<'a> ThinPrinter<'a> {
                     es5_emitter.set_source_text(source_text);
                 }
                 let es5_output = es5_emitter.emit_class(class_node);
-                if self.writer.has_source_map() {
-                    if let Some(source_text) = self.source_text_for_map() {
-                        if let Some(class_node) = self.arena.get(class_node) {
-                            if let Some(class_data) = self.arena.get_class(class_node) {
-                                let class_name = self.get_identifier_text(class_data.name);
-                                if !class_name.is_empty() {
-                                    if let Some(name_node) = self.arena.get(class_data.name) {
-                                        if let Some(offset) = es5_output.find(&class_name) {
-                                            let source_pos = source_position_from_offset(
-                                                source_text,
-                                                name_node.pos,
-                                            );
-                                            let pending = self.pending_source_pos.take();
-                                            let (prefix, rest) = es5_output.split_at(offset);
-                                            let (name, suffix) =
-                                                rest.split_at(class_name.len());
-
-                                            if let Some(source_pos) = pending {
-                                                if !prefix.is_empty() {
-                                                    self.writer.write_node(prefix, source_pos);
-                                                }
-                                            } else {
-                                                self.writer.write(prefix);
-                                            }
-
-                                            self.writer
-                                                .write_node_with_name(name, source_pos, &class_name);
-                                            self.writer.write(suffix);
-                                            return;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
                 self.write(&es5_output);
             }
             EmitDirective::ES5ClassExpression { class_node } => {

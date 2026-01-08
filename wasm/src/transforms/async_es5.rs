@@ -59,7 +59,6 @@
 use crate::parser::thin_node::ThinNodeArena;
 use crate::parser::{syntax_kind_ext, NodeIndex, NodeList};
 use crate::scanner::SyntaxKind;
-use crate::transforms::arrow_es5::contains_this_reference;
 use crate::transforms::emit_utils;
 
 /// State for tracking async function transformation
@@ -71,8 +70,6 @@ pub struct AsyncTransformState {
     pub in_async_body: bool,
     /// Whether any await expressions were found (determines if we need switch/case)
     pub has_await: bool,
-    /// Arrow `this` capture depth for nested arrow emission
-    pub arrow_this_capture_depth: u32,
 }
 
 impl AsyncTransformState {
@@ -85,7 +82,6 @@ impl AsyncTransformState {
         self.label_counter = 0;
         self.in_async_body = false;
         self.has_await = false;
-        self.arrow_this_capture_depth = 0;
     }
 
     /// Get the next label number
@@ -249,7 +245,6 @@ impl<'a> AsyncES5Emitter<'a> {
     /// or with return value: "return __generator(this, function (_a) { return [2 /*return*/, expr]; })"
     pub fn emit_simple_generator_body(&mut self, body_idx: NodeIndex) -> String {
         self.output.clear();
-        self.state.arrow_this_capture_depth = 0;
 
         self.write("return __generator(this, function (_a) {");
 
@@ -578,198 +573,6 @@ impl<'a> AsyncES5Emitter<'a> {
         self.increase_indent();
     }
 
-    fn emit_arrow_function_expression(&mut self, arrow_idx: NodeIndex) {
-        let Some(func_node) = self.arena.get(arrow_idx) else {
-            return;
-        };
-        let Some(func) = self.arena.get_function(func_node) else {
-            return;
-        };
-
-        let captures_this = contains_this_reference(self.arena, arrow_idx);
-        let parent_this_expr = if self.state.arrow_this_capture_depth > 0 {
-            "_this"
-        } else {
-            "this"
-        };
-
-        if captures_this {
-            self.write("(function (_this) { return ");
-            self.state.arrow_this_capture_depth += 1;
-        }
-
-        if func.is_async {
-            let this_expr = if captures_this { "_this" } else { parent_this_expr };
-            self.emit_async_arrow_function(func, this_expr);
-        } else {
-            self.emit_arrow_function_body(func);
-        }
-
-        if captures_this {
-            self.state.arrow_this_capture_depth -= 1;
-            self.write("; })(");
-            self.write(parent_this_expr);
-            self.write(")");
-        }
-    }
-
-    fn emit_async_arrow_function(
-        &mut self,
-        func: &crate::parser::thin_node::FunctionData,
-        this_expr: &str,
-    ) {
-        self.write("function (");
-        self.emit_arrow_parameters(&func.parameters.nodes);
-        self.write(") {");
-        self.write_line();
-        self.increase_indent();
-
-        let mut async_emitter = AsyncES5Emitter::new(self.arena);
-        async_emitter.set_indent_level(self.indent_level + 1);
-
-        let generator_body = if async_emitter.body_contains_await(func.body) {
-            async_emitter.emit_generator_body_with_await(func.body)
-        } else {
-            async_emitter.emit_simple_generator_body(func.body)
-        };
-
-        self.write_indent();
-        self.write("return __awaiter(");
-        self.write(this_expr);
-        self.write(", void 0, void 0, function () {");
-        self.write_line();
-        self.increase_indent();
-        self.write(&generator_body);
-        self.decrease_indent();
-        self.write_line();
-        self.write_indent();
-        self.write("});");
-        self.write_line();
-        self.decrease_indent();
-        self.write_indent();
-        self.write("}");
-    }
-
-    fn emit_arrow_function_body(&mut self, func: &crate::parser::thin_node::FunctionData) {
-        self.write("function (");
-        self.emit_arrow_parameters(&func.parameters.nodes);
-        self.write(") ");
-
-        let Some(body_node) = self.arena.get(func.body) else {
-            self.write("{ }");
-            return;
-        };
-
-        if body_node.kind == syntax_kind_ext::BLOCK {
-            if let Some(block) = self.arena.get_block(body_node) {
-                if block.statements.nodes.len() == 1 {
-                    let stmt_idx = block.statements.nodes[0];
-                    if let Some(stmt_node) = self.arena.get(stmt_idx) {
-                        if stmt_node.kind == syntax_kind_ext::RETURN_STATEMENT {
-                            if let Some(ret) = self.arena.get_return_statement(stmt_node) {
-                                self.write("{ return ");
-                                if !ret.expression.is_none() {
-                                    self.emit_expression(ret.expression);
-                                }
-                                self.write("; }");
-                                return;
-                            }
-                        }
-                    }
-                }
-
-                self.write("{");
-                self.write_line();
-                self.increase_indent();
-                for &stmt_idx in &block.statements.nodes {
-                    self.emit_plain_statement(stmt_idx);
-                }
-                self.decrease_indent();
-                self.write_indent();
-                self.write("}");
-                return;
-            }
-        }
-
-        self.write("{ return ");
-        self.emit_expression(func.body);
-        self.write("; }");
-    }
-
-    fn emit_plain_statement(&mut self, stmt_idx: NodeIndex) {
-        let Some(stmt_node) = self.arena.get(stmt_idx) else {
-            return;
-        };
-
-        match stmt_node.kind {
-            k if k == syntax_kind_ext::EXPRESSION_STATEMENT => {
-                if let Some(expr_stmt) = self.arena.get_expression_statement(stmt_node) {
-                    self.write_indent();
-                    self.emit_expression(expr_stmt.expression);
-                    self.write(";");
-                    self.write_line();
-                }
-            }
-            k if k == syntax_kind_ext::RETURN_STATEMENT => {
-                if let Some(ret) = self.arena.get_return_statement(stmt_node) {
-                    self.write_indent();
-                    self.write("return");
-                    if !ret.expression.is_none() {
-                        self.write(" ");
-                        self.emit_expression(ret.expression);
-                    }
-                    self.write(";");
-                    self.write_line();
-                }
-            }
-            _ => {
-                self.write_indent();
-                self.write("/* statement */;");
-                self.write_line();
-            }
-        }
-    }
-
-    fn emit_arrow_parameters(&mut self, params: &[NodeIndex]) {
-        let mut first = true;
-
-        for (index, &param_idx) in params.iter().enumerate() {
-            if !first {
-                self.write(", ");
-            }
-            first = false;
-
-            let Some(param_node) = self.arena.get(param_idx) else {
-                continue;
-            };
-            let Some(param) = self.arena.get_parameter(param_node) else {
-                continue;
-            };
-
-            if self.emit_simple_binding_name(param.name) {
-                continue;
-            }
-
-            self.write("_a");
-            self.write_u32(index as u32);
-        }
-    }
-
-    fn emit_simple_binding_name(&mut self, name_idx: NodeIndex) -> bool {
-        let Some(name_node) = self.arena.get(name_idx) else {
-            return false;
-        };
-
-        if name_node.kind == SyntaxKind::Identifier as u16 {
-            if let Some(ident) = self.arena.get_identifier(name_node) {
-                self.write(&ident.escaped_text);
-                return true;
-            }
-        }
-
-        false
-    }
-
     fn emit_expression(&mut self, idx: NodeIndex) {
         let Some(node) = self.arena.get(idx) else {
             return;
@@ -806,11 +609,7 @@ impl<'a> AsyncES5Emitter<'a> {
                 self.write("undefined");
             }
             k if k == SyntaxKind::ThisKeyword as u16 => {
-                if self.state.arrow_this_capture_depth > 0 {
-                    self.write("_this");
-                } else {
-                    self.write("this");
-                }
+                self.write("this");
             }
             k if k == syntax_kind_ext::CALL_EXPRESSION => {
                 if let Some(call) = self.arena.get_call_expr(node) {
@@ -874,9 +673,6 @@ impl<'a> AsyncES5Emitter<'a> {
                         self.emit_expression(unary.expression);
                     }
                 }
-            }
-            k if k == syntax_kind_ext::ARROW_FUNCTION => {
-                self.emit_arrow_function_expression(idx);
             }
             _ => {
                 // Fallback for unhandled expressions
