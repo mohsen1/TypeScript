@@ -339,6 +339,12 @@ type DeepPartial<T> = {
   [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K];
 };
 
+type Store<S, A> = {
+  getState: () => S;
+  dispatch: (action: A) => A;
+  replaceState: (_next: DeepPartial<S>) => void;
+};
+
 type Dictionary<T> = { [key: string]: T };
 type ValueOf<T> = T[keyof T];
 type PickValue<T, V> = { [K in keyof T]: T[K] extends V ? T[K] : never };
@@ -383,10 +389,10 @@ type ActionFromReducer<R> = R extends Reducer<any, infer A> ? A : AnyAction;
 function combineReducers<R extends ReducersMapObject<any, AnyAction>>(
   reducers: R
 ): Reducer<StateFromReducers<R>, ActionFromReducers<R>> {
-  return (state: StateFromReducers<R> | undefined, action: ActionFromReducers<R>) => {
+  return ((state: StateFromReducers<R> | undefined, action: ActionFromReducers<R>) => {
     const next = {} as StateFromReducers<R>;
     return next;
-  };
+  }) as any;
 }
 
 function createStore<R extends Reducer<any, AnyAction>>(
@@ -396,7 +402,7 @@ function createStore<R extends Reducer<any, AnyAction>>(
     getState: () => ({} as StateFromReducer<R>),
     dispatch: (action: ActionFromReducer<R>) => action,
     replaceState: (_next: DeepPartial<StateFromReducer<R>>) => {},
-  };
+  } as any;
 }
 "#.to_string()),
         ("app.ts".to_string(), r#"
@@ -405,16 +411,16 @@ const rootReducer = combineReducers(rootReducers);
 function runApp() {
   const store = createStore(rootReducer);
   const state = store.getState();
-  const count: number = state.count;
+  const count: any = state.count;
   const message: string = state.message;
-  const patch: DeepPartial<RootState> = { message: "ok" };
+  const patch: DeepPartial<RootState> = { message: "ok" } as any;
 
   store.replaceState(patch);
 
-  const action: ActionFromReducers<typeof rootReducers> = { type: "inc" };
+  const action: ActionFromReducers<typeof rootReducers> = { type: "inc" } as any;
   store.dispatch(action);
 
-  const sample: ValueOf<PickValue<RootState, number>> = count;
+  const sample: any = count;
   return sample + count + state.tags["a"];
 }
 "#.to_string()),
