@@ -35,3 +35,4 @@ No
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/forge-3`
 - **NEVER edit**: `DIRECTOR_AGENT.md`, `SQUAD_LEAD_AGENT.md`, `MANAGER_AGENT.md`, `AGENTS.md`, `start_*.sh`
+- Latest `./wasm/test.sh` fails at `emitter_edge_case_tests::test_parse_error_tolerance` (expects "x" declaration) after sync; compile error in `async_es5.rs` fixed locally.
