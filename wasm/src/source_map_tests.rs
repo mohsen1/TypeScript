@@ -9842,3 +9842,64 @@ fn test_source_map_es5_transform_async_chained_method_await_mapping() {
         }
     }
 }
+
+#[test]
+fn test_source_map_es5_transform_class_super_call_mapping() {
+    let source = "class Base { constructor(public value: number) {} }\nclass Derived extends Base { constructor() { super(42); } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    assert!(
+        output.contains("__extends"),
+        "expected __extends helper in output: {output}"
+    );
+    assert!(
+        output.contains(".call(this") || output.contains("_super.call(this"),
+        "expected super() call pattern in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+    let (super_line, super_col) = find_line_col(source, "super(42)");
+    let (class_line, _) = find_line_col(source, "class Derived");
+
+    // Look for mapping near the super() call in source
+    let mapping = decoded
+        .iter()
+        .filter(|entry| {
+            entry.original_line == super_line || entry.original_line == class_line
+        })
+        .max_by_key(|entry| (entry.original_line, entry.original_column))
+        .unwrap_or_else(|| {
+            panic!(
+                "expected mapping for super() call. mappings: {mappings} output: {output}"
+            )
+        });
+
+    assert_eq!(mapping.source_index, 0);
+    assert!(
+        mapping.original_line <= super_line,
+        "expected mapping at or before super() call. mapping line: {} super line: {}",
+        mapping.original_line,
+        super_line
+    );
+}

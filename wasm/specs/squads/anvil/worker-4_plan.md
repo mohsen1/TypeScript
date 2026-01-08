@@ -65,6 +65,7 @@ Priority: 4
 - [x] Add async await detection for throw statements (with fix). Tests: `./wasm/test.sh body_contains_await_in_throw_statement`
 - [x] Add async spread await source-map coverage. Tests: `./wasm/test.sh async_spread_await_mapping`
 - [x] Add async chained method await source-map coverage. Tests: `./wasm/test.sh async_chained_method_await_mapping`
+- [x] Add class ES5 super() call source-map coverage. Tests: `./wasm/test.sh class_super_call_mapping`
 
 ## Ready for Merge
 Yes
