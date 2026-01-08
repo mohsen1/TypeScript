@@ -1030,6 +1030,56 @@ class Derived extends Base {
 }
 
 #[test]
+fn test_two_phase_emission_es5_class_async_return_arrow_super_method_this_capture() {
+    let source = r#"
+class Base { m(x) { return x; } }
+class Derived extends Base {
+    async method() {
+        return () => super.m(this.x);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("return __awaiter"),
+        "ES5 output should emit __awaiter for async method: {}",
+        output
+    );
+    assert!(
+        output.contains("_super.prototype.m.call(_this"),
+        "ES5 output should lower super method call with lexical this: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.x"),
+        "ES5 output should capture this inside returned arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("super.m"),
+        "ES5 output should not contain super method access: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel returned arrow: {}",
+        output
+    );
+}
+
+#[test]
 fn test_two_phase_emission_es5_class_async_arrow_arguments_capture() {
     let source = r#"
 class Base {}
