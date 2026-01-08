@@ -1315,6 +1315,36 @@ impl<'a> InferenceContext<'a> {
             return true;
         }
 
+        if name.is_empty() {
+            return false;
+        }
+
+        let bytes = name.as_bytes();
+        if bytes[0] == b'+' {
+            return false;
+        }
+
+        let (neg, body) = if bytes[0] == b'-' {
+            (true, &name[1..])
+        } else {
+            (false, name)
+        };
+        if body.is_empty() || body.contains('E') {
+            return false;
+        }
+
+        let is_canonical = if let Some(e_pos) = body.find('e') {
+            if body[e_pos + 1..].contains('e') {
+                return false;
+            }
+            Self::is_canonical_exponent_name(body, e_pos)
+        } else {
+            Self::is_canonical_decimal_name(body, neg)
+        };
+        if !is_canonical {
+            return false;
+        }
+
         let value: f64 = match name.parse() {
             Ok(value) => value,
             Err(_) => return false,
@@ -1322,49 +1352,127 @@ impl<'a> InferenceContext<'a> {
         if !value.is_finite() {
             return false;
         }
+        if value == 0.0 {
+            return name == "0";
+        }
 
-        Self::js_number_to_string(value) == name
+        true
     }
 
-    fn js_number_to_string(value: f64) -> String {
-        if value.is_nan() {
-            return "NaN".to_string();
-        }
-        if value == 0.0 {
-            return "0".to_string();
-        }
-        if value.is_infinite() {
-            return if value.is_sign_negative() {
-                "-Infinity".to_string()
-            } else {
-                "Infinity".to_string()
-            };
-        }
-
-        let abs = value.abs();
-        if abs >= 1e21 || abs < 1e-6 {
-            let mut formatted = format!("{:e}", value);
-            if let Some(split) = formatted.find('e') {
-                let (mantissa, exp) = formatted.split_at(split);
-                let exp_digits = &exp[1..];
-                let (sign, digits) = if exp_digits.starts_with('-') {
-                    ('-', &exp_digits[1..])
-                } else {
-                    ('+', exp_digits)
-                };
-                let trimmed = digits.trim_start_matches('0');
-                let digits = if trimmed.is_empty() { "0" } else { trimmed };
-                formatted = format!("{mantissa}e{sign}{digits}");
+    fn is_canonical_decimal_name(body: &str, neg: bool) -> bool {
+        if let Some(dot_pos) = body.find('.') {
+            if body[dot_pos + 1..].contains('.') {
+                return false;
             }
-            return formatted;
+            let int_part = &body[..dot_pos];
+            let frac_part = &body[dot_pos + 1..];
+            if int_part.is_empty() || frac_part.is_empty() {
+                return false;
+            }
+            if !Self::all_ascii_digits(int_part) || !Self::all_ascii_digits(frac_part) {
+                return false;
+            }
+            if int_part.len() > 1 && int_part.as_bytes()[0] == b'0' {
+                return false;
+            }
+            if frac_part.as_bytes().last() == Some(&b'0') {
+                return false;
+            }
+
+            let exponent = if int_part == "0" {
+                let Some(first_non_zero) = frac_part.bytes().position(|b| b != b'0') else {
+                    return false;
+                };
+                -(first_non_zero as i32 + 1)
+            } else {
+                (int_part.len() as i32) - 1
+            };
+
+            if exponent < -6 || exponent > 20 {
+                return false;
+            }
+
+            true
+        } else {
+            if !Self::all_ascii_digits(body) {
+                return false;
+            }
+            if body.len() > 1 && body.as_bytes()[0] == b'0' {
+                return false;
+            }
+            if body == "0" {
+                return !neg;
+            }
+            let exponent = (body.len() as i32) - 1;
+            exponent <= 20
+        }
+    }
+
+    fn is_canonical_exponent_name(body: &str, e_pos: usize) -> bool {
+        let mantissa = &body[..e_pos];
+        let exponent = &body[e_pos + 1..];
+        if mantissa.is_empty() || exponent.is_empty() {
+            return false;
         }
 
-        let formatted = value.to_string();
-        if formatted == "-0" {
-            "0".to_string()
-        } else {
-            formatted
+        let (exp_sign, exp_digits) = exponent.split_at(1);
+        let exp_sign = exp_sign.as_bytes()[0];
+        if exp_sign != b'+' && exp_sign != b'-' {
+            return false;
         }
+        if exp_digits.is_empty() || !Self::all_ascii_digits(exp_digits) {
+            return false;
+        }
+        if exp_digits.len() > 1 && exp_digits.as_bytes()[0] == b'0' {
+            return false;
+        }
+        if exp_digits == "0" {
+            return false;
+        }
+
+        let exp_value: i32 = match exp_digits.parse() {
+            Ok(value) => value,
+            Err(_) => return false,
+        };
+        let signed_exp = if exp_sign == b'-' { -exp_value } else { exp_value };
+        if signed_exp > -7 && signed_exp < 21 {
+            return false;
+        }
+
+        if let Some(dot_pos) = mantissa.find('.') {
+            if mantissa[dot_pos + 1..].contains('.') {
+                return false;
+            }
+            let int_part = &mantissa[..dot_pos];
+            let frac_part = &mantissa[dot_pos + 1..];
+            if int_part.len() != 1 || frac_part.is_empty() {
+                return false;
+            }
+            let digit = int_part.as_bytes()[0];
+            if digit < b'1' || digit > b'9' {
+                return false;
+            }
+            if !Self::all_ascii_digits(frac_part) {
+                return false;
+            }
+            if frac_part.as_bytes().last() == Some(&b'0') {
+                return false;
+            }
+        } else {
+            if mantissa.len() != 1 {
+                return false;
+            }
+            let digit = mantissa.as_bytes()[0];
+            if digit < b'1' || digit > b'9' {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    fn all_ascii_digits(text: &str) -> bool {
+        !text.is_empty() && text.as_bytes().iter().all(|b| b.is_ascii_digit())
     }
 
     fn function_like_subtype_of(
