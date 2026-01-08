@@ -198,6 +198,13 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             TypeKey::KeyOf(operand) => {
                 self.evaluate_keyof(*operand)
             }
+            TypeKey::TypeQuery(symbol) => {
+                if let Some(resolved) = self.resolver.resolve_ref(*symbol, self.interner) {
+                    resolved
+                } else {
+                    type_id
+                }
+            }
             // Other types pass through unchanged
             _ => type_id,
         }
@@ -212,17 +219,15 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
     /// 4. If false (disjoint) -> return false_type
     /// 5. If ambiguous (unresolved type param) -> return deferred conditional
     pub fn evaluate_conditional(&self, cond: &ConditionalType) -> TypeId {
-        let check_type = cond.check_type;
-        let extends_type = cond.extends_type;
+        let check_type = self.evaluate(cond.check_type);
+        let extends_type = self.evaluate(cond.extends_type);
 
         if cond.is_distributive && check_type == TypeId::NEVER {
             return TypeId::NEVER;
         }
 
         if check_type == TypeId::ANY {
-            let true_eval = self.evaluate(cond.true_type);
-            let false_eval = self.evaluate(cond.false_type);
-            return self.interner.union2(true_eval, false_eval);
+            return TypeId::ANY;
         }
 
         // Step 1: Check for distributivity
@@ -784,6 +789,12 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
     ///
     /// This resolves property access on object types.
     pub fn evaluate_index_access(&self, object_type: TypeId, index_type: TypeId) -> TypeId {
+        let evaluated_object = self.evaluate(object_type);
+        let evaluated_index = self.evaluate(index_type);
+        if evaluated_object != object_type || evaluated_index != index_type {
+            return self.evaluate_index_access(evaluated_object, evaluated_index);
+        }
+
         // Get the object structure
         let obj_key = match self.interner.lookup(object_type) {
             Some(k) => k,
@@ -1398,7 +1409,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             subst.insert(mapped.type_param.name, key_literal);
 
             // Substitute into the template
-            let property_type = instantiate_type(self.interner, mapped.template, &subst);
+            let property_type = self.evaluate(instantiate_type(self.interner, mapped.template, &subst));
 
             properties.push(PropertyInfo {
                 name: remapped_name,
@@ -1419,7 +1430,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     let key_type = TypeId::STRING;
                     let mut subst = TypeSubstitution::new();
                     subst.insert(mapped.type_param.name, key_type);
-                    let mut value_type = instantiate_type(self.interner, mapped.template, &subst);
+                    let mut value_type = self.evaluate(instantiate_type(self.interner, mapped.template, &subst));
                     if optional {
                         value_type = self.interner.union2(value_type, TypeId::UNDEFINED);
                     }
@@ -1445,7 +1456,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     let key_type = TypeId::NUMBER;
                     let mut subst = TypeSubstitution::new();
                     subst.insert(mapped.type_param.name, key_type);
-                    let mut value_type = instantiate_type(self.interner, mapped.template, &subst);
+                    let mut value_type = self.evaluate(instantiate_type(self.interner, mapped.template, &subst));
                     if optional {
                         value_type = self.interner.union2(value_type, TypeId::UNDEFINED);
                     }

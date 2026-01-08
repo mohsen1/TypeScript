@@ -442,6 +442,34 @@ if (guard(x)) {
     let flow_else = binder.get_node_flow(ident_else).expect("flow else");
 
     let narrowed_then = analyzer.get_flow_type(ident_then, union, flow_then);
+    // Debug: check if callee type is stored in node_types
+    // Get the if statement and extract the call expression
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+    let if_idx = *source_file.statements.nodes.get(3).expect("if statement");
+    let if_node = arena.get(if_idx).expect("if node");
+    let if_data = arena.get_if_statement(if_node).expect("if data");
+    let call_idx = if_data.expression;
+    let call_node = arena.get(call_idx).expect("call node");
+    let call_data = arena.get_call_expr(call_node).expect("call data");
+    let callee_idx = call_data.expression;
+
+    // Check if callee type is in node_types
+    let callee_type_opt = checker.ctx.node_types.get(&callee_idx.0);
+    assert!(callee_type_opt.is_some(), "Callee type should be in node_types, callee_idx.0 = {}", callee_idx.0);
+    let callee_type = *callee_type_opt.unwrap();
+
+    // Check that callee type is a function with a type predicate
+    let callee_key = types.lookup(callee_type);
+    assert!(callee_key.is_some(), "Callee type {} should have a key", callee_type.0);
+    match callee_key.unwrap() {
+        crate::solver::TypeKey::Function(shape_id) => {
+            let shape = types.function_shape(shape_id);
+            assert!(shape.type_predicate.is_some(), "Function should have a type predicate");
+        }
+        other => panic!("Expected TypeKey::Function, got {:?}. callee_type = {}", other, callee_type.0),
+    }
+
     assert_eq!(narrowed_then, TypeId::STRING);
 
     let narrowed_else = analyzer.get_flow_type(ident_else, union, flow_else);

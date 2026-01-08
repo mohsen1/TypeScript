@@ -256,6 +256,8 @@ pub struct MergedProgram {
     pub files: Vec<BoundFile>,
     /// Global symbol arena (all symbols from all files, with remapped IDs)
     pub symbols: SymbolArena,
+    /// Symbol-to-arena mapping for declaration lookup
+    pub symbol_arenas: FxHashMap<SymbolId, Arc<ThinNodeArena>>,
     /// Global symbol table (exports from all files)
     pub globals: SymbolTable,
     /// Per-file symbol tables (file-local symbols, symbol IDs remapped)
@@ -287,6 +289,7 @@ pub fn merge_bind_results_ref(results: &[&BindResult]) -> MergedProgram {
 
     // Create global symbol arena with pre-allocated capacity
     let mut global_symbols = SymbolArena::with_capacity(total_symbols);
+    let mut symbol_arenas = FxHashMap::default();
     let mut globals = SymbolTable::new();
     let mut files = Vec::with_capacity(results.len());
     let mut file_locals_list = Vec::with_capacity(results.len());
@@ -299,6 +302,40 @@ pub fn merge_bind_results_ref(results: &[&BindResult]) -> MergedProgram {
             if let Some(sym) = result.symbols.get(old_id) {
                 let new_id = global_symbols.alloc(sym.flags, sym.escaped_name.clone());
                 id_remap.insert(old_id, new_id);
+                symbol_arenas.insert(new_id, Arc::clone(&result.arena));
+            }
+        }
+
+        let remap_symbol_table = |table: &SymbolTable,
+                                  id_remap: &FxHashMap<SymbolId, SymbolId>|
+         -> SymbolTable {
+            let mut remapped = SymbolTable::new();
+            for (name, old_sym_id) in table.iter() {
+                if let Some(&new_sym_id) = id_remap.get(old_sym_id) {
+                    remapped.set(name.clone(), new_sym_id);
+                }
+            }
+            remapped
+        };
+
+        for (old_id, &new_id) in id_remap.iter() {
+            let Some(old_sym) = result.symbols.get(*old_id) else {
+                continue;
+            };
+            if let Some(new_sym) = global_symbols.get_mut(new_id) {
+                let mut updated = old_sym.clone();
+                updated.id = new_id;
+                updated.parent = id_remap.get(&old_sym.parent).copied().unwrap_or(SymbolId::NONE);
+                updated.value_declaration = old_sym.value_declaration;
+                updated.declarations = old_sym.declarations.clone();
+                updated.is_exported = old_sym.is_exported;
+                updated.exports = old_sym.exports.as_ref().map(|table| {
+                    Box::new(remap_symbol_table(table.as_ref(), &id_remap))
+                });
+                updated.members = old_sym.members.as_ref().map(|table| {
+                    Box::new(remap_symbol_table(table.as_ref(), &id_remap))
+                });
+                *new_sym = updated;
             }
         }
 
@@ -352,6 +389,7 @@ pub fn merge_bind_results_ref(results: &[&BindResult]) -> MergedProgram {
     MergedProgram {
         files,
         symbols: global_symbols,
+        symbol_arenas,
         globals,
         file_locals: file_locals_list,
         type_interner: TypeInterner::new(),
@@ -607,13 +645,16 @@ fn create_binder_from_bound_file(file: &BoundFile, program: &MergedProgram, file
         }
     }
 
-    ThinBinderState::from_bound_state_with_scopes(
+    let mut binder = ThinBinderState::from_bound_state_with_scopes(
         program.symbols.clone(),
         file_locals,
         file.node_symbols.clone(),
         file.scopes.clone(),
         file.node_scope_ids.clone(),
-    )
+    );
+
+    binder.symbol_arenas = program.symbol_arenas.clone();
+    binder
 }
 
 /// Check function bodies with statistics

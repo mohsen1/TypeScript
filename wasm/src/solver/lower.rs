@@ -213,6 +213,16 @@ impl<'a> TypeLowering<'a> {
         }
     }
 
+    pub fn seed_type_params(&self, params: &[(Atom, TypeId)]) {
+        if params.is_empty() {
+            return;
+        }
+        self.push_type_param_scope();
+        for (name, type_id) in params {
+            self.add_type_param_binding(*name, *type_id);
+        }
+    }
+
     /// Resolve a node to a type symbol ID if a resolver is provided.
     fn resolve_type_symbol(&self, node_idx: NodeIndex) -> Option<u32> {
         self.type_resolver.and_then(|resolver| resolver(node_idx))
