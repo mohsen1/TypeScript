@@ -216,6 +216,8 @@ Priority: 5
       Tests: `./wasm/test.sh test_source_map_es5_transform_async_compound_assignment_divide_mapping`.
 - [x] Added ES5 async compound assignment subtract await source map mapping test in `wasm/src/source_map_tests.rs`.
       Tests: `./wasm/test.sh test_source_map_es5_transform_async_compound_assignment_subtract_mapping`.
+- [x] Added ES5 async compound assignment modulo await source map mapping test in `wasm/src/source_map_tests.rs`.
+      Tests: `./wasm/test.sh test_source_map_es5_transform_async_compound_assignment_modulo_mapping`.
 - [x] Added ES5 async ternary consequent await source map mapping test in `wasm/src/source_map_tests.rs`.
       Tests: `./wasm/test.sh test_source_map_es5_transform_async_ternary_consequent_await_mapping`.
 
