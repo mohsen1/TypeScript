@@ -88,3 +88,64 @@ fn test_parity_async_es5() {
         ModuleKind::None,
     );
 }
+
+/// Parity test for ES5 class with async method calling super.method().
+/// This test compares our output against expected tsc output behavior.
+/// The async method should:
+/// 1. Be wrapped in __awaiter
+/// 2. Use _super.prototype.method.call(this) for super calls
+/// 3. Include __extends helper for class inheritance
+#[test]
+fn test_parity_es5_class_async_super_method() {
+    let source = "class Derived extends Base { async foo() { return super.method(); } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 class downlevel produces correct output matching tsc behavior
+    assert!(
+        output.contains("__extends"),
+        "ES5 output should include __extends helper for class inheritance: {}",
+        output
+    );
+    assert!(
+        output.contains("__awaiter"),
+        "ES5 output should include __awaiter helper for async method: {}",
+        output
+    );
+    assert!(
+        output.contains("__generator"),
+        "ES5 output should include __generator helper for async method: {}",
+        output
+    );
+    assert!(
+        output.contains("_super.prototype.method.call(this)"),
+        "ES5 output should lower super.method() to _super.prototype.method.call(this): {}",
+        output
+    );
+    assert!(
+        output.contains("Derived.prototype.foo = function"),
+        "ES5 output should emit method on prototype: {}",
+        output
+    );
+    assert!(
+        !output.contains("async"),
+        "ES5 output should not contain async keyword: {}",
+        output
+    );
+}
