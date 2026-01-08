@@ -8,7 +8,7 @@ Priority: 1
 Blocked: Awaiting next EM-Anvil assignment.
 
 ## Current Assignment
-- Complete: Added Math.pow preservation ES5 test; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` - pre-existing Forge domain failure).
+- Complete: Added generator method ES5 test; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` - pre-existing Forge domain failure).
 
 ## Task Queue
 - [x] Inspect `wasm/src/emitter_edge_case_tests.rs` to capture the failing case and expected output.
@@ -61,6 +61,7 @@ Blocked: Awaiting next EM-Anvil assignment.
 - [x] Added optional chaining ES5 test; verifies `?.` operator is transformed for ES5 output. Ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Added class expression ES5 tests (anonymous and named); verifies class expressions emit correctly with properties and methods on prototype. Ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Added Math.pow preservation ES5 test; verifies Math.pow calls are preserved in class methods. Ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
+- [x] Added generator method ES5 test; verifies generator methods are placed on prototype. Ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 
 ## Ready for Merge
 Yes
