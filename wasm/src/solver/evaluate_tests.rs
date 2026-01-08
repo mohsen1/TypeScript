@@ -1556,6 +1556,59 @@ fn test_conditional_infer_template_literal_non_distributive_union_input() {
 }
 
 #[test]
+fn test_conditional_infer_template_literal_non_distributive_union_branch() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // [T] extends [`foo${infer R}`] ? R : never, with T = "foo1" | "bar" (no distribution).
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("foo")),
+        TemplateSpan::Type(infer_r),
+    ]);
+    let cond = ConditionalType {
+        check_type: interner.tuple(vec![TupleElement {
+            type_id: t_param,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        extends_type: interner.tuple(vec![TupleElement {
+            type_id: extends_template,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let lit_foo1 = interner.literal_string("foo1");
+    let lit_bar = interner.literal_string("bar");
+    subst.insert(t_name, interner.union(vec![lit_foo1, lit_bar]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
 fn test_conditional_infer_template_literal_non_distributive_template_union_input() {
     let interner = TypeInterner::new();
 
@@ -1669,6 +1722,59 @@ fn test_conditional_infer_template_literal_with_constrained_infer_non_distributi
         interner.literal_string("2"),
     ]);
     assert_eq!(result, expected);
+}
+
+#[test]
+fn test_conditional_infer_template_literal_with_constrained_infer_non_distributive_union_branch() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    // [T] extends [`foo${infer R extends string}`] ? R : never, with T = "foo1" | "bar" (no distribution).
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("foo")),
+        TemplateSpan::Type(infer_r),
+    ]);
+    let cond = ConditionalType {
+        check_type: interner.tuple(vec![TupleElement {
+            type_id: t_param,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        extends_type: interner.tuple(vec![TupleElement {
+            type_id: extends_template,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let lit_foo1 = interner.literal_string("foo1");
+    let lit_bar = interner.literal_string("bar");
+    subst.insert(t_name, interner.union(vec![lit_foo1, lit_bar]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
 }
 
 #[test]
