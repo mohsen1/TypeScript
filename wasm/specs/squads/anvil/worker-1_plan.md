@@ -8,7 +8,7 @@ Priority: 1
 Blocked: Awaiting next EM-Anvil assignment.
 
 ## Current Assignment
-- Complete: Added ES5 tests for private methods (instance and static); ran `./wasm/test.sh class_es5_tests` (all 90 pass).
+- [ ] Add ES5 class tests for computed properties and Symbol-keyed members in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
 
 ## Task Queue
 - [ ] (empty)
