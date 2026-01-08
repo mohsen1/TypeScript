@@ -7,6 +7,10 @@ Priority: 2
 ## Current Milestone
 Phase 8 - Conformance, Convergence, and Hardening: Output fidelity across the integrated pipeline.
 
+## Project Direction Alignment
+- Strategic shift: integration and correctness across the pipeline; conformance tests drive work.
+- Top priority: Emitter is the utility bottleneck; fix ES5 downleveling and source-map fidelity before new features.
+
 ## Focus Areas (Director can reassign)
 - `wasm/src/thin_emitter/` - JavaScript emission
 - `wasm/src/transforms/` - ES5 downleveling, source maps
@@ -29,7 +33,7 @@ Phase 8 - Conformance, Convergence, and Hardening: Output fidelity across the in
 
 3. **End-to-End Compilation**
    - Context: Stop adding AST nodes; compile real code end-to-end
-   - Success Criteria: Compile a non-trivial generic library (e.g., redux/lodash types) without panics
+   - Success Criteria: Compile a non-trivial generic library (e.g., redux/lodash types) without panics and track JS parity deltas in conformance runs
    - Key Files: `cli/driver.rs`, `thin_emitter/mod.rs`
    - Estimated Complexity: Medium
 
@@ -43,6 +47,7 @@ Phase 8 - Conformance, Convergence, and Hardening: Output fidelity across the in
 - Forge squad owns type checking; emitter may expose Forge bugs
 
 ## Notes to EM
+- Re-anchor worker tasks to conformance-driven integration; avoid feature work that does not close emitter fidelity gaps.
 - Read `wasm/specs/WASM_ARCHITECTURE.md` for architecture
 - Use Docker for tests: `./wasm/test.sh`
 - Focus on regression tests to guard against breakage
@@ -52,4 +57,5 @@ Phase 8 - Conformance, Convergence, and Hardening: Output fidelity across the in
 - Workers Active: 0/5
 - Branches Pending Merge: None
 - Current Focus: Awaiting EM assignment
+- Direction: Conformance-first integration; emitter fidelity before feature work
 - Blockers: None
