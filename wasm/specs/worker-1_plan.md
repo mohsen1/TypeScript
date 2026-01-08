@@ -17,6 +17,7 @@ Priority: 1
 - [x] Ignore circular upper bounds during inference resolution; added `test_resolve_circular_upper_bound_defaults_unknown`. Tests: `./wasm/test.sh test_resolve_circular_upper_bound_defaults_unknown`.
 - [x] Prefer upper bounds when lower bounds are only `error`; added `test_resolve_error_lower_prefers_upper_bound`. Tests: `./wasm/test.sh test_resolve_error_lower_prefers_upper_bound`.
 - [x] Contextual inference prefers specific lower bounds over `any`; added `test_resolve_contextual_ignores_any_lower_with_literal`. Tests: `./wasm/test.sh test_resolve_contextual_ignores_any_lower_with_literal`.
+- [x] Drop mutual circular upper bounds across type params; added `test_resolve_mutual_circular_upper_bounds_unknown`. Tests: `./wasm/test.sh test_resolve_mutual_circular_upper_bounds_unknown`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.

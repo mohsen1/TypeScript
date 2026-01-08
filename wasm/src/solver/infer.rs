@@ -285,6 +285,62 @@ impl<'a> InferenceContext<'a> {
         false
     }
 
+    fn type_param_names_for_root(&mut self, root: InferenceVar) -> Vec<Atom> {
+        self.type_params
+            .iter()
+            .filter_map(|(name, var)| {
+                if self.table.find(*var) == root {
+                    Some(*name)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    fn upper_bound_cycles_param(&mut self, bound: TypeId, targets: &[Atom]) -> bool {
+        let Some(TypeKey::TypeParameter(info)) = self.interner.lookup(bound) else {
+            return false;
+        };
+        let mut visited = FxHashSet::default();
+        self.param_depends_on_targets(info.name, targets, &mut visited)
+    }
+
+    fn param_depends_on_targets(
+        &mut self,
+        name: Atom,
+        targets: &[Atom],
+        visited: &mut FxHashSet<Atom>,
+    ) -> bool {
+        if targets.iter().any(|target| *target == name) {
+            return true;
+        }
+        if !visited.insert(name) {
+            return false;
+        }
+        let Some(var) = self.find_type_param(name) else {
+            return false;
+        };
+        let root = self.table.find(var);
+        let upper_bounds = self.constraints[root.0 as usize].upper_bounds.clone();
+
+        for bound in upper_bounds {
+            for target in targets {
+                let mut seen = FxHashSet::default();
+                if self.type_contains_param(bound, *target, &mut seen) {
+                    return true;
+                }
+            }
+            if let Some(TypeKey::TypeParameter(info)) = self.interner.lookup(bound) {
+                if self.param_depends_on_targets(info.name, targets, visited) {
+                    return true;
+                }
+            }
+        }
+
+        false
+    }
+
     fn type_contains_param(&self, ty: TypeId, target: Atom, visited: &mut FxHashSet<TypeId>) -> bool {
         if !visited.insert(ty) {
             return false;
@@ -551,9 +607,13 @@ impl<'a> InferenceContext<'a> {
     fn compute_constraint_result(&mut self, var: InferenceVar) -> (InferenceVar, TypeId, Vec<TypeId>) {
         let root = self.table.find(var);
         let constraints = self.constraints[root.0 as usize].clone();
+        let target_names = self.type_param_names_for_root(root);
         let mut upper_bounds = Vec::new();
         for bound in constraints.upper_bounds {
             if !self.occurs_in(root, bound) {
+                if !target_names.is_empty() && self.upper_bound_cycles_param(bound, &target_names) {
+                    continue;
+                }
                 upper_bounds.push(bound);
             }
         }
