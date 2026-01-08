@@ -8,12 +8,13 @@ Priority: 1
 Blocked: Awaiting next EM-Anvil assignment.
 
 ## Current Assignment
-- [ ] Add ES5 class tests for mixin patterns in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
+- Complete: Added ES5 tests for mixin patterns (6 tests); ran `./wasm/test.sh class_es5_tests` (all 110 pass).
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 tests for mixin patterns (6 tests): mixin base class, mixin with extends, mixin multiple methods, mixin with static members, mixin with generic constraint, mixin composed class. Ran `./wasm/test.sh class_es5_tests` (all 110 pass).
 - [x] Added ES5 tests for abstract classes (6 tests): basic abstract class, abstract class with implemented methods, abstract class with abstract property, concrete extends abstract, abstract class with static members, abstract class with constructor. Ran `./wasm/test.sh class_es5_tests` (all 104 pass).
 - [x] Added ES5 tests for static blocks (6 tests): basic static block, static block with static methods, static block with private access, multiple static blocks, static block with try/catch, static block with super property access. Ran `./wasm/test.sh class_es5_tests` (all 98 pass).
 - [x] Added ES5 tests for computed properties and Symbol-keyed members (6 tests): computed property method, computed property accessor, Symbol.toStringTag, Symbol.hasInstance, multiple computed properties, computed static property. Ran `./wasm/test.sh class_es5_tests` (all 93 pass).
