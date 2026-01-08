@@ -495,6 +495,26 @@ fn test_collect_export_names_ignores_reexports() {
 }
 
 #[test]
+fn test_collect_export_names_ignores_reexports_with_type_only_specifiers() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = "export { foo, type Bar } from \"./foo\";";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let Some(source_file) = parser.arena.get_source_file(parser.arena.get(root).unwrap()) else {
+        panic!("Failed to get source file");
+    };
+
+    let export_names = collect_export_names(&parser.arena, &source_file.statements.nodes);
+
+    assert!(
+        export_names.is_empty(),
+        "Expected no runtime exports for re-exports with type-only specifiers"
+    );
+}
+
+#[test]
 fn test_collect_export_names_ignores_reexports_with_aliases() {
     use crate::thin_parser::ThinParserState;
 
