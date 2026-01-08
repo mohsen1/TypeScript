@@ -1159,3 +1159,112 @@ fn test_parity_es5_object_destructuring_param() {
         output
     );
 }
+
+/// Parity test for ES5 arrow function with expression body.
+/// Arrow with expression body should be converted to function with return.
+#[test]
+fn test_parity_es5_arrow_expression_body() {
+    let source = "const double = (x) => x * 2;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 arrow expression body downlevel
+    assert!(
+        output.contains("var double"),
+        "ES5 output should define double variable: {}",
+        output
+    );
+    // Arrow with expression body should have return statement
+    // tsc outputs: var double = function(x) { return x * 2; };
+    assert!(
+        output.contains("function"),
+        "ES5 output should use function keyword: {}",
+        output
+    );
+    assert!(
+        output.contains("return"),
+        "ES5 output should have return statement: {}",
+        output
+    );
+    assert!(
+        output.contains("* 2") || output.contains("*2"),
+        "ES5 output should contain multiplication: {}",
+        output
+    );
+    // No arrow syntax
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should not contain arrow syntax: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 derived class with constructor and super call.
+/// Derived class constructor should call _super with proper arguments.
+#[test]
+fn test_parity_es5_class_constructor_super() {
+    let source = "class Animal { constructor(name) { this.name = name; } } class Dog extends Animal { constructor(name, breed) { super(name); this.breed = breed; } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 class with constructor and super
+    assert!(
+        output.contains("__extends"),
+        "ES5 output should include __extends helper: {}",
+        output
+    );
+    assert!(
+        output.contains("function Animal"),
+        "ES5 output should define Animal function: {}",
+        output
+    );
+    assert!(
+        output.contains("function Dog"),
+        "ES5 output should define Dog function: {}",
+        output
+    );
+    // super(name) should be converted to _super.call(this, name)
+    assert!(
+        output.contains("_super.call(this") || output.contains("_super.apply(this"),
+        "ES5 output should call _super with this: {}",
+        output
+    );
+    // No class syntax
+    assert!(
+        !output.contains("class Animal") && !output.contains("class Dog"),
+        "ES5 output should not contain class syntax: {}",
+        output
+    );
+}
