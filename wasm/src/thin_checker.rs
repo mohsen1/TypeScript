@@ -2556,10 +2556,170 @@ impl<'a> ThinCheckerState<'a> {
         class_idx: NodeIndex,
         class: &crate::parser::thin_node::ClassData,
     ) -> TypeId {
-        use crate::solver::{CallSignature, CallableShape};
+        use crate::solver::{CallSignature, CallableShape, PropertyInfo};
+        use rustc_hash::FxHashMap;
 
         let (class_type_params, type_param_updates) = self.push_type_parameters(&class.type_parameters);
         let instance_type = self.get_class_instance_type(class_idx, class);
+
+        struct MethodAggregate {
+            overload_signatures: Vec<CallSignature>,
+            impl_signatures: Vec<CallSignature>,
+            overload_optional: bool,
+            impl_optional: bool,
+        }
+
+        struct AccessorAggregate {
+            getter: Option<TypeId>,
+            setter: Option<TypeId>,
+        }
+
+        let mut properties: FxHashMap<Atom, PropertyInfo> = FxHashMap::default();
+        let mut methods: FxHashMap<Atom, MethodAggregate> = FxHashMap::default();
+        let mut accessors: FxHashMap<Atom, AccessorAggregate> = FxHashMap::default();
+
+        for &member_idx in &class.members.nodes {
+            let Some(member_node) = self.ctx.arena.get(member_idx) else {
+                continue;
+            };
+
+            match member_node.kind {
+                k if k == syntax_kind_ext::PROPERTY_DECLARATION => {
+                    let Some(prop) = self.ctx.arena.get_property_decl(member_node) else {
+                        continue;
+                    };
+                    if !self.has_static_modifier(&prop.modifiers) {
+                        continue;
+                    }
+                    let Some(name) = self.get_property_name(prop.name) else {
+                        continue;
+                    };
+                    let name_atom = self.ctx.types.intern_string(&name);
+                    let type_id = if !prop.type_annotation.is_none() {
+                        self.get_type_from_type_node(prop.type_annotation)
+                    } else if !prop.initializer.is_none() {
+                        self.get_type_of_node(prop.initializer)
+                    } else {
+                        TypeId::ANY
+                    };
+
+                    properties.insert(name_atom, PropertyInfo {
+                        name: name_atom,
+                        type_id,
+                        write_type: type_id,
+                        optional: prop.question_token,
+                        readonly: self.has_readonly_modifier(&prop.modifiers),
+                        is_method: false,
+                    });
+                }
+                k if k == syntax_kind_ext::METHOD_DECLARATION => {
+                    let Some(method) = self.ctx.arena.get_method_decl(member_node) else {
+                        continue;
+                    };
+                    if !self.has_static_modifier(&method.modifiers) {
+                        continue;
+                    }
+                    let Some(name) = self.get_property_name(method.name) else {
+                        continue;
+                    };
+                    let name_atom = self.ctx.types.intern_string(&name);
+                    let signature = self.call_signature_from_method(method);
+                    let entry = methods.entry(name_atom).or_insert(MethodAggregate {
+                        overload_signatures: Vec::new(),
+                        impl_signatures: Vec::new(),
+                        overload_optional: false,
+                        impl_optional: false,
+                    });
+                    if method.body.is_none() {
+                        entry.overload_signatures.push(signature);
+                        entry.overload_optional |= method.question_token;
+                    } else {
+                        entry.impl_signatures.push(signature);
+                        entry.impl_optional |= method.question_token;
+                    }
+                }
+                k if k == syntax_kind_ext::GET_ACCESSOR || k == syntax_kind_ext::SET_ACCESSOR => {
+                    let Some(accessor) = self.ctx.arena.get_accessor(member_node) else {
+                        continue;
+                    };
+                    if !self.has_static_modifier(&accessor.modifiers) {
+                        continue;
+                    }
+                    let Some(name) = self.get_property_name(accessor.name) else {
+                        continue;
+                    };
+                    let name_atom = self.ctx.types.intern_string(&name);
+                    let entry = accessors.entry(name_atom).or_insert(AccessorAggregate {
+                        getter: None,
+                        setter: None,
+                    });
+
+                    if k == syntax_kind_ext::GET_ACCESSOR {
+                        let getter_type = if !accessor.type_annotation.is_none() {
+                            self.get_type_from_type_node(accessor.type_annotation)
+                        } else {
+                            self.infer_getter_return_type(accessor.body)
+                        };
+                        entry.getter = Some(getter_type);
+                    } else {
+                        let setter_type = accessor.parameters.nodes.first()
+                            .and_then(|&param_idx| self.ctx.arena.get(param_idx))
+                            .and_then(|param_node| self.ctx.arena.get_parameter(param_node))
+                            .and_then(|param| {
+                                if !param.type_annotation.is_none() {
+                                    Some(self.get_type_from_type_node(param.type_annotation))
+                                } else {
+                                    None
+                                }
+                            })
+                            .unwrap_or(TypeId::ANY);
+                        entry.setter = Some(setter_type);
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        for (name, accessor) in accessors {
+            if methods.contains_key(&name) {
+                continue;
+            }
+            let read_type = accessor.getter.or(accessor.setter).unwrap_or(TypeId::ANY);
+            let write_type = accessor.setter.or(accessor.getter).unwrap_or(read_type);
+            let readonly = accessor.getter.is_some() && accessor.setter.is_none();
+            properties.insert(name, PropertyInfo {
+                name,
+                type_id: read_type,
+                write_type,
+                optional: false,
+                readonly,
+                is_method: false,
+            });
+        }
+
+        for (name, method) in methods {
+            let (signatures, optional) = if !method.overload_signatures.is_empty() {
+                (method.overload_signatures, method.overload_optional)
+            } else {
+                (method.impl_signatures, method.impl_optional)
+            };
+            if signatures.is_empty() {
+                continue;
+            }
+            let type_id = self.ctx.types.callable(CallableShape {
+                call_signatures: signatures,
+                construct_signatures: Vec::new(),
+                properties: Vec::new(),
+            });
+            properties.insert(name, PropertyInfo {
+                name,
+                type_id,
+                write_type: type_id,
+                optional,
+                readonly: false,
+                is_method: true,
+            });
+        }
 
         let mut has_overloads = false;
         for &member_idx in &class.members.nodes {
@@ -2616,12 +2776,13 @@ impl<'a> ThinCheckerState<'a> {
             });
         }
 
+        let properties: Vec<PropertyInfo> = properties.into_values().collect();
         self.pop_type_parameters(type_param_updates);
 
         self.ctx.types.callable(CallableShape {
             call_signatures: Vec::new(),
             construct_signatures,
-            properties: Vec::new(),
+            properties,
         })
     }
 
