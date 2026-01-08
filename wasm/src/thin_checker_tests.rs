@@ -2765,6 +2765,31 @@ interface Derived extends Base {
 }
 
 #[test]
+fn test_optional_property_allows_undefined_assignment() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface Foo {
+    x?: number;
+}
+const ok: Foo = {};
+const ok2: Foo = { x: 1 };
+const ok3: Foo = { x: undefined };
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+}
+
+#[test]
 fn test_interface_extends_string_literal_property_mismatch_2430() {
     use crate::thin_parser::ThinParserState;
 
