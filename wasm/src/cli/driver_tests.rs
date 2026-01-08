@@ -4488,3 +4488,344 @@ export namespace Models {
     let js = std::fs::read_to_string(base.join("dist/src/models.js")).expect("read js");
     assert!(!js.is_empty(), "JS output should not be empty");
 }
+
+// =============================================================================
+// E2E: Enum Compilation
+// =============================================================================
+
+#[test]
+fn compile_numeric_enum() {
+    // Test basic numeric enum compilation
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "declaration": true
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/status.ts"),
+        r#"
+export enum Status {
+    Pending,
+    Active,
+    Completed,
+    Failed
+}
+
+export function getStatusName(status: Status): string {
+    return Status[status];
+}
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+
+    let js = std::fs::read_to_string(base.join("dist/src/status.js")).expect("read js");
+    assert!(js.contains("Status"), "Enum should be present in JS");
+    assert!(!js.is_empty(), "JS output should not be empty");
+}
+
+#[test]
+fn compile_string_enum() {
+    // Test string enum compilation
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "declaration": true
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/direction.ts"),
+        r#"
+export enum Direction {
+    Up = "UP",
+    Down = "DOWN",
+    Left = "LEFT",
+    Right = "RIGHT"
+}
+
+export function move(dir: Direction): void {
+    console.log(dir);
+}
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+
+    let js = std::fs::read_to_string(base.join("dist/src/direction.js")).expect("read js");
+    assert!(js.contains("Direction"), "Enum should be present in JS");
+    assert!(!js.is_empty(), "JS output should not be empty");
+}
+
+#[test]
+fn compile_const_enum() {
+    // Test const enum compilation (should be inlined)
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/flags.ts"),
+        r#"
+export const enum Flags {
+    None = 0,
+    Read = 1,
+    Write = 2,
+    Execute = 4
+}
+
+export function hasFlag(flags: Flags, flag: Flags): boolean {
+    return (flags & flag) !== 0;
+}
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+
+    let js = std::fs::read_to_string(base.join("dist/src/flags.js")).expect("read js");
+    // Const enums may be inlined, so just verify compilation succeeded
+    assert!(!js.is_empty(), "JS output should not be empty");
+}
+
+#[test]
+fn compile_enum_with_computed_values() {
+    // Test enum with computed/expression values
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/sizes.ts"),
+        r#"
+export enum Size {
+    Small = 1,
+    Medium = Small * 2,
+    Large = Medium * 2,
+    ExtraLarge = Large * 2
+}
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+
+    let js = std::fs::read_to_string(base.join("dist/src/sizes.js")).expect("read js");
+    assert!(js.contains("Size"), "Enum should be present in JS");
+    assert!(!js.is_empty(), "JS output should not be empty");
+}
+
+// =============================================================================
+// E2E: Arrow Function Compilation
+// =============================================================================
+
+#[test]
+fn compile_basic_arrow_function() {
+    // Test basic arrow function compilation
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "declaration": true
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/utils.ts"),
+        r#"
+export const add = (a: number, b: number): number => a + b;
+export const multiply = (a: number, b: number): number => {
+    return a * b;
+};
+export const identity = <T>(x: T): T => x;
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+
+    let js = std::fs::read_to_string(base.join("dist/src/utils.js")).expect("read js");
+    assert!(js.contains("=>") || js.contains("function"), "Arrow or function should be present");
+    assert!(!js.is_empty(), "JS output should not be empty");
+}
+
+#[test]
+fn compile_arrow_function_with_rest_params() {
+    // Test arrow function with rest parameters
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/helpers.ts"),
+        r#"
+export const sum = (...numbers: number[]): number => {
+    let total = 0;
+    for (const n of numbers) {
+        total += n;
+    }
+    return total;
+};
+
+export const first = <T>(...items: T[]): T => items[0];
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+
+    let js = std::fs::read_to_string(base.join("dist/src/helpers.js")).expect("read js");
+    assert!(!js.is_empty(), "JS output should not be empty");
+}
+
+#[test]
+fn compile_arrow_function_with_default_params() {
+    // Test arrow function with default parameters
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/greet.ts"),
+        r#"
+export const greet = (name: string, greeting: string = "Hello"): string => {
+    return greeting + ", " + name;
+};
+
+export const repeat = (str: string, times: number = 1): string => {
+    let result = "";
+    for (let i = 0; i < times; i++) {
+        result += str;
+    }
+    return result;
+};
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+
+    let js = std::fs::read_to_string(base.join("dist/src/greet.js")).expect("read js");
+    assert!(!js.is_empty(), "JS output should not be empty");
+}
+
+#[test]
+fn compile_arrow_function_in_class() {
+    // Test arrow functions as class properties (for lexical this)
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/counter.ts"),
+        r#"
+export class Counter {
+    count: number = 0;
+
+    increment = (): void => {
+        this.count++;
+    };
+
+    decrement = (): void => {
+        this.count--;
+    };
+
+    reset = (): void => {
+        this.count = 0;
+    };
+}
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+
+    let js = std::fs::read_to_string(base.join("dist/src/counter.js")).expect("read js");
+    assert!(js.contains("Counter"), "Class should be present");
+    assert!(!js.is_empty(), "JS output should not be empty");
+}
