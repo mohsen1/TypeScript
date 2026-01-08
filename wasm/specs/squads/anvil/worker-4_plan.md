@@ -7,12 +7,17 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [ ] Add ES5 class tests for super() edge cases with field initializers in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
+- [x] Add ES5 class tests for super() edge cases with field initializers in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Add ES5 super with conditional field init test. Tests: `./wasm/test.sh super_with_conditional_field`
+- [x] Add ES5 super with arrow field init test. Tests: `./wasm/test.sh super_with_arrow_field`
+- [x] Add ES5 super with computed field init test. Tests: `./wasm/test.sh super_with_computed_field`
+- [x] Add ES5 super with method call in field init test. Tests: `./wasm/test.sh super_with_method_call`
+- [x] Add ES5 super with nested inheritance field init test. Tests: `./wasm/test.sh super_with_nested_inheritance`
 - [x] Add ES5 constructor param inject decorator test. Tests: `./wasm/test.sh constructor_param_inject`
 - [x] Add ES5 constructor param optional decorator test. Tests: `./wasm/test.sh constructor_param_optional`
 - [x] Add ES5 constructor param attribute decorator test. Tests: `./wasm/test.sh constructor_param_attribute`
