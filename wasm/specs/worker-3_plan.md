@@ -88,6 +88,7 @@ Priority: 3
 - [x] Solver unsoundness: apparent string number index signature in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_apparent_string_number_index_subtyping`.
 - [x] Solver unsoundness: index signature consistency (number index must subtype string index) in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_index_signature_consistency_number_vs_string_index`.
 - [x] Solver unsoundness: apparent string length property in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_apparent_string_length_subtyping`.
+- [x] Solver unsoundness: template literal gets apparent string members in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_template_literal_apparent_member_subtyping`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
