@@ -8,12 +8,13 @@ Priority: 1
 Blocked: Awaiting next EM-Anvil assignment.
 
 ## Current Assignment
-- [ ] Add ES5 class tests for private methods (instance and static) in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
+- Complete: Added ES5 tests for private methods (instance and static); ran `./wasm/test.sh class_es5_tests` (all 90 pass).
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 tests for private methods (6 tests): instance private method, static private method, private method calling private method, private async method, private generator method, private method with private field. Ran `./wasm/test.sh class_es5_tests` (all 90 pass).
 - [x] Added ES5 tests for accessor decorators (6 tests): getter with decorator, setter with decorator, getter/setter pair with decorators, static getter with decorator, accessor with multiple decorators, accessor in derived class. Ran `./wasm/test.sh class_es5_tests` (all 84 pass).
 - [x] Added ES5 tests for generator methods with decorators (6 tests): generator method with decorator, static generator with decorator, generator with multiple decorators, async generator with decorator, generator with yield expressions, generator in decorated class. Ran `./wasm/test.sh class_es5_tests` (all 81 pass).
 - [x] Added additional ES5 coverage tests (6 tests): multiple private fields, mixed static/instance async, property initializers with method calls, labeled statements, new.target meta property, fluent method (this type). Ran `./wasm/test.sh class_es5_tests` (all 75 pass).

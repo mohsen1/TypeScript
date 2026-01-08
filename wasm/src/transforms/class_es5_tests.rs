@@ -4457,3 +4457,339 @@ class Derived extends Base {
         output
     );
 }
+
+#[test]
+fn test_class_es5_instance_private_method() {
+    // Test instance private method (#method syntax)
+    let source = r#"
+class Calculator {
+    #validate(value: number): boolean {
+        return value >= 0 && value <= 100;
+    }
+
+    calculate(a: number, b: number): number {
+        if (this.#validate(a) && this.#validate(b)) {
+            return a + b;
+        }
+        return 0;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function Calculator"),
+        "Expected Calculator class to emit as function: {}",
+        output
+    );
+
+    // Should use WeakSet or __classPrivateFieldGet for private methods
+    assert!(
+        output.contains("WeakSet") || output.contains("__classPrivateFieldGet") || output.contains("_validate"),
+        "Expected private method mechanism in output: {}",
+        output
+    );
+
+    // Public method should be on prototype
+    assert!(
+        output.contains(".prototype.calculate") || output.contains("prototype[\"calculate\"]"),
+        "Expected calculate method on prototype: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_static_private_method_basic() {
+    // Test static private method
+    let source = r#"
+class IdGenerator {
+    static #counter: number = 0;
+
+    static #increment(): number {
+        return ++IdGenerator.#counter;
+    }
+
+    static generate(): string {
+        return "id_" + IdGenerator.#increment();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function IdGenerator"),
+        "Expected IdGenerator class to emit as function: {}",
+        output
+    );
+
+    // Static public method should be on the class
+    assert!(
+        output.contains("IdGenerator.generate"),
+        "Expected static generate method on class: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_private_method_calling_private_method() {
+    // Test private method calling another private method
+    let source = r#"
+class DataProcessor {
+    #normalize(value: string): string {
+        return value.trim().toLowerCase();
+    }
+
+    #validate(value: string): boolean {
+        const normalized = this.#normalize(value);
+        return normalized.length > 0;
+    }
+
+    process(input: string): string | null {
+        if (this.#validate(input)) {
+            return this.#normalize(input);
+        }
+        return null;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function DataProcessor"),
+        "Expected DataProcessor class to emit as function: {}",
+        output
+    );
+
+    // Public method should be on prototype
+    assert!(
+        output.contains(".prototype.process") || output.contains("prototype[\"process\"]"),
+        "Expected process method on prototype: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_private_async_method() {
+    // Test private async method
+    let source = r#"
+class ApiClient {
+    async #fetchData(url: string): Promise<any> {
+        const response = await fetch(url);
+        return response.json();
+    }
+
+    async getData(endpoint: string): Promise<any> {
+        return this.#fetchData("https://api.example.com" + endpoint);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function ApiClient"),
+        "Expected ApiClient class to emit as function: {}",
+        output
+    );
+
+    // Should use __awaiter for async method
+    assert!(
+        output.contains("__awaiter"),
+        "Expected __awaiter for async methods: {}",
+        output
+    );
+
+    // Public async method should be on prototype
+    assert!(
+        output.contains(".prototype.getData") || output.contains("prototype[\"getData\"]"),
+        "Expected getData method on prototype: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_private_generator_method() {
+    // Test private generator method
+    let source = r#"
+class NumberSequence {
+    *#generateRange(start: number, end: number): Generator<number> {
+        for (let i = start; i <= end; i++) {
+            yield i;
+        }
+    }
+
+    getRange(start: number, end: number): number[] {
+        return [...this.#generateRange(start, end)];
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function NumberSequence"),
+        "Expected NumberSequence class to emit as function: {}",
+        output
+    );
+
+    // Public method should be on prototype
+    assert!(
+        output.contains(".prototype.getRange") || output.contains("prototype[\"getRange\"]"),
+        "Expected getRange method on prototype: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_private_method_with_private_field() {
+    // Test private method accessing private fields
+    let source = r#"
+class BankAccount {
+    #balance: number = 0;
+
+    #updateBalance(amount: number): void {
+        this.#balance += amount;
+    }
+
+    #getBalance(): number {
+        return this.#balance;
+    }
+
+    deposit(amount: number): void {
+        if (amount > 0) {
+            this.#updateBalance(amount);
+        }
+    }
+
+    getStatement(): string {
+        return "Balance: $" + this.#getBalance();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function BankAccount"),
+        "Expected BankAccount class to emit as function: {}",
+        output
+    );
+
+    // Should have WeakMap for private fields
+    assert!(
+        output.contains("WeakMap") || output.contains("__classPrivateFieldGet") || output.contains("__classPrivateFieldSet"),
+        "Expected private field mechanism: {}",
+        output
+    );
+
+    // Public methods should be on prototype
+    assert!(
+        output.contains(".prototype.deposit") || output.contains("prototype[\"deposit\"]"),
+        "Expected deposit method on prototype: {}",
+        output
+    );
+    assert!(
+        output.contains(".prototype.getStatement") || output.contains("prototype[\"getStatement\"]"),
+        "Expected getStatement method on prototype: {}",
+        output
+    );
+}
