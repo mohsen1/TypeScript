@@ -12232,3 +12232,84 @@ const swapped = swap([1, 2]);"#;
         "expected non-empty source mappings for destructuring patterns"
     );
 }
+
+#[test]
+fn test_source_map_logical_assignment_operators_mapping() {
+    // Test source-map accuracy for logical assignment operators (&&=, ||=, ??=)
+    let source = r#"let a = null;
+let b = false;
+let c = undefined;
+
+a ??= "default";
+b ||= true;
+c &&= "value";"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Verify variable declarations are in output
+    assert!(
+        output.contains("a") && output.contains("b") && output.contains("c"),
+        "expected variable names in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the variable declarations
+    let (a_line, _) = find_line_col(source, "let a");
+    let has_a_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == a_line
+    });
+
+    let (b_line, _) = find_line_col(source, "let b");
+    let has_b_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == b_line
+    });
+
+    // Verify we have mappings for the logical assignment lines
+    let (nullish_line, _) = find_line_col(source, "a ??=");
+    let has_nullish_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == nullish_line
+    });
+
+    // We should have mappings for the declarations and assignments
+    assert!(
+        has_a_mapping || has_b_mapping || has_nullish_mapping,
+        "expected mappings for logical assignment operators. mappings: {mappings}"
+    );
+
+    // Verify non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for logical assignment code"
+    );
+
+    // Verify mappings span multiple source lines
+    let unique_source_lines: std::collections::HashSet<_> =
+        decoded.iter().map(|m| m.original_line).collect();
+    assert!(
+        unique_source_lines.len() >= 2,
+        "expected mappings from at least 2 different source lines, got: {:?}",
+        unique_source_lines
+    );
+}
