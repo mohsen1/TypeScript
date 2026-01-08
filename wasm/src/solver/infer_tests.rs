@@ -1,5 +1,5 @@
 use super::*;
-use crate::solver::{AssignabilityChecker, CompatChecker};
+use crate::solver::{AssignabilityChecker, CompatChecker, infer_generic_function};
 
 #[test]
 fn test_inference_basic() {
@@ -4401,6 +4401,41 @@ fn test_resolve_no_constraints() {
     // No constraints at all
     let result = ctx.resolve_with_constraints(var).unwrap();
     assert_eq!(result, TypeId::UNKNOWN);
+}
+
+#[test]
+fn test_infer_union_target_with_placeholder_member() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let param_type = interner.union(vec![t_type, TypeId::STRING]);
+
+    let func = FunctionShape {
+        type_params: vec![TypeParamInfo {
+            name: t_name,
+            constraint: None,
+            default: None,
+        }],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: param_type,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: t_type,
+        type_predicate: None,
+        is_constructor: false,
+    };
+
+    let result = infer_generic_function(&interner, &mut checker, &func, &[TypeId::NUMBER]);
+    assert_eq!(result, TypeId::NUMBER);
 }
 
 #[test]
