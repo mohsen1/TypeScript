@@ -1,16 +1,28 @@
 # Worker 5 Plan
 
+## 🔥 CRUCIBLE TASK - TEST PORTING
+
+**Reassigned from Anvil emitter work to Crucible test porting.**
+
 ## Mission
-Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transforms, cli, lsp).
+Port conditional and mapped type tests from the official TypeScript repo into `tests/cases/`.
 
 Status: Active
 Priority: 5
+Mode: **CRUCIBLE - TEST PORTING**
 
 ## Current Assignment
-- [ ] Add ES5 async tests for async class methods in `wasm/src/transforms/async_es5_tests.rs`. Run `./wasm/test.sh async_es5_tests`.
+- [ ] Port 15-20 conditional/mapped type tests from official TypeScript repo into `tests/cases/`.
 
 ## Task Queue
-- [ ] (empty)
+- [ ] Port `distributiveConditionalTypes.ts` - distributive conditional tests
+- [ ] Port `conditionalTypesWithInfer.ts` - infer in conditionals
+- [ ] Port `mappedTypeRecursiveInference.ts` - recursive mapped types
+- [ ] Port `templateLiteralTypes.ts` - template literal type tests
+- [ ] Target: 50 total solver test cases this week (shared with workers 3-4)
+
+## Goal
+Give Forge workers failing tests to triangulate correct behavior for the Redux blocker.
 
 ## Completed
 - [x] Added 14 error handling pattern tests (try/catch basic, try/finally basic, try/catch/finally full, await in catch, await in finally, nested try/catch, rethrow, error wrapping, sequential try, return in finally, type guard catch, multiple catches, finally always runs, catch and rethrow new error) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (76 tests PASS).

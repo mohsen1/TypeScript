@@ -3,15 +3,20 @@
 ## Mission
 Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transforms, cli, lsp).
 
+## ⚠️ OPERATION CRUCIBLE - BUG FIXES ONLY
+
+**Emitter is in MAINTENANCE MODE. No new transforms or features.**
+
 Status: Active
 Priority: 1
-Blocked: Awaiting next EM-Anvil assignment.
+Mode: **BUG FIXES ONLY**
 
 ## Current Assignment
-- [ ] Add ES5 class tests for static blocks in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
+- [ ] Fix blocking ES5 regression: async computed `super["m"]` emits `void 0["m"]`. See `transforms/async_es5.rs`.
 
-## Task Queue
-- [ ] (empty)
+## Task Queue (BUG FIXES ONLY)
+- [ ] Fix nested arrow `this` capture edge cases
+- [ ] ⛔ NO NEW TRANSFORMS - rejected per Operation Crucible
 
 ## Completed
 - [x] Added ES5 tests for computed properties and Symbol-keyed members (6 tests): computed property method, computed property accessor, Symbol.toStringTag, Symbol.hasInstance, multiple computed properties, computed static property. Ran `./wasm/test.sh class_es5_tests` (all 93 pass).

@@ -4,71 +4,82 @@ Updated: 2026-01-08
 
 Priority: 1
 
+## 🚨 OPERATION CRUCIBLE - SWARM THE BLOCKER
+
+**Redux/Lodash Generics blocker must pass. All 5 workers on this.**
+
+### Root Cause Identified
+The bug is **eager evaluation of conditional types when `InferenceVar`s are not yet bound**.
+
+### The Fix
+Refactor `solver/evaluate.rs` to introduce a **`Deferred` state** for `ConditionalResult`:
+- When `check_type` contains an unbound `InferenceVar`, do NOT return `Any` or `Never`
+- Return a `TypeKey::Conditional` that preserves the constraint
+- Only evaluate when inference context is finalized
+
 ## Current Milestone
 Phase 8 - Conformance, Convergence, and Hardening: Type-system correctness in the integrated pipeline, driven by conformance tests.
 
 ## Project Direction Alignment
-- Strategic shift: integration and correctness across the pipeline; conformance tests drive work.
-- Top priority: Solver is the correctness bottleneck; fix inference and subtype gaps before new features.
+- Solver is the correctness bottleneck (estimated 55% complete)
+- 🚨 BLOCKER: `test_check_redux_lodash_style_generics` must pass
+- All workers swarm until it's green
 
-## Focus Areas (Director can reassign)
+## Focus Areas
+- `wasm/src/solver/evaluate.rs` - **PRIMARY: Deferred state for conditionals**
+- `wasm/src/solver/infer.rs` - Inference context finalization
 - `wasm/src/solver/` - Type inference, constraint solving
-- `wasm/src/checker/` - Type checking logic
-- `wasm/src/binder/` - Symbol binding, scope analysis
-- `wasm/src/types/` - Type representations
 
 ## Objectives (Ranked)
 
-1. **Generic Inference Hardening**
+1. **🚨 BLOCKER: Redux/Lodash Generics**
+   - Context: This test combines mapped types, conditional inference, AND cross-file resolution
+   - Root Cause: Eager evaluation of conditionals when InferenceVars aren't bound
+   - Fix: Introduce `Deferred` state in `solver/evaluate.rs`
+   - Key Files: `solver/evaluate.rs`, `solver/infer.rs`
+   - **SWARM THIS UNTIL GREEN**
+
+2. **Generic Inference Hardening**
    - Context: Solver is the correctness bottleneck per Project Direction
-   - Success Criteria: Inference from usage and context-sensitive typing match `tsc`, including circular constraints in `extends` clauses; redux/lodash-type suites compile without panics
+   - Success Criteria: Inference from usage and context-sensitive typing match `tsc`
    - Key Files: `solver/infer.rs`, `solver/infer_tests.rs`
-   - Estimated Complexity: High
 
-2. **Conditional Type Evaluation**
+3. **Conditional Type Evaluation**
    - Context: Distributive conditional types over unions must match TypeScript
-   - Success Criteria: `solver/evaluate.rs` handles distributive conditionals over unions and template literal inference without regressions
+   - Success Criteria: `solver/evaluate.rs` handles distributive conditionals correctly
    - Key Files: `solver/evaluate.rs`, `solver/evaluate_tests.rs`
-   - Estimated Complexity: High
-
-3. **Structural Compatibility (Variance)**
-   - Context: Variance handling must be correct for all edge cases
-   - Success Criteria: Covariant returns and contravariant parameters match `tsc` across subtype edge cases and conditional inference flows
-   - Key Files: `solver/subtype.rs`, `solver/subtype_tests.rs`
-   - Estimated Complexity: Medium
-
-4. **End-to-End Conformance Validation**
-   - Context: Stop adding AST nodes; compile real code end-to-end
-   - Success Criteria: Compile a non-trivial generic library (e.g., redux/lodash types) without panics and track conformance pass-rate deltas
-   - Key Files: `checker/mod.rs`, `solver/mod.rs`, `binder/mod.rs`
-   - Estimated Complexity: Medium
 
 ## Anti-Priorities
-- New LSP features (unless they expose a Solver bug)
+- New LSP features
 - CLI argument parsing or UX changes
-- Performance micro-optimizations (unless regression)
-- New AST nodes or isolated features outside solver correctness
+- Performance micro-optimizations
+- New AST nodes
 
 ## Cross-Squad Dependencies
-- Anvil squad conformance/emitter runs may surface solver bugs; coordinate on failure triage and ownership
+- Anvil workers 3-5 are on **Crucible Tasks** porting tests from official TS repo
+- These tests will help triangulate correct behavior for Forge workers
 
 ## Notes to EM
-- Re-anchor worker tasks to conformance-driven integration; avoid feature work that does not close solver correctness gaps.
+- **All 5 workers on Redux blocker**
+- Focus on `solver/evaluate.rs` Deferred state implementation
 - Read `wasm/specs/SOLVER.md` for solver architecture
-- Read `wasm/specs/TS_UNSOUNDNESS_CATALOG.md` for known TypeScript unsoundness
 - Use Docker for tests: `./wasm/test.sh`
 
 ## Management Strategy
-Per Project Direction: **Autocratic Scheduling**
-- The Manager is the single source of truth for priority
-- Squads are generic workers - if Solver needs more workers, they get assigned regardless of previous track
-- Zero-Idle: If a high-priority task is blocked, swarm it
+Per Project Direction: **Autocratic Scheduling + Bisect-on-Merge**
+- PRs that regress ANY existing baseline are auto-rejected
+- Zero-Idle: All workers swarm the blocker
 
 ## Squad Status
-- Last EM Report: 2026-01-08 17:30
+- Last EM Report: 2026-01-08 - Operation Crucible activated
 - Workers Active: 5/5
-- Branches Pending Merge: None (cleared blockers)
-- Current Focus: Fixing `test_check_redux_lodash_style_generics` (6 diagnostics vs 0) - mapped type + conditional infer interactions
-- Direction: Conformance-first integration; solver correctness before feature work
-- Blockers: Fixed `set_use_this_capture` build error in em/forge branch; `test_check_redux_lodash_style_generics` is primary regression
-- EM Notes: All workers assigned to investigate/fix redux/lodash-style generic patterns. Worker 1 investigating type predicate aliasing narrowing issue.
+- Current Focus: 🚨 Redux/Lodash Generics blocker - Deferred state in evaluate.rs
+- Direction: SWARM THE BLOCKER
+- Blockers: `test_check_redux_lodash_style_generics` (6 diagnostics vs 0)
+- Root Cause: Eager evaluation of conditionals with unbound InferenceVars
+- Worker Assignments:
+  - W1: Implement Deferred state in solver/evaluate.rs
+  - W2: Update inference context finalization in solver/infer.rs
+  - W3: Add TypeKey::Conditional preservation logic
+  - W4: Write regression tests for deferred conditional evaluation
+  - W5: Investigate cross-file resolution with deferred conditionals

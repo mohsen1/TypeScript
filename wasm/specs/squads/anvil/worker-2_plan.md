@@ -3,14 +3,20 @@
 ## Mission
 Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transforms, cli, lsp).
 
+## ⚠️ OPERATION CRUCIBLE - BUG FIXES ONLY
+
+**Emitter is in MAINTENANCE MODE. No new transforms or features.**
+
 Status: Active
 Priority: 2
+Mode: **BUG FIXES ONLY**
 
 ## Current Assignment
-- [ ] Add ES5 emitter parity tests for spread operators in `wasm/src/emitter_parity_tests.rs`. Run `./wasm/test.sh emitter_parity`.
+- [ ] Fix critical source map bug: verify source maps attach correctly in debuggers for async ES5 transforms.
 
-## Task Queue
-- [ ] (empty)
+## Task Queue (BUG FIXES ONLY)
+- [ ] Fix any blocking source map validation issues
+- [ ] ⛔ NO NEW TRANSFORMS - rejected per Operation Crucible
 
 ## Completed
 - [x] Added ES5 decorator parity tests (class, method, property, parameter) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (63 tests).

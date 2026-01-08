@@ -1,16 +1,28 @@
 # Worker 3 Plan
 
+## 🔥 CRUCIBLE TASK - TEST PORTING
+
+**Reassigned from Anvil emitter work to Crucible test porting.**
+
 ## Mission
-Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transforms, cli, lsp).
+Port conditional type tests from the official TypeScript repo into `tests/cases/`.
 
 Status: Active
 Priority: 3
+Mode: **CRUCIBLE - TEST PORTING**
 
 ## Current Assignment
-- [ ] Add source map tests for namespace transforms in `wasm/src/source_map_tests.rs`. Run `./wasm/test.sh source_map`.
+- [ ] Port 15-20 conditional type tests from official TypeScript repo (`tests/cases/conformance/types/conditional/`) into `tests/cases/`.
 
 ## Task Queue
-- [ ] (empty)
+- [ ] Port `conditionalTypes1.ts` - basic conditional type tests
+- [ ] Port `conditionalTypes2.ts` - distributive conditional types
+- [ ] Port `inferTypes1.ts` - infer keyword tests
+- [ ] Port `inferTypes2.ts` - advanced infer patterns
+- [ ] Target: 50 total solver test cases this week (shared with workers 4-5)
+
+## Goal
+Give Forge workers failing tests to triangulate correct behavior for the Redux blocker.
 
 ## Completed
 - [x] Added generator transform source map tests (basic yield, multiple yields, yield in loop, yield delegation, return value, class method, try/catch, parameters, object yield, generator expression); `./wasm/test.sh source_map` passes.
