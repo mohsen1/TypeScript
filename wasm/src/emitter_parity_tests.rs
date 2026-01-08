@@ -329,3 +329,72 @@ fn test_parity_es5_class_static_async_this_capture() {
         output
     );
 }
+
+/// Parity test for ES5 class expression with extends.
+/// Class expressions should be downleveled similarly to class declarations,
+/// using __extends helper and IIFE pattern.
+#[test]
+fn test_parity_es5_class_expression_extends() {
+    let source = "const Derived = class extends Base { constructor() { super(); this.value = 1; } };";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 class expression downlevel with extends
+    assert!(
+        output.contains("__extends"),
+        "ES5 output should include __extends helper for class expression inheritance: {}",
+        output
+    );
+    assert!(
+        output.contains("var Derived ="),
+        "ES5 output should assign class expression to variable: {}",
+        output
+    );
+    assert!(
+        output.contains("function (_super)"),
+        "ES5 output should use IIFE pattern with _super parameter: {}",
+        output
+    );
+    assert!(
+        output.contains("__extends("),
+        "ES5 output should call __extends: {}",
+        output
+    );
+    assert!(
+        output.contains("_super.call(this)") || output.contains("_super.apply(this"),
+        "ES5 output should convert super() to _super.call/apply: {}",
+        output
+    );
+    assert!(
+        output.contains("(Base)"),
+        "ES5 output should pass Base to IIFE: {}",
+        output
+    );
+    // Class expression uses /** @class */ comment pattern
+    assert!(
+        output.contains("/** @class */"),
+        "ES5 output should include @class annotation: {}",
+        output
+    );
+    assert!(
+        !output.contains("extends Base"),
+        "ES5 output should not contain extends keyword: {}",
+        output
+    );
+}

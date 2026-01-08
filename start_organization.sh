@@ -11,26 +11,44 @@ set -euo pipefail
 # =============================================================================
 
 SESSION="zang-org"
-CODEX_CMD="${CODEX_CMD:-codex}"
-CODEX_ARGS="${CODEX_ARGS:---dangerously-bypass-approvals-and-sandbox}"
+
+# Agent CLI selection (claude is default, use --codex for OpenAI Codex)
+USE_CODEX=0
+for arg in "$@"; do
+  if [ "$arg" = "--codex" ]; then
+    USE_CODEX=1
+  fi
+done
+
+if [ "$USE_CODEX" = "1" ]; then
+  AGENT_CMD="${AGENT_CMD:-codex}"
+  AGENT_ARGS="${AGENT_ARGS:---dangerously-bypass-approvals-and-sandbox}"
+  AGENT_UPDATE_CMD="${AGENT_UPDATE_CMD:-npm install -g @openai/codex}"
+  echo "Using OpenAI Codex CLI"
+else
+  AGENT_CMD="${AGENT_CMD:-claude}"
+  AGENT_ARGS="${AGENT_ARGS:---dangerously-skip-permissions}"
+  AGENT_UPDATE_CMD="${AGENT_UPDATE_CMD:-npm install -g @anthropic-ai/claude-code}"
+  echo "Using Claude Code CLI (default)"
+fi
+
 AUTO_FETCH="${AUTO_FETCH:-1}"
-AUTO_RESTART_CODEX="${AUTO_RESTART_CODEX:-1}"
-CODEX_RESTART_DELAY="${CODEX_RESTART_DELAY:-2}"
-CODEX_AUTO_UPDATE="${CODEX_AUTO_UPDATE:-1}"
-CODEX_UPDATE_CMD="${CODEX_UPDATE_CMD:-npm install -g @openai/codex}"
+AUTO_RESTART_AGENT="${AUTO_RESTART_AGENT:-1}"
+AGENT_RESTART_DELAY="${AGENT_RESTART_DELAY:-2}"
+AGENT_AUTO_UPDATE="${AGENT_AUTO_UPDATE:-1}"
 
 # Idle monitoring (Director should be mostly idle - hands-off management)
 DIRECTOR_IDLE_SECONDS="${DIRECTOR_IDLE_SECONDS:-600}"
-DIRECTOR_POKE="${DIRECTOR_POKE:-Check if any intervention is needed. If EMs are working, do nothing.}"
-EM_IDLE_SECONDS="${EM_IDLE_SECONDS:-90}"
-EM_POKE="${EM_POKE:-Check worker panes. If any worker is asking for help or idle at a prompt, provide guidance.}"
+DIRECTOR_POKE="${DIRECTOR_POKE:-Check if any intervention is needed. Merge EM branches if ready. If EMs are working, do nothing.}"
+EM_IDLE_SECONDS="${EM_IDLE_SECONDS:-120}"
+EM_POKE="${EM_POKE:-FIRST: Run ./wasm/test.sh 2>&1 | head -50 to check build health. If build fails, fix it yourself. Then check worker panes for stuck workers.}"
 WORKER_IDLE_SECONDS="${WORKER_IDLE_SECONDS:-300}"
 WORKER_POKE="${WORKER_POKE:-How is your task going? If you need help, describe what you are stuck on.}"
 
-# Startup timing (codex boots in ~5s)
-WORKER_START_PROMPT="${WORKER_START_PROMPT:-You are worker \$WORKER_NUM in squad \$SQUAD_NAME. Read AGENTS.md then your plan at wasm/specs/squads/\$SQUAD_NAME/worker-\${WORKER_NUM}_plan.md. Switch to branch worker/\$SQUAD_NAME-\$WORKER_NUM and work on your current assignment.}"
-EM_START_PROMPT="${EM_START_PROMPT:-You are an Engineering Manager. Do NOT read AGENTS.md (that is for workers). Read SQUAD_LEAD_AGENT.md for your instructions. Your job: manage workers via tmux, merge branches, update plans. Do NOT write code.}"
-DIRECTOR_START_PROMPT="${DIRECTOR_START_PROMPT:-Read DIRECTOR_AGENT.md. Be hands-off. Only intervene if EMs need help.}"
+# Startup timing (agent boots in ~5s)
+WORKER_START_PROMPT="${WORKER_START_PROMPT:-You are worker \$WORKER_NUM in squad \$SQUAD_NAME. Read .role/AGENTS.md then your plan at wasm/specs/squads/\$SQUAD_NAME/worker-\${WORKER_NUM}_plan.md. Switch to branch worker/\$SQUAD_NAME-\$WORKER_NUM and work on your current assignment.}"
+EM_START_PROMPT="${EM_START_PROMPT:-You are EM for squad \$SQUAD_NAME. Read .role/AGENTS.md for your instructions. You have your own worktree on branch em/\$SQUAD_NAME. FIRST: run ./wasm/test.sh 2>&1 | head -50 to check build. If build fails, FIX IT YOURSELF before assigning worker tasks.}"
+DIRECTOR_START_PROMPT="${DIRECTOR_START_PROMPT:-Read .role/AGENTS.md for your instructions. Merge EM branches (em/forge, em/anvil) into rust when they have blocker fixes. Be hands-off otherwise.}"
 START_PAUSE="${START_PAUSE:-10}"
 SEND_ENTER_PAUSE="${SEND_ENTER_PAUSE:-1}"
 STAGGER_PAUSE="${STAGGER_PAUSE:-2}"
@@ -88,7 +106,7 @@ if [ ! -d "$WORKTREE_BASE" ]; then
   exit 1
 fi
 
-for cmd in tmux git "$CODEX_CMD"; do
+for cmd in tmux git "$AGENT_CMD"; do
   if ! command -v "$cmd" >/dev/null 2>&1; then
     echo "error: $cmd not found in PATH" >&2
     exit 1
@@ -101,13 +119,13 @@ if ! git -C "$ROOT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
 fi
 
 # =============================================================================
-# Auto-update Codex
+# Auto-update Agent CLI
 # =============================================================================
-if [ "$CODEX_AUTO_UPDATE" = "1" ]; then
+if [ "$AGENT_AUTO_UPDATE" = "1" ]; then
   if command -v npm >/dev/null 2>&1; then
-    echo "Updating Codex..."
-    if ! bash -lc "$CODEX_UPDATE_CMD" >/dev/null 2>&1; then
-      echo "warning: Codex update failed; continuing" >&2
+    echo "Updating $AGENT_CMD..."
+    if ! bash -lc "$AGENT_UPDATE_CMD" >/dev/null 2>&1; then
+      echo "warning: $AGENT_CMD update failed; continuing" >&2
     fi
   fi
 fi
@@ -299,6 +317,49 @@ ensure_worktree() {
 }
 
 # =============================================================================
+# Ensure EM worktrees (EMs get their own worktrees for blocker fixes)
+# =============================================================================
+ensure_em_worktree() {
+  local squad="$1"
+  local dir="$WORKTREE_BASE/TypeScript-em-${squad}"
+  local branch="em/$squad"
+
+  if [ -d "$dir" ]; then
+    if ! is_worktree "$dir"; then
+      echo "warning: $dir exists but is not a git worktree; skipping" >&2
+      return 1
+    fi
+    # Fresh mode: reset worktree to origin/rust
+    if [ "$FRESH_MODE" = "1" ]; then
+      git -C "$dir" fetch origin >/dev/null 2>&1 || true
+      git -C "$dir" reset --hard origin/rust >/dev/null 2>&1 || true
+      git -C "$dir" clean -fd >/dev/null 2>&1 || true
+      git -C "$dir" checkout -B "$branch" origin/rust >/dev/null 2>&1 || true
+      echo "  Reset EM worktree $squad -> origin/rust" >&2
+    fi
+  else
+    git -C "$ROOT_DIR" worktree add --force "$dir" rust >/dev/null 2>&1 || {
+      echo "warning: could not create EM worktree for $squad" >&2
+      return 1
+    }
+    # Create EM branch
+    git -C "$dir" checkout -B "$branch" origin/rust >/dev/null 2>&1 || true
+  fi
+  echo "$dir"
+}
+
+# Create EM worktrees
+WORKTREE_em_forge=""
+WORKTREE_em_anvil=""
+
+for squad in forge anvil; do
+  if dir="$(ensure_em_worktree "$squad")"; then
+    eval "WORKTREE_em_${squad}=\"$dir\""
+    echo "EM-${squad} worktree: $dir"
+  fi
+done
+
+# =============================================================================
 # Ensure worktrees for all workers (using simple variables instead of assoc array)
 # =============================================================================
 WORKTREE_forge_1=""
@@ -328,21 +389,67 @@ get_worktree_dir() {
   eval "echo \"\$WORKTREE_${squad}_${n}\""
 }
 
+# Helper to get EM worktree dir
+get_em_worktree_dir() {
+  local squad="$1"
+  eval "echo \"\$WORKTREE_em_${squad}\""
+}
+
+# =============================================================================
+# Setup role-specific AGENTS.md for each worktree
+# =============================================================================
+# Note: Git worktrees share the index, so we use .gitignore'd copies or symlinks
+# to untracked locations. We put the role file in a .role/ directory.
+setup_role_agents() {
+  echo "Setting up role-specific agent instructions..."
+
+  # EM worktrees: create .role/AGENTS.md pointing to SQUAD_LEAD_AGENT.md
+  for squad in forge anvil; do
+    local em_dir
+    em_dir="$(get_em_worktree_dir "$squad")"
+    if [ -n "$em_dir" ] && [ -d "$em_dir" ]; then
+      mkdir -p "$em_dir/.role"
+      cp "$ROOT_DIR/SQUAD_LEAD_AGENT.md" "$em_dir/.role/AGENTS.md" 2>/dev/null || true
+      echo "  EM-${squad}: .role/AGENTS.md = SQUAD_LEAD_AGENT.md"
+    fi
+  done
+
+  # Worker worktrees: create .role/AGENTS.md pointing to worker AGENTS.md
+  for squad in forge anvil; do
+    for n in 1 2 3 4 5; do
+      local worker_dir
+      worker_dir="$(get_worktree_dir "$squad" "$n")"
+      if [ -n "$worker_dir" ] && [ -d "$worker_dir" ]; then
+        mkdir -p "$worker_dir/.role"
+        cp "$ROOT_DIR/AGENTS.md" "$worker_dir/.role/AGENTS.md" 2>/dev/null || true
+      fi
+    done
+  done
+  echo "  Workers: .role/AGENTS.md = AGENTS.md (worker instructions)"
+
+  # Director: create .role/AGENTS.md in ROOT_DIR
+  mkdir -p "$ROOT_DIR/.role"
+  cp "$ROOT_DIR/DIRECTOR_AGENT.md" "$ROOT_DIR/.role/AGENTS.md" 2>/dev/null || true
+  echo "  Director: .role/AGENTS.md = DIRECTOR_AGENT.md"
+}
+
+setup_role_agents
+
 # =============================================================================
 # Build commands
 # =============================================================================
 build_cmd() {
   local base_cmd="$1"
-  if [ "$AUTO_RESTART_CODEX" = "1" ]; then
-    echo "while true; do ${base_cmd}; sleep ${CODEX_RESTART_DELAY}; done"
+  if [ "$AUTO_RESTART_AGENT" = "1" ]; then
+    echo "while true; do ${base_cmd}; sleep ${AGENT_RESTART_DELAY}; done"
   else
     echo "$base_cmd"
   fi
 }
 
-director_cmd="$(build_cmd "$CODEX_CMD $CODEX_ARGS")"
-em_cmd="$(build_cmd "$CODEX_CMD $CODEX_ARGS")"
-worker_cmd="$(build_cmd "$CODEX_CMD $CODEX_ARGS")"
+director_cmd="$(build_cmd "$AGENT_CMD $AGENT_ARGS")"
+em_cmd="$(build_cmd "$AGENT_CMD $AGENT_ARGS")"
+worker_cmd="$(build_cmd "$AGENT_CMD $AGENT_ARGS")"
 
 # =============================================================================
 # Create tmux session if not exists
@@ -364,14 +471,18 @@ echo "Setting up Director window with EMs..."
 tmux send-keys -t "$SESSION:director.0" "bash -lc '$director_cmd'" C-m
 tmux select-pane -t "$SESSION:director.0" -T "director" 2>/dev/null || true
 
-# Split right for EM-Forge (pane 1)
-tmux split-window -h -t "$SESSION:director.0" -c "$ROOT_DIR"
-tmux send-keys -t "$SESSION:director.1" "export SQUAD_NAME=forge && bash -lc '$em_cmd'" C-m
+# Split right for EM-Forge (pane 1) - uses EM worktree
+EM_FORGE_DIR="$(get_em_worktree_dir forge)"
+[ -z "$EM_FORGE_DIR" ] && EM_FORGE_DIR="$ROOT_DIR"
+tmux split-window -h -t "$SESSION:director.0" -c "$EM_FORGE_DIR"
+tmux send-keys -t "$SESSION:director.1" "cd '$EM_FORGE_DIR' && export SQUAD_NAME=forge EM_WORKTREE='$EM_FORGE_DIR' && bash -lc '$em_cmd'" C-m
 tmux select-pane -t "$SESSION:director.1" -T "em-forge" 2>/dev/null || true
 
-# Split below EM-Forge for EM-Anvil (pane 2)
-tmux split-window -v -t "$SESSION:director.1" -c "$ROOT_DIR"
-tmux send-keys -t "$SESSION:director.2" "export SQUAD_NAME=anvil && bash -lc '$em_cmd'" C-m
+# Split below EM-Forge for EM-Anvil (pane 2) - uses EM worktree
+EM_ANVIL_DIR="$(get_em_worktree_dir anvil)"
+[ -z "$EM_ANVIL_DIR" ] && EM_ANVIL_DIR="$ROOT_DIR"
+tmux split-window -v -t "$SESSION:director.1" -c "$EM_ANVIL_DIR"
+tmux send-keys -t "$SESSION:director.2" "cd '$EM_ANVIL_DIR' && export SQUAD_NAME=anvil EM_WORKTREE='$EM_ANVIL_DIR' && bash -lc '$em_cmd'" C-m
 tmux select-pane -t "$SESSION:director.2" -T "em-anvil" 2>/dev/null || true
 
 # Wait for director and EMs to boot
@@ -624,13 +735,21 @@ echo "  1. director  - Director (pane 0) + EM-Forge (pane 1) + EM-Anvil (pane 2)
 echo "  2. forge     - 5 Workers (type system, panes 0-4)"
 echo "  3. anvil     - 5 Workers (output, panes 0-4)"
 echo ""
-echo "Worktrees:"
+echo "EM Worktrees (for blocker fixes):"
+for squad in forge anvil; do
+  dir="$(get_em_worktree_dir "$squad")"
+  [ -n "$dir" ] && echo "  em-${squad}: $dir (branch: em/$squad)"
+done
+echo ""
+echo "Worker Worktrees:"
 for squad in forge anvil; do
   for n in 1 2 3 4 5; do
     dir="$(get_worktree_dir "$squad" "$n")"
     [ -n "$dir" ] && echo "  ${squad}-${n}: $dir"
   done
 done
+echo ""
+echo "Agent CLI: $AGENT_CMD $AGENT_ARGS"
 echo ""
 echo "Quick navigation:"
 echo "  tmux select-window -t $SESSION:director"
@@ -640,6 +759,7 @@ echo ""
 echo "Attach: tmux attach -t $SESSION"
 echo "Kill:   $0 --kill"
 echo "Fresh:  $0 --fresh  (reset all branches to origin/rust)"
+echo "Codex:  $0 --codex  (use OpenAI Codex instead of Claude)"
 echo "=============================================="
 
 # =============================================================================

@@ -65,6 +65,7 @@ Priority: 3
 - [x] Added end-to-end CLI tests for multi-file projects with imports (models/utils/services structure, default+named imports, type-only imports, source maps, declarations); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 - [x] Added comprehensive --declaration flag CLI tests (true/false/absent, interfaces, types, classes with methods, declarationDir); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 - [x] Added comprehensive --outDir option CLI tests (outDir placement, rootDir flattening, nested structures, deep paths, declaration+sourcemap, multiple entry points, absent outDir); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
+- [x] Added comprehensive missing input file error handling tests (missing file in files array, include pattern, CLI args, multiple files, project dir, tsconfig.json); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 
 ## Ready for Merge
 Yes

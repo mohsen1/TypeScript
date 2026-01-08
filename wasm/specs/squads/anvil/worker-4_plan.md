@@ -68,6 +68,7 @@ Priority: 4
 - [x] Add class ES5 super() call source-map coverage. Tests: `./wasm/test.sh class_super_call_mapping`
 - [x] Add arrow function default param source-map coverage. Tests: `./wasm/test.sh arrow_default_param_mapping`
 - [x] Add destructuring assignment source-map coverage. Tests: `./wasm/test.sh destructuring_assignment_mapping`
+- [x] Add template literal source-map coverage. Tests: `./wasm/test.sh template_literal_mapping`
 
 ## Ready for Merge
 Yes
