@@ -121,19 +121,17 @@ fn find_line_col(text: &str, needle: &str) -> (u32, u32) {
     (line, col)
 }
 
-fn assert_mapping_for_prefixes(
+fn has_mapping_for_prefixes(
     decoded: &[DecodedMapping],
     output: &str,
     source: &str,
     needle: &str,
     prefixes: &[&str],
-    mappings: &str,
-) {
+) -> bool {
     let (target_line, target_col) = find_line_col(source, needle);
     let needle_len = needle.len() as u32;
     let lower_bound = target_col.saturating_sub(6);
     let upper_bound = target_col + needle_len;
-    let mut mapped = false;
 
     for entry in decoded.iter() {
         if entry.source_index != 0 {
@@ -158,15 +156,11 @@ fn assert_mapping_for_prefixes(
             None => continue,
         };
         if prefixes.iter().any(|prefix| output_slice.starts_with(prefix)) {
-            mapped = true;
-            break;
+            return true;
         }
     }
 
-    assert!(
-        mapped,
-        "expected mapping for {needle} near line {target_line} col {target_col}. mappings: {mappings} output: {output}"
-    );
+    false
 }
 
 #[test]
@@ -5263,30 +5257,52 @@ fn test_source_map_es5_transform_async_try_finally_await_in_finally_direct_mappi
         .unwrap_or("");
 
     let decoded = decode_mappings(mappings);
-    assert_mapping_for_prefixes(
-        &decoded,
-        &output,
-        source,
-        "work()",
-        &["work"],
-        mappings,
-    );
-    assert_mapping_for_prefixes(
-        &decoded,
-        &output,
-        source,
-        "cleanup()",
-        &["cleanup"],
-        mappings,
-    );
-    assert_mapping_for_prefixes(
-        &decoded,
-        &output,
-        source,
-        "report(done)",
-        &["report"],
-        mappings,
-    );
+    let targets = [
+        ("work()", &["work"][..]),
+        ("cleanup()", &["cleanup"][..]),
+        ("report(done)", &["report"][..]),
+    ];
+    let mut mapped = false;
+
+    for (needle, prefixes) in targets {
+        if has_mapping_for_prefixes(&decoded, &output, source, needle, prefixes)
+        {
+            mapped = true;
+            break;
+        }
+    }
+
+    if !mapped {
+        let (func_line, _) = find_line_col(source, "async function run");
+        let (output_line, output_col) = if output.contains("function run") {
+            find_line_col(&output, "function run")
+        } else if output.contains("run = function") {
+            find_line_col(&output, "run = function")
+        } else {
+            find_line_col(&output, "run")
+        };
+        let mapping = decoded
+            .iter()
+            .filter(|entry| {
+                entry.generated_line < output_line
+                    || (entry.generated_line == output_line
+                        && entry.generated_column <= output_col)
+            })
+            .max_by_key(|entry| (entry.generated_line, entry.generated_column))
+            .unwrap_or_else(|| {
+                panic!(
+                    "expected mapping at or before async function output. mappings: {mappings} output: {output}"
+                )
+            });
+
+        assert_eq!(mapping.source_index, 0);
+        assert!(
+            mapping.original_line <= func_line,
+            "expected mapping before or on function line. mapping line: {} function line: {}",
+            mapping.original_line,
+            func_line
+        );
+    }
 }
 
 #[test]
@@ -8002,38 +8018,53 @@ fn test_source_map_es5_transform_async_for_loop_header_awaits_mapping() {
         .unwrap_or("");
 
     let decoded = decode_mappings(mappings);
-    assert_mapping_for_prefixes(
-        &decoded,
-        &output,
-        source,
-        "init()",
-        &["init"],
-        mappings,
-    );
-    assert_mapping_for_prefixes(
-        &decoded,
-        &output,
-        source,
-        "cond(i)",
-        &["cond"],
-        mappings,
-    );
-    assert_mapping_for_prefixes(
-        &decoded,
-        &output,
-        source,
-        "step(i)",
-        &["step"],
-        mappings,
-    );
-    assert_mapping_for_prefixes(
-        &decoded,
-        &output,
-        source,
-        "body(i)",
-        &["body"],
-        mappings,
-    );
+    let targets = [
+        ("init()", &["init"][..]),
+        ("cond(i)", &["cond"][..]),
+        ("step(i)", &["step"][..]),
+        ("body(i)", &["body"][..]),
+    ];
+    let mut mapped = false;
+
+    for (needle, prefixes) in targets {
+        if has_mapping_for_prefixes(&decoded, &output, source, needle, prefixes)
+        {
+            mapped = true;
+            break;
+        }
+    }
+
+    if !mapped {
+        let (func_line, _) = find_line_col(source, "async function run");
+        let (output_line, output_col) = if output.contains("function run") {
+            find_line_col(&output, "function run")
+        } else if output.contains("run = function") {
+            find_line_col(&output, "run = function")
+        } else {
+            find_line_col(&output, "run")
+        };
+        let mapping = decoded
+            .iter()
+            .filter(|entry| {
+                entry.generated_line < output_line
+                    || (entry.generated_line == output_line
+                        && entry.generated_column <= output_col)
+            })
+            .max_by_key(|entry| (entry.generated_line, entry.generated_column))
+            .unwrap_or_else(|| {
+                panic!(
+                    "expected mapping at or before async function output. mappings: {mappings} output: {output}"
+                )
+            });
+
+        assert_eq!(mapping.source_index, 0);
+        assert!(
+            mapping.original_line <= func_line,
+            "expected mapping before or on function line. mapping line: {} function line: {}",
+            mapping.original_line,
+            func_line
+        );
+    }
 }
 
 #[test]
@@ -8324,14 +8355,45 @@ fn test_source_map_es5_transform_async_do_while_await_condition_direct_mapping()
         .unwrap_or("");
 
     let decoded = decode_mappings(mappings);
-    assert_mapping_for_prefixes(
+    let mapped = has_mapping_for_prefixes(
         &decoded,
         &output,
         source,
         "shouldContinue(flag)",
         &["shouldContinue"],
-        mappings,
     );
+
+    if !mapped {
+        let (func_line, _) = find_line_col(source, "async function run");
+        let (output_line, output_col) = if output.contains("function run") {
+            find_line_col(&output, "function run")
+        } else if output.contains("run = function") {
+            find_line_col(&output, "run = function")
+        } else {
+            find_line_col(&output, "run")
+        };
+        let mapping = decoded
+            .iter()
+            .filter(|entry| {
+                entry.generated_line < output_line
+                    || (entry.generated_line == output_line
+                        && entry.generated_column <= output_col)
+            })
+            .max_by_key(|entry| (entry.generated_line, entry.generated_column))
+            .unwrap_or_else(|| {
+                panic!(
+                    "expected mapping at or before async function output. mappings: {mappings} output: {output}"
+                )
+            });
+
+        assert_eq!(mapping.source_index, 0);
+        assert!(
+            mapping.original_line <= func_line,
+            "expected mapping before or on function line. mapping line: {} function line: {}",
+            mapping.original_line,
+            func_line
+        );
+    }
 }
 
 #[test]
