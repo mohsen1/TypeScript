@@ -27,6 +27,17 @@ fn test_intrinsic_subtyping() {
 }
 
 #[test]
+fn test_legacy_null_undefined_subtyping() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    checker.strict_null_checks = false;
+
+    assert!(checker.is_subtype_of(TypeId::NULL, TypeId::STRING));
+    assert!(checker.is_subtype_of(TypeId::UNDEFINED, TypeId::STRING));
+}
+
+#[test]
 fn test_error_poisoning_subtyping() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
