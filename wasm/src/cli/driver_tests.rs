@@ -4301,3 +4301,65 @@ export { login, logout, fetchData, saveData } from "./features";
     assert!(index_dts.contains("login"), "login should be re-exported");
     assert!(index_dts.contains("fetchData"), "fetchData should be re-exported");
 }
+
+// =============================================================================
+// E2E: Classes with Generic Methods
+// =============================================================================
+
+#[test]
+fn compile_class_with_generic_constructor() {
+    // Test class with generic constructor pattern
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "declaration": true
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/builder.ts"),
+        r#"
+export class Builder<T> {
+    private value: T;
+
+    constructor(initial: T) {
+        this.value = initial;
+    }
+
+    set(value: T): Builder<T> {
+        this.value = value;
+        return this;
+    }
+
+    transform<U>(fn: (value: T) => U): Builder<U> {
+        return new Builder(fn(this.value));
+    }
+
+    build(): T {
+        return this.value;
+    }
+}
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors");
+
+    let js = std::fs::read_to_string(base.join("dist/src/builder.js")).expect("read js");
+    assert!(js.contains("class Builder"), "Class should be present");
+    assert!(js.contains("constructor("), "Constructor should be present");
+    assert!(!js.contains("<T>"), "Generic should be stripped");
+
+    let dts = std::fs::read_to_string(base.join("dist/src/builder.d.ts")).expect("read dts");
+    assert!(dts.contains("Builder<T>"), "Generic class should be in declaration");
+    assert!(dts.contains("transform<U>"), "Generic method should be in declaration");
+}
