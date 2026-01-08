@@ -31,6 +31,7 @@ Priority: 3
 - [x] Added CommonJS export-name test for shorthand `export { foo }`; `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 - [x] Added CommonJS module name sanitization coverage for scoped paths with hyphens/dots; `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 - [x] Added CommonJS export-name test for default re-exports; `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
+- [x] Added CommonJS export-name test for `export { foo as default }`; `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 
 ## Ready for Merge
 No
