@@ -815,3 +815,53 @@ class Foo {
         output
     );
 }
+
+#[test]
+fn test_class_es5_object_spread_in_method() {
+    let source = r#"
+class Foo {
+    defaults = { a: 1, b: 2 };
+
+    merge(extra: object) {
+        return { ...this.defaults, ...extra, c: 3 };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Should NOT contain spread syntax (ES5 doesn't support it)
+    assert!(
+        !output.contains("...this.defaults") && !output.contains("...extra"),
+        "Expected object spread to be transformed, not raw spread syntax: {}",
+        output
+    );
+
+    // Should use Object.assign for ES5 object spread
+    assert!(
+        output.contains("Object.assign"),
+        "Expected ES5 object spread transformation using Object.assign: {}",
+        output
+    );
+
+    // The c: 3 property should still be present (emitted as assignment _a.c = 3)
+    assert!(
+        output.contains(".c = 3") || output.contains("c = 3"),
+        "Expected property c: 3 to be preserved as assignment: {}",
+        output
+    );
+}
