@@ -79,10 +79,12 @@ Priority: 3
 - [x] Solver unsoundness: key remap with optional+readonly remove yields required mutable properties in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_key_remap_optional_readonly_remove_subtyping`.
 - [x] Solver unsoundness: base constraint not assignable to type parameter in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_base_constraint_not_assignable_to_param`.
 - [x] Solver unsoundness: template literal subtyping to string in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_template_literal_subtyping_to_string`.
-- [x] Solver unsoundness: mapped type over number keys with optional+readonly add in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_over_number_keys_optional_readonly_add_subtyping` (fails: `cli/driver.rs` E0515 borrow).
-- [x] Test runner: mount repo root and copy `package.json` for Docker tests in `wasm/test.sh`. Tests: `./wasm/test.sh test_template_literal_subtyping_to_string` (fails: `cli/driver.rs` E0515 borrow).
+- [x] Solver unsoundness: mapped type over number keys with optional+readonly add in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_over_number_keys_optional_readonly_add_subtyping`.
+- [x] Test runner: mount repo root and copy `package.json` for Docker tests in `wasm/test.sh`. Tests: `./wasm/test.sh test_template_literal_subtyping_to_string`.
+- [x] CLI: avoid `package.json` version borrow in `wasm/src/cli/driver.rs`. Tests: `./wasm/test.sh test_template_literal_subtyping_to_string`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
 - Use Docker for Rust tests (`./wasm/test.sh`), never `cargo test` directly.
 - Update this plan after each task and keep it accurate.
+- Ready for merge.
