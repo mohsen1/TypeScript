@@ -91,6 +91,23 @@ fn test_literal_subtyping() {
 }
 
 #[test]
+fn test_template_literal_subtyping_to_string() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let red = interner.literal_string("red");
+    let blue = interner.literal_string("blue");
+    let colors = interner.union(vec![red, blue]);
+    let template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("color-")),
+        TemplateSpan::Type(colors),
+    ]);
+
+    assert!(checker.is_subtype_of(template, TypeId::STRING));
+    assert!(!checker.is_subtype_of(TypeId::STRING, template));
+}
+
+#[test]
 fn test_apparent_number_member_subtyping() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
@@ -2315,6 +2332,20 @@ fn test_base_constraint_assignability_subtyping() {
     assert!(!checker.is_subtype_of(t_param, TypeId::NUMBER));
     assert!(!checker.is_subtype_of(t_param, u_param));
     assert!(!checker.is_subtype_of(t_param, v_param));
+}
+
+#[test]
+fn test_base_constraint_not_assignable_to_param() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    assert!(!checker.is_subtype_of(TypeId::STRING, t_param));
 }
 
 #[test]
