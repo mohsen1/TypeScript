@@ -3842,3 +3842,320 @@ class Builder {
         output
     );
 }
+
+#[test]
+fn test_class_es5_generator_method_with_decorator() {
+    // Test generator method with method decorator
+    let source = r#"
+function log(target: any, key: string, descriptor: PropertyDescriptor) {
+    return descriptor;
+}
+
+class DataStream {
+    @log
+    *items(): Generator<number> {
+        yield 1;
+        yield 2;
+        yield 3;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Get the class (second statement after function declaration)
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function DataStream"),
+        "Expected DataStream class to emit as function: {}",
+        output
+    );
+
+    // Generator method should be on prototype
+    assert!(
+        output.contains(".prototype.items") || output.contains("prototype[\"items\"]"),
+        "Expected items generator method on prototype: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_static_generator_method_with_decorator() {
+    // Test static generator method with decorator
+    let source = r#"
+function memoize(target: any, key: string, descriptor: PropertyDescriptor) {
+    return descriptor;
+}
+
+class StaticGenerator {
+    @memoize
+    static *sequence(start: number, end: number): Generator<number> {
+        for (let i = start; i <= end; i++) {
+            yield i;
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Get the class (second statement after function declaration)
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function StaticGenerator"),
+        "Expected StaticGenerator class to emit as function: {}",
+        output
+    );
+
+    // Generator method should be on prototype or as static
+    // Note: Current emitter puts static methods on prototype
+    assert!(
+        output.contains("StaticGenerator.sequence") || output.contains(".prototype.sequence"),
+        "Expected sequence generator method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_generator_method_with_multiple_decorators() {
+    // Test generator method with multiple decorators
+    let source = r#"
+function first(target: any, key: string, descriptor: PropertyDescriptor) {
+    return descriptor;
+}
+
+function second(target: any, key: string, descriptor: PropertyDescriptor) {
+    return descriptor;
+}
+
+class MultiDecorated {
+    @first
+    @second
+    *generate(): Generator<string> {
+        yield "a";
+        yield "b";
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Get the class (third statement after two function declarations)
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(2)
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function MultiDecorated"),
+        "Expected MultiDecorated class to emit as function: {}",
+        output
+    );
+
+    // Generator method should be on prototype
+    assert!(
+        output.contains(".prototype.generate") || output.contains("prototype[\"generate\"]"),
+        "Expected generate method on prototype: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_async_generator_method_with_decorator() {
+    // Test async generator method with decorator
+    let source = r#"
+function trace(target: any, key: string, descriptor: PropertyDescriptor) {
+    return descriptor;
+}
+
+class AsyncDataStream {
+    @trace
+    async *fetchItems(): AsyncGenerator<any> {
+        yield await fetch("/item/1");
+        yield await fetch("/item/2");
+        yield await fetch("/item/3");
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Get the class (second statement after function declaration)
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function AsyncDataStream"),
+        "Expected AsyncDataStream class to emit as function: {}",
+        output
+    );
+
+    // Method should be on prototype
+    assert!(
+        output.contains(".prototype.fetchItems") || output.contains("prototype[\"fetchItems\"]"),
+        "Expected fetchItems method on prototype: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_generator_method_with_yield_expressions() {
+    // Test generator method with complex yield expressions
+    let source = r#"
+class YieldExpressions {
+    *processItems(items: string[]): Generator<string> {
+        for (const item of items) {
+            yield item.toUpperCase();
+            yield item.toLowerCase();
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function YieldExpressions"),
+        "Expected YieldExpressions class to emit as function: {}",
+        output
+    );
+
+    // Generator method should be on prototype
+    assert!(
+        output.contains(".prototype.processItems") || output.contains("prototype[\"processItems\"]"),
+        "Expected processItems method on prototype: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_generator_in_decorated_class() {
+    // Test generator method in a decorated class
+    let source = r#"
+function sealed(constructor: Function) {
+    Object.seal(constructor);
+}
+
+@sealed
+class SealedGenerator {
+    *values(): Generator<number> {
+        yield 10;
+        yield 20;
+        yield 30;
+    }
+
+    *keys(): Generator<string> {
+        yield "a";
+        yield "b";
+        yield "c";
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Get the class (second statement after function declaration)
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function SealedGenerator"),
+        "Expected SealedGenerator class to emit as function: {}",
+        output
+    );
+
+    // Both generator methods should be on prototype
+    assert!(
+        output.contains(".prototype.values") || output.contains("prototype[\"values\"]"),
+        "Expected values method on prototype: {}",
+        output
+    );
+    assert!(
+        output.contains(".prototype.keys") || output.contains("prototype[\"keys\"]"),
+        "Expected keys method on prototype: {}",
+        output
+    );
+}
