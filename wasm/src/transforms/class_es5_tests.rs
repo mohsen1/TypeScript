@@ -1128,3 +1128,51 @@ class Parser {
         output
     );
 }
+
+#[test]
+fn test_class_es5_default_parameters_in_method() {
+    let source = r#"
+class Calculator {
+    add(a: number, b: number = 0, c: number = 1) {
+        return a + b + c;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Should have parameter default handling (void 0 check or === undefined)
+    assert!(
+        output.contains("void 0") || output.contains("undefined"),
+        "Expected ES5 default parameter check using void 0 or undefined: {}",
+        output
+    );
+
+    // Should contain the default values
+    assert!(
+        output.contains("0") && output.contains("1"),
+        "Expected default values 0 and 1 in output: {}",
+        output
+    );
+
+    // Method should be on prototype
+    assert!(
+        output.contains(".prototype.add") || output.contains("prototype[\"add\"]"),
+        "Expected add method on prototype: {}",
+        output
+    );
+}
