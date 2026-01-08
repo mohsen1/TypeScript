@@ -7,13 +7,18 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- Emitter fidelity: validate source map correctness. Add a focused test in `wasm/src/source_map_tests.rs` that checks mappings for a transformed ES5 output, then fix `wasm/src/source_writer.rs` or `wasm/src/source_map.rs` if needed.
+- Await next manager assignment.
 
 ## Task Queue
-- [ ] If mappings are correct, expand coverage to include async/await downleveling and verify debuggers can attach.
+- [ ] (empty)
 
 ## Completed
-- [x] (Move finished items here with brief notes and tests run.)
+- [x] Added ES5 for-of source map mapping test in `wasm/src/source_map_tests.rs`; no fixes needed in source map writer/generator.
+      Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_class_extends_helper`).
+- [x] Added ES5 async/await source map mapping test in `wasm/src/source_map_tests.rs` for downlevel emit.
+      Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_class_extends_helper`).
+- [x] Added ES5 class downlevel source map regression for class name mapping; emit now maps class names in ES5 class output.
+      Tests: `./wasm/test.sh test_source_map_es5_transform_class_mapping`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.

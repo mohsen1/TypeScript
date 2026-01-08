@@ -7,14 +7,13 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- (awaiting next assignment)
+- Solver hardening: stress test conditional type evaluation in `wasm/src/solver/evaluate.rs`. Add or extend tests in `wasm/src/solver/evaluate_tests.rs` for distributive conditionals over unions and fix any mismatches.
 
 ## Task Queue
-- [ ] (none)
+- [ ] If conditionals already pass, add coverage for nested/distributive conditionals with `extends` and `infer` positions.
 
 ## Completed
-- [x] Solver hardening: added infer/distributive conditional matching in `wasm/src/solver/evaluate.rs`, plus nested/distributive infer tests in `wasm/src/solver/evaluate_tests.rs`. Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_class_extends_helper`).
-- [x] Conditional infer object coverage: added object property/index signature infer matching in `wasm/src/solver/evaluate.rs` and tests in `wasm/src/solver/evaluate_tests.rs`. Tests: `./wasm/test.sh test_conditional_infer_object_`.
+- [x] (Move finished items here with brief notes and tests run.)
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
