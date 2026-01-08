@@ -19,7 +19,7 @@ Priority: 2
 - [x] Confirmed `super()` ordering remains stable with computed field initializers via regression; `./wasm/test.sh` failed at `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports` (unrelated).
 
 ## Ready for Merge
-No
+Yes - branch ready for merge into rust.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
