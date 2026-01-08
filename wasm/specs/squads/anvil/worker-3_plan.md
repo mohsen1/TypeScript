@@ -60,6 +60,7 @@ Priority: 3
 - [x] Added CommonJS export-name test for alias + rest destructuring; `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 - [x] Added CommonJS export-name test for nested array destructuring; `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 - [x] Added CommonJS export-name test for array destructuring holes; `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
+- [x] Extended helpers_tests.rs with tests for remaining helpers (decorate, param, metadata, generator, values, read, spread_array, import_default, import_star, export_star, make_template_object, class_private_field_get/set/in, create_binding) plus helper ordering test; `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 
 ## Ready for Merge
 Yes
