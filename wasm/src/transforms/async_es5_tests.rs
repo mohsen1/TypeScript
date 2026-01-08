@@ -193,6 +193,31 @@ fn test_body_contains_await_in_switch_case() {
 }
 
 #[test]
+fn test_body_contains_await_in_switch_default() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "async function foo() { switch (kind) { case 1: break; default: await bar(); } }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&func_idx) = source_file.statements.nodes.first() {
+                if let Some(func_node) = parser.arena.get(func_idx) {
+                    if let Some(func) = parser.arena.get_function(func_node) {
+                        let emitter = AsyncES5Emitter::new(&parser.arena);
+                        assert!(
+                            emitter.body_contains_await(func.body),
+                            "Should detect await in switch default"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn test_body_contains_await_in_with_statement() {
     let mut parser = ThinParserState::new(
         "test.ts".to_string(),
