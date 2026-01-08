@@ -68,6 +68,7 @@ Priority: 3
 - [x] Solver unsoundness: mapped optional remove over optional keyof yields required properties in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_optional_remove_from_optional_keyof`.
 - [x] Solver unsoundness: mapped readonly remove over readonly keyof yields mutable properties in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_readonly_remove_from_readonly_keyof`.
 - [x] Solver unsoundness: mapped optional+readonly add yields optional readonly properties in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_optional_readonly_add_subtyping`.
+- [x] Solver unsoundness: mapped optional+readonly remove yields mutable required properties in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_optional_readonly_remove_subtyping`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
