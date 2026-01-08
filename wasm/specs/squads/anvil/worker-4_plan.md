@@ -7,12 +7,13 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [ ] Add ES5 class tests for using declarations in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
+- [ ] (none)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Add ES5 class tests for using declarations. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for decorators on constructor params. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for extends expression. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for private field initialization. Tests: `./wasm/test.sh class_es5_tests`
