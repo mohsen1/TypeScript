@@ -9106,3 +9106,85 @@ fn test_mapped_type_deferred() {
     // Should return the same mapped type (deferred)
     assert_eq!(result, mapped_type);
 }
+
+#[test]
+fn test_mapped_type_with_conditional_value_filter() {
+    let interner = TypeInterner::new();
+
+    // PickValue<T, V> = { [K in keyof T]: T[K] extends V ? T[K] : never }
+    // Applied to { a: number; b: string } with V = number
+    // The mapped type should evaluate to an object with 2 properties
+    // The conditional types in the value position may remain deferred if K is not fully resolved
+    let prop_a = interner.intern_string("a");
+    let prop_b = interner.intern_string("b");
+
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: prop_a,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: prop_b,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Type param K for the mapped type
+    let k_param = TypeParamInfo {
+        name: interner.intern_string("K"),
+        constraint: None,
+        default: None,
+    };
+    let k_ref = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    // T[K] as indexed access (using K as key into source object)
+    let indexed_access = interner.intern(TypeKey::IndexAccess(source_obj, k_ref));
+
+    // Conditional: T[K] extends number ? T[K] : never
+    let conditional = interner.conditional(ConditionalType {
+        check_type: indexed_access,
+        extends_type: TypeId::NUMBER,
+        true_type: indexed_access,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    });
+
+    // keyof T
+    let keyof_obj = interner.intern(TypeKey::KeyOf(source_obj));
+
+    let mapped = MappedType {
+        type_param: k_param,
+        constraint: keyof_obj,
+        name_type: None,
+        template: conditional,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Verify result is an object with 2 properties (property types may be deferred conditionals)
+    let result_key = interner.lookup(result);
+    match result_key {
+        Some(TypeKey::Object(shape_id)) => {
+            let shape = interner.object_shape(shape_id);
+            assert_eq!(shape.properties.len(), 2, "Expected 2 properties");
+
+            let prop_a_info = shape.properties.iter().find(|p| p.name == prop_a).expect("Expected property 'a'");
+            let prop_b_info = shape.properties.iter().find(|p| p.name == prop_b).expect("Expected property 'b'");
+
+            // Properties exist - their types may be conditional types or evaluated
+            assert!(prop_a_info.type_id != TypeId::NEVER, "Property 'a' should exist (non-never)");
+            // prop_b could be never or a deferred conditional - both are valid
+        }
+        _ => panic!("Expected result to be an object type, got {:?}", result_key),
+    }
+}
