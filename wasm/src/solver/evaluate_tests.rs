@@ -9284,3 +9284,147 @@ fn test_mapped_type_with_optional_modifier_and_conditional() {
         _ => panic!("Expected result to be an object type, got {:?}", result_key),
     }
 }
+
+#[test]
+fn test_mapped_type_required_removes_optional() {
+    let interner = TypeInterner::new();
+
+    // Required<T> = { [K in keyof T]-?: T[K] }
+    // Applied to { a?: number; b?: string } should make both required
+    let prop_a = interner.intern_string("a");
+    let prop_b = interner.intern_string("b");
+
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: prop_a,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: true, // Originally optional
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: prop_b,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: true, // Originally optional
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let k_param = TypeParamInfo {
+        name: interner.intern_string("K"),
+        constraint: None,
+        default: None,
+    };
+    let k_ref = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+    let indexed_access = interner.intern(TypeKey::IndexAccess(source_obj, k_ref));
+    let keyof_obj = interner.intern(TypeKey::KeyOf(source_obj));
+
+    let mapped = MappedType {
+        type_param: k_param,
+        constraint: keyof_obj,
+        name_type: None,
+        template: indexed_access,
+        readonly_modifier: None,
+        optional_modifier: Some(MappedModifier::Remove), // -? removes optional
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    let result_key = interner.lookup(result);
+    match result_key {
+        Some(TypeKey::Object(shape_id)) => {
+            let shape = interner.object_shape(shape_id);
+            assert_eq!(shape.properties.len(), 2, "Expected 2 properties");
+
+            let prop_a_info = shape.properties.iter().find(|p| p.name == prop_a).expect("Expected property 'a'");
+            let prop_b_info = shape.properties.iter().find(|p| p.name == prop_b).expect("Expected property 'b'");
+
+            // Both properties should now be required (optional = false)
+            assert!(!prop_a_info.optional, "Property 'a' should be required (not optional)");
+            assert!(!prop_b_info.optional, "Property 'b' should be required (not optional)");
+        }
+        _ => panic!("Expected result to be an object type, got {:?}", result_key),
+    }
+}
+
+#[test]
+fn test_mapped_type_pick_subset_keys() {
+    let interner = TypeInterner::new();
+
+    // Pick<T, K> = { [P in K]: T[P] }
+    // Pick<{ a: number; b: string; c: boolean }, "a" | "c">
+    // Should produce { a: number; c: boolean }
+    let prop_a = interner.intern_string("a");
+    let prop_b = interner.intern_string("b");
+    let prop_c = interner.intern_string("c");
+
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: prop_a,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: prop_b,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: prop_c,
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Keys to pick: "a" | "c"
+    let key_a = interner.literal_string("a");
+    let key_c = interner.literal_string("c");
+    let pick_keys = interner.union(vec![key_a, key_c]);
+
+    let k_param = TypeParamInfo {
+        name: interner.intern_string("K"),
+        constraint: None,
+        default: None,
+    };
+    let k_ref = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+    let indexed_access = interner.intern(TypeKey::IndexAccess(source_obj, k_ref));
+
+    let mapped = MappedType {
+        type_param: k_param,
+        constraint: pick_keys, // Only iterate over "a" | "c"
+        name_type: None,
+        template: indexed_access,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    let result_key = interner.lookup(result);
+    match result_key {
+        Some(TypeKey::Object(shape_id)) => {
+            let shape = interner.object_shape(shape_id);
+            assert_eq!(shape.properties.len(), 2, "Expected 2 properties (a and c only)");
+
+            let prop_names: Vec<String> = shape.properties.iter()
+                .map(|p| interner.resolve_atom(p.name))
+                .collect();
+            assert!(prop_names.contains(&"a".to_string()), "Should have property 'a'");
+            assert!(prop_names.contains(&"c".to_string()), "Should have property 'c'");
+            assert!(!prop_names.contains(&"b".to_string()), "Should NOT have property 'b'");
+        }
+        _ => panic!("Expected result to be an object type, got {:?}", result_key),
+    }
+}
