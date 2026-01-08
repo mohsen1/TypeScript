@@ -59,6 +59,9 @@
 use crate::parser::thin_node::ThinNodeArena;
 use crate::parser::{syntax_kind_ext, NodeIndex, NodeList};
 use crate::scanner::SyntaxKind;
+use crate::thin_emitter::ThinPrinter;
+use crate::transform_context::{TransformContext, TransformDirective};
+use crate::transforms::arrow_es5::contains_this_reference;
 use crate::transforms::emit_utils;
 
 /// State for tracking async function transformation
@@ -205,6 +208,35 @@ impl<'a> AsyncES5Emitter<'a> {
                             return true;
                         }
                     }
+                }
+            }
+        }
+
+        // Check property/element access expressions
+        if node.kind == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION
+            || node.kind == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION
+        {
+            if let Some(access) = self.arena.get_access_expr(node) {
+                if self.contains_await_recursive(access.expression) {
+                    return true;
+                }
+                if self.contains_await_recursive(access.name_or_argument) {
+                    return true;
+                }
+            }
+        }
+
+        // Check conditional expressions
+        if node.kind == syntax_kind_ext::CONDITIONAL_EXPRESSION {
+            if let Some(cond) = self.arena.get_conditional_expr(node) {
+                if self.contains_await_recursive(cond.condition) {
+                    return true;
+                }
+                if self.contains_await_recursive(cond.when_true) {
+                    return true;
+                }
+                if self.contains_await_recursive(cond.when_false) {
+                    return true;
                 }
             }
         }
@@ -482,59 +514,69 @@ impl<'a> AsyncES5Emitter<'a> {
             return;
         };
 
-        for &decl_idx in &var_data.declarations.nodes {
-            let Some(decl_node) = self.arena.get(decl_idx) else {
+        for &decl_list_idx in &var_data.declarations.nodes {
+            let Some(decl_list_node) = self.arena.get(decl_list_idx) else {
                 continue;
             };
 
-            let Some(decl) = self.arena.get_variable_declaration(decl_node) else {
+            let Some(decl_list) = self.arena.get_variable(decl_list_node) else {
                 continue;
             };
 
-            if self.contains_await_recursive(decl.initializer) {
-                // Handle await in initializer
-                // var x = await foo(); -> return [4, foo()]; case N: x = _a.sent();
-                let name = self.get_binding_name(decl.name);
+            for &decl_idx in &decl_list.declarations.nodes {
+                let Some(decl_node) = self.arena.get(decl_idx) else {
+                    continue;
+                };
 
-                if self.is_await_expression(decl.initializer) {
-                    let Some(await_node) = self.arena.get(decl.initializer) else {
-                        continue;
-                    };
+                let Some(decl) = self.arena.get_variable_declaration(decl_node) else {
+                    continue;
+                };
 
-                    // await uses UnaryExprDataEx, not UnaryExprData
-                    let operand_idx = if await_node.has_data() {
-                        if let Some(unary_ex) = self.arena.unary_exprs_ex.get(await_node.data_index as usize) {
-                            unary_ex.expression
+                if self.contains_await_recursive(decl.initializer) {
+                    // Handle await in initializer
+                    // var x = await foo(); -> return [4, foo()]; case N: x = _a.sent();
+                    let name = self.get_binding_name(decl.name);
+
+                    if self.is_await_expression(decl.initializer) {
+                        let Some(await_node) = self.arena.get(decl.initializer) else {
+                            continue;
+                        };
+
+                        // await uses UnaryExprDataEx, not UnaryExprData
+                        let operand_idx = if await_node.has_data() {
+                            if let Some(unary_ex) = self.arena.unary_exprs_ex.get(await_node.data_index as usize) {
+                                unary_ex.expression
+                            } else {
+                                continue;
+                            }
                         } else {
                             continue;
-                        }
-                    } else {
-                        continue;
-                    };
+                        };
 
-                    self.write_indent();
-                    self.write("return [4 /*yield*/, ");
-                    self.emit_expression(operand_idx);
-                    self.write("];");
-                    self.write_line();
+                        self.write_indent();
+                        self.write("return [4 /*yield*/, ");
+                        self.emit_expression(operand_idx);
+                        self.write("];");
+                        self.write_line();
 
-                    self.state.label_counter += 1;
-                    self.emit_case_label(self.state.label_counter);
+                        self.state.label_counter += 1;
+                        self.emit_case_label(self.state.label_counter);
+                        self.write_indent();
+                        self.write(&name);
+                        self.write(" = _a.sent();");
+                        self.write_line();
+                    }
+                } else {
+                    // Regular variable declaration
                     self.write_indent();
-                    self.write(&name);
-                    self.write(" = _a.sent();");
+                    self.emit_expression(decl.name);
+                    if !decl.initializer.is_none() {
+                        self.write(" = ");
+                        self.emit_expression(decl.initializer);
+                    }
+                    self.write(";");
                     self.write_line();
                 }
-            } else {
-                // Regular variable declaration
-                self.write_indent();
-                self.emit_expression(decl.name);
-                if !decl.initializer.is_none() {
-                    self.write(" = ");
-                    self.emit_expression(decl.initializer);
-                }
-                self.write(";");
-                self.write_line();
             }
         }
     }
@@ -613,21 +655,26 @@ impl<'a> AsyncES5Emitter<'a> {
             }
             k if k == syntax_kind_ext::CALL_EXPRESSION => {
                 if let Some(call) = self.arena.get_call_expr(node) {
-                    self.emit_expression(call.expression);
-                    self.write("(");
-                    if let Some(args) = &call.arguments {
-                        let mut first = true;
-                        for &arg_idx in &args.nodes {
-                            if !first {
-                                self.write(", ");
+                    if self.is_super_method_call(call.expression) {
+                        self.emit_super_method_call(call.expression, &call.arguments);
+                    } else {
+                        self.emit_expression(call.expression);
+                        self.write("(");
+                        if let Some(args) = &call.arguments {
+                            let mut first = true;
+                            for &arg_idx in &args.nodes {
+                                if !first {
+                                    self.write(", ");
+                                }
+                                first = false;
+                                self.emit_expression(arg_idx);
                             }
-                            first = false;
-                            self.emit_expression(arg_idx);
                         }
+                        self.write(")");
                     }
-                    self.write(")");
                 }
             }
+
             k if k == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION => {
                 if let Some(access) = self.arena.get_access_expr(node) {
                     self.emit_expression(access.expression);
@@ -674,11 +721,67 @@ impl<'a> AsyncES5Emitter<'a> {
                     }
                 }
             }
+            k if k == syntax_kind_ext::ARROW_FUNCTION => {
+                let captures_this = contains_this_reference(self.arena, idx);
+                let mut transforms = TransformContext::new();
+                transforms.insert(
+                    idx,
+                    TransformDirective::ES5ArrowFunction {
+                        arrow_node: idx,
+                        captures_this,
+                    },
+                );
+                let mut printer = ThinPrinter::with_transforms(self.arena, transforms);
+                printer.set_target_es5(true);
+                printer.emit(idx);
+                self.write(printer.get_output());
+            }
             _ => {
                 // Fallback for unhandled expressions
                 self.write("void 0");
             }
         }
+    }
+
+    fn is_super_method_call(&self, expr_idx: NodeIndex) -> bool {
+        let Some(expr_node) = self.arena.get(expr_idx) else {
+            return false;
+        };
+
+        if expr_node.kind != syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION {
+            return false;
+        }
+
+        let Some(access) = self.arena.get_access_expr(expr_node) else {
+            return false;
+        };
+        let Some(base_node) = self.arena.get(access.expression) else {
+            return false;
+        };
+
+        base_node.kind == SyntaxKind::SuperKeyword as u16
+    }
+
+    fn emit_super_method_call(&mut self, callee_idx: NodeIndex, args: &Option<NodeList>) {
+        let Some(callee_node) = self.arena.get(callee_idx) else {
+            return;
+        };
+        let Some(access) = self.arena.get_access_expr(callee_node) else {
+            return;
+        };
+
+        self.write("_super.prototype.");
+        self.emit_expression(access.name_or_argument);
+        self.write(".call(this");
+
+        if let Some(arg_list) = args {
+            for &arg_idx in &arg_list.nodes {
+                self.write(", ");
+                self.emit_expression(arg_idx);
+            }
+        }
+
+        self.write(")");
     }
 
     fn emit_operator(&mut self, op: u16) {
@@ -807,6 +910,32 @@ mod tests {
                         if let Some(func) = parser.arena.get_function(func_node) {
                             let emitter = AsyncES5Emitter::new(&parser.arena);
                             assert!(emitter.body_contains_await(func.body), "Should detect await");
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_body_contains_await_in_conditional_property_access() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "async function foo() { return cond ? (await bar()).baz : (await qux())[idx]; }"
+                .to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        if let Some(root_node) = parser.arena.get(root) {
+            if let Some(source_file) = parser.arena.get_source_file(root_node) {
+                if let Some(&func_idx) = source_file.statements.nodes.first() {
+                    if let Some(func_node) = parser.arena.get(func_idx) {
+                        if let Some(func) = parser.arena.get_function(func_node) {
+                            let emitter = AsyncES5Emitter::new(&parser.arena);
+                            assert!(
+                                emitter.body_contains_await(func.body),
+                                "Should detect await in conditional property/element access"
+                            );
                         }
                     }
                 }
