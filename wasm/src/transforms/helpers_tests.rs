@@ -87,3 +87,17 @@ fn test_emit_create_binding_before_import_star_helpers() {
     assert!(create_binding_pos < set_module_default_pos, "__createBinding should precede __setModuleDefault");
     assert!(create_binding_pos < import_star_pos, "__createBinding should precede __importStar");
 }
+
+#[test]
+fn test_emit_class_private_helpers_ordering() {
+    let mut helpers = HelpersNeeded::default();
+    helpers.class_private_field_get = true;
+    helpers.class_private_field_set = true;
+    helpers.class_private_field_in = true;
+    let output = emit_helpers(&helpers);
+    let get_pos = output.find("__classPrivateFieldGet").expect("Expected __classPrivateFieldGet helper");
+    let set_pos = output.find("__classPrivateFieldSet").expect("Expected __classPrivateFieldSet helper");
+    let in_pos = output.find("__classPrivateFieldIn").expect("Expected __classPrivateFieldIn helper");
+    assert!(get_pos < set_pos, "__classPrivateFieldGet should precede __classPrivateFieldSet");
+    assert!(set_pos < in_pos, "__classPrivateFieldSet should precede __classPrivateFieldIn");
+}
