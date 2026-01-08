@@ -142,6 +142,57 @@ fn test_body_contains_await_in_for_loop_condition() {
 }
 
 #[test]
+fn test_body_contains_await_in_for_of_expression() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "async function foo() { for (const item of await getItems()) { work(item); } }"
+            .to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&func_idx) = source_file.statements.nodes.first() {
+                if let Some(func_node) = parser.arena.get(func_idx) {
+                    if let Some(func) = parser.arena.get_function(func_node) {
+                        let emitter = AsyncES5Emitter::new(&parser.arena);
+                        assert!(
+                            emitter.body_contains_await(func.body),
+                            "Should detect await in for-of expression"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn test_body_contains_await_in_for_in_expression() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "async function foo() { for (const key in await getMap()) { use(key); } }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&func_idx) = source_file.statements.nodes.first() {
+                if let Some(func_node) = parser.arena.get(func_idx) {
+                    if let Some(func) = parser.arena.get_function(func_node) {
+                        let emitter = AsyncES5Emitter::new(&parser.arena);
+                        assert!(
+                            emitter.body_contains_await(func.body),
+                            "Should detect await in for-in expression"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn test_body_contains_await_in_try_finally() {
     let mut parser = ThinParserState::new(
         "test.ts".to_string(),
