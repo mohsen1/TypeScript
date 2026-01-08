@@ -7,12 +7,13 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- [ ] Add ES5 async tests for async method expressions in `wasm/src/transforms/async_es5_tests.rs`. Run `./wasm/test.sh async_es5_tests`.
+- Complete: Added 12 async method expression tests (basic, with return, no await, multiple awaits, with parameters, body_contains_await, ignores nested async, shorthand syntax, try/catch, in loop, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (112 tests PASS).
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added 12 async method expression tests (basic, with return, no await, multiple awaits, with parameters, body_contains_await, ignores nested async, shorthand syntax, try/catch, in loop, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (112 tests PASS).
 - [x] Added 12 async arrow function tests (block body, expression body, no await, with parameters, multiple awaits, body_contains_await, ignores nested async, rest params, destructuring params, try/catch, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (100 tests PASS).
 - [x] Added 12 async class method tests (basic, with return, no await, multiple awaits, static method, with parameters, body_contains_await, ignores nested async, try/catch, in loop, conditional await) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (88 tests PASS).
 - [x] Added 14 error handling pattern tests (try/catch basic, try/finally basic, try/catch/finally full, await in catch, await in finally, nested try/catch, rethrow, error wrapping, sequential try, return in finally, type guard catch, multiple catches, finally always runs, catch and rethrow new error) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (76 tests PASS).
