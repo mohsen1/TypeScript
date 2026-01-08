@@ -7,10 +7,10 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- (Manager to fill in.)
+- Emitter fidelity: analyze expected output for `emitter_parity_tests::test_parity_async_es5` by reading the test and any golden helpers. Report expected output/invariants (no code edits).
 
 ## Task Queue
-- [ ] (Manager to fill in.)
+- [ ] If the expected output is underspecified, propose what a stable expected output should assert.
 
 ## Completed
 - [x] (Move finished items here with brief notes and tests run.)

@@ -7,10 +7,10 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- (Manager to fill in.)
+- Emitter fidelity: own the fix for `emitter_parity_tests::test_parity_async_es5`. Run targeted test, capture actual vs expected output, implement minimal fix, and rerun.
 
 ## Task Queue
-- [ ] (Manager to fill in.)
+- [ ] If parity_async_es5 is resolved, rerun emitter-focused tests and report remaining failures.
 
 ## Completed
 - [x] (Move finished items here with brief notes and tests run.)

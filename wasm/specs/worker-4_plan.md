@@ -7,10 +7,10 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- (Manager to fill in.)
+- Emitter fidelity: summarize current `async_es5` changes and whether they address `emitter_parity_tests::test_parity_async_es5`; run targeted test and propose next minimal change if needed. Coordinate with worker-5.
 
 ## Task Queue
-- [ ] (Manager to fill in.)
+- [ ] If parity_async_es5 is fixed, re-verify ES5 downleveling edge cases for `this` capture and super() property initializer ordering.
 
 ## Completed
 - [x] (Move finished items here with brief notes and tests run.)
