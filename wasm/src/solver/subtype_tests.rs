@@ -1999,6 +1999,75 @@ fn test_number_index_signature_type_mismatch() {
 }
 
 #[test]
+fn test_number_index_signature_method_bivariant_property() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let narrow_param = TypeId::STRING;
+    let wide_param = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    let narrow_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: narrow_param,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let wide_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: wide_param,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let source_method = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("0"),
+        type_id: narrow_method,
+        write_type: narrow_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let source_prop = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("0"),
+        type_id: narrow_method,
+        write_type: narrow_method,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let target_shape = ObjectShape {
+        properties: vec![],
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: wide_fn,
+            readonly: false,
+        }),
+        string_index: None,
+    };
+    let target = interner.object_with_index(target_shape);
+
+    assert!(checker.is_subtype_of(source_method, target));
+    assert!(!checker.is_subtype_of(source_prop, target));
+}
+
+#[test]
 fn test_number_index_signature_multiple_numeric_props() {
     // { 0: string, 1: string, 2: string } should match { [x: number]: string }
     use std::sync::Arc;
