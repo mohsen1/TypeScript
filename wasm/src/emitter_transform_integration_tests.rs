@@ -468,6 +468,46 @@ class Derived extends Base {
 }
 
 #[test]
+fn test_two_phase_emission_es5_class_method_nested_arrow_arguments_capture() {
+    let source = r#"
+class Foo {
+    method(a) {
+        const f = () => () => this.x + arguments[0];
+        return f()();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("_this.x"),
+        "ES5 output should capture this inside nested arrow: {}",
+        output
+    );
+    assert!(
+        output.contains("arguments[0]"),
+        "ES5 output should preserve arguments usage in nested arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel nested arrow: {}",
+        output
+    );
+}
+
+#[test]
 fn test_two_phase_emission_es5_class_derived_prop_init_after_super() {
     let source = r#"
 class Base {}
