@@ -75,6 +75,7 @@ Priority: 2
 - [x] Added template literal suffix infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_with_suffix_distributive`.
 - [x] Added function rest parameter infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_function_rest_param_distributive`.
 - [x] Added non-distributive template literal infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_non_distributive_union_input`.
+- [x] Added template literal middle infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_with_middle_infer_distributive`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
