@@ -1418,3 +1418,62 @@ fn test_parity_es5_let_in_for_loop() {
         output
     );
 }
+
+/// Parity test for ES5 CommonJS named exports.
+/// Named exports should be assigned to exports object.
+#[test]
+fn test_parity_es5_commonjs_named_exports() {
+    let source = "const foo = 1; const bar = 2; export { foo, bar };";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::CommonJS;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify CommonJS named exports
+    assert!(
+        output.contains("__esModule"),
+        "CommonJS output should include __esModule marker: {}",
+        output
+    );
+    assert!(
+        output.contains("var foo") || output.contains("foo = 1"),
+        "CommonJS output should define foo: {}",
+        output
+    );
+    assert!(
+        output.contains("var bar") || output.contains("bar = 2"),
+        "CommonJS output should define bar: {}",
+        output
+    );
+    // Named exports should be assigned to exports
+    assert!(
+        output.contains("exports.foo") || output.contains("exports[\"foo\"]"),
+        "CommonJS output should export foo: {}",
+        output
+    );
+    assert!(
+        output.contains("exports.bar") || output.contains("exports[\"bar\"]"),
+        "CommonJS output should export bar: {}",
+        output
+    );
+    // No ES6 export syntax
+    assert!(
+        !output.contains("export {"),
+        "CommonJS output should not contain ES6 export syntax: {}",
+        output
+    );
+}
