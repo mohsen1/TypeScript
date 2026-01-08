@@ -91,6 +91,26 @@ fn test_async_return_await_emits_sent() {
 }
 
 #[test]
+fn test_async_await_in_variable_initializer() {
+    let output = parse_and_emit_async("async function foo() { let x = await bar(); return x; }");
+    assert!(
+        output.contains("return [4 /*yield*/, bar()]"),
+        "Await initializer should yield: {}",
+        output
+    );
+    assert!(
+        output.contains("x = _a.sent();"),
+        "Await initializer should assign _a.sent(): {}",
+        output
+    );
+    assert!(
+        output.contains("return [2 /*return*/, x];"),
+        "Return should use initialized variable: {}",
+        output
+    );
+}
+
+#[test]
 fn test_body_contains_await_detection() {
     let mut parser =
         ThinParserState::new("test.ts".to_string(), "async function foo() { await x; }".to_string());
