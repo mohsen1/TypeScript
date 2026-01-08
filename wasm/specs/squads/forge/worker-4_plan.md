@@ -10,7 +10,7 @@ Priority: 4
 - [x] Investigate `DeepPartial<T>` and `PickValue<T, V>` mapped type patterns from `test_check_redux_lodash_style_generics`. Test these patterns in isolation in `wasm/src/solver/evaluate_tests.rs` to identify if they contribute to the 6 diagnostics. **Result:** The 6 diagnostics issue is now fixed (test passes with 0 diagnostics). Added solver tests for both patterns.
 
 ## Task Queue
-- [ ] Add additional end-to-end tests for other lodash-style utility types (Omit, Pick, Required, Readonly).
+- [x] Add additional end-to-end tests for other lodash-style utility types (Omit, Pick, Required, Readonly). **Done:** Added Required and Pick pattern tests. Omit covered by existing `test_mapped_type_key_remap_filters_keys`. Readonly covered by existing `test_mapped_type_with_readonly_modifier`.
 - [ ] Verify mapped type + conditional type nesting works correctly.
 
 ## Completed
@@ -49,6 +49,8 @@ Priority: 4
 - [x] Added solver coverage for mapped type with conditional value filter (PickValue pattern). Tests: `./wasm/test.sh`.
 - [x] Investigated DeepPartial/PickValue patterns - 6 diagnostics issue is now fixed. Tests: `./wasm/test.sh`.
 - [x] Added solver coverage for mapped type with optional modifier and conditional (DeepPartial pattern). Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for Required utility type pattern (removes optional modifier). Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for Pick utility type pattern (subset key iteration). Tests: `./wasm/test.sh`.
 
 ## Ready for Merge
 Yes
