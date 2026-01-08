@@ -46,6 +46,7 @@ Priority: 1
 - [x] Missing optional property is allowed; added `test_resolve_bounds_optional_property_missing_ok`. Tests: `./wasm/test.sh test_resolve_bounds_optional_property_missing_ok`.
 - [x] Object keyword upper rejects string lower; added `test_resolve_bounds_object_keyword_rejects_string`. Tests: `./wasm/test.sh test_resolve_bounds_object_keyword_rejects_string`.
 - [x] Missing optional readonly property is allowed; added `test_resolve_bounds_object_readonly_property_missing_ok`. Tests: `./wasm/test.sh test_resolve_bounds_object_readonly_property_missing_ok`.
+- [x] String index rejects incompatible property; added `test_resolve_bounds_string_index_property_mismatch`. Tests: `./wasm/test.sh test_resolve_bounds_string_index_property_mismatch`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
