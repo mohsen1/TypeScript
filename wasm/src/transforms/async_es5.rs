@@ -657,6 +657,8 @@ impl<'a> AsyncES5Emitter<'a> {
                 if let Some(call) = self.arena.get_call_expr(node) {
                     if self.is_super_method_call(call.expression) {
                         self.emit_super_method_call(call.expression, &call.arguments);
+                    } else if self.is_super_element_call(call.expression) {
+                        self.emit_super_element_call(call.expression, &call.arguments);
                     } else {
                         self.emit_expression(call.expression);
                         self.write("(");
@@ -762,6 +764,25 @@ impl<'a> AsyncES5Emitter<'a> {
         base_node.kind == SyntaxKind::SuperKeyword as u16
     }
 
+    fn is_super_element_call(&self, expr_idx: NodeIndex) -> bool {
+        let Some(expr_node) = self.arena.get(expr_idx) else {
+            return false;
+        };
+
+        if expr_node.kind != syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION {
+            return false;
+        }
+
+        let Some(access) = self.arena.get_access_expr(expr_node) else {
+            return false;
+        };
+        let Some(base_node) = self.arena.get(access.expression) else {
+            return false;
+        };
+
+        base_node.kind == SyntaxKind::SuperKeyword as u16
+    }
+
     fn emit_super_method_call(&mut self, callee_idx: NodeIndex, args: &Option<NodeList>) {
         let Some(callee_node) = self.arena.get(callee_idx) else {
             return;
@@ -773,6 +794,28 @@ impl<'a> AsyncES5Emitter<'a> {
         self.write("_super.prototype.");
         self.emit_expression(access.name_or_argument);
         self.write(".call(this");
+
+        if let Some(arg_list) = args {
+            for &arg_idx in &arg_list.nodes {
+                self.write(", ");
+                self.emit_expression(arg_idx);
+            }
+        }
+
+        self.write(")");
+    }
+
+    fn emit_super_element_call(&mut self, callee_idx: NodeIndex, args: &Option<NodeList>) {
+        let Some(callee_node) = self.arena.get(callee_idx) else {
+            return;
+        };
+        let Some(access) = self.arena.get_access_expr(callee_node) else {
+            return;
+        };
+
+        self.write("_super.prototype[");
+        self.emit_expression(access.name_or_argument);
+        self.write("].call(this");
 
         if let Some(arg_list) = args {
             for &arg_idx in &arg_list.nodes {
