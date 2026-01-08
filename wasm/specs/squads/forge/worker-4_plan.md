@@ -7,15 +7,20 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [ ] End-to-end validation: add a compile-and-check regression for a non-trivial generic library snippet in `wasm/src/thin_checker_tests.rs` and fix the first panic or mismatch in `wasm/src/checker/mod.rs` or `wasm/src/solver/mod.rs`; run `./wasm/test.sh`.
+- [ ] Investigate `DeepPartial<T>` and `PickValue<T, V>` mapped type patterns from `test_check_redux_lodash_style_generics`. Test these patterns in isolation in `wasm/src/solver/evaluate_tests.rs` to identify if they contribute to the 6 diagnostics.
 
 ## Task Queue
-- [ ] Add a multi-file generic library test case (redux/lodash-style types) and assert no panics + expected diagnostics.
-- [ ] If a panic arises, minimize to a focused solver/checker regression test in `wasm/src/solver/*_tests.rs` or `wasm/src/checker/*_tests.rs`.
-- [ ] Validate the new test still passes with `./wasm/test.sh`.
+- [ ] Add additional end-to-end tests for other lodash-style utility types (Omit, Pick, Required, Readonly).
+- [ ] Verify mapped type + conditional type nesting works correctly.
 
 ## Completed
-- [x] (Move finished items here with brief notes and tests run)
+- [x] Added generic library regression + fixed declare function overload handling. Tests: `./wasm/test.sh test_generic_library_snippet_compiles_and_checks` (full suite fails on existing `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
+- [x] Added multi-file generic regression across two files. Tests: `./wasm/test.sh test_multi_file_generic_library_snippet_compiles_and_checks`.
+- [x] Synced with `origin/rust`; `FunctionId` build error not reproducible in `wasm/src/solver/evaluate.rs`. Tests: `./wasm/test.sh` (fails on existing `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
+- [x] Added redux/lodash-style mapped/conditional regression in `wasm/src/parallel_tests.rs`. Tests: `./wasm/test.sh` (fails: `src/transforms/async_es5.rs` unexpected closing delimiter).
+- [x] Added union normalization coverage for `unknown` and nested unions. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` diagnostic count 6 vs 0).
+- [x] Added intersection flatten/dedup coverage. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` diagnostic count 6 vs 0).
+- [x] Added `any` vs `unknown` precedence coverage for unions/intersections. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` diagnostic count 6 vs 0).
 
 ## Ready for Merge
 No
@@ -24,6 +29,7 @@ No
 - Project Direction: integration and conformance-first; prioritize solver correctness (inference/conditional/subtype) before new features.
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
+- Conformance focus: tie regressions to official TypeScript conformance cases when possible.
 - Commit format: `[wasm] solver: <description>` or `[wasm] checker: <description>`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/forge-4`

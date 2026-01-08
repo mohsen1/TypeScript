@@ -1847,13 +1847,15 @@ impl ThinBinderState {
             // Enter function scope and bind body
             self.enter_scope(ContainerKind::Function, idx);
 
-            // Bind parameters
-            for &param_idx in &func.parameters.nodes {
-                self.bind_parameter(arena, param_idx);
-            }
+            self.with_fresh_flow(|binder| {
+                // Bind parameters
+                for &param_idx in &func.parameters.nodes {
+                    binder.bind_parameter(arena, param_idx);
+                }
 
-            // Bind body
-            self.bind_node(arena, func.body);
+                // Bind body
+                binder.bind_node(arena, func.body);
+            });
 
             self.exit_scope();
         }
@@ -1890,13 +1892,15 @@ impl ThinBinderState {
             // Enter function scope
             self.enter_scope(ContainerKind::Function, idx);
 
-            // Bind parameters
-            for &param_idx in &func.parameters.nodes {
-                self.bind_parameter(arena, param_idx);
-            }
+            self.with_fresh_flow(|binder| {
+                // Bind parameters
+                for &param_idx in &func.parameters.nodes {
+                    binder.bind_parameter(arena, param_idx);
+                }
 
-            // Bind body (could be a block or an expression)
-            self.bind_node(arena, func.body);
+                // Bind body (could be a block or an expression)
+                binder.bind_node(arena, func.body);
+            });
 
             self.exit_scope();
         }
@@ -1909,13 +1913,15 @@ impl ThinBinderState {
             // Enter function scope
             self.enter_scope(ContainerKind::Function, idx);
 
-            // Bind parameters
-            for &param_idx in &func.parameters.nodes {
-                self.bind_parameter(arena, param_idx);
-            }
+            self.with_fresh_flow(|binder| {
+                // Bind parameters
+                for &param_idx in &func.parameters.nodes {
+                    binder.bind_parameter(arena, param_idx);
+                }
 
-            // Bind body
-            self.bind_node(arena, func.body);
+                // Bind body
+                binder.bind_node(arena, func.body);
+            });
 
             self.exit_scope();
         }
@@ -1930,13 +1936,15 @@ impl ThinBinderState {
     ) {
         self.enter_scope(ContainerKind::Function, idx);
 
-        for &param_idx in &parameters.nodes {
-            self.bind_parameter(arena, param_idx);
-        }
+        self.with_fresh_flow(|binder| {
+            for &param_idx in &parameters.nodes {
+                binder.bind_parameter(arena, param_idx);
+            }
 
-        if !body.is_none() {
-            self.bind_node(arena, body);
-        }
+            if !body.is_none() {
+                binder.bind_node(arena, body);
+            }
+        });
 
         self.exit_scope();
     }
@@ -2239,12 +2247,14 @@ impl ThinBinderState {
         if let Some(import) = arena.get_import_decl(node) {
             if let Some(clause_node) = arena.get(import.import_clause) {
                 if let Some(clause) = arena.get_import_clause(clause_node) {
+                    let clause_type_only = clause.is_type_only;
                     // Default import
                     if !clause.name.is_none() {
                         if let Some(name) = self.get_identifier_name(arena, clause.name) {
                             let sym_id = self.symbols.alloc(symbol_flags::ALIAS, name.to_string());
                             if let Some(sym) = self.symbols.get_mut(sym_id) {
                                 sym.declarations.push(clause.name);
+                                sym.is_type_only = clause_type_only;
                             }
                             self.current_scope.set(name.to_string(), sym_id);
                             self.node_symbols.insert(clause.name.0, sym_id);
@@ -2259,6 +2269,7 @@ impl ThinBinderState {
                                     let sym_id = self.symbols.alloc(symbol_flags::ALIAS, name.to_string());
                                     if let Some(sym) = self.symbols.get_mut(sym_id) {
                                         sym.declarations.push(clause.named_bindings);
+                                        sym.is_type_only = clause_type_only;
                                     }
                                     self.current_scope.set(name.to_string(), sym_id);
                                     self.node_symbols.insert(clause.named_bindings.0, sym_id);
@@ -2267,6 +2278,7 @@ impl ThinBinderState {
                                 for &spec_idx in &named.elements.nodes {
                                     if let Some(spec_node) = arena.get(spec_idx) {
                                         if let Some(spec) = arena.get_specifier(spec_node) {
+                                            let spec_type_only = clause_type_only || spec.is_type_only;
                                             let local_ident = if !spec.name.is_none() {
                                                 spec.name
                                             } else {
@@ -2278,6 +2290,7 @@ impl ThinBinderState {
                                                 let sym_id = self.symbols.alloc(symbol_flags::ALIAS, name.to_string());
                                                 if let Some(sym) = self.symbols.get_mut(sym_id) {
                                                     sym.declarations.push(local_ident);
+                                                    sym.is_type_only = spec_type_only;
                                                 }
                                                 self.current_scope.set(name.to_string(), sym_id);
                                                 self.node_symbols.insert(spec_idx.0, sym_id);
@@ -2468,6 +2481,17 @@ impl ThinBinderState {
         if !self.current_flow.is_none() {
             self.node_flow.insert(node.0, self.current_flow);
         }
+    }
+
+    fn with_fresh_flow<F>(&mut self, bind_body: F)
+    where
+        F: FnOnce(&mut Self),
+    {
+        let prev_flow = self.current_flow;
+        let start_flow = self.flow_nodes.alloc(flow_flags::START);
+        self.current_flow = start_flow;
+        bind_body(self);
+        self.current_flow = prev_flow;
     }
 
     // =========================================================================

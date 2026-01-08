@@ -52,6 +52,12 @@ pub const MAX_INSTANTIATION_DEPTH: u32 = 50;
 /// Maximum depth for call expression resolution.
 pub const MAX_CALL_DEPTH: u32 = 20;
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum EnumKind {
+    Numeric,
+    String,
+}
+
 impl<'a> ThinCheckerState<'a> {
     /// Create a new ThinCheckerState.
     ///
@@ -494,6 +500,9 @@ impl<'a> ThinCheckerState<'a> {
                         self.error_value_only_type_at(&name, type_name_idx);
                         return TypeId::ERROR;
                     }
+                    // Ensure the base type symbol is resolved first so its type params
+                    // are available in the type_env for Application expansion
+                    let _ = self.get_type_of_symbol(sym_id);
                     let type_resolver = |node_idx: NodeIndex| self.resolve_type_symbol_for_lowering(node_idx);
                     let value_resolver = |node_idx: NodeIndex| self.resolve_value_symbol_for_lowering(node_idx);
                     let lowering = crate::solver::TypeLowering::with_resolvers(
@@ -528,6 +537,9 @@ impl<'a> ThinCheckerState<'a> {
                                 self.error_value_only_type_at(name, type_name_idx);
                                 return TypeId::ERROR;
                             }
+                            // Ensure the base type symbol is resolved first so its type params
+                            // are available in the type_env for Application expansion
+                            let _ = self.get_type_of_symbol(sym_id);
                         }
                     }
                     let type_resolver = |node_idx: NodeIndex| self.resolve_type_symbol_for_lowering(node_idx);
@@ -2255,6 +2267,7 @@ impl<'a> ThinCheckerState<'a> {
         let mut properties: FxHashMap<Atom, PropertyInfo> = FxHashMap::default();
         let mut methods: FxHashMap<Atom, MethodAggregate> = FxHashMap::default();
         let mut accessors: FxHashMap<Atom, AccessorAggregate> = FxHashMap::default();
+        let mut has_nominal_members = false;
 
         for &member_idx in &class.members.nodes {
             let Some(member_node) = self.ctx.arena.get(member_idx) else {
@@ -2268,6 +2281,9 @@ impl<'a> ThinCheckerState<'a> {
                     };
                     if self.has_static_modifier(&prop.modifiers) {
                         continue;
+                    }
+                    if self.member_requires_nominal(&prop.modifiers, prop.name) {
+                        has_nominal_members = true;
                     }
                     let Some(name) = self.get_property_name(prop.name) else {
                         continue;
@@ -2297,6 +2313,9 @@ impl<'a> ThinCheckerState<'a> {
                     if self.has_static_modifier(&method.modifiers) {
                         continue;
                     }
+                    if self.member_requires_nominal(&method.modifiers, method.name) {
+                        has_nominal_members = true;
+                    }
                     let Some(name) = self.get_property_name(method.name) else {
                         continue;
                     };
@@ -2322,6 +2341,9 @@ impl<'a> ThinCheckerState<'a> {
                     };
                     if self.has_static_modifier(&accessor.modifiers) {
                         continue;
+                    }
+                    if self.member_requires_nominal(&accessor.modifiers, accessor.name) {
+                        has_nominal_members = true;
                     }
                     let Some(name) = self.get_property_name(accessor.name) else {
                         continue;
@@ -2370,6 +2392,11 @@ impl<'a> ThinCheckerState<'a> {
                         };
                         if !self.has_parameter_property_modifier(&param.modifiers) {
                             continue;
+                        }
+                        if self.has_private_modifier(&param.modifiers)
+                            || self.has_protected_modifier(&param.modifiers)
+                        {
+                            has_nominal_members = true;
                         }
                         let Some(name) = self.get_property_name(param.name) else {
                             continue;
@@ -2437,6 +2464,23 @@ impl<'a> ThinCheckerState<'a> {
                 optional,
                 readonly: false,
                 is_method: true,
+            });
+        }
+
+        if has_nominal_members {
+            let brand_name = if let Some(sym_id) = current_sym {
+                format!("__private_brand_{}", sym_id.0)
+            } else {
+                format!("__private_brand_node_{}", class_idx.0)
+            };
+            let brand_atom = self.ctx.types.intern_string(&brand_name);
+            properties.entry(brand_atom).or_insert(PropertyInfo {
+                name: brand_atom,
+                type_id: TypeId::ANY,
+                write_type: TypeId::ANY,
+                optional: false,
+                readonly: true,
+                is_method: false,
             });
         }
 
@@ -2550,10 +2594,170 @@ impl<'a> ThinCheckerState<'a> {
         class_idx: NodeIndex,
         class: &crate::parser::thin_node::ClassData,
     ) -> TypeId {
-        use crate::solver::{CallSignature, CallableShape};
+        use crate::solver::{CallSignature, CallableShape, PropertyInfo};
+        use rustc_hash::FxHashMap;
 
         let (class_type_params, type_param_updates) = self.push_type_parameters(&class.type_parameters);
         let instance_type = self.get_class_instance_type(class_idx, class);
+
+        struct MethodAggregate {
+            overload_signatures: Vec<CallSignature>,
+            impl_signatures: Vec<CallSignature>,
+            overload_optional: bool,
+            impl_optional: bool,
+        }
+
+        struct AccessorAggregate {
+            getter: Option<TypeId>,
+            setter: Option<TypeId>,
+        }
+
+        let mut properties: FxHashMap<Atom, PropertyInfo> = FxHashMap::default();
+        let mut methods: FxHashMap<Atom, MethodAggregate> = FxHashMap::default();
+        let mut accessors: FxHashMap<Atom, AccessorAggregate> = FxHashMap::default();
+
+        for &member_idx in &class.members.nodes {
+            let Some(member_node) = self.ctx.arena.get(member_idx) else {
+                continue;
+            };
+
+            match member_node.kind {
+                k if k == syntax_kind_ext::PROPERTY_DECLARATION => {
+                    let Some(prop) = self.ctx.arena.get_property_decl(member_node) else {
+                        continue;
+                    };
+                    if !self.has_static_modifier(&prop.modifiers) {
+                        continue;
+                    }
+                    let Some(name) = self.get_property_name(prop.name) else {
+                        continue;
+                    };
+                    let name_atom = self.ctx.types.intern_string(&name);
+                    let type_id = if !prop.type_annotation.is_none() {
+                        self.get_type_from_type_node(prop.type_annotation)
+                    } else if !prop.initializer.is_none() {
+                        self.get_type_of_node(prop.initializer)
+                    } else {
+                        TypeId::ANY
+                    };
+
+                    properties.insert(name_atom, PropertyInfo {
+                        name: name_atom,
+                        type_id,
+                        write_type: type_id,
+                        optional: prop.question_token,
+                        readonly: self.has_readonly_modifier(&prop.modifiers),
+                        is_method: false,
+                    });
+                }
+                k if k == syntax_kind_ext::METHOD_DECLARATION => {
+                    let Some(method) = self.ctx.arena.get_method_decl(member_node) else {
+                        continue;
+                    };
+                    if !self.has_static_modifier(&method.modifiers) {
+                        continue;
+                    }
+                    let Some(name) = self.get_property_name(method.name) else {
+                        continue;
+                    };
+                    let name_atom = self.ctx.types.intern_string(&name);
+                    let signature = self.call_signature_from_method(method);
+                    let entry = methods.entry(name_atom).or_insert(MethodAggregate {
+                        overload_signatures: Vec::new(),
+                        impl_signatures: Vec::new(),
+                        overload_optional: false,
+                        impl_optional: false,
+                    });
+                    if method.body.is_none() {
+                        entry.overload_signatures.push(signature);
+                        entry.overload_optional |= method.question_token;
+                    } else {
+                        entry.impl_signatures.push(signature);
+                        entry.impl_optional |= method.question_token;
+                    }
+                }
+                k if k == syntax_kind_ext::GET_ACCESSOR || k == syntax_kind_ext::SET_ACCESSOR => {
+                    let Some(accessor) = self.ctx.arena.get_accessor(member_node) else {
+                        continue;
+                    };
+                    if !self.has_static_modifier(&accessor.modifiers) {
+                        continue;
+                    }
+                    let Some(name) = self.get_property_name(accessor.name) else {
+                        continue;
+                    };
+                    let name_atom = self.ctx.types.intern_string(&name);
+                    let entry = accessors.entry(name_atom).or_insert(AccessorAggregate {
+                        getter: None,
+                        setter: None,
+                    });
+
+                    if k == syntax_kind_ext::GET_ACCESSOR {
+                        let getter_type = if !accessor.type_annotation.is_none() {
+                            self.get_type_from_type_node(accessor.type_annotation)
+                        } else {
+                            self.infer_getter_return_type(accessor.body)
+                        };
+                        entry.getter = Some(getter_type);
+                    } else {
+                        let setter_type = accessor.parameters.nodes.first()
+                            .and_then(|&param_idx| self.ctx.arena.get(param_idx))
+                            .and_then(|param_node| self.ctx.arena.get_parameter(param_node))
+                            .and_then(|param| {
+                                if !param.type_annotation.is_none() {
+                                    Some(self.get_type_from_type_node(param.type_annotation))
+                                } else {
+                                    None
+                                }
+                            })
+                            .unwrap_or(TypeId::ANY);
+                        entry.setter = Some(setter_type);
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        for (name, accessor) in accessors {
+            if methods.contains_key(&name) {
+                continue;
+            }
+            let read_type = accessor.getter.or(accessor.setter).unwrap_or(TypeId::ANY);
+            let write_type = accessor.setter.or(accessor.getter).unwrap_or(read_type);
+            let readonly = accessor.getter.is_some() && accessor.setter.is_none();
+            properties.insert(name, PropertyInfo {
+                name,
+                type_id: read_type,
+                write_type,
+                optional: false,
+                readonly,
+                is_method: false,
+            });
+        }
+
+        for (name, method) in methods {
+            let (signatures, optional) = if !method.overload_signatures.is_empty() {
+                (method.overload_signatures, method.overload_optional)
+            } else {
+                (method.impl_signatures, method.impl_optional)
+            };
+            if signatures.is_empty() {
+                continue;
+            }
+            let type_id = self.ctx.types.callable(CallableShape {
+                call_signatures: signatures,
+                construct_signatures: Vec::new(),
+                properties: Vec::new(),
+            });
+            properties.insert(name, PropertyInfo {
+                name,
+                type_id,
+                write_type: type_id,
+                optional,
+                readonly: false,
+                is_method: true,
+            });
+        }
 
         let mut has_overloads = false;
         for &member_idx in &class.members.nodes {
@@ -2610,12 +2814,13 @@ impl<'a> ThinCheckerState<'a> {
             });
         }
 
+        let properties: Vec<PropertyInfo> = properties.into_values().collect();
         self.pop_type_parameters(type_param_updates);
 
         self.ctx.types.callable(CallableShape {
             call_signatures: Vec::new(),
             construct_signatures,
-            properties: Vec::new(),
+            properties,
         })
     }
 
@@ -2768,6 +2973,8 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Get type of a symbol.
     pub fn get_type_of_symbol(&mut self, sym_id: SymbolId) -> TypeId {
+        use crate::solver::SymbolRef;
+
         self.record_symbol_dependency(sym_id);
 
         // Check cache first
@@ -2795,6 +3002,17 @@ impl<'a> ThinCheckerState<'a> {
         // Cache result
         self.ctx.symbol_types.insert(sym_id, result);
 
+        // Also populate the type environment for Application expansion
+        if result != TypeId::ANY && result != TypeId::ERROR {
+            let type_params = self.get_type_params_for_symbol(sym_id);
+            let mut env = self.ctx.type_env.borrow_mut();
+            if type_params.is_empty() {
+                env.insert(SymbolRef(sym_id.0), result);
+            } else {
+                env.insert_with_params(SymbolRef(sym_id.0), result, type_params);
+            }
+        }
+
         result
     }
 
@@ -2816,6 +3034,11 @@ impl<'a> ThinCheckerState<'a> {
         if flags & (symbol_flags::NAMESPACE_MODULE | symbol_flags::VALUE_MODULE) != 0 {
             // Note: We use the symbol ID directly.
             // For merged declarations, this ID points to the unified symbol in the binder.
+            return self.ctx.types.intern(TypeKey::Ref(SymbolRef(sym_id.0)));
+        }
+
+        // Enum - return a nominal reference type
+        if flags & symbol_flags::ENUM != 0 {
             return self.ctx.types.intern(TypeKey::Ref(SymbolRef(sym_id.0)));
         }
 
@@ -3027,6 +3250,20 @@ impl<'a> ThinCheckerState<'a> {
                 Some(self.ctx.types.literal_number(value))
             }
             _ => None,
+        }
+    }
+
+    fn widen_literal_type(&self, type_id: TypeId) -> TypeId {
+        use crate::solver::{LiteralValue, TypeKey};
+
+        match self.ctx.types.lookup(type_id) {
+            Some(TypeKey::Literal(literal)) => match literal {
+                LiteralValue::String(_) => TypeId::STRING,
+                LiteralValue::Number(_) => TypeId::NUMBER,
+                LiteralValue::BigInt(_) => TypeId::BIGINT,
+                LiteralValue::Boolean(_) => TypeId::BOOLEAN,
+            },
+            _ => type_id,
         }
     }
 
@@ -3471,6 +3708,9 @@ impl<'a> ThinCheckerState<'a> {
 
         if symbol.flags & symbol_flags::ALIAS == 0 {
             return false;
+        }
+        if symbol.is_type_only {
+            return true;
         }
 
         let mut visited = Vec::new();
@@ -4682,13 +4922,115 @@ impl<'a> ThinCheckerState<'a> {
     // Type Relations (uses solver::CompatChecker for assignability)
     // =========================================================================
 
+    fn enum_symbol_from_type(&self, type_id: TypeId) -> Option<SymbolId> {
+        use crate::solver::{SymbolRef, TypeKey};
+
+        let Some(TypeKey::Ref(SymbolRef(sym_id))) = self.ctx.types.lookup(type_id) else {
+            return None;
+        };
+        let symbol = self.ctx.binder.get_symbol(SymbolId(sym_id))?;
+        if symbol.flags & symbol_flags::ENUM == 0 {
+            return None;
+        }
+        Some(SymbolId(sym_id))
+    }
+
+    fn enum_kind(&self, sym_id: SymbolId) -> Option<EnumKind> {
+        let symbol = self.ctx.binder.get_symbol(sym_id)?;
+        if symbol.flags & symbol_flags::ENUM == 0 {
+            return None;
+        }
+
+        let decl_idx = if !symbol.value_declaration.is_none() {
+            symbol.value_declaration
+        } else {
+            *symbol.declarations.first()?
+        };
+        let node = self.ctx.arena.get(decl_idx)?;
+        let enum_decl = self.ctx.arena.get_enum(node)?;
+
+        let mut saw_string = false;
+        for &member_idx in &enum_decl.members.nodes {
+            let Some(member_node) = self.ctx.arena.get(member_idx) else {
+                continue;
+            };
+            let Some(member) = self.ctx.arena.get_enum_member(member_node) else {
+                continue;
+            };
+            if member.initializer.is_none() {
+                continue;
+            }
+            let Some(init_node) = self.ctx.arena.get(member.initializer) else {
+                continue;
+            };
+            if init_node.kind == SyntaxKind::StringLiteral as u16
+                || init_node.kind == SyntaxKind::NoSubstitutionTemplateLiteral as u16
+            {
+                saw_string = true;
+                break;
+            }
+        }
+
+        if saw_string {
+            Some(EnumKind::String)
+        } else {
+            Some(EnumKind::Numeric)
+        }
+    }
+
+    fn enum_assignability_override(
+        &self,
+        source: TypeId,
+        target: TypeId,
+        env: Option<&crate::solver::TypeEnvironment>,
+    ) -> Option<bool> {
+        let source_enum = self.enum_symbol_from_type(source);
+        let target_enum = self.enum_symbol_from_type(target);
+
+        if let (Some(source_enum), Some(target_enum)) = (source_enum, target_enum) {
+            return Some(source_enum == target_enum);
+        }
+
+        if let Some(source_enum) = source_enum {
+            if self.enum_kind(source_enum) == Some(EnumKind::Numeric) {
+                if let Some(env) = env {
+                    let mut checker =
+                        crate::solver::CompatChecker::with_resolver(self.ctx.types, env);
+                    return Some(checker.is_assignable(TypeId::NUMBER, target));
+                }
+                let mut checker = crate::solver::CompatChecker::new(self.ctx.types);
+                return Some(checker.is_assignable(TypeId::NUMBER, target));
+            }
+        }
+
+        if let Some(target_enum) = target_enum {
+            if self.enum_kind(target_enum) == Some(EnumKind::Numeric) {
+                if let Some(env) = env {
+                    let mut checker =
+                        crate::solver::CompatChecker::with_resolver(self.ctx.types, env);
+                    return Some(checker.is_assignable(source, TypeId::NUMBER));
+                }
+                let mut checker = crate::solver::CompatChecker::new(self.ctx.types);
+                return Some(checker.is_assignable(source, TypeId::NUMBER));
+            }
+        }
+
+        None
+    }
+
     /// Check if `source` type is assignable to `target` type.
     ///
     /// Uses the solver's SubtypeChecker with coinductive cycle detection.
-    /// Note: Does not resolve Ref types (use `is_assignable_to_with_resolution` for that).
+    /// Uses the context's TypeEnvironment for resolving type references and expanding Applications.
     pub fn is_assignable_to(&self, source: TypeId, target: TypeId) -> bool {
         use crate::solver::CompatChecker;
-        let mut checker = CompatChecker::new(self.ctx.types);
+
+        let env = self.ctx.type_env.borrow();
+        if let Some(result) = self.enum_assignability_override(source, target, Some(&*env)) {
+            return result;
+        }
+
+        let mut checker = CompatChecker::with_resolver(self.ctx.types, &*env);
         checker.is_assignable(source, target)
     }
 
@@ -4702,6 +5044,11 @@ impl<'a> ThinCheckerState<'a> {
         env: &crate::solver::TypeEnvironment,
     ) -> bool {
         use crate::solver::CompatChecker;
+
+        if let Some(result) = self.enum_assignability_override(source, target, Some(env)) {
+            return result;
+        }
+
         let mut checker = CompatChecker::with_resolver(self.ctx.types, env);
         checker.is_assignable(source, target)
     }
@@ -4709,9 +5056,11 @@ impl<'a> ThinCheckerState<'a> {
     /// Check if `source` type is a subtype of `target` type.
     ///
     /// Stricter than assignability. Uses coinductive semantics for recursive types.
+    /// Uses the context's TypeEnvironment for resolving type references and expanding Applications.
     pub fn is_subtype_of(&self, source: TypeId, target: TypeId) -> bool {
         use crate::solver::SubtypeChecker;
-        let mut checker = SubtypeChecker::new(self.ctx.types);
+        let env = self.ctx.type_env.borrow();
+        let mut checker = SubtypeChecker::with_resolver(self.ctx.types, &*env);
         checker.is_subtype_of(source, target)
     }
 
@@ -4737,9 +5086,11 @@ impl<'a> ThinCheckerState<'a> {
     }
 
     /// Check if a type is assignable to a union of types.
+    /// Uses the context's TypeEnvironment for resolving type references and expanding Applications.
     pub fn is_assignable_to_union(&self, source: TypeId, targets: &[TypeId]) -> bool {
         use crate::solver::CompatChecker;
-        let mut checker = CompatChecker::new(self.ctx.types);
+        let env = self.ctx.type_env.borrow();
+        let mut checker = CompatChecker::with_resolver(self.ctx.types, &*env);
         for &target in targets {
             if checker.is_assignable(source, target) {
                 return true;
@@ -4770,12 +5121,65 @@ impl<'a> ThinCheckerState<'a> {
             // Get the type for this symbol
             let type_id = self.get_type_of_symbol(sym_id);
             if type_id != TypeId::ANY && type_id != TypeId::ERROR {
-                // Use symbol's raw ID as the SymbolRef
-                env.insert(SymbolRef(sym_id.0), type_id);
+                // Get type parameters if this is a generic type
+                let type_params = self.get_type_params_for_symbol(sym_id);
+                if type_params.is_empty() {
+                    env.insert(SymbolRef(sym_id.0), type_id);
+                } else {
+                    env.insert_with_params(SymbolRef(sym_id.0), type_id, type_params);
+                }
             }
         }
 
         env
+    }
+
+    /// Get type parameters for a symbol (for generic type aliases and interfaces).
+    fn get_type_params_for_symbol(&mut self, sym_id: SymbolId) -> Vec<crate::solver::TypeParamInfo> {
+        let Some(symbol) = self.ctx.binder.get_symbol(sym_id) else {
+            return Vec::new();
+        };
+
+        let flags = symbol.flags;
+        let value_decl = symbol.value_declaration;
+
+        // Type alias - get type parameters from declaration
+        if flags & symbol_flags::TYPE_ALIAS != 0 {
+            let decl_idx = if !value_decl.is_none() {
+                value_decl
+            } else {
+                symbol.declarations.first().copied().unwrap_or(NodeIndex::NONE)
+            };
+            if !decl_idx.is_none() {
+                if let Some(node) = self.ctx.arena.get(decl_idx) {
+                    if let Some(type_alias) = self.ctx.arena.get_type_alias(node) {
+                        let (params, updates) = self.push_type_parameters(&type_alias.type_parameters);
+                        self.pop_type_parameters(updates);
+                        return params;
+                    }
+                }
+            }
+        }
+
+        // Interface - get type parameters from first declaration
+        if flags & symbol_flags::INTERFACE != 0 {
+            let decl_idx = if !value_decl.is_none() {
+                value_decl
+            } else {
+                symbol.declarations.first().copied().unwrap_or(NodeIndex::NONE)
+            };
+            if !decl_idx.is_none() {
+                if let Some(node) = self.ctx.arena.get(decl_idx) {
+                    if let Some(iface) = self.ctx.arena.get_interface(node) {
+                        let (params, updates) = self.push_type_parameters(&iface.type_parameters);
+                        self.pop_type_parameters(updates);
+                        return params;
+                    }
+                }
+            }
+        }
+
+        Vec::new()
     }
 
     /// Create a union type from multiple types.
@@ -5647,12 +6051,13 @@ impl<'a> ThinCheckerState<'a> {
                     declared_type
                 } else {
                     // No type annotation - use inferred type from initializer
-                    if checker.is_const_variable_declaration(decl_idx) {
-                        if let Some(literal_type) =
-                            checker.literal_type_from_initializer(var_decl.initializer)
-                        {
+                    if let Some(literal_type) =
+                        checker.literal_type_from_initializer(var_decl.initializer)
+                    {
+                        if checker.is_const_variable_declaration(decl_idx) {
                             return literal_type;
                         }
+                        return checker.widen_literal_type(literal_type);
                     }
                     init_type
                 }
@@ -6305,6 +6710,54 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
         false
+    }
+
+    /// Check if modifiers include the 'private' keyword.
+    fn has_private_modifier(&self, modifiers: &Option<crate::parser::NodeList>) -> bool {
+        use crate::scanner::SyntaxKind;
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(mod_node) = self.ctx.arena.get(mod_idx) {
+                    if mod_node.kind == SyntaxKind::PrivateKeyword as u16 {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Check if modifiers include the 'protected' keyword.
+    fn has_protected_modifier(&self, modifiers: &Option<crate::parser::NodeList>) -> bool {
+        use crate::scanner::SyntaxKind;
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(mod_node) = self.ctx.arena.get(mod_idx) {
+                    if mod_node.kind == SyntaxKind::ProtectedKeyword as u16 {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    fn is_private_identifier_name(&self, name_idx: NodeIndex) -> bool {
+        use crate::scanner::SyntaxKind;
+        let Some(node) = self.ctx.arena.get(name_idx) else {
+            return false;
+        };
+        node.kind == SyntaxKind::PrivateIdentifier as u16
+    }
+
+    fn member_requires_nominal(
+        &self,
+        modifiers: &Option<crate::parser::NodeList>,
+        name_idx: NodeIndex,
+    ) -> bool {
+        self.has_private_modifier(modifiers)
+            || self.has_protected_modifier(modifiers)
+            || self.is_private_identifier_name(name_idx)
     }
 
     /// Get the const modifier node from a list of modifiers, if present.
@@ -7599,6 +8052,10 @@ impl<'a> ThinCheckerState<'a> {
             if node.kind == syntax_kind_ext::FUNCTION_DECLARATION {
                 if let Some(func) = self.ctx.arena.get_function(node) {
                     if func.body.is_none() {
+                        if self.has_declare_modifier(&func.modifiers) {
+                            i += 1;
+                            continue;
+                        }
                         // Function overload signature - check for implementation
                         let func_name = self.get_function_name_from_node(stmt_idx);
                         if let Some(name) = func_name {
