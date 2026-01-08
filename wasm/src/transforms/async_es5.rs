@@ -333,6 +333,102 @@ impl<'a> AsyncES5Emitter<'a> {
             }
         }
 
+        // Check try/catch/finally statements
+        if node.kind == syntax_kind_ext::TRY_STATEMENT {
+            if let Some(try_data) = self.arena.get_try(node) {
+                if self.contains_await_recursive(try_data.try_block) {
+                    return true;
+                }
+                if self.contains_await_recursive(try_data.catch_clause) {
+                    return true;
+                }
+                if self.contains_await_recursive(try_data.finally_block) {
+                    return true;
+                }
+            }
+        }
+
+        // Check catch clauses
+        if node.kind == syntax_kind_ext::CATCH_CLAUSE {
+            if let Some(catch) = self.arena.get_catch_clause(node) {
+                return self.contains_await_recursive(catch.block);
+            }
+        }
+
+        // Check loop statements (while, do-while, for)
+        if node.kind == syntax_kind_ext::WHILE_STATEMENT
+            || node.kind == syntax_kind_ext::DO_STATEMENT
+            || node.kind == syntax_kind_ext::FOR_STATEMENT
+        {
+            if let Some(loop_data) = self.arena.get_loop(node) {
+                if self.contains_await_recursive(loop_data.initializer) {
+                    return true;
+                }
+                if self.contains_await_recursive(loop_data.condition) {
+                    return true;
+                }
+                if self.contains_await_recursive(loop_data.incrementor) {
+                    return true;
+                }
+                if self.contains_await_recursive(loop_data.statement) {
+                    return true;
+                }
+            }
+        }
+
+        // Check for-in/for-of statements
+        if node.kind == syntax_kind_ext::FOR_IN_STATEMENT
+            || node.kind == syntax_kind_ext::FOR_OF_STATEMENT
+        {
+            if let Some(for_data) = self.arena.get_for_in_of(node) {
+                if self.contains_await_recursive(for_data.expression) {
+                    return true;
+                }
+                if self.contains_await_recursive(for_data.statement) {
+                    return true;
+                }
+            }
+        }
+
+        // Check switch statements
+        if node.kind == syntax_kind_ext::SWITCH_STATEMENT {
+            if let Some(switch_data) = self.arena.get_switch(node) {
+                if self.contains_await_recursive(switch_data.expression) {
+                    return true;
+                }
+                if self.contains_await_recursive(switch_data.case_block) {
+                    return true;
+                }
+            }
+        }
+
+        // Check case blocks (uses block data with statements)
+        if node.kind == syntax_kind_ext::CASE_BLOCK {
+            if let Some(block_data) = self.arena.get_block(node) {
+                for &stmt_idx in &block_data.statements.nodes {
+                    if self.contains_await_recursive(stmt_idx) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        // Check case/default clauses
+        if node.kind == syntax_kind_ext::CASE_CLAUSE
+            || node.kind == syntax_kind_ext::DEFAULT_CLAUSE
+        {
+            if let Some(clause_data) = self.arena.get_case_clause(node) {
+                if self.contains_await_recursive(clause_data.expression) {
+                    return true;
+                }
+                for &stmt_idx in &clause_data.statements.nodes {
+                    if self.contains_await_recursive(stmt_idx) {
+                        return true;
+                    }
+                }
+            }
+        }
+
         false
     }
 

@@ -1,20 +1,34 @@
 # Worker 3 Plan
 
+## 🔥 CRUCIBLE TASK - TEST PORTING
+
+**Reassigned from Anvil emitter work to Crucible test porting.**
+
 ## Mission
-Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transforms, cli, lsp).
+Port conditional type tests from the official TypeScript repo into `tests/cases/`.
 
 Status: Active
 Priority: 3
+Mode: **CRUCIBLE - TEST PORTING**
 
 ## Current Assignment
-- [EM: Assign next task]
+- [ ] Port 15-20 conditional type tests from official TypeScript repo (`tests/cases/conformance/types/conditional/`) into `tests/cases/`.
 
 ## Task Queue
-- [x] Add a `wasm/src/cli/driver_tests.rs` assertion that `sourcesContent` is present and matches the input when `sourceMap`/`declarationMap` are enabled.
-- [x] Add a `wasm/src/source_map_tests.rs` check that transformed output still records `names` entries for identifiers.
-- [x] Verify `sourceRoot` and `file` fields remain stable (non-empty `file`, empty `sourceRoot`) and lock with a test.
+- [ ] Port `conditionalTypes1.ts` - basic conditional type tests
+- [ ] Port `conditionalTypes2.ts` - distributive conditional types
+- [ ] Port `inferTypes1.ts` - infer keyword tests
+- [ ] Port `inferTypes2.ts` - advanced infer patterns
+- [ ] Target: 50 total solver test cases this week (shared with workers 4-5)
+
+## Goal
+Give Forge workers failing tests to triangulate correct behavior for the Redux blocker.
 
 ## Completed
+- [x] Added generator transform source map tests (basic yield, multiple yields, yield in loop, yield delegation, return value, class method, try/catch, parameters, object yield, generator expression); `./wasm/test.sh source_map` passes.
+- [x] Added ES5 class transform source map tests (basic IIFE, constructor, instance methods, static methods, accessors, inheritance, super method calls, computed properties, multi-level inheritance, class expressions); `./wasm/test.sh source_map` passes.
+- [x] Added async/await transform source map tests (multiple awaits, try/catch, for-of loop, IIFE, rest/default params, destructuring, nested functions, static method, while loop); `./wasm/test.sh source_map` passes.
+- [x] Added decorator transform source map tests (class, method, parameter, property, accessor, factory, mixed decorators); `./wasm/test.sh source_map` passes.
 - [x] Lowered async ES5 computed `super[...]` calls (async emitter + ThinPrinter) and updated integration tests; `./wasm/test.sh` fails at `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`.
 - [x] Added JS + d.ts source map `file`/`sourcesContent`/`sourceRoot` assertions in `wasm/src/cli/driver_tests.rs` plus ES5 transform name mapping coverage in `wasm/src/source_map_tests.rs`; `./wasm/test.sh` fails at `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`.
 - [x] Relaxed export-assignment class declaration assertion to accept ES6 class output; `./wasm/test.sh test_export_assignment_suppresses_other_exports`.
@@ -83,6 +97,8 @@ Priority: 3
 - [x] Added enum ES5 source map tests (string enum, exported enum, computed members, mixed values); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 - [x] Added CommonJS module source map tests (import, export, default export, re-export); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 - [x] Added declaration emitter source map tests (type alias, function, class, enum, multiple declarations); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
+- [x] Added comprehensive helpers tests (16 new tests for remaining helpers: decorate, param, metadata, generator, values, read, spread_array, import_default, import_star, export_star, make_template_object, class_private_field_get/set/in, create_binding, plus all-helpers test); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
+- [x] Added JSX source map tests (element, fragment, expression, component); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 
 ## Ready for Merge
 Yes

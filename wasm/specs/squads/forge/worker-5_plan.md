@@ -35,10 +35,48 @@ Priority: 5
 - Pre-existing test failures in origin/rust merge unrelated to this change
 
 ## Task Queue
-- [ ] Add coverage for `StateFromReducers<R>` mapped type that uses `ExtractState` on each property.
-- [ ] Add coverage for `ActionFromReducers<R>` that uses indexed access `[keyof R]` on a mapped type.
+- [x] Add coverage for `StateFromReducers<R>` mapped type that uses `ExtractState` on each property.
+- [x] Add coverage for `ActionFromReducers<R>` that uses indexed access `[keyof R]` on a mapped type.
+- [x] Fix `test_redux_pattern_generic_function_with_conditional_return` - conditional type in function return.
+
+### Generic Function Conditional Return Fix
+**Issue:** `createStore(numberReducer)` returning `Store<ExtractState<Reducer<number>>>` failed to resolve properties because `Application` types weren't being evaluated before property access.
+
+**Root cause:** The property access evaluator received an unevaluated `Application` type (e.g., `Store<ExtractState<Reducer<number>>>`). The `evaluate_type` function with `NoopResolver` couldn't expand the type because it lacked symbol resolution.
+
+**Fix:**
+1. Added `evaluate_application_type` method to `ThinCheckerState` (thin_checker.rs) that:
+   - Resolves the base `Ref` symbol to get the type body
+   - Gets type parameters for the symbol
+   - Recursively evaluates type arguments
+   - Instantiates the body with the evaluated arguments
+   - Recursively evaluates the result for nested applications
+
+2. Modified `get_type_of_property_access` to call `evaluate_application_type` on the object type before resolving property access.
+
+3. Added fallback handling for `TypeKey::Application` in `PropertyAccessEvaluator.resolve_property_access_inner` (operations.rs) that attempts evaluation with `evaluate_type` for robustness.
+
+### StateFromReducers Coverage Added
+Added 6 tests in `evaluate_tests.rs`:
+- `test_mapped_type_with_conditional_template_simple` - ExtractValue pattern with object infer
+- `test_mapped_state_from_reducers_pattern_with_simple_objects` - SimpleReducer<S> pattern with object infer
+- `test_mapped_state_from_reducers_indexed_access` - R["key"] indexed access evaluation
+- `test_mapped_type_full_state_from_reducers_simulation` - mapped type over literal key union
+- `test_mapped_type_over_keyof_reducers_object` - mapped type with keyof T constraint
+- `test_extract_state_with_function_reducer_pattern` - Redux function-based Reducer pattern (TODO: returns never)
+
+### ActionFromReducers Coverage Added
+Added 5 tests in `evaluate_tests.rs`:
+- `test_indexed_access_on_object_with_keyof` - obj[keyof obj] produces value union
+- `test_indexed_access_mapped_type_result_with_union_key` - mapped result indexed with keyof
+- `test_action_from_reducers_pattern_with_simple_objects` - ExtractAction with SimpleReducer pattern
+- `test_action_from_reducers_full_pattern` - full pattern: mapped type + keyof indexed access
+- `test_indexed_access_with_single_key` - single key indexed access baseline
 
 ## Completed
+- [x] Fixed `test_redux_pattern_generic_function_with_conditional_return`: Added `evaluate_application_type` to ThinCheckerState for resolving generic type aliases in property access; `./wasm/test.sh` (fails: `test_check_redux_lodash_style_generics` pre-existing).
+- [x] Added StateFromReducers mapped type test coverage (6 tests) for mapped type + conditional infer patterns; `./wasm/test.sh` (fails: `test_check_redux_lodash_style_generics` pre-existing).
+- [x] Added ActionFromReducers indexed access test coverage (5 tests) for mapped type + keyof indexed access patterns; `./wasm/test.sh` (fails: `test_check_redux_lodash_style_generics` pre-existing).
 - [x] Added never-input readonly array infer regression; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
 - [x] Added never-input multi-template infer regression; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
 - [x] Added never-input tuple infer regression; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).

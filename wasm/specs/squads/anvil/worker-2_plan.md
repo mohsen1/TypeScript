@@ -3,16 +3,30 @@
 ## Mission
 Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transforms, cli, lsp).
 
+## ⚠️ OPERATION CRUCIBLE - BUG FIXES ONLY
+
+**Emitter is in MAINTENANCE MODE. No new transforms or features.**
+
 Status: Active
 Priority: 2
+Mode: **BUG FIXES ONLY**
 
 ## Current Assignment
-- [EM: Assign next task]
+- [ ] Fix critical source map bug: verify source maps attach correctly in debuggers for async ES5 transforms.
 
-## Task Queue
-- [ ] [EM: Add queued tasks]
+## Task Queue (BUG FIXES ONLY)
+- [ ] Fix any blocking source map validation issues
+- [ ] ⛔ NO NEW TRANSFORMS - rejected per Operation Crucible
 
 ## Completed
+- [x] Added ES5 decorator parity tests (class, method, property, parameter) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (63 tests).
+- [x] Added ES5 async generator parity tests (type erasure, method, await+yield) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (59 tests).
+- [x] Added ES5 generator function parity tests (type erasure, method, yield type erasure) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (56 tests).
+- [x] Added ES5 private class field parity tests (instance field, static access, method, getter, setter) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (51 tests).
+- [x] Added ES5 static block parity tests (`test_parity_es5_static_block`, `test_parity_es5_static_block_multi_stmt`) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (44 tests).
+- [x] Added parity test for function param type erasure in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (39 tests).
+- [x] Added parity test for type alias erasure in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (38 tests).
+- [x] Added parity test for interface erasure in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (37 tests).
 - [x] Added parity test for type-only import erasure in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (36 tests).
 - [x] Added parity test for string enum ES5 downlevel in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (35 tests).
 - [x] Added parity test for enum ES5 downlevel in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (34 tests).

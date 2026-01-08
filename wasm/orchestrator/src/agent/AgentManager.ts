@@ -83,15 +83,15 @@ export class AgentManager {
     const envVars = this.buildEnvVars(role, squad, workerNum, cwd);
 
     // Build the command with environment and agent
-    const envPrefix = Object.entries(envVars)
-      .map(([k, v]) => `export ${k}=${shellEscape(v)}`)
-      .join(' && ');
+    const envExports = Object.entries(envVars)
+      .map(([k, v]) => `export ${k}=${shellEscape(v)}`);
 
     const cdCommand = `cd ${shellEscape(cwd)}`;
     const agentCmd = this.getAgentRunCommand();
 
-    // Combine: cd, set env, run agent in bash -lc (login shell for PATH)
-    const fullCommand = `${cdCommand} && ${envPrefix} && bash -lc '${agentCmd}'`;
+    // Combine: cd, set env (if any), run agent in bash -lc (login shell for PATH)
+    const commandParts = [cdCommand, ...envExports, `bash -lc '${agentCmd}'`];
+    const fullCommand = commandParts.join(' && ');
 
     // Send the command to start the agent
     await this.tmux.sendKeys(pane, fullCommand, true);

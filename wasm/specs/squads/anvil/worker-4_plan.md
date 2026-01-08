@@ -1,18 +1,48 @@
 # Worker 4 Plan
 
+## 🔥 CRUCIBLE TASK - TEST PORTING
+
+**Reassigned from Anvil emitter work to Crucible test porting.**
+
 ## Mission
-Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transforms, cli, lsp).
+Port mapped type tests from the official TypeScript repo into `tests/cases/`.
 
 Status: Active
 Priority: 4
+Mode: **CRUCIBLE - TEST PORTING**
 
 ## Current Assignment
-- [x] Add tests for ES5 class downleveling edge cases with computed super[] access.
+- [ ] Port 15-20 mapped type tests from official TypeScript repo (`tests/cases/conformance/types/mapped/`) into `tests/cases/`.
 
 ## Task Queue
-- [ ] [EM: Add queued tasks]
+- [ ] Port `mappedTypes1.ts` - basic mapped type tests
+- [ ] Port `mappedTypes2.ts` - mapped type modifiers
+- [ ] Port `mappedTypeConstraints.ts` - constraint handling
+- [ ] Port `keyRemappingKeyof.ts` - key remapping tests
+- [ ] Target: 50 total solver test cases this week (shared with workers 3, 5)
+
+## Goal
+Give Forge workers failing tests to triangulate correct behavior for the Redux blocker.
 
 ## Completed
+- [x] Add ES5 super with conditional field init test. Tests: `./wasm/test.sh super_with_conditional_field`
+- [x] Add ES5 super with arrow field init test. Tests: `./wasm/test.sh super_with_arrow_field`
+- [x] Add ES5 super with computed field init test. Tests: `./wasm/test.sh super_with_computed_field`
+- [x] Add ES5 super with method call in field init test. Tests: `./wasm/test.sh super_with_method_call`
+- [x] Add ES5 super with nested inheritance field init test. Tests: `./wasm/test.sh super_with_nested_inheritance`
+- [x] Add ES5 constructor param inject decorator test. Tests: `./wasm/test.sh constructor_param_inject`
+- [x] Add ES5 constructor param optional decorator test. Tests: `./wasm/test.sh constructor_param_optional`
+- [x] Add ES5 constructor param attribute decorator test. Tests: `./wasm/test.sh constructor_param_attribute`
+- [x] Add ES5 async method decorator pattern test. Tests: `./wasm/test.sh async_method_decorator_pattern`
+- [x] Add ES5 async lifecycle decorator pattern test. Tests: `./wasm/test.sh async_lifecycle_decorator_pattern`
+- [x] Add ES5 async event handler decorator pattern test. Tests: `./wasm/test.sh async_event_handler_decorator_pattern`
+- [x] Add ES5 component decorator pattern test. Tests: `./wasm/test.sh component_decorator_pattern`
+- [x] Add ES5 injectable service pattern test. Tests: `./wasm/test.sh injectable_service_pattern`
+- [x] Add ES5 entity decorator pattern test. Tests: `./wasm/test.sh entity_decorator_pattern`
+- [x] Add ES5 async static method test. Tests: `./wasm/test.sh async_static_method`
+- [x] Add ES5 decorators syntax test. Tests: `./wasm/test.sh decorators_syntax`
+- [x] Add ES5 parameter decorator pattern test. Tests: `./wasm/test.sh parameter_decorator_pattern`
+- [x] Add ES5 property decorator pattern test. Tests: `./wasm/test.sh property_decorator_pattern`
 - [x] Add async/class ES5 transform source-map mappings and offsets. Tests: `./wasm/test.sh source_map`
 - [x] Add async nested function source-map offset coverage. Tests: `./wasm/test.sh source_map`
 - [x] Add async await detection test for nested functions. Tests: `./wasm/test.sh body_contains_await`
@@ -96,6 +126,18 @@ Priority: 4
 - [x] Add TypeScript namespace source-map test. Tests: `./wasm/test.sh typescript_namespace_mapping`
 - [x] Add ES5 computed super[] edge case tests. Tests: `./wasm/test.sh computed_super`
 - [x] Add ES5 super property access tests. Tests: `./wasm/test.sh super_property`
+- [x] Add ES5 abstract class lowering test. Tests: `./wasm/test.sh abstract_class_lowering`
+- [x] Add ES5 class with index signature test. Tests: `./wasm/test.sh class_with_index_signature`
+- [x] Add ES5 class expression test. Tests: `./wasm/test.sh class_expression`
+- [x] Add ES5 Symbol-keyed methods test. Tests: `./wasm/test.sh symbol_keyed_methods`
+- [x] Add ES5 nested class test. Tests: `./wasm/test.sh nested_class`
+- [x] Add ES5 generator methods test. Tests: `./wasm/test.sh generator_methods`
+- [x] Add ES5 deep inheritance chain test. Tests: `./wasm/test.sh deep_inheritance_chain`
+- [x] Add ES5 mixin pattern test. Tests: `./wasm/test.sh mixin_pattern`
+- [x] Add ES5 method overloads test. Tests: `./wasm/test.sh method_overloads`
+- [x] Add ES5 computed method names test. Tests: `./wasm/test.sh computed_method_names`
+- [x] Add ES5 optional and readonly properties test. Tests: `./wasm/test.sh optional_and_readonly`
+- [x] Add ES5 constructor overloads test. Tests: `./wasm/test.sh constructor_overloads`
 
 ## Ready for Merge
 Yes
