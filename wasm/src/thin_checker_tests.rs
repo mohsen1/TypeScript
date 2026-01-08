@@ -3471,6 +3471,48 @@ const value = obj[key];
 }
 
 #[test]
+fn test_checker_element_access_union_key_cross_product() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::TypeKey;
+
+    let source = r#"
+type A = { kind: "a"; val: 1 } | { kind: "b"; val: 2 };
+declare const obj: A;
+declare const key: "kind" | "val";
+const value = obj[key];
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let value_sym = binder.file_locals.get("value").expect("value should exist");
+    let value_type = checker.get_type_of_symbol(value_sym);
+    let value_key = types.lookup(value_type).expect("value type should exist");
+    match value_key {
+        TypeKey::Union(members) => {
+            let members = types.type_list(members);
+            let lit_a = types.literal_string("a");
+            let lit_b = types.literal_string("b");
+            let lit_one = types.literal_number(1.0);
+            let lit_two = types.literal_number(2.0);
+            assert!(members.contains(&lit_a));
+            assert!(members.contains(&lit_b));
+            assert!(members.contains(&lit_one));
+            assert!(members.contains(&lit_two));
+        }
+        other => panic!("Expected union type for value, got {:?}", other),
+    }
+}
+
+#[test]
 fn test_checker_lowers_element_access_literal_key_type() {
     use crate::thin_parser::ThinParserState;
 

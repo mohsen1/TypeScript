@@ -715,28 +715,28 @@ impl<'a> AsyncES5Emitter<'a> {
                 }
             }
             k if k == syntax_kind_ext::CALL_EXPRESSION => {
-                    if let Some(call) = self.arena.get_call_expr(node) {
-                        if self.is_super_method_call(call.expression) {
-                            self.emit_super_method_call(call.expression, &call.arguments);
-                        } else if self.is_super_element_call(call.expression) {
-                            self.emit_super_element_call(call.expression, &call.arguments);
-                        } else {
-                            self.emit_expression(call.expression);
-                            self.write("(");
-                            if let Some(args) = &call.arguments {
-                                let mut first = true;
-                                for &arg_idx in &args.nodes {
-                                    if !first {
-                                        self.write(", ");
-                                    }
-                                    first = false;
-                                    self.emit_expression(arg_idx);
+                if let Some(call) = self.arena.get_call_expr(node) {
+                    if self.is_super_method_call(call.expression) {
+                        self.emit_super_method_call(call.expression, &call.arguments);
+                    } else if self.is_super_element_call(call.expression) {
+                        self.emit_super_element_call(call.expression, &call.arguments);
+                    } else {
+                        self.emit_expression(call.expression);
+                        self.write("(");
+                        if let Some(args) = &call.arguments {
+                            let mut first = true;
+                            for &arg_idx in &args.nodes {
+                                if !first {
+                                    self.write(", ");
                                 }
+                                first = false;
+                                self.emit_expression(arg_idx);
                             }
-                            self.write(")");
                         }
+                        self.write(")");
                     }
                 }
+            }
             k if k == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION => {
                 if let Some(access) = self.arena.get_access_expr(node) {
                     self.emit_expression(access.expression);
