@@ -15,6 +15,7 @@ Priority: 5
 - [ ] [EM: Add queued tasks]
 
 ## Completed
+- [x] Added never-input tuple infer regression; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
 - [x] Added never-input function infer regression; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
 - [x] Added never-input array infer regression; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
 - [x] Added never-input object infer regression; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
@@ -63,7 +64,7 @@ Priority: 5
 - [x] Updated non-distributive union object inference expectation (tests not run).
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize solver correctness (inference/conditional/subtype) before new features.

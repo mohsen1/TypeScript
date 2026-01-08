@@ -8448,6 +8448,36 @@ fn test_conditional_infer_function_never_input() {
 }
 
 #[test]
+fn test_conditional_infer_tuple_never_input() {
+    let interner = TypeInterner::new();
+
+    let r_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: r_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // never extends [infer R] ? R : string -> never
+    let extends_tuple = interner.tuple(vec![TupleElement {
+        type_id: infer_r,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
+    let cond = ConditionalType {
+        check_type: TypeId::NEVER,
+        extends_type: extends_tuple,
+        true_type: infer_r,
+        false_type: TypeId::STRING,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
 fn test_conditional_infer_constraint_mismatch() {
     let interner = TypeInterner::new();
 
