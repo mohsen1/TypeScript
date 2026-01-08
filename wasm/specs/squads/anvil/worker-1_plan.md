@@ -21,7 +21,7 @@ Priority: 1
 - [x] Allowed ES6 `class C` in export assignment edge-case test; ran `./wasm/test.sh emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`.
 
 ## Ready for Merge
-No
+Yes
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
