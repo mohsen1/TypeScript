@@ -76,6 +76,7 @@ Priority: 4
 - [x] Add nullish coalescing source-map test. Tests: `./wasm/test.sh nullish_coalescing_mapping`
 - [x] Add numeric separators source-map test. Tests: `./wasm/test.sh numeric_separators_mapping`
 - [x] Add import.meta source-map test. Tests: `./wasm/test.sh import_meta_mapping`
+- [x] Add export * as namespace source-map test. Tests: `./wasm/test.sh export_star_as_namespace_mapping`
 
 ## Ready for Merge
 Yes
