@@ -14,6 +14,12 @@ Priority: 2
 - [ ] TODO: Add non-distributive template literal infer over template-literal union input (e.g., T = `foo${string}` | `bar${string}`).
 - [ ] TODO: Add non-distributive template literal infer with non-string union branch for middle+suffix patterns (e.g., T = `foo${string}bar` | number).
 - [ ] TODO: Add non-distributive template literal infer with numeric constraint to document current behavior.
+- [ ] TODO: Add distributive template literal infer over template-literal union input; expected `string` for matching branch (non-matching -> `never`).
+- [ ] TODO: Add template literal infer from `string` or `` `${string}` `` input (e.g., T extends `${infer R}`) expected `string`.
+- [ ] TODO: Add tuple rest inference test (e.g., T extends [infer H, ...infer R] ? R : never) with T = [string, number] | [boolean], expected `[number] | []`.
+- [ ] TODO: Add object call-signature infer test (e.g., T extends { (x: infer R): void } ? R : never) expected union of parameter types.
+- [ ] TODO: Add function optional-parameter infer test (e.g., T extends (x?: infer R) => void) expected `string | number | undefined` (confirm).
+- [ ] TODO: Add function param infer with non-function union branch (e.g., T = (x: string) => void | number) expected `string`.
 
 ## Completed
 - [x] Added optional/rest/`this` assignability edge cases and tightened parameter matching; ran `./wasm/test.sh optional_parameter_assignability`, `./wasm/test.sh this_parameter_assignability`, `./wasm/test.sh rest_parameter_assignability`.
