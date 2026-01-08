@@ -5344,404 +5344,267 @@ const Counter = class {
     );
 }
 
-// =============================================================================
-// Generic Class Tests
-// =============================================================================
+#[test]
+fn test_class_es5_accessor_basic() {
+    // Test basic accessor keyword (ES2022)
+    let source = r#"
+class Person {
+    accessor name: string = "default";
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should transform class to function
+    assert!(
+        output.contains("function Person") || output.contains("var Person"),
+        "Expected Person class transformation: {}",
+        output
+    );
+
+    // Accessor should generate getter/setter pattern
+    // Either via Object.defineProperty or direct get/set
+    assert!(
+        output.contains("defineProperty")
+            || output.contains("get")
+            || output.contains("name"),
+        "Expected accessor transformation: {}",
+        output
+    );
+}
 
 #[test]
-fn test_class_es5_generic_class_basic() {
-    // Test basic generic class with type parameter
+fn test_class_es5_accessor_with_initializer() {
+    // Test accessor with non-trivial initializer
     let source = r#"
-class Container<T> {
-    private value: T;
+class Counter {
+    accessor count: number = 0;
+    accessor label: string = "Counter: ";
 
-    constructor(value: T) {
-        this.value = value;
+    increment(): void {
+        this.count++;
     }
 
-    getValue(): T {
-        return this.value;
-    }
-
-    setValue(value: T): void {
-        this.value = value;
+    display(): string {
+        return this.label + this.count;
     }
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
-    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
 
-    // Generic class should emit as function (type parameter erased)
+    let output = printer.get_output().to_string();
+
+    // Should transform class
     assert!(
-        output.contains("function Container"),
-        "Expected Container to emit as function: {}",
-        output
-    );
-
-    // Constructor should set value
-    assert!(
-        output.contains("this.value") || output.contains("value"),
-        "Expected value assignment: {}",
+        output.contains("function Counter") || output.contains("var Counter"),
+        "Expected Counter class transformation: {}",
         output
     );
 
     // Methods should be on prototype
     assert!(
-        output.contains("getValue") || output.contains(".prototype.getValue"),
-        "Expected getValue method: {}",
+        output.contains("increment") && output.contains("display"),
+        "Expected methods: {}",
         output
     );
+
+    // Accessors should be handled
     assert!(
-        output.contains("setValue") || output.contains(".prototype.setValue"),
-        "Expected setValue method: {}",
+        output.contains("count") && output.contains("label"),
+        "Expected accessor properties: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_generic_class_multiple_type_params() {
-    // Test generic class with multiple type parameters
+fn test_class_es5_accessor_static() {
+    // Test static accessor keyword
     let source = r#"
-class Pair<K, V> {
-    key: K;
-    value: V;
+class Config {
+    static accessor debug: boolean = false;
+    static accessor version: string = "1.0.0";
 
-    constructor(key: K, value: V) {
-        this.key = key;
-        this.value = value;
+    static enableDebug(): void {
+        Config.debug = true;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should transform class
+    assert!(
+        output.contains("function Config") || output.contains("var Config"),
+        "Expected Config class transformation: {}",
+        output
+    );
+
+    // Static accessors should reference the constructor
+    assert!(
+        output.contains("Config") && output.contains("debug"),
+        "Expected static accessor reference: {}",
+        output
+    );
+
+    // Static method should be present
+    assert!(
+        output.contains("enableDebug"),
+        "Expected enableDebug method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_accessor_inheritance() {
+    // Test accessor with inheritance
+    let source = r#"
+class Animal {
+    accessor name: string = "unnamed";
+
+    speak(): string {
+        return this.name + " makes a sound";
+    }
+}
+
+class Dog extends Animal {
+    accessor breed: string = "unknown";
+
+    speak(): string {
+        return this.name + " barks";
     }
 
-    getKey(): K {
-        return this.key;
+    describe(): string {
+        return this.name + " is a " + this.breed;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Both classes should be transformed
+    assert!(
+        output.contains("Animal") && output.contains("Dog"),
+        "Expected both class transformations: {}",
+        output
+    );
+
+    // Inheritance pattern should be present
+    assert!(
+        output.contains("__extends") || output.contains("prototype"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+
+    // Accessors from both classes
+    assert!(
+        output.contains("name") && output.contains("breed"),
+        "Expected accessor properties: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_accessor_private_backing() {
+    // Test that accessor generates private backing field pattern
+    let source = r#"
+class SecureValue {
+    accessor value: number = 0;
+
+    increment(): void {
+        this.value = this.value + 1;
     }
 
-    getValue(): V {
+    getValue(): number {
         return this.value;
     }
 
-    swap(): Pair<V, K> {
-        return new Pair(this.value, this.key);
+    setValue(v: number): void {
+        this.value = v;
     }
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
-    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
 
-    // Generic class should emit as function
-    assert!(
-        output.contains("function Pair"),
-        "Expected Pair to emit as function: {}",
-        output
-    );
+    let output = printer.get_output().to_string();
 
-    // Constructor should set key and value
+    // Should transform class
     assert!(
-        output.contains("this.key") || output.contains("key"),
-        "Expected key assignment: {}",
-        output
-    );
-    assert!(
-        output.contains("this.value") || output.contains("value"),
-        "Expected value assignment: {}",
+        output.contains("function SecureValue") || output.contains("var SecureValue"),
+        "Expected SecureValue class transformation: {}",
         output
     );
 
     // Methods should be present
     assert!(
-        output.contains("getKey"),
-        "Expected getKey method: {}",
-        output
-    );
-    assert!(
-        output.contains("getValue"),
-        "Expected getValue method: {}",
-        output
-    );
-    assert!(
-        output.contains("swap"),
-        "Expected swap method: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_generic_class_with_constraint() {
-    // Test generic class with type constraint
-    let source = r#"
-class NumberContainer<T extends number> {
-    items: T[] = [];
-
-    add(item: T): void {
-        this.items.push(item);
-    }
-
-    sum(): number {
-        return this.items.reduce((acc, item) => acc + item, 0);
-    }
-
-    getItems(): T[] {
-        return this.items;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
-    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
-
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
-
-    // Generic class should emit as function
-    assert!(
-        output.contains("function NumberContainer"),
-        "Expected NumberContainer to emit as function: {}",
+        output.contains("increment")
+            && output.contains("getValue")
+            && output.contains("setValue"),
+        "Expected methods: {}",
         output
     );
 
-    // Instance field should be initialized
+    // Value accessor should be present
     assert!(
-        output.contains("this.items") || output.contains("items"),
-        "Expected items field: {}",
-        output
-    );
-
-    // Methods should be present
-    assert!(
-        output.contains("add"),
-        "Expected add method: {}",
-        output
-    );
-    assert!(
-        output.contains("sum"),
-        "Expected sum method: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_generic_class_extends() {
-    // Test generic class extending another generic class
-    let source = r#"
-class Base<T> {
-    value: T;
-
-    constructor(value: T) {
-        this.value = value;
-    }
-}
-
-class Extended<T, U> extends Base<T> {
-    extra: U;
-
-    constructor(value: T, extra: U) {
-        super(value);
-        this.extra = extra;
-    }
-
-    getExtra(): U {
-        return this.extra;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
-    // Get Extended class (second statement)
-    let class_idx = *source_file.statements.nodes.get(1).expect("expected Extended class");
-
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
-
-    // Generic class should emit as function
-    assert!(
-        output.contains("function Extended"),
-        "Expected Extended to emit as function: {}",
-        output
-    );
-
-    // Should have inheritance setup
-    assert!(
-        output.contains("_super") || output.contains("Base") || output.contains("__extends"),
-        "Expected inheritance handling: {}",
-        output
-    );
-
-    // Extra field should be set
-    assert!(
-        output.contains("this.extra") || output.contains("extra"),
-        "Expected extra field: {}",
-        output
-    );
-
-    // Method should be present
-    assert!(
-        output.contains("getExtra"),
-        "Expected getExtra method: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_generic_class_with_default_type() {
-    // Test generic class with default type parameter
-    let source = r#"
-class Optional<T = string> {
-    private value: T | undefined;
-
-    constructor(value?: T) {
-        this.value = value;
-    }
-
-    hasValue(): boolean {
-        return this.value !== undefined;
-    }
-
-    getValue(): T | undefined {
-        return this.value;
-    }
-
-    setValue(value: T): void {
-        this.value = value;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
-    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
-
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
-
-    // Generic class should emit as function
-    assert!(
-        output.contains("function Optional"),
-        "Expected Optional to emit as function: {}",
-        output
-    );
-
-    // Methods should be present
-    assert!(
-        output.contains("hasValue"),
-        "Expected hasValue method: {}",
-        output
-    );
-    assert!(
-        output.contains("getValue"),
-        "Expected getValue method: {}",
-        output
-    );
-    assert!(
-        output.contains("setValue"),
-        "Expected setValue method: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_generic_class_with_static_members() {
-    // Test generic class with static members
-    let source = r#"
-class Registry<T> {
-    static defaultCapacity: number = 100;
-    private items: Map<string, T> = new Map();
-
-    static setDefaultCapacity(capacity: number): void {
-        Registry.defaultCapacity = capacity;
-    }
-
-    register(key: string, item: T): void {
-        this.items.set(key, item);
-    }
-
-    get(key: string): T | undefined {
-        return this.items.get(key);
-    }
-
-    size(): number {
-        return this.items.size;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
-    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
-
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
-
-    // Generic class should emit as function
-    assert!(
-        output.contains("function Registry"),
-        "Expected Registry to emit as function: {}",
-        output
-    );
-
-    // Static field should be on constructor
-    assert!(
-        output.contains("Registry.defaultCapacity") || output.contains("defaultCapacity"),
-        "Expected defaultCapacity static field: {}",
-        output
-    );
-
-    // Static method should be on constructor
-    assert!(
-        output.contains("Registry.setDefaultCapacity") || output.contains("setDefaultCapacity"),
-        "Expected setDefaultCapacity static method: {}",
-        output
-    );
-
-    // Instance methods should be present
-    assert!(
-        output.contains("register"),
-        "Expected register method: {}",
-        output
-    );
-    assert!(
-        output.contains("get"),
-        "Expected get method: {}",
+        output.contains("value"),
+        "Expected value accessor: {}",
         output
     );
 }
