@@ -1612,6 +1612,21 @@ fn test_resolve_bounds_conflict() {
 }
 
 #[test]
+fn test_resolve_bounds_duplicate_upper_bounds_no_intersection() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var = ctx.fresh_type_param(t_name);
+
+    ctx.add_upper_bound(var, TypeId::STRING);
+    ctx.add_upper_bound(var, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
 fn test_resolve_no_constraints() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);

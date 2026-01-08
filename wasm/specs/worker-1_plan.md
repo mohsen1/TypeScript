@@ -40,6 +40,7 @@ Priority: 1
 - [x] Self upper bound with concrete upper resolves to concrete; added `test_resolve_self_upper_bound_with_concrete`. Tests: `./wasm/test.sh test_resolve_self_upper_bound_with_concrete`.
 - [x] Union lower bound violating string upper errors; added `test_resolve_bounds_union_lower_vs_string_upper`. Tests: `./wasm/test.sh test_resolve_bounds_union_lower_vs_string_upper`.
 - [x] Lower bounds ignore `never`; added `test_resolve_lower_bounds_ignores_never`. Tests: `./wasm/test.sh test_resolve_lower_bounds_ignores_never`.
+- [x] Duplicate upper bounds resolve without intersection; added `test_resolve_bounds_duplicate_upper_bounds_no_intersection`. Tests: `./wasm/test.sh test_resolve_bounds_duplicate_upper_bounds_no_intersection`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
