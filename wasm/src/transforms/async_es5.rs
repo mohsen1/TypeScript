@@ -442,6 +442,51 @@ impl<'a> AsyncES5Emitter<'a> {
             }
         }
 
+        // Check array/object literals
+        if node.kind == syntax_kind_ext::ARRAY_LITERAL_EXPRESSION
+            || node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION
+        {
+            if let Some(literal) = self.arena.get_literal_expr(node) {
+                for &elem_idx in &literal.elements.nodes {
+                    if self.contains_await_recursive(elem_idx) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        if node.kind == syntax_kind_ext::PROPERTY_ASSIGNMENT {
+            if let Some(prop) = self.arena.get_property_assignment(node) {
+                if self.contains_await_recursive(prop.initializer) {
+                    return true;
+                }
+            }
+        }
+
+        if node.kind == syntax_kind_ext::SHORTHAND_PROPERTY_ASSIGNMENT {
+            if let Some(shorthand) = self.arena.get_shorthand_property(node) {
+                if self.contains_await_recursive(shorthand.object_assignment_initializer)
+                {
+                    return true;
+                }
+            }
+        }
+
+        if node.kind == syntax_kind_ext::SPREAD_ELEMENT
+            || node.kind == syntax_kind_ext::SPREAD_ASSIGNMENT
+        {
+            if let Some(spread) = self.arena.get_spread(node) {
+                if self.contains_await_recursive(spread.expression) {
+                    return true;
+                }
+            }
+            if let Some(spread) = self.arena.get_unary_expr_ex(node) {
+                if self.contains_await_recursive(spread.expression) {
+                    return true;
+                }
+            }
+        }
+
         // Check binary expressions
         if node.kind == syntax_kind_ext::BINARY_EXPRESSION {
             if let Some(bin) = self.arena.get_binary_expr(node) {
