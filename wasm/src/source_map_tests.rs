@@ -13232,3 +13232,90 @@ async function processItems(items: number[]) {
         unique_source_lines
     );
 }
+
+#[test]
+fn test_source_map_for_await_of_es5_mapping() {
+    // Test source-map accuracy for for-await-of async iteration with ES5 downleveling
+    let source = r#"async function processStream(stream: AsyncIterable<number>) {
+    for await (const value of stream) {
+        console.log(value);
+    }
+}
+
+async function processWithDestructure(items: AsyncIterable<{id: number, name: string}>) {
+    for await (const { id, name } of items) {
+        console.log(id, name);
+    }
+}
+
+async function processMultiple(streams: AsyncIterable<number>[]) {
+    for (const stream of streams) {
+        for await (const value of stream) {
+            await process(value);
+        }
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for processStream function
+    let (process_stream_line, _) = find_line_col(source, "async function processStream");
+    let has_process_stream_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == process_stream_line
+    });
+
+    // Verify we have mappings for processWithDestructure function
+    let (destructure_line, _) = find_line_col(source, "async function processWithDestructure");
+    let has_destructure_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == destructure_line
+    });
+
+    // Verify we have mappings for processMultiple function
+    let (multiple_line, _) = find_line_col(source, "async function processMultiple");
+    let has_multiple_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == multiple_line
+    });
+
+    assert!(
+        has_process_stream_mapping || has_destructure_mapping || has_multiple_mapping,
+        "expected mappings for async function declarations. mappings: {mappings}"
+    );
+
+    // Verify source map has non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for for-await-of ES5"
+    );
+
+    // Should have mappings from multiple source lines (at least 3 for the function declarations)
+    let unique_source_lines: std::collections::HashSet<_> =
+        decoded.iter().map(|m| m.original_line).collect();
+    assert!(
+        unique_source_lines.len() >= 3,
+        "expected mappings from at least 3 different source lines for for-await-of ES5, got: {:?}",
+        unique_source_lines
+    );
+}

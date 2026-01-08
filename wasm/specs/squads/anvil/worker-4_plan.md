@@ -91,6 +91,7 @@ Priority: 4
 - [x] Add shorthand properties source-map test. Tests: `./wasm/test.sh shorthand_properties_mapping`
 - [x] Add method definitions source-map test. Tests: `./wasm/test.sh method_definitions_mapping`
 - [x] Add for-of/for-in loops source-map test. Tests: `./wasm/test.sh for_of_for_in_loops_mapping`
+- [x] Add for-await-of ES5 async iteration source-map test. Tests: `./wasm/test.sh for_await_of_es5_mapping`
 
 ## Ready for Merge
 Yes
