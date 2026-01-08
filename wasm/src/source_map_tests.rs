@@ -11332,3 +11332,65 @@ fn test_source_map_names_array_multiple_identifiers() {
         "expected some mappings to have name indices. mappings: {mappings}"
     );
 }
+
+#[test]
+fn test_source_map_sources_content_accuracy() {
+    // Test with multiline source containing various constructs
+    let source = r#"function hello(name: string): string {
+    const greeting = "Hello, " + name;
+    return greeting;
+}
+
+const result = hello("World");
+console.log(result);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    // Verify sources array exists and contains the source file
+    let sources = map_value
+        .get("sources")
+        .and_then(|v| v.as_array())
+        .expect("expected sources array");
+    assert_eq!(sources.len(), 1, "expected one source file");
+    assert_eq!(
+        sources[0].as_str(),
+        Some("test.ts"),
+        "expected source file name"
+    );
+
+    // Verify sourcesContent array exists and has same length as sources
+    let sources_content = map_value
+        .get("sourcesContent")
+        .and_then(|v| v.as_array())
+        .expect("expected sourcesContent array");
+    assert_eq!(
+        sources_content.len(),
+        sources.len(),
+        "sourcesContent length should match sources length"
+    );
+
+    // Verify the sourcesContent contains the exact original source
+    let content = sources_content[0]
+        .as_str()
+        .expect("expected sourcesContent to be a string");
+    assert_eq!(
+        content, source,
+        "sourcesContent should exactly match original source"
+    );
+}
