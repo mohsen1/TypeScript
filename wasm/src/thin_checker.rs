@@ -5117,6 +5117,12 @@ impl<'a> ThinCheckerState<'a> {
         self.resolve_refs_in_type(target);
 
         let env = self.ctx.type_env.borrow();
+
+        // Debug: check if TypeEnvironment has entries for Application expansion
+        if let Some(crate::solver::TypeKey::Application(_)) = self.ctx.types.lookup(target) {
+            eprintln!("[DEBUG] is_assignable_to: target is Application, env has {} entries", env.len());
+        }
+
         if let Some(result) = self.enum_assignability_override(source, target, Some(&*env)) {
             return result;
         }
@@ -5267,7 +5273,9 @@ impl<'a> ThinCheckerState<'a> {
             TypeKey::Ref(sym_ref) => {
                 // Resolve this symbol to populate the TypeEnvironment
                 let sym_id = SymbolId(sym_ref.0);
-                let _ = self.get_type_of_symbol(sym_id);
+                eprintln!("[DEBUG] resolve_refs: resolving Ref({})", sym_ref.0);
+                let resolved = self.get_type_of_symbol(sym_id);
+                eprintln!("[DEBUG] resolve_refs: Ref({}) resolved to {:?}", sym_ref.0, resolved);
             }
             TypeKey::Application(app_id) => {
                 let app = self.ctx.types.type_application(*app_id);
@@ -5313,8 +5321,8 @@ impl<'a> ThinCheckerState<'a> {
             TypeKey::Object(shape_id) | TypeKey::ObjectWithIndex(shape_id) => {
                 let shape = self.ctx.types.object_shape(*shape_id);
                 let props: Vec<TypeId> = shape.properties.iter().map(|p| p.type_id).collect();
-                let string_idx = shape.string_index.map(|s| s.type_id);
-                let number_idx = shape.number_index.map(|s| s.type_id);
+                let string_idx = shape.string_index.as_ref().map(|s| s.value_type);
+                let number_idx = shape.number_index.as_ref().map(|s| s.value_type);
                 for prop in props {
                     self.resolve_refs_in_type_recursive(prop, visited);
                 }
@@ -5345,11 +5353,9 @@ impl<'a> ThinCheckerState<'a> {
             TypeKey::Mapped(map_id) => {
                 let mapped = self.ctx.types.mapped_type(*map_id);
                 let constraint = mapped.constraint;
-                let template = mapped.template_type;
+                let template = mapped.template;
                 self.resolve_refs_in_type_recursive(constraint, visited);
-                if let Some(t) = template {
-                    self.resolve_refs_in_type_recursive(t, visited);
-                }
+                self.resolve_refs_in_type_recursive(template, visited);
             }
             TypeKey::TypeParameter(param) | TypeKey::Infer(param) => {
                 if let Some(constraint) = param.constraint {
@@ -5363,7 +5369,7 @@ impl<'a> ThinCheckerState<'a> {
                 let callable = self.ctx.types.callable_shape(*call_id);
                 for sig in &callable.call_signatures {
                     let ret = sig.return_type;
-                    let params: Vec<TypeId> = sig.parameters.iter().map(|p| p.param_type).collect();
+                    let params: Vec<TypeId> = sig.params.iter().map(|p| p.type_id).collect();
                     self.resolve_refs_in_type_recursive(ret, visited);
                     for param in params {
                         self.resolve_refs_in_type_recursive(param, visited);
