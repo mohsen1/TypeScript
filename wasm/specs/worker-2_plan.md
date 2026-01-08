@@ -109,7 +109,6 @@ Priority: 2
 - [x] Added non-distributive template literal infer with non-string template union branch (current behavior yields never). Tests: `./wasm/test.sh non_string_template_union_branch`.
 
 ## Notes
-- Ready for merge.
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
 - Use Docker for Rust tests (`./wasm/test.sh`), never `cargo test` directly.
 - Update this plan after each task and keep it accurate.
