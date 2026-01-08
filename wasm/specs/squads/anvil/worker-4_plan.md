@@ -7,7 +7,7 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [ ] Blocked: awaiting EM assignment (requested).
+- [ ] Awaiting EM assignment.
 
 ## Task Queue
 - [ ] [EM: Add queued tasks]
@@ -15,6 +15,7 @@ Priority: 4
 ## Completed
 - [x] Add async/class ES5 transform source-map mappings and offsets. Tests: `./wasm/test.sh source_map`
 - [x] Add async nested function source-map offset coverage. Tests: `./wasm/test.sh source_map`
+- [x] Add async await detection test for nested functions. Tests: `./wasm/test.sh body_contains_await`
 
 ## Ready for Merge
 Yes - branch `worker/anvil-4` is ready for merge.
