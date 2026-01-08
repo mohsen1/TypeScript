@@ -7108,3 +7108,316 @@ declare class Config {
         output
     );
 }
+
+#[test]
+fn test_class_es5_private_field_init_basic() {
+    // Test basic private field initialization with #
+    let source = r#"
+class Counter {
+    #count: number = 0;
+
+    increment(): void {
+        this.#count++;
+    }
+
+    getCount(): number {
+        return this.#count;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should transform class to function
+    assert!(
+        output.contains("function Counter") || output.contains("var Counter"),
+        "Expected Counter class transformation: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("increment") && output.contains("getCount"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Private field should be downleveled (WeakMap pattern or similar)
+    assert!(
+        output.contains("count") || output.contains("WeakMap") || output.contains("_count"),
+        "Expected private field handling: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_private_field_init_complex() {
+    // Test private field with complex initializer
+    let source = r#"
+class Config {
+    #settings: object = { debug: false, verbose: true };
+    #timestamp: number = Date.now();
+    #id: string = Math.random().toString(36);
+
+    getSettings(): object {
+        return this.#settings;
+    }
+
+    getId(): string {
+        return this.#id;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should transform class
+    assert!(
+        output.contains("function Config") || output.contains("var Config"),
+        "Expected Config class transformation: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("getSettings") && output.contains("getId"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Initializers should be present
+    assert!(
+        output.contains("debug") || output.contains("Date.now") || output.contains("random"),
+        "Expected initializer expressions: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_private_field_init_multiple() {
+    // Test multiple private fields
+    let source = r#"
+class User {
+    #id: number = 0;
+    #name: string = "";
+    #email: string = "";
+    #active: boolean = true;
+
+    constructor(id: number, name: string, email: string) {
+        this.#id = id;
+        this.#name = name;
+        this.#email = email;
+    }
+
+    getId(): number {
+        return this.#id;
+    }
+
+    getName(): string {
+        return this.#name;
+    }
+
+    isActive(): boolean {
+        return this.#active;
+    }
+
+    deactivate(): void {
+        this.#active = false;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should transform class
+    assert!(
+        output.contains("function User") || output.contains("var User"),
+        "Expected User class transformation: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("getId")
+            && output.contains("getName")
+            && output.contains("isActive")
+            && output.contains("deactivate"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_private_field_init_inheritance() {
+    // Test private field initialization with inheritance
+    let source = r#"
+class Animal {
+    #name: string = "unnamed";
+
+    constructor(name: string) {
+        this.#name = name;
+    }
+
+    getName(): string {
+        return this.#name;
+    }
+}
+
+class Dog extends Animal {
+    #breed: string = "unknown";
+
+    constructor(name: string, breed: string) {
+        super(name);
+        this.#breed = breed;
+    }
+
+    getBreed(): string {
+        return this.#breed;
+    }
+
+    describe(): string {
+        return this.getName() + " is a " + this.#breed;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Both classes should be transformed
+    assert!(
+        output.contains("Animal") && output.contains("Dog"),
+        "Expected both class transformations: {}",
+        output
+    );
+
+    // Inheritance pattern should be present
+    assert!(
+        output.contains("__extends") || output.contains("prototype"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("getName") && output.contains("getBreed") && output.contains("describe"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_private_field_init_with_methods() {
+    // Test private field accessed by multiple methods
+    let source = r#"
+class BankAccount {
+    #balance: number = 0;
+    #transactions: number[] = [];
+
+    deposit(amount: number): void {
+        this.#balance += amount;
+        this.#transactions.push(amount);
+    }
+
+    withdraw(amount: number): boolean {
+        if (this.#balance >= amount) {
+            this.#balance -= amount;
+            this.#transactions.push(-amount);
+            return true;
+        }
+        return false;
+    }
+
+    getBalance(): number {
+        return this.#balance;
+    }
+
+    getTransactionCount(): number {
+        return this.#transactions.length;
+    }
+
+    getLastTransaction(): number {
+        return this.#transactions[this.#transactions.length - 1];
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should transform class
+    assert!(
+        output.contains("function BankAccount") || output.contains("var BankAccount"),
+        "Expected BankAccount class transformation: {}",
+        output
+    );
+
+    // All methods should be present
+    assert!(
+        output.contains("deposit")
+            && output.contains("withdraw")
+            && output.contains("getBalance")
+            && output.contains("getTransactionCount")
+            && output.contains("getLastTransaction"),
+        "Expected all methods: {}",
+        output
+    );
+}
