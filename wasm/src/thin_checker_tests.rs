@@ -9180,3 +9180,248 @@ processor.process(dogs, handleDog);
         checker.ctx.diagnostics
     );
 }
+
+/// TS Unsoundness #1: The "Any" Type - Any is assignable to everything
+///
+/// `any` acts as both Top (unknown) and Bottom (never). It is assignable
+/// to everything and everything is assignable to it. This is the fundamental
+/// escape hatch in TypeScript.
+#[test]
+fn test_any_type_assignable_to_specific() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+declare const anyVal: any;
+
+// Any is assignable to any specific type
+const str: string = anyVal;
+const num: number = anyVal;
+const bool: boolean = anyVal;
+const obj: { x: number } = anyVal;
+const fn: (x: string) => number = anyVal;
+const arr: number[] = anyVal;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    if !checker.ctx.diagnostics.is_empty() {
+        eprintln!("=== Any Assignable To Specific Diagnostics ===");
+        for diag in &checker.ctx.diagnostics {
+            eprintln!("[{}] {}", diag.start, diag.message_text);
+        }
+    }
+
+    // Any should be assignable to any specific type (0 errors)
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Any should be assignable to all specific types: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// TS Unsoundness #1: The "Any" Type - Everything is assignable to any
+///
+/// Any specific type is assignable to `any`. This is the escape hatch
+/// that allows bypassing type checking.
+#[test]
+fn test_specific_types_assignable_to_any() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+declare let anyTarget: any;
+
+// Everything is assignable to any
+const str = "hello";
+const num = 42;
+const bool = true;
+const obj = { x: 1 };
+const fn = (x: string) => x.length;
+const arr = [1, 2, 3];
+
+anyTarget = str;
+anyTarget = num;
+anyTarget = bool;
+anyTarget = obj;
+anyTarget = fn;
+anyTarget = arr;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    if !checker.ctx.diagnostics.is_empty() {
+        eprintln!("=== Specific To Any Diagnostics ===");
+        for diag in &checker.ctx.diagnostics {
+            eprintln!("[{}] {}", diag.start, diag.message_text);
+        }
+    }
+
+    // All specific types should be assignable to any (0 errors)
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "All types should be assignable to any: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// TS Unsoundness #1: The "Any" Type - Any in function arguments
+///
+/// Any can be passed where a specific type is expected, and any function
+/// can accept any as an argument.
+#[test]
+fn test_any_type_in_function_calls() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+declare const anyVal: any;
+
+function expectString(s: string): void {}
+function expectNumber(n: number): void {}
+function expectObject(o: { x: number }): void {}
+
+// Any can be passed where specific types are expected
+expectString(anyVal);
+expectNumber(anyVal);
+expectObject(anyVal);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    if !checker.ctx.diagnostics.is_empty() {
+        eprintln!("=== Any In Function Calls Diagnostics ===");
+        for diag in &checker.ctx.diagnostics {
+            eprintln!("[{}] {}", diag.start, diag.message_text);
+        }
+    }
+
+    // Any should be valid in function calls expecting specific types
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Any should be valid in function calls: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// TS Unsoundness #1: The "Any" Type - Any propagation in operations
+///
+/// Operations on any produce any, maintaining the escape hatch.
+#[test]
+fn test_any_type_propagation() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+declare const anyVal: any;
+
+// Operations on any produce any
+const propAccess = anyVal.foo;
+const elemAccess = anyVal[0];
+const call = anyVal();
+const method = anyVal.bar();
+
+// Results can be assigned to any specific type
+const str: string = propAccess;
+const num: number = elemAccess;
+const obj: { x: number } = call;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    if !checker.ctx.diagnostics.is_empty() {
+        eprintln!("=== Any Propagation Diagnostics ===");
+        for diag in &checker.ctx.diagnostics {
+            eprintln!("[{}] {}", diag.start, diag.message_text);
+        }
+    }
+
+    // Any should propagate through operations
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Any should propagate through operations: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// TS Unsoundness #1: The "Any" Type - Any does NOT bypass never
+///
+/// While any is both top and bottom, never is the true bottom.
+/// Assigning never to any is allowed, but it doesn't mean anything
+/// because never has no values.
+#[test]
+fn test_any_type_never_relationship() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+declare const neverVal: never;
+declare let anyTarget: any;
+
+// Never is assignable to any (but has no values)
+anyTarget = neverVal;
+
+// Any is NOT assignable to never (you can't produce a never value)
+// This should produce an error
+function returnNever(): never {
+    throw new Error();
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    if !checker.ctx.diagnostics.is_empty() {
+        eprintln!("=== Any Never Relationship Diagnostics ===");
+        for diag in &checker.ctx.diagnostics {
+            eprintln!("[{}] {}", diag.start, diag.message_text);
+        }
+    }
+
+    // never -> any is allowed, but we don't test any -> never here
+    // as it requires implicit return checking
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Never should be assignable to any: {:?}",
+        checker.ctx.diagnostics
+    );
+}
