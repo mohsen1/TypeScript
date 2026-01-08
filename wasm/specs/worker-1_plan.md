@@ -6,12 +6,12 @@ Execute the highest-impact tasks assigned by the manager across all areas (solve
 Status: Active
 Priority: 1
 Ready for merge: yes
+Ready for merge: yes
 
 ## Current Assignment
 - Awaiting next assignment.
 
 ## Task Queue
-- [ ] Add uppercase exponent plus missing digits test (`1E+`).
 - [ ] Add numeric separator underscore name test (`1_0` or `1_0e1`).
 - [ ] Add numeric separator in integer name test (`1_000`).
 - [ ] Add numeric separator in fractional name test (`1.0_0`).
@@ -24,6 +24,7 @@ Ready for merge: yes
 - [ ] Add numeric separator in hex/binary name test (`0x1_0`, `0b1_0`, `0o1_0`).
 
 ## Completed
+- [x] Number index ignores uppercase exponent missing digits; verified `test_resolve_bounds_number_index_ignores_uppercase_exponent_missing_digits`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_uppercase_exponent_missing_digits`.
 - [x] Number index ignores exponent missing digits; verified `test_resolve_bounds_number_index_ignores_exponent_missing_digits`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_exponent_missing_digits`.
 - [x] Number index ignores uppercase exponent leading zeros zero; added `test_resolve_bounds_number_index_ignores_uppercase_exponent_leading_zeros_zero`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_uppercase_exponent_leading_zeros_zero`.
 - [x] Number index ignores mixed-case exponent trailing double minus; added `test_resolve_bounds_number_index_ignores_mixed_case_exponent_trailing_double_minus`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_mixed_case_exponent_trailing_double_minus`.
