@@ -35,6 +35,7 @@ Priority: 4
 - [x] Added binder coverage for enum/namespace merge exports. Tests: `./wasm/test.sh`.
 - [x] Added checker coverage for enum/namespace merged value member access. Tests: `./wasm/test.sh`.
 - [x] Added checker coverage for enum/namespace merged type member access. Tests: `./wasm/test.sh`.
+- [x] Added checker coverage for function/namespace merged value member access. Tests: `./wasm/test.sh`.
 
 ## Ready for Merge
 Yes
