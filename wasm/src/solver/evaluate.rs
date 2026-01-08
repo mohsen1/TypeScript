@@ -1821,6 +1821,28 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         }
     }
 
+    fn bind_infer(
+        &self,
+        info: &TypeParamInfo,
+        inferred: TypeId,
+        bindings: &mut FxHashMap<Atom, TypeId>,
+        checker: &mut SubtypeChecker<'_, R>,
+    ) -> bool {
+        if let Some(constraint) = info.constraint {
+            if !checker.is_subtype_of(inferred, constraint) {
+                return false;
+            }
+        }
+
+        if let Some(existing) = bindings.get(&info.name) {
+            return checker.is_subtype_of(inferred, *existing)
+                && checker.is_subtype_of(*existing, inferred);
+        }
+
+        bindings.insert(info.name, inferred);
+        true
+    }
+
     fn match_infer_pattern(
         &self,
         source: TypeId,
@@ -1837,25 +1859,43 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             return true;
         }
 
+        if let Some(TypeKey::Union(members)) = self.interner.lookup(source) {
+            let members = self.interner.type_list(members);
+            let base = bindings.clone();
+            let mut merged = base.clone();
+
+            for &member in members.iter() {
+                let mut local = base.clone();
+                if !self.match_infer_pattern(member, pattern, &mut local, visited, checker) {
+                    return false;
+                }
+
+                for (name, ty) in local {
+                    if base.contains_key(&name) {
+                        continue;
+                    }
+
+                    if let Some(existing) = merged.get_mut(&name) {
+                        if *existing != ty {
+                            *existing = self.interner.union2(*existing, ty);
+                        }
+                    } else {
+                        merged.insert(name, ty);
+                    }
+                }
+            }
+
+            *bindings = merged;
+            return true;
+        }
+
         let Some(pattern_key) = self.interner.lookup(pattern) else {
             return false;
         };
 
         match pattern_key {
             TypeKey::Infer(info) => {
-                if let Some(constraint) = info.constraint {
-                    if !checker.is_subtype_of(source, constraint) {
-                        return false;
-                    }
-                }
-
-                if let Some(existing) = bindings.get(&info.name) {
-                    return checker.is_subtype_of(source, *existing)
-                        && checker.is_subtype_of(*existing, source);
-                }
-
-                bindings.insert(info.name, source);
-                true
+                self.bind_infer(&info, source, bindings, checker)
             }
             TypeKey::Array(pattern_elem) => match self.interner.lookup(source) {
                 Some(TypeKey::Array(source_elem)) => self.match_infer_pattern(
@@ -2036,8 +2076,182 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 }
                 _ => false,
             },
+            TypeKey::TemplateLiteral(pattern_spans_id) => {
+                let pattern_spans = self.interner.template_list(pattern_spans_id);
+                match self.interner.lookup(source) {
+                    Some(TypeKey::Literal(LiteralValue::String(atom))) => {
+                        let source_text = self.interner.resolve_atom_ref(atom);
+                        self.match_template_literal_string(
+                            source_text.as_ref(),
+                            pattern_spans.as_ref(),
+                            bindings,
+                            checker,
+                        )
+                    }
+                    Some(TypeKey::TemplateLiteral(source_spans_id)) => {
+                        let source_spans = self.interner.template_list(source_spans_id);
+                        self.match_template_literal_spans(
+                            source,
+                            source_spans.as_ref(),
+                            pattern_spans.as_ref(),
+                            bindings,
+                            checker,
+                        )
+                    }
+                    Some(TypeKey::Intrinsic(IntrinsicKind::String)) => {
+                        self.match_template_literal_string_type(
+                            pattern_spans.as_ref(),
+                            bindings,
+                            checker,
+                        )
+                    }
+                    _ => false,
+                }
+            }
             _ => checker.is_subtype_of(source, pattern),
         }
+    }
+
+    fn match_template_literal_string(
+        &self,
+        source: &str,
+        pattern: &[TemplateSpan],
+        bindings: &mut FxHashMap<Atom, TypeId>,
+        checker: &mut SubtypeChecker<'_, R>,
+    ) -> bool {
+        let mut pos = 0;
+        let mut index = 0;
+
+        while index < pattern.len() {
+            match pattern[index] {
+                TemplateSpan::Text(text) => {
+                    let text_value = self.interner.resolve_atom_ref(text);
+                    let text_value = text_value.as_ref();
+                    if !source[pos..].starts_with(text_value) {
+                        return false;
+                    }
+                    pos += text_value.len();
+                    index += 1;
+                }
+                TemplateSpan::Type(type_id) => {
+                    let next_text = pattern[index + 1..]
+                        .iter()
+                        .find_map(|span| match span {
+                            TemplateSpan::Text(text) => Some(*text),
+                            TemplateSpan::Type(_) => None,
+                        });
+                    let end = if let Some(next_text) = next_text {
+                        let next_value = self.interner.resolve_atom_ref(next_text);
+                        match source[pos..].find(next_value.as_ref()) {
+                            Some(offset) => pos + offset,
+                            None => return false,
+                        }
+                    } else {
+                        source.len()
+                    };
+
+                    let captured = &source[pos..end];
+                    pos = end;
+                    let captured_type = self.interner.literal_string(captured);
+
+                    if let Some(TypeKey::Infer(info)) = self.interner.lookup(type_id) {
+                        if !self.bind_infer(&info, captured_type, bindings, checker) {
+                            return false;
+                        }
+                    } else if !checker.is_subtype_of(captured_type, type_id) {
+                        return false;
+                    }
+                    index += 1;
+                }
+            }
+        }
+
+        pos == source.len()
+    }
+
+    fn match_template_literal_spans(
+        &self,
+        source: TypeId,
+        source_spans: &[TemplateSpan],
+        pattern_spans: &[TemplateSpan],
+        bindings: &mut FxHashMap<Atom, TypeId>,
+        checker: &mut SubtypeChecker<'_, R>,
+    ) -> bool {
+        if pattern_spans.len() == 1 {
+            if let TemplateSpan::Type(type_id) = pattern_spans[0] {
+                if let Some(TypeKey::Infer(info)) = self.interner.lookup(type_id) {
+                    let inferred = if source_spans
+                        .iter()
+                        .all(|span| matches!(span, TemplateSpan::Type(_)))
+                    {
+                        TypeId::STRING
+                    } else {
+                        source
+                    };
+                    return self.bind_infer(&info, inferred, bindings, checker);
+                }
+                return checker.is_subtype_of(source, type_id);
+            }
+        }
+
+        if source_spans.len() != pattern_spans.len() {
+            return false;
+        }
+
+        for (source_span, pattern_span) in source_spans.iter().zip(pattern_spans.iter()) {
+            match pattern_span {
+                TemplateSpan::Text(text) => match source_span {
+                    TemplateSpan::Text(source_text) if source_text == text => {}
+                    _ => return false,
+                },
+                TemplateSpan::Type(type_id) => {
+                    let inferred = match source_span {
+                        TemplateSpan::Text(text) => {
+                            let text_value = self.interner.resolve_atom_ref(*text);
+                            self.interner.literal_string(text_value.as_ref())
+                        }
+                        TemplateSpan::Type(source_type) => *source_type,
+                    };
+                    if let Some(TypeKey::Infer(info)) = self.interner.lookup(*type_id) {
+                        if !self.bind_infer(&info, inferred, bindings, checker) {
+                            return false;
+                        }
+                    } else if !checker.is_subtype_of(inferred, *type_id) {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        true
+    }
+
+    fn match_template_literal_string_type(
+        &self,
+        pattern_spans: &[TemplateSpan],
+        bindings: &mut FxHashMap<Atom, TypeId>,
+        checker: &mut SubtypeChecker<'_, R>,
+    ) -> bool {
+        if pattern_spans
+            .iter()
+            .any(|span| matches!(span, TemplateSpan::Text(_)))
+        {
+            return false;
+        }
+
+        for span in pattern_spans {
+            if let TemplateSpan::Type(type_id) = span {
+                if let Some(TypeKey::Infer(info)) = self.interner.lookup(*type_id) {
+                    if !self.bind_infer(&info, TypeId::STRING, bindings, checker) {
+                        return false;
+                    }
+                } else if !checker.is_subtype_of(TypeId::STRING, *type_id) {
+                    return false;
+                }
+            }
+        }
+
+        true
     }
 
     fn is_numeric_property_name(&self, name: Atom) -> bool {
