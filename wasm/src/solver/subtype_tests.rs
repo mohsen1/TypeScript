@@ -3773,6 +3773,51 @@ fn test_keyof_union_overlapping_keys_is_common() {
 }
 
 #[test]
+fn test_keyof_union_optional_key_is_common() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let key_a = interner.intern_string("a");
+    let key_b = interner.intern_string("b");
+
+    let obj_optional_a = interner.object(vec![PropertyInfo {
+        name: key_a,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_ab = interner.object(vec![
+        PropertyInfo {
+            name: key_a,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: key_b,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let union = interner.union(vec![obj_optional_a, obj_ab]);
+    let keyof_union = interner.intern(TypeKey::KeyOf(union));
+    let key_a_literal = interner.literal_string("a");
+    let key_b_literal = interner.literal_string("b");
+
+    assert!(checker.is_subtype_of(keyof_union, key_a_literal));
+    assert!(!checker.is_subtype_of(keyof_union, key_b_literal));
+    assert!(checker.is_subtype_of(key_a_literal, keyof_union));
+}
+
+#[test]
 fn test_keyof_deferred_not_subtype_of_string() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
