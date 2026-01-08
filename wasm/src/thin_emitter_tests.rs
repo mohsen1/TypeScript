@@ -1995,6 +1995,37 @@ fn test_commonjs_import_namespace() {
 }
 
 #[test]
+fn test_commonjs_import_namespace_emits_helpers() {
+    let source = r#"import * as ns from "./module";"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("var __createBinding"),
+        "Expected __createBinding helper in CommonJS output: {}",
+        output
+    );
+    assert!(
+        output.contains("var __setModuleDefault"),
+        "Expected __setModuleDefault helper in CommonJS output: {}",
+        output
+    );
+    assert!(
+        output.contains("var __importStar"),
+        "Expected __importStar helper in CommonJS output: {}",
+        output
+    );
+}
+
+#[test]
 fn test_commonjs_import_default() {
     let source = r#"import myDefault from "./module";"#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -2073,6 +2104,32 @@ fn test_commonjs_export_star() {
     let output = printer.get_output();
     assert!(output.contains("require(\"./module\")"), "Expected require() in CommonJS output: {}", output);
     assert!(output.contains("__exportStar("), "Expected __exportStar call in CommonJS output: {}", output);
+}
+
+#[test]
+fn test_commonjs_export_star_emits_helpers() {
+    let source = r#"export * from "./module";"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("var __createBinding"),
+        "Expected __createBinding helper in CommonJS output: {}",
+        output
+    );
+    assert!(
+        output.contains("var __exportStar"),
+        "Expected __exportStar helper in CommonJS output: {}",
+        output
+    );
 }
 
 #[test]
