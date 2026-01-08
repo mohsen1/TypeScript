@@ -38,7 +38,9 @@ pub fn contains_this_reference(arena: &ThinNodeArena, node_idx: NodeIndex) -> bo
     let Some(node) = arena.get(node_idx) else { return false };
     
     // Check if this node is `this`
-    if node.kind == crate::scanner::SyntaxKind::ThisKeyword as u16 {
+    if node.kind == crate::scanner::SyntaxKind::ThisKeyword as u16
+        || node.kind == crate::scanner::SyntaxKind::SuperKeyword as u16
+    {
         return true;
     }
     

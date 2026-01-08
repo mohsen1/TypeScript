@@ -3,6 +3,7 @@ use crate::parser::{NodeIndex, NodeList};
 use crate::parser::thin_node::ThinNode;
 use crate::parser::syntax_kind_ext;
 use crate::scanner::SyntaxKind;
+use crate::transforms::class_es5::ClassES5Emitter;
 
 impl<'a> ThinPrinter<'a> {
     // =========================================================================
@@ -115,6 +116,17 @@ impl<'a> ThinPrinter<'a> {
 
         // Skip ambient declarations (declare class)
         if self.has_declare_modifier(&class.modifiers) {
+            return;
+        }
+
+        if self.ctx.target_es5 {
+            let mut es5_emitter = ClassES5Emitter::new(self.arena);
+            es5_emitter.set_indent_level(self.writer.indent_level());
+            if let Some(source_text) = self.source_text {
+                es5_emitter.set_source_text(source_text);
+            }
+            let output = es5_emitter.emit_class(idx);
+            self.write(&output);
             return;
         }
 
