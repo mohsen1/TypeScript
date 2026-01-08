@@ -35,9 +35,10 @@ Priority: 3
 - [x] Added CommonJS export-name test for declare enums; `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 - [x] Added CommonJS module name sanitization coverage for plain paths; `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 - [x] Added CommonJS module name sanitization coverage for dot-separated paths; `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
+- [x] Added CommonJS module name sanitization coverage for scoped subpaths; `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 
 ## Ready for Merge
-No
+Yes
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize emitter fidelity (ES5 downleveling/source maps) before new features.

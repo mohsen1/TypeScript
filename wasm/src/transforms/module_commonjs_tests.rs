@@ -14,6 +14,7 @@ fn test_sanitize_module_name() {
     assert_eq!(sanitize_module_name("foo/bar"), "foo_bar");
     assert_eq!(sanitize_module_name("foo-bar"), "foo_bar");
     assert_eq!(sanitize_module_name("foo.bar/baz"), "foo_bar_baz");
+    assert_eq!(sanitize_module_name("@scope/pkg/sub"), "_scope_pkg_sub");
 }
 
 #[test]
