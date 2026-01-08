@@ -43,13 +43,13 @@ engine on top to match TypeScript behavior while preserving correctness where po
 
 
 ## Executive Summary (Manager report)
-Last updated: 2026-01-07
+Last updated: 2026-01-08
 
-- Overall: Migration remains active; Rust/WASM compiler is under construction and not production-ready.
-- Tracks: CLI added focused binder regression tests for the binder.ts:331 parameter binding gap and re-ran benches (still stops at `binder.ts:432` with `statements` missing); emitter `.d.ts` now covers default re-export specifiers with parser coverage; checker routes tuple literal element access through the solver so optional elements include `undefined`; LSP stabilized nested function-body edit cache timing to preserve prefix symbols and scope reuse; solver expanded TS_UNSOUNDNESS coverage for homomorphic mapped types over primitives and noUnchecked object index signatures.
-- Baselines (`tests/cases`, first 100): compiler errors 60/77 (77.9%) pass, JS 40/76 (52.6%) pass; conformance errors 18/90 (20.0%) pass, JS 1/88 (1.1%) pass (no new run).
-- Risk: CLI bench blocked by TS2304 in `binder.ts:432`; ES module imports still resolve to `any`; source maps remain minimal; parser/arena child enumeration TODOs remain; conformance baseline pass rates are low.
-- Next focus: fix the binder.ts:432 scope wiring and rerun real repo benchmarks, keep pushing assignability/member lookup into solver to end split-brain typing, remove remaining inline emitter transforms in favor of directives, tighten LSP incremental edits that touch suffix scopes, and retire legacy AST with arena memory-hygiene checks.
+- Overall: Migration remains active; Rust/WASM compiler is under construction and not production-ready; local commits are in flight with cleanup follow-ups for earlier mixed staging.
+- Tracks: Solver now includes occurs-check coverage for function/callable `this` types, infer-aware conditional evaluation for object/index patterns, and optional/rest/`this` assignability edge cases with focused tests; emitter now handles nested arrow `this` capture in async ES5 with integration tests, and a legacy ES5 class/helper fix passes `test_class_extends_helper` in a worker worktree but is not committed yet; source map coverage includes ES5 for-of, async/await, and class-name mapping regressions.
+- Baselines (`tests/cases`, first 100): no new run since 2026-01-07; last known compiler errors 60/77 (77.9%) pass, JS 40/76 (52.6%) pass; conformance errors 18/90 (20.0%) pass, JS 1/88 (1.1%) pass.
+- Risk: ES module imports still resolve to `any`; full test runs remain blocked until the ES5 class/helper fix is committed; parser/arena child enumeration TODOs remain; CLI typesVersions compiler version is hardcoded; conformance baseline pass rates are low.
+- Next focus: land the ES5 helper fix for `emitter_edge_case_tests::test_class_extends_helper`, clean up mixed staging from earlier commits, and expand ES5 downleveling/source map coverage (`this` capture, `super()` + property initializer ordering).
 
 ## Status
 This project is not ready for general use yet. The interface and distribution are in progress.
