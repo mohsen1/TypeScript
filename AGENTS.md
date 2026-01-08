@@ -96,8 +96,6 @@ Commit frequently and atomically
 
 ## 🎯 If Blocked
 
-**You are almost never truly blocked. Do not ask permission. Act.**
-
 - Dirty worktree? `git stash` and continue.
 - No assignment in plan? Pick the first item from Task Queue.
 - Task Queue empty? Add a test for existing code.
@@ -105,4 +103,6 @@ Commit frequently and atomically
 - Merge conflict? Resolve it.
 - Wrong branch? Switch to the right one.
 
-**Stop asking questions. Start writing code.**
+## 💡 Exploration is OK
+
+This is a complex compiler project. Take time to understand the code before making changes. Reading architecture docs, tracing call paths, and understanding existing patterns is valuable work - not wasted time.
