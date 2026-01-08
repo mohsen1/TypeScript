@@ -7,7 +7,7 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- Complete: Added 12 async IIFE pattern tests (arrow basic, function expression, with return, no await, with arguments, body_contains_await, ignores nested async, named function, try/catch, in expression, multiple awaits) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (136 tests PASS).
+- [ ] Add ES5 async tests for async callback patterns in `wasm/src/transforms/async_es5_tests.rs`. Run `./wasm/test.sh async_es5_tests`.
 
 ## Task Queue
 - [ ] (empty)
