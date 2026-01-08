@@ -3521,6 +3521,47 @@ fn test_keyof_intersection_contravariant() {
 }
 
 #[test]
+fn test_keyof_contravariant_object_subtyping() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_ab = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    assert!(checker.is_subtype_of(obj_ab, obj_a));
+
+    let keyof_a = interner.intern(TypeKey::KeyOf(obj_a));
+    let keyof_ab = interner.intern(TypeKey::KeyOf(obj_ab));
+
+    assert!(checker.is_subtype_of(keyof_a, keyof_ab));
+    assert!(!checker.is_subtype_of(keyof_ab, keyof_a));
+}
+
+#[test]
 fn test_keyof_intersection_union_of_keys() {
     use crate::solver::evaluate_keyof;
 
