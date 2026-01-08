@@ -3797,6 +3797,9 @@ impl<'a> ThinCheckerState<'a> {
         // Get the type of the object
         let object_type = self.get_type_of_node(access.expression);
 
+        // Evaluate Application types to resolve generic type aliases/interfaces
+        let object_type = self.evaluate_application_type(object_type);
+
         // Don't report errors for any/error types
         if object_type == TypeId::ANY || object_type == TypeId::ERROR {
             return TypeId::ANY;
@@ -5097,6 +5100,53 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
         false
+    }
+
+    /// Evaluate an Application type by resolving the base symbol and instantiating.
+    ///
+    /// This handles types like `Store<ExtractState<R>>` by:
+    /// 1. Resolving the base type reference to get its body
+    /// 2. Getting the type parameters
+    /// 3. Instantiating the body with the provided type arguments
+    /// 4. Recursively evaluating the result
+    fn evaluate_application_type(&mut self, type_id: TypeId) -> TypeId {
+        use crate::solver::{TypeKey, SymbolRef, instantiate_type, TypeSubstitution};
+        use crate::binder::SymbolId;
+
+        let Some(TypeKey::Application(app_id)) = self.ctx.types.lookup(type_id) else {
+            return type_id;
+        };
+
+        let app = self.ctx.types.type_application(app_id);
+
+        // Check if the base is a Ref
+        let Some(TypeKey::Ref(SymbolRef(sym_id))) = self.ctx.types.lookup(app.base) else {
+            return type_id;
+        };
+
+        // Get the symbol's type (which is the body of the type alias/interface)
+        let body_type = self.get_type_of_symbol(SymbolId(sym_id));
+        if body_type == TypeId::ANY || body_type == TypeId::ERROR {
+            return type_id;
+        }
+
+        // Get type parameters for this symbol
+        let type_params = self.get_type_params_for_symbol(SymbolId(sym_id));
+        if type_params.is_empty() {
+            return body_type;
+        }
+
+        // Recursively evaluate the type arguments first
+        let evaluated_args: Vec<TypeId> = app.args.iter()
+            .map(|&arg| self.evaluate_application_type(arg))
+            .collect();
+
+        // Create substitution and instantiate
+        let substitution = TypeSubstitution::from_args(&type_params, &evaluated_args);
+        let instantiated = instantiate_type(self.ctx.types, body_type, &substitution);
+
+        // Recursively evaluate in case the result contains more applications
+        self.evaluate_application_type(instantiated)
     }
 
     /// Create a TypeEnvironment populated with resolved symbol types.
