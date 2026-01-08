@@ -7,12 +7,13 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- Ask manager for next assignment (ES5 class async method parity handled).
+- Stand by for next emitter fidelity task.
 
 ## Task Queue
 - [ ] Stand by for next emitter fidelity task.
 
 ## Completed
+- [x] Async ES5 variable statement emission: handle declaration lists so const/let initializers emit in async bodies; test `./wasm/test.sh nested_arrow_this_capture`.
 - [x] Async ES5 parity investigation: parity test passed; fixed nested arrow `this` capture in async ES5 emission; tests `./wasm/test.sh test_parity_async_es5`, `./wasm/test.sh nested_arrow`.
 - [x] Async ES5 await detection traversal: include property/element/conditional expressions; tests `./wasm/test.sh async_es5`.
 - [x] ES5 downleveling edge cases: fixed default-constructor arrow `this` capture and preserved pre-super statements with property initializer ordering; tests `./wasm/test.sh class_es5`.
