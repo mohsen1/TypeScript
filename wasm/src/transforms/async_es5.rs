@@ -281,6 +281,71 @@ impl<'a> AsyncES5Emitter<'a> {
             }
         }
 
+        // Check computed property names
+        if node.kind == syntax_kind_ext::COMPUTED_PROPERTY_NAME {
+            if let Some(computed) = self.arena.get_computed_property(node) {
+                return self.contains_await_recursive(computed.expression);
+            }
+        }
+
+        // Check object/array literal expressions
+        if node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION
+            || node.kind == syntax_kind_ext::ARRAY_LITERAL_EXPRESSION
+        {
+            if let Some(literal) = self.arena.get_literal_expr(node) {
+                for &elem_idx in &literal.elements.nodes {
+                    if elem_idx.is_none() {
+                        continue;
+                    }
+                    let Some(elem_node) = self.arena.get(elem_idx) else {
+                        continue;
+                    };
+
+                    if let Some(property) = self.arena.get_property_assignment(elem_node) {
+                        if self.contains_await_recursive(property.name) {
+                            return true;
+                        }
+                        if self.contains_await_recursive(property.initializer) {
+                            return true;
+                        }
+                        continue;
+                    }
+
+                    if let Some(shorthand) = self.arena.get_shorthand_property(elem_node) {
+                        if self.contains_await_recursive(shorthand.object_assignment_initializer) {
+                            return true;
+                        }
+                        continue;
+                    }
+
+                    if let Some(spread) = self.arena.get_spread(elem_node) {
+                        if self.contains_await_recursive(spread.expression) {
+                            return true;
+                        }
+                        continue;
+                    }
+
+                    if let Some(method) = self.arena.get_method_decl(elem_node) {
+                        if self.contains_await_recursive(method.name) {
+                            return true;
+                        }
+                        continue;
+                    }
+
+                    if let Some(accessor) = self.arena.get_accessor(elem_node) {
+                        if self.contains_await_recursive(accessor.name) {
+                            return true;
+                        }
+                        continue;
+                    }
+
+                    if self.contains_await_recursive(elem_idx) {
+                        return true;
+                    }
+                }
+            }
+        }
+
         // Check conditional expressions
         if node.kind == syntax_kind_ext::CONDITIONAL_EXPRESSION {
             if let Some(cond) = self.arena.get_conditional_expr(node) {
