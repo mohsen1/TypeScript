@@ -971,3 +971,61 @@ class Foo {
         output
     );
 }
+
+#[test]
+fn test_class_es5_super_with_spread_args_and_field_init() {
+    // Edge case: super() with spread arguments in derived class with field initializers
+    let source = r#"
+class Base {
+    constructor(...args: number[]) {}
+}
+class Derived extends Base {
+    value = 42;
+    constructor(first: number, ...rest: number[]) {
+        super(first, ...rest);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected derived class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Should have super call with spread converted to .apply() or __spreadArray
+    assert!(
+        output.contains("_super") || output.contains("__extends"),
+        "Expected ES5 super mechanism in output: {}",
+        output
+    );
+
+    // Field initializer should be present
+    assert!(
+        output.contains("value") && output.contains("42"),
+        "Expected field initializer value = 42 in output: {}",
+        output
+    );
+
+    // Field init should come after super call
+    if let (Some(super_pos), Some(value_pos)) = (
+        output.find("_super").or_else(|| output.find("__extends")),
+        output.find("42"),
+    ) {
+        assert!(
+            super_pos < value_pos,
+            "Expected super call before field initializer: {}",
+            output
+        );
+    }
+}

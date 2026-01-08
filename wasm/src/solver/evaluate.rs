@@ -16,6 +16,7 @@ use crate::solver::types::*;
 use crate::solver::{apparent_primitive_members, ApparentMemberKind, TypeDatabase};
 use crate::solver::infer::InferenceContext;
 use crate::solver::instantiate::{
+    instantiate_generic,
     instantiate_type,
     instantiate_type_with_infer,
     TypeSubstitution,
@@ -233,11 +234,51 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             TypeKey::KeyOf(operand) => {
                 self.evaluate_keyof(*operand)
             }
-            // TODO: Add TypeKey::Application case here to expand generic type applications
-            // See doc comment above for fix approach.
+            TypeKey::Application(app_id) => {
+                self.evaluate_application(*app_id)
+            }
             // Other types pass through unchanged
             _ => type_id,
         }
+    }
+
+    /// Evaluate a generic type application: Base<Args>
+    ///
+    /// Algorithm:
+    /// 1. Look up the base type - if it's a Ref, resolve it
+    /// 2. Get the type parameters for the base symbol
+    /// 3. If we have type params, instantiate the resolved type with args
+    /// 4. Recursively evaluate the result
+    fn evaluate_application(&self, app_id: TypeApplicationId) -> TypeId {
+        let app = self.interner.type_application(app_id);
+
+        // Look up the base type
+        let base_key = match self.interner.lookup(app.base) {
+            Some(k) => k,
+            None => return self.interner.application(app.base, app.args.clone()),
+        };
+
+        // If the base is a Ref, try to resolve and instantiate
+        if let TypeKey::Ref(symbol) = base_key {
+            // Try to get the type parameters for this symbol
+            if let Some(type_params) = self.resolver.get_type_params(symbol) {
+                // Resolve the base type to get the body
+                if let Some(resolved) = self.resolver.resolve_ref(symbol, self.interner) {
+                    // Instantiate the resolved type with the type arguments
+                    let instantiated = instantiate_generic(
+                        self.interner,
+                        resolved,
+                        &type_params,
+                        &app.args,
+                    );
+                    // Recursively evaluate the result
+                    return self.evaluate(instantiated);
+                }
+            }
+        }
+
+        // If we can't expand, return the original application
+        self.interner.application(app.base, app.args.clone())
     }
 
     /// Evaluate a conditional type: T extends U ? X : Y
