@@ -7,12 +7,26 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [ ] Add ES5 class tests for class expressions with decorators in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
+- [ ] Add ES5 class tests for class expressions in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Add ES5 super with conditional field init test. Tests: `./wasm/test.sh super_with_conditional_field`
+- [x] Add ES5 super with arrow field init test. Tests: `./wasm/test.sh super_with_arrow_field`
+- [x] Add ES5 super with computed field init test. Tests: `./wasm/test.sh super_with_computed_field`
+- [x] Add ES5 super with method call in field init test. Tests: `./wasm/test.sh super_with_method_call`
+- [x] Add ES5 super with nested inheritance field init test. Tests: `./wasm/test.sh super_with_nested_inheritance`
+- [x] Add ES5 constructor param inject decorator test. Tests: `./wasm/test.sh constructor_param_inject`
+- [x] Add ES5 constructor param optional decorator test. Tests: `./wasm/test.sh constructor_param_optional`
+- [x] Add ES5 constructor param attribute decorator test. Tests: `./wasm/test.sh constructor_param_attribute`
+- [x] Add ES5 async method decorator pattern test. Tests: `./wasm/test.sh async_method_decorator_pattern`
+- [x] Add ES5 async lifecycle decorator pattern test. Tests: `./wasm/test.sh async_lifecycle_decorator_pattern`
+- [x] Add ES5 async event handler decorator pattern test. Tests: `./wasm/test.sh async_event_handler_decorator_pattern`
+- [x] Add ES5 component decorator pattern test. Tests: `./wasm/test.sh component_decorator_pattern`
+- [x] Add ES5 injectable service pattern test. Tests: `./wasm/test.sh injectable_service_pattern`
+- [x] Add ES5 entity decorator pattern test. Tests: `./wasm/test.sh entity_decorator_pattern`
 - [x] Add ES5 async static method test. Tests: `./wasm/test.sh async_static_method`
 - [x] Add ES5 decorators syntax test. Tests: `./wasm/test.sh decorators_syntax`
 - [x] Add ES5 parameter decorator pattern test. Tests: `./wasm/test.sh parameter_decorator_pattern`

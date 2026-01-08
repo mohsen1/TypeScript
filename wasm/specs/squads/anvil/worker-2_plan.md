@@ -7,12 +7,19 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] Add ES5 emitter parity tests for private class fields (`#field`) in `wasm/src/emitter_parity_tests.rs`. Run `./wasm/test.sh emitter_parity`.
+- [ ] Add ES5 emitter parity tests for nullish coalescing in `wasm/src/emitter_parity_tests.rs`. Run `./wasm/test.sh emitter_parity`.
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 optional chaining parity tests (method call, element access, with nullish, call) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (76 tests).
+- [x] Added ES5 destructuring parity tests (array, object, nested, defaults, rest) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (72 tests).
+- [x] Added ES5 spread operator parity tests (call spread, new spread, rest params, mixed array spread) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (67 tests).
+- [x] Added ES5 decorator parity tests (class, method, property, parameter) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (63 tests).
+- [x] Added ES5 async generator parity tests (type erasure, method, await+yield) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (59 tests).
+- [x] Added ES5 generator function parity tests (type erasure, method, yield type erasure) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (56 tests).
+- [x] Added ES5 private class field parity tests (instance field, static access, method, getter, setter) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (51 tests).
 - [x] Added ES5 static block parity tests (`test_parity_es5_static_block`, `test_parity_es5_static_block_multi_stmt`) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (44 tests).
 - [x] Added parity test for function param type erasure in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (39 tests).
 - [x] Added parity test for type alias erasure in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (38 tests).

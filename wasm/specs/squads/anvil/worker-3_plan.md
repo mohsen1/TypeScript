@@ -7,12 +7,18 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] Add decorator transform source map tests in `wasm/src/source_map_tests.rs` covering class decorators, method decorators, and parameter decorators. Run `./wasm/test.sh source_map`.
+- [ ] Add source map tests for template literal transforms in `wasm/src/source_map_tests.rs`. Run `./wasm/test.sh source_map`.
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added spread and rest parameter transform source map tests (rest param function/arrow, spread function call/array/object literal, rest array/object destructuring, class method, new expression, combined); `./wasm/test.sh source_map` passes.
+- [x] Added namespace transform source map tests (functions, class, enum, nested dot notation, merging, variables, exported, nested declaration, interface-only, mixed content); `./wasm/test.sh source_map` passes.
+- [x] Added generator transform source map tests (basic yield, multiple yields, yield in loop, yield delegation, return value, class method, try/catch, parameters, object yield, generator expression); `./wasm/test.sh source_map` passes.
+- [x] Added ES5 class transform source map tests (basic IIFE, constructor, instance methods, static methods, accessors, inheritance, super method calls, computed properties, multi-level inheritance, class expressions); `./wasm/test.sh source_map` passes.
+- [x] Added async/await transform source map tests (multiple awaits, try/catch, for-of loop, IIFE, rest/default params, destructuring, nested functions, static method, while loop); `./wasm/test.sh source_map` passes.
+- [x] Added decorator transform source map tests (class, method, parameter, property, accessor, factory, mixed decorators); `./wasm/test.sh source_map` passes.
 - [x] Lowered async ES5 computed `super[...]` calls (async emitter + ThinPrinter) and updated integration tests; `./wasm/test.sh` fails at `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`.
 - [x] Added JS + d.ts source map `file`/`sourcesContent`/`sourceRoot` assertions in `wasm/src/cli/driver_tests.rs` plus ES5 transform name mapping coverage in `wasm/src/source_map_tests.rs`; `./wasm/test.sh` fails at `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`.
 - [x] Relaxed export-assignment class declaration assertion to accept ES6 class output; `./wasm/test.sh test_export_assignment_suppresses_other_exports`.

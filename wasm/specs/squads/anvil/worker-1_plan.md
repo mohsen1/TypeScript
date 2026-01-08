@@ -8,12 +8,19 @@ Priority: 1
 Blocked: Awaiting next EM-Anvil assignment.
 
 ## Current Assignment
-- Complete: Added async static field initializer tests; ran `./wasm/test.sh class_es5_tests` (all 69 pass).
+- [ ] Add ES5 class tests for mixin patterns in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 tests for abstract classes (6 tests): basic abstract class, abstract class with implemented methods, abstract class with abstract property, concrete extends abstract, abstract class with static members, abstract class with constructor. Ran `./wasm/test.sh class_es5_tests` (all 104 pass).
+- [x] Added ES5 tests for static blocks (6 tests): basic static block, static block with static methods, static block with private access, multiple static blocks, static block with try/catch, static block with super property access. Ran `./wasm/test.sh class_es5_tests` (all 98 pass).
+- [x] Added ES5 tests for computed properties and Symbol-keyed members (6 tests): computed property method, computed property accessor, Symbol.toStringTag, Symbol.hasInstance, multiple computed properties, computed static property. Ran `./wasm/test.sh class_es5_tests` (all 93 pass).
+- [x] Added ES5 tests for private methods (6 tests): instance private method, static private method, private method calling private method, private async method, private generator method, private method with private field. Ran `./wasm/test.sh class_es5_tests` (all 90 pass).
+- [x] Added ES5 tests for accessor decorators (6 tests): getter with decorator, setter with decorator, getter/setter pair with decorators, static getter with decorator, accessor with multiple decorators, accessor in derived class. Ran `./wasm/test.sh class_es5_tests` (all 84 pass).
+- [x] Added ES5 tests for generator methods with decorators (6 tests): generator method with decorator, static generator with decorator, generator with multiple decorators, async generator with decorator, generator with yield expressions, generator in decorated class. Ran `./wasm/test.sh class_es5_tests` (all 81 pass).
+- [x] Added additional ES5 coverage tests (6 tests): multiple private fields, mixed static/instance async, property initializers with method calls, labeled statements, new.target meta property, fluent method (this type). Ran `./wasm/test.sh class_es5_tests` (all 75 pass).
 - [x] Added async static field initializer ES5 tests (8 tests): await chain, conditional, try/catch, Promise.all, loop/await, object destructuring, nested async calls, switch/case. Ran `./wasm/test.sh class_es5_tests` (all 69 pass). Also fixed duplicate test names in source_map_tests.rs from merge.
 - [x] Fixed private field access in async methods (was emitting `this.void 0` instead of `__classPrivateFieldGet`); added `class_name` tracking to AsyncES5Emitter; added 2 tests. Ran `./wasm/test.sh emitter_transform_integration_tests` (all 124 pass).
 - [x] Added static async arrow field tests (3 tests for static field with async arrow: basic, integration, nested arrow). Verified correct __awaiter usage and this preservation. Ran `./wasm/test.sh emitter_transform_integration_tests` (all 123 pass).
