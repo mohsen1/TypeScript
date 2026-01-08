@@ -2642,3 +2642,335 @@ export { ConsoleLogger, createLogger } from './logger';
         logger_js
     );
 }
+
+#[test]
+fn compile_declaration_true_emits_dts_files() {
+    // Test that declaration: true produces .d.ts files
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "declaration": true
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+    write_file(
+        &base.join("src/index.ts"),
+        r#"
+export const VERSION = "1.0.0";
+export function greet(name: string): string {
+    return "Hello, " + name;
+}
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(
+        result.diagnostics.is_empty(),
+        "Expected no diagnostics, got: {:?}",
+        result.diagnostics
+    );
+
+    // JS file should exist
+    assert!(
+        base.join("dist/src/index.js").is_file(),
+        "JS output should exist"
+    );
+
+    // Declaration file should exist
+    assert!(
+        base.join("dist/src/index.d.ts").is_file(),
+        "Declaration file should exist when declaration: true"
+    );
+
+    // Verify declaration file content
+    let dts = std::fs::read_to_string(base.join("dist/src/index.d.ts")).expect("read d.ts");
+    assert!(
+        dts.contains("VERSION") && dts.contains("string"),
+        "Declaration should contain VERSION: {}",
+        dts
+    );
+    assert!(
+        dts.contains("greet") && dts.contains("name"),
+        "Declaration should contain greet function: {}",
+        dts
+    );
+}
+
+#[test]
+fn compile_declaration_false_no_dts_files() {
+    // Test that declaration: false (or absent) does NOT produce .d.ts files
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "declaration": false
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+    write_file(&base.join("src/index.ts"), "export const value = 42;");
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty());
+
+    // JS file should exist
+    assert!(
+        base.join("dist/src/index.js").is_file(),
+        "JS output should exist"
+    );
+
+    // Declaration file should NOT exist
+    assert!(
+        !base.join("dist/src/index.d.ts").is_file(),
+        "Declaration file should NOT exist when declaration: false"
+    );
+}
+
+#[test]
+fn compile_declaration_absent_no_dts_files() {
+    // Test that missing declaration option does NOT produce .d.ts files
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+    write_file(&base.join("src/index.ts"), "export const value = 42;");
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty());
+
+    // JS file should exist
+    assert!(
+        base.join("dist/src/index.js").is_file(),
+        "JS output should exist"
+    );
+
+    // Declaration file should NOT exist (declaration defaults to false)
+    assert!(
+        !base.join("dist/src/index.d.ts").is_file(),
+        "Declaration file should NOT exist when declaration is not specified"
+    );
+}
+
+#[test]
+fn compile_declaration_interface_and_type() {
+    // Test declaration output for interfaces and type aliases
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "declaration": true
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+    write_file(
+        &base.join("src/types.ts"),
+        r#"
+export interface User {
+    id: number;
+    name: string;
+    email: string;
+}
+
+export type UserId = number;
+
+export type UserRole = "admin" | "user" | "guest";
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty());
+
+    // Declaration file should exist
+    let dts_path = base.join("dist/src/types.d.ts");
+    assert!(dts_path.is_file(), "Declaration file should exist");
+
+    let dts = std::fs::read_to_string(&dts_path).expect("read d.ts");
+
+    // Interface should be in declaration
+    assert!(
+        dts.contains("interface User"),
+        "Declaration should contain User interface: {}",
+        dts
+    );
+    assert!(
+        dts.contains("id") && dts.contains("number"),
+        "Declaration should contain id property: {}",
+        dts
+    );
+    assert!(
+        dts.contains("name") && dts.contains("string"),
+        "Declaration should contain name property: {}",
+        dts
+    );
+
+    // Type aliases should be in declaration
+    assert!(
+        dts.contains("UserId"),
+        "Declaration should contain UserId type: {}",
+        dts
+    );
+    assert!(
+        dts.contains("UserRole"),
+        "Declaration should contain UserRole type: {}",
+        dts
+    );
+}
+
+#[test]
+fn compile_declaration_class_with_methods() {
+    // Test declaration output for classes with methods
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "declaration": true
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+    write_file(
+        &base.join("src/calculator.ts"),
+        r#"
+export class Calculator {
+    private value: number;
+
+    constructor(initial: number) {
+        this.value = initial;
+    }
+
+    add(n: number): Calculator {
+        this.value = this.value + n;
+        return this;
+    }
+
+    subtract(n: number): Calculator {
+        this.value = this.value - n;
+        return this;
+    }
+
+    getResult(): number {
+        return this.value;
+    }
+}
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty());
+
+    // Declaration file should exist
+    let dts_path = base.join("dist/src/calculator.d.ts");
+    assert!(dts_path.is_file(), "Declaration file should exist");
+
+    let dts = std::fs::read_to_string(&dts_path).expect("read d.ts");
+
+    // Class should be in declaration
+    assert!(
+        dts.contains("class Calculator"),
+        "Declaration should contain Calculator class: {}",
+        dts
+    );
+
+    // Methods should be in declaration
+    assert!(
+        dts.contains("add") && dts.contains("Calculator"),
+        "Declaration should contain add method with return type: {}",
+        dts
+    );
+    assert!(
+        dts.contains("subtract"),
+        "Declaration should contain subtract method: {}",
+        dts
+    );
+    assert!(
+        dts.contains("getResult") && dts.contains("number"),
+        "Declaration should contain getResult method: {}",
+        dts
+    );
+
+    // Private members should be marked private in declaration
+    assert!(
+        dts.contains("private") && dts.contains("value"),
+        "Declaration should contain private value: {}",
+        dts
+    );
+}
+
+#[test]
+fn compile_declaration_with_declaration_dir() {
+    // Test that declarationDir puts .d.ts files in separate directory
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "rootDir": "src",
+            "declaration": true,
+            "declarationDir": "types"
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+    write_file(&base.join("src/index.ts"), "export const value = 42;");
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty());
+
+    // JS file should be in outDir
+    assert!(
+        base.join("dist/index.js").is_file(),
+        "JS output should be in dist/"
+    );
+
+    // Declaration file should be in declarationDir, NOT in outDir
+    assert!(
+        base.join("types/index.d.ts").is_file(),
+        "Declaration file should be in types/"
+    );
+    assert!(
+        !base.join("dist/index.d.ts").is_file(),
+        "Declaration file should NOT be in dist/ when declarationDir is set"
+    );
+}
