@@ -86,6 +86,7 @@ Priority: 3
 - [x] Generic type reference test fix: updated test_checker_lower_generic_type_reference_applies_args to accept Object type. Generic type aliases like `Box<string>` are now eagerly resolved to their expanded form. Tests: `./wasm/test.sh` (55 failures, down from 57).
 - [x] JSX Intrinsic Lookup coverage (TS unsoundness #36): added 3 tests for JSX tag resolution - lowercase intrinsic elements, uppercase component resolution, and invalid element error detection. Tests currently pass as non-crash verification since JSX type checking is not yet implemented. Tests: `./wasm/test.sh -- test_jsx` (all 3 pass).
 - [x] Ref type symbol resolution: fixed TypeFormatter to resolve SymbolRef types to actual symbol names. Before: `Ref(12)<...>`, After: `Store<...>`. Improves error message readability significantly.
+- [x] Merge fix: updated thin_checker.rs to use seed_type_params() instead of removed add_external_type_params(). Tests: `./wasm/test.sh` (40 failures, down from 55 after sync).
 
 ## Ready for Merge
 Yes
@@ -99,4 +100,4 @@ Yes
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/forge-3`
 - **NEVER edit**: `DIRECTOR_AGENT.md`, `SQUAD_LEAD_AGENT.md`, `MANAGER_AGENT.md`, `AGENTS.md`, `start_*.sh`
-- Latest `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics` (assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
+- Latest `./wasm/test.sh`: 40 failures (test_check_redux_lodash_style_generics has 5 diagnostics).
