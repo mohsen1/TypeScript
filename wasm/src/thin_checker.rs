@@ -4813,12 +4813,25 @@ impl<'a> ThinCheckerState<'a> {
 
         // First, handle the top-level type
         let expanded = match key {
-            TypeKey::Application(_) => {
+            TypeKey::Application(app_id) => {
+                // Debug: print what we're expanding
+                let app = self.ctx.types.type_application(app_id);
+                if let Some(TypeKey::Ref(sym_ref)) = self.ctx.types.lookup(app.base) {
+                    let sym_id = SymbolId(sym_ref.0);
+                    let sym_name = self.ctx.binder.get_symbol(sym_id)
+                        .map(|s| s.escaped_name.clone())
+                        .unwrap_or_default();
+                    eprintln!("[DEBUG] expand_type_recursive: Application with Ref({}), args={}", sym_name, app.args.len());
+                }
+
                 // Expand Application types
                 let exp = self.try_expand_application_shallow(type_id);
                 // Recursively expand the result
                 if exp != type_id {
+                    eprintln!("[DEBUG]   -> expanded to different type");
                     return self.expand_type_recursive(exp, visited);
+                } else {
+                    eprintln!("[DEBUG]   -> NOT expanded (same type returned)");
                 }
                 exp
             }
@@ -4870,6 +4883,65 @@ impl<'a> ThinCheckerState<'a> {
                 }
                 type_id
             }
+            TypeKey::Union(members) => {
+                // Walk into union members and expand Applications
+                let members_list = self.ctx.types.type_list(members);
+                let mut changed = false;
+                let mut new_members = Vec::with_capacity(members_list.len());
+                for &member in members_list.as_ref() {
+                    let expanded_member = self.expand_type_recursive(member, visited);
+                    if expanded_member != member {
+                        changed = true;
+                    }
+                    new_members.push(expanded_member);
+                }
+                if changed {
+                    self.ctx.types.union(new_members)
+                } else {
+                    type_id
+                }
+            }
+            TypeKey::Function(func_id) => {
+                // Walk into function params and return type
+                let func = self.ctx.types.function_shape(func_id);
+                let mut changed = false;
+
+                // Expand return type
+                let expanded_return = self.expand_type_recursive(func.return_type, visited);
+                if expanded_return != func.return_type {
+                    changed = true;
+                }
+
+                // Expand param types
+                let mut new_params = Vec::with_capacity(func.params.len());
+                for param in &func.params {
+                    let expanded_type = self.expand_type_recursive(param.type_id, visited);
+                    if expanded_type != param.type_id {
+                        changed = true;
+                        new_params.push(crate::solver::ParamInfo {
+                            name: param.name,
+                            type_id: expanded_type,
+                            optional: param.optional,
+                            rest: param.rest,
+                        });
+                    } else {
+                        new_params.push(param.clone());
+                    }
+                }
+
+                if changed {
+                    self.ctx.types.function(crate::solver::FunctionShape {
+                        type_params: func.type_params.clone(),
+                        params: new_params,
+                        return_type: expanded_return,
+                        this_type: func.this_type,
+                        type_predicate: func.type_predicate.clone(),
+                        is_constructor: func.is_constructor,
+                    })
+                } else {
+                    type_id
+                }
+            }
             _ => type_id,
         };
 
@@ -4910,6 +4982,12 @@ impl<'a> ThinCheckerState<'a> {
 
         // Try to get the cached type for this symbol, or resolve it
         let sym_id = SymbolId(sym_ref.0);
+
+        // Debug: get symbol name
+        let sym_name = self.ctx.binder.get_symbol(sym_id)
+            .map(|s| s.escaped_name.clone())
+            .unwrap_or_default();
+
         let resolved = if let Some(&cached) = self.ctx.symbol_types.get(&sym_id) {
             cached
         } else {
@@ -4920,6 +4998,8 @@ impl<'a> ThinCheckerState<'a> {
         // Extract type parameters from the symbol's declaration (more reliable than type body scanning)
         let type_params = self.get_type_params_from_symbol_decl(sym_id);
         if type_params.is_empty() || type_params.len() != app.args.len() {
+            // Debug: print when type params don't match
+            eprintln!("[DEBUG] try_expand_application_shallow: sym='{}', type_params={}, args={}", sym_name, type_params.len(), app.args.len());
             // No type params or mismatch - return resolved without substitution
             return resolved;
         }

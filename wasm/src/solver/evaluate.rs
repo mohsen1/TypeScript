@@ -198,6 +198,38 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             TypeKey::KeyOf(operand) => {
                 self.evaluate_keyof(*operand)
             }
+            TypeKey::Application(app_id) => {
+                // Expand Application types like Reducer<S, A> by:
+                // 1. Checking if base is a Ref to a type alias
+                // 2. Getting type params from the resolved type
+                // 3. Creating a substitution mapping params to args
+                // 4. Instantiating the body with the substitution
+                let app = self.interner.type_application(*app_id);
+                if let Some(TypeKey::Ref(symbol_ref)) = self.interner.lookup(app.base) {
+                    // Get type params from the resolved type
+                    if let Some(type_params) = self.resolver.get_type_params(symbol_ref, self.interner) {
+                        // Get the body type
+                        if let Some(body) = self.resolver.resolve_ref(symbol_ref, self.interner) {
+                            // Create substitution mapping param names to args
+                            let mut substitution = TypeSubstitution::new();
+                            for (param, &arg) in type_params.iter().zip(app.args.iter()) {
+                                substitution.insert(param.name, arg);
+                            }
+                            // Fill in defaults for missing args
+                            for param in type_params.iter().skip(app.args.len()) {
+                                if let Some(default) = param.default {
+                                    substitution.insert(param.name, default);
+                                }
+                            }
+                            // Instantiate the body with the substitution
+                            let instantiated = instantiate_type(self.interner, body, &substitution);
+                            // Recursively evaluate to handle nested meta-types
+                            return self.evaluate(instantiated);
+                        }
+                    }
+                }
+                type_id
+            }
             // Other types pass through unchanged
             _ => type_id,
         }
@@ -1397,8 +1429,9 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             let mut subst = TypeSubstitution::new();
             subst.insert(mapped.type_param.name, key_literal);
 
-            // Substitute into the template
+            // Substitute into the template and evaluate to resolve nested types
             let property_type = instantiate_type(self.interner, mapped.template, &subst);
+            let property_type = self.evaluate(property_type);
 
             properties.push(PropertyInfo {
                 name: remapped_name,
@@ -1420,6 +1453,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     let mut subst = TypeSubstitution::new();
                     subst.insert(mapped.type_param.name, key_type);
                     let mut value_type = instantiate_type(self.interner, mapped.template, &subst);
+                    value_type = self.evaluate(value_type);
                     if optional {
                         value_type = self.interner.union2(value_type, TypeId::UNDEFINED);
                     }
@@ -1446,6 +1480,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     let mut subst = TypeSubstitution::new();
                     subst.insert(mapped.type_param.name, key_type);
                     let mut value_type = instantiate_type(self.interner, mapped.template, &subst);
+                    value_type = self.evaluate(value_type);
                     if optional {
                         value_type = self.interner.union2(value_type, TypeId::UNDEFINED);
                     }
@@ -3580,6 +3615,17 @@ pub fn evaluate_index_access(
 /// Convenience function for full type evaluation
 pub fn evaluate_type(interner: &dyn TypeDatabase, type_id: TypeId) -> TypeId {
     let evaluator = TypeEvaluator::new(interner);
+    evaluator.evaluate(type_id)
+}
+
+/// Convenience function for full type evaluation with a custom resolver.
+/// Use this when you need to resolve type aliases during evaluation.
+pub fn evaluate_type_with_resolver<R: TypeResolver>(
+    interner: &dyn TypeDatabase,
+    type_id: TypeId,
+    resolver: &R,
+) -> TypeId {
+    let evaluator = TypeEvaluator::with_resolver(interner, resolver);
     evaluator.evaluate(type_id)
 }
 
