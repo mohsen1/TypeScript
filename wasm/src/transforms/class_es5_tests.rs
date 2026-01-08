@@ -4107,3 +4107,273 @@ class EventProcessor {
         output
     );
 }
+
+#[test]
+fn test_class_es5_constructor_param_inject_decorator() {
+    // Test class with constructor parameter injection metadata
+    // Similar to Angular's @Inject decorator for DI
+    let source = r#"
+class UserService {
+    static __paramtypes__ = ["HttpClient", "Logger", "Config"];
+    static __inject__ = [0, 1, 2];
+
+    private http: any;
+    private logger: any;
+    private config: any;
+
+    constructor(http: any, logger: any, config: any) {
+        this.http = http;
+        this.logger = logger;
+        this.config = config;
+    }
+
+    getUser(id: number): any {
+        this.logger.log("Fetching user:", id);
+        return this.http.get("/users/" + id);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // UserService should emit as function
+    assert!(
+        output.contains("function UserService"),
+        "Expected UserService to emit as function: {}",
+        output
+    );
+
+    // Static parameter type metadata
+    assert!(
+        output.contains("UserService.__paramtypes__"),
+        "Expected static __paramtypes__ property: {}",
+        output
+    );
+    assert!(
+        output.contains("UserService.__inject__"),
+        "Expected static __inject__ property: {}",
+        output
+    );
+
+    // Constructor should assign all injected dependencies
+    assert!(
+        output.contains("this.http = http"),
+        "Expected http assignment: {}",
+        output
+    );
+    assert!(
+        output.contains("this.logger = logger"),
+        "Expected logger assignment: {}",
+        output
+    );
+    assert!(
+        output.contains("this.config = config"),
+        "Expected config assignment: {}",
+        output
+    );
+
+    // Method should be on prototype
+    assert!(
+        output.contains(".prototype.getUser") || output.contains("prototype[\"getUser\"]"),
+        "Expected getUser method on prototype: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_constructor_param_optional_decorator() {
+    // Test class with optional constructor parameter metadata
+    // Similar to Angular's @Optional decorator
+    let source = r#"
+class ConfigurableService {
+    static __paramtypes__ = ["RequiredDep", "OptionalDep", "AnotherOptional"];
+    static __optional__ = [1, 2];
+
+    private required: any;
+    private optional: any;
+    private another: any;
+
+    constructor(required: any, optional: any, another: any) {
+        this.required = required;
+        this.optional = optional || null;
+        this.another = another || { default: true };
+    }
+
+    hasOptional(): boolean {
+        return this.optional !== null;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // ConfigurableService should emit as function
+    assert!(
+        output.contains("function ConfigurableService"),
+        "Expected ConfigurableService to emit as function: {}",
+        output
+    );
+
+    // Static optional parameter metadata
+    assert!(
+        output.contains("ConfigurableService.__paramtypes__"),
+        "Expected static __paramtypes__ property: {}",
+        output
+    );
+    assert!(
+        output.contains("ConfigurableService.__optional__"),
+        "Expected static __optional__ property: {}",
+        output
+    );
+
+    // Constructor should handle optional parameters with fallbacks
+    assert!(
+        output.contains("this.required = required"),
+        "Expected required assignment: {}",
+        output
+    );
+    assert!(
+        output.contains("this.optional = optional || null") || output.contains("this.optional ="),
+        "Expected optional assignment with fallback: {}",
+        output
+    );
+
+    // Method should be on prototype
+    assert!(
+        output.contains(".prototype.hasOptional") || output.contains("prototype[\"hasOptional\"]"),
+        "Expected hasOptional method on prototype: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_constructor_param_attribute_decorator() {
+    // Test class with constructor parameter attribute metadata
+    // Similar to Angular's @Attribute decorator for host element attributes
+    let source = r#"
+class CustomElement {
+    static __paramtypes__ = ["ElementRef", "string", "string"];
+    static __attributes__ = { 1: "id", 2: "class" };
+
+    private elementRef: any;
+    private id: string;
+    private className: string;
+
+    constructor(elementRef: any, id: string, className: string) {
+        this.elementRef = elementRef;
+        this.id = id || "";
+        this.className = className || "";
+    }
+
+    getId(): string {
+        return this.id;
+    }
+
+    getClassName(): string {
+        return this.className;
+    }
+
+    setClassName(name: string): void {
+        this.className = name;
+        this.elementRef.nativeElement.className = name;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // CustomElement should emit as function
+    assert!(
+        output.contains("function CustomElement"),
+        "Expected CustomElement to emit as function: {}",
+        output
+    );
+
+    // Static attribute metadata
+    assert!(
+        output.contains("CustomElement.__paramtypes__"),
+        "Expected static __paramtypes__ property: {}",
+        output
+    );
+    assert!(
+        output.contains("CustomElement.__attributes__"),
+        "Expected static __attributes__ property: {}",
+        output
+    );
+
+    // Constructor should assign parameters
+    assert!(
+        output.contains("this.elementRef = elementRef"),
+        "Expected elementRef assignment: {}",
+        output
+    );
+    assert!(
+        output.contains("this.id ="),
+        "Expected id assignment: {}",
+        output
+    );
+    assert!(
+        output.contains("this.className ="),
+        "Expected className assignment: {}",
+        output
+    );
+
+    // Methods should be on prototype
+    assert!(
+        output.contains(".prototype.getId") || output.contains("prototype[\"getId\"]"),
+        "Expected getId method on prototype: {}",
+        output
+    );
+    assert!(
+        output.contains(".prototype.getClassName") || output.contains("prototype[\"getClassName\"]"),
+        "Expected getClassName method on prototype: {}",
+        output
+    );
+    assert!(
+        output.contains(".prototype.setClassName") || output.contains("prototype[\"setClassName\"]"),
+        "Expected setClassName method on prototype: {}",
+        output
+    );
+}
