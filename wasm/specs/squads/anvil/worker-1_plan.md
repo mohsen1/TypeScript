@@ -29,6 +29,7 @@ Priority: 1
 Yes
 
 ## Notes
+- Project Direction: integration and conformance-first; prioritize emitter fidelity (ES5 downleveling/source maps) before new features.
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
 - Commit format: `[wasm] emitter: <description>` or `[wasm] cli: <description>`
