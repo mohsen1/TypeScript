@@ -47,6 +47,17 @@ Priority: 5
   - `test_application_ref_expansion_with_literal_arg` - Box<"hello">
   - `test_application_ref_expansion_with_numeric_literal_arg` - Box<42>
   - `test_application_ref_expansion_with_multiple_refs_to_same_param` - Pair<T> = { first: T; second: T }
+- [x] Added 10 more Application expansion edge case tests in `evaluate_tests.rs`:
+  - `test_application_ref_expansion_with_boolean_literal_arg` - Box<true>
+  - `test_application_ref_expansion_with_union_body` - Either<L, R> = L | R
+  - `test_application_ref_expansion_with_intersection_body` - Both<A, B> = A & B
+  - `test_application_ref_expansion_with_this_param` - BoundMethod<T> = (this: T) => void
+  - `test_application_ref_expansion_with_optional_param` - OptionalFn<T> = (x?: T) => T
+  - `test_application_ref_expansion_with_readonly_array_body` - ReadonlyArrayOf<T> = readonly T[]
+  - `test_application_ref_expansion_with_mixed_modifiers` - Config<T> = { readonly id: string; value?: T }
+  - `test_application_ref_expansion_with_callable_body` - Callback<T, R> = { (arg: T): R }
+  - `test_application_ref_expansion_with_construct_signature` - Constructor<T> = { new (): T }
+  - `test_application_ref_expansion_with_deeply_nested_param` - Wrapper<T> = { inner: { value: T } }
 
 ### Circular Reference Root Cause (for Worker 1)
 

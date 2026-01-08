@@ -13738,6 +13738,705 @@ fn test_application_ref_expansion_with_multiple_refs_to_same_param() {
     );
 }
 
+/// Test Application expansion with boolean literal type argument.
+///
+/// `type Box<T> = { value: T }` with `Box<true>`
+/// should expand to `{ value: true }`
+#[test]
+fn test_application_ref_expansion_with_boolean_literal_arg() {
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    // Define type parameter T
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    // Define: type Box<T> = { value: T }
+    let value_name = interner.intern_string("value");
+    let box_body = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: t_type,
+        write_type: t_type,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Create Ref(1) for Box type alias
+    let box_ref = interner.reference(SymbolRef(1));
+
+    // Create literal type true
+    let lit_true = interner.literal_boolean(true);
+
+    // Create Application: Box<true>
+    let box_true = interner.application(box_ref, vec![lit_true]);
+
+    // Set up resolver with type parameters
+    let mut env = TypeEnvironment::new();
+    env.insert_with_params(SymbolRef(1), box_body, vec![t_param]);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(box_true);
+
+    // Expected: { value: true }
+    let expected = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: lit_true,
+        write_type: lit_true,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert_eq!(
+        result, expected,
+        "Box<true> should expand to {{ value: true }}"
+    );
+}
+
+/// Test Application expansion with union type in body.
+///
+/// `type Either<L, R> = L | R` with `Either<string, number>`
+/// should expand to `string | number`
+#[test]
+fn test_application_ref_expansion_with_union_body() {
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    // Define type parameters L and R
+    let l_name = interner.intern_string("L");
+    let r_name = interner.intern_string("R");
+    let l_param = TypeParamInfo {
+        name: l_name,
+        constraint: None,
+        default: None,
+    };
+    let r_param = TypeParamInfo {
+        name: r_name,
+        constraint: None,
+        default: None,
+    };
+    let l_type = interner.intern(TypeKey::TypeParameter(l_param.clone()));
+    let r_type = interner.intern(TypeKey::TypeParameter(r_param.clone()));
+
+    // Define: type Either<L, R> = L | R
+    let either_body = interner.union(vec![l_type, r_type]);
+
+    // Create Ref(1) for Either type alias
+    let either_ref = interner.reference(SymbolRef(1));
+
+    // Create Application: Either<string, number>
+    let either_string_number = interner.application(either_ref, vec![TypeId::STRING, TypeId::NUMBER]);
+
+    // Set up resolver with type parameters
+    let mut env = TypeEnvironment::new();
+    env.insert_with_params(SymbolRef(1), either_body, vec![l_param, r_param]);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(either_string_number);
+
+    // Expected: string | number
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    assert_eq!(
+        result, expected,
+        "Either<string, number> should expand to string | number"
+    );
+}
+
+/// Test Application expansion with intersection type in body.
+///
+/// `type Both<A, B> = A & B` with `Both<{x: number}, {y: string}>`
+/// should expand to `{x: number} & {y: string}`
+#[test]
+fn test_application_ref_expansion_with_intersection_body() {
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    // Define type parameters A and B
+    let a_name = interner.intern_string("A");
+    let b_name = interner.intern_string("B");
+    let a_param = TypeParamInfo {
+        name: a_name,
+        constraint: None,
+        default: None,
+    };
+    let b_param = TypeParamInfo {
+        name: b_name,
+        constraint: None,
+        default: None,
+    };
+    let a_type = interner.intern(TypeKey::TypeParameter(a_param.clone()));
+    let b_type = interner.intern(TypeKey::TypeParameter(b_param.clone()));
+
+    // Define: type Both<A, B> = A & B
+    let both_body = interner.intersection(vec![a_type, b_type]);
+
+    // Create Ref(1) for Both type alias
+    let both_ref = interner.reference(SymbolRef(1));
+
+    // Create object types: {x: number} and {y: string}
+    let x_name = interner.intern_string("x");
+    let y_name = interner.intern_string("y");
+    let obj_x = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_y = interner.object(vec![PropertyInfo {
+        name: y_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Create Application: Both<{x: number}, {y: string}>
+    let both_xy = interner.application(both_ref, vec![obj_x, obj_y]);
+
+    // Set up resolver with type parameters
+    let mut env = TypeEnvironment::new();
+    env.insert_with_params(SymbolRef(1), both_body, vec![a_param, b_param]);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(both_xy);
+
+    // Expected: {x: number} & {y: string}
+    let expected = interner.intersection(vec![obj_x, obj_y]);
+
+    assert_eq!(
+        result, expected,
+        "Both<{{x: number}}, {{y: string}}> should expand to {{x: number}} & {{y: string}}"
+    );
+}
+
+/// Test Application expansion with this-parameter in function body.
+///
+/// `type BoundMethod<T> = (this: T) => void` with `BoundMethod<{x: number}>`
+/// should expand to `(this: {x: number}) => void`
+#[test]
+fn test_application_ref_expansion_with_this_param() {
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    // Define type parameter T
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    // Define: type BoundMethod<T> = (this: T) => void
+    let bound_method_body = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: Some(t_type),  // this parameter
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Create Ref(1) for BoundMethod type alias
+    let bound_method_ref = interner.reference(SymbolRef(1));
+
+    // Create object type: {x: number}
+    let x_name = interner.intern_string("x");
+    let obj_x = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Create Application: BoundMethod<{x: number}>
+    let bound_method_obj = interner.application(bound_method_ref, vec![obj_x]);
+
+    // Set up resolver with type parameters
+    let mut env = TypeEnvironment::new();
+    env.insert_with_params(SymbolRef(1), bound_method_body, vec![t_param]);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(bound_method_obj);
+
+    // Expected: (this: {x: number}) => void
+    let expected = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: Some(obj_x),
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    assert_eq!(
+        result, expected,
+        "BoundMethod<{{x: number}}> should expand to (this: {{x: number}}) => void"
+    );
+}
+
+/// Test Application expansion with optional parameter in function body.
+///
+/// `type OptionalFn<T> = (x?: T) => T` with `OptionalFn<string>`
+/// should expand to `(x?: string) => string`
+#[test]
+fn test_application_ref_expansion_with_optional_param() {
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    // Define type parameter T
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    // Define: type OptionalFn<T> = (x?: T) => T
+    let x_name = interner.intern_string("x");
+    let optional_fn_body = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(x_name),
+            type_id: t_type,
+            optional: true,  // optional parameter
+            rest: false,
+        }],
+        this_type: None,
+        return_type: t_type,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Create Ref(1) for OptionalFn type alias
+    let optional_fn_ref = interner.reference(SymbolRef(1));
+
+    // Create Application: OptionalFn<string>
+    let optional_fn_string = interner.application(optional_fn_ref, vec![TypeId::STRING]);
+
+    // Set up resolver with type parameters
+    let mut env = TypeEnvironment::new();
+    env.insert_with_params(SymbolRef(1), optional_fn_body, vec![t_param]);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(optional_fn_string);
+
+    // Expected: (x?: string) => string
+    let expected = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(x_name),
+            type_id: TypeId::STRING,
+            optional: true,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    assert_eq!(
+        result, expected,
+        "OptionalFn<string> should expand to (x?: string) => string"
+    );
+}
+
+/// Test Application expansion with readonly array in body.
+///
+/// `type ReadonlyArray<T> = readonly T[]` with `ReadonlyArray<number>`
+/// should expand to `readonly number[]`
+#[test]
+fn test_application_ref_expansion_with_readonly_array_body() {
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    // Define type parameter T
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    // Define: type ReadonlyArrayOf<T> = readonly T[]
+    let t_array = interner.array(t_type);
+    let readonly_array_body = interner.intern(TypeKey::ReadonlyType(t_array));
+
+    // Create Ref(1) for ReadonlyArrayOf type alias
+    let readonly_array_ref = interner.reference(SymbolRef(1));
+
+    // Create Application: ReadonlyArrayOf<number>
+    let readonly_array_number = interner.application(readonly_array_ref, vec![TypeId::NUMBER]);
+
+    // Set up resolver with type parameters
+    let mut env = TypeEnvironment::new();
+    env.insert_with_params(SymbolRef(1), readonly_array_body, vec![t_param]);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(readonly_array_number);
+
+    // Expected: readonly number[]
+    let number_array = interner.array(TypeId::NUMBER);
+    let expected = interner.intern(TypeKey::ReadonlyType(number_array));
+
+    assert_eq!(
+        result, expected,
+        "ReadonlyArrayOf<number> should expand to readonly number[]"
+    );
+}
+
+/// Test Application expansion with mixed readonly and optional properties.
+///
+/// `type Config<T> = { readonly id: string; value?: T }` with `Config<number>`
+/// should expand to `{ readonly id: string; value?: number }`
+#[test]
+fn test_application_ref_expansion_with_mixed_modifiers() {
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    // Define type parameter T
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    // Define: type Config<T> = { readonly id: string; value?: T }
+    let id_name = interner.intern_string("id");
+    let value_name = interner.intern_string("value");
+    let config_body = interner.object(vec![
+        PropertyInfo {
+            name: id_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: true,  // readonly
+            is_method: false,
+        },
+        PropertyInfo {
+            name: value_name,
+            type_id: t_type,
+            write_type: t_type,
+            optional: true,  // optional
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Create Ref(1) for Config type alias
+    let config_ref = interner.reference(SymbolRef(1));
+
+    // Create Application: Config<number>
+    let config_number = interner.application(config_ref, vec![TypeId::NUMBER]);
+
+    // Set up resolver with type parameters
+    let mut env = TypeEnvironment::new();
+    env.insert_with_params(SymbolRef(1), config_body, vec![t_param]);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(config_number);
+
+    // Expected: { readonly id: string; value?: number }
+    let expected = interner.object(vec![
+        PropertyInfo {
+            name: id_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: true,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: value_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: true,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    assert_eq!(
+        result, expected,
+        "Config<number> should expand to {{ readonly id: string; value?: number }}"
+    );
+}
+
+/// Test Application expansion with callable type in body.
+///
+/// `type Callback<T, R> = { (arg: T): R }` with `Callback<string, boolean>`
+/// should expand to `{ (arg: string): boolean }`
+#[test]
+fn test_application_ref_expansion_with_callable_body() {
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    // Define type parameters T and R
+    let t_name = interner.intern_string("T");
+    let r_name = interner.intern_string("R");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let r_param = TypeParamInfo {
+        name: r_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+    let r_type = interner.intern(TypeKey::TypeParameter(r_param.clone()));
+
+    // Define: type Callback<T, R> = { (arg: T): R }
+    let arg_name = interner.intern_string("arg");
+    let call_sig = CallSignature {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(arg_name),
+            type_id: t_type,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: r_type,
+        type_predicate: None,
+    };
+    let callback_body = interner.callable(CallableShape {
+        call_signatures: vec![call_sig],
+        construct_signatures: vec![],
+        properties: vec![],
+    });
+
+    // Create Ref(1) for Callback type alias
+    let callback_ref = interner.reference(SymbolRef(1));
+
+    // Create Application: Callback<string, boolean>
+    let callback_string_bool = interner.application(callback_ref, vec![TypeId::STRING, TypeId::BOOLEAN]);
+
+    // Set up resolver with type parameters
+    let mut env = TypeEnvironment::new();
+    env.insert_with_params(SymbolRef(1), callback_body, vec![t_param, r_param]);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(callback_string_bool);
+
+    // Expected: { (arg: string): boolean }
+    let expected_call_sig = CallSignature {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(arg_name),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::BOOLEAN,
+        type_predicate: None,
+    };
+    let expected = interner.callable(CallableShape {
+        call_signatures: vec![expected_call_sig],
+        construct_signatures: vec![],
+        properties: vec![],
+    });
+
+    assert_eq!(
+        result, expected,
+        "Callback<string, boolean> should expand to {{ (arg: string): boolean }}"
+    );
+}
+
+/// Test Application expansion with construct signature in body.
+///
+/// `type Constructor<T> = { new (): T }` with `Constructor<{x: number}>`
+/// should expand to `{ new (): {x: number} }`
+#[test]
+fn test_application_ref_expansion_with_construct_signature() {
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    // Define type parameter T
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    // Define: type Constructor<T> = { new (): T }
+    let construct_sig = CallSignature {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: t_type,
+        type_predicate: None,
+    };
+    let constructor_body = interner.callable(CallableShape {
+        call_signatures: vec![],
+        construct_signatures: vec![construct_sig],
+        properties: vec![],
+    });
+
+    // Create Ref(1) for Constructor type alias
+    let constructor_ref = interner.reference(SymbolRef(1));
+
+    // Create object type: {x: number}
+    let x_name = interner.intern_string("x");
+    let obj_x = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Create Application: Constructor<{x: number}>
+    let constructor_obj = interner.application(constructor_ref, vec![obj_x]);
+
+    // Set up resolver with type parameters
+    let mut env = TypeEnvironment::new();
+    env.insert_with_params(SymbolRef(1), constructor_body, vec![t_param]);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(constructor_obj);
+
+    // Expected: { new (): {x: number} }
+    let expected_construct_sig = CallSignature {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: obj_x,
+        type_predicate: None,
+    };
+    let expected = interner.callable(CallableShape {
+        call_signatures: vec![],
+        construct_signatures: vec![expected_construct_sig],
+        properties: vec![],
+    });
+
+    assert_eq!(
+        result, expected,
+        "Constructor<{{x: number}}> should expand to {{ new (): {{x: number}} }}"
+    );
+}
+
+/// Test Application expansion with deeply nested type params.
+///
+/// `type Wrapper<T> = { inner: { value: T } }` with `Wrapper<string>`
+/// should expand to `{ inner: { value: string } }`
+#[test]
+fn test_application_ref_expansion_with_deeply_nested_param() {
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    // Define type parameter T
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    // Define inner object: { value: T }
+    let value_name = interner.intern_string("value");
+    let inner_obj = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: t_type,
+        write_type: t_type,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Define: type Wrapper<T> = { inner: { value: T } }
+    let inner_name = interner.intern_string("inner");
+    let wrapper_body = interner.object(vec![PropertyInfo {
+        name: inner_name,
+        type_id: inner_obj,
+        write_type: inner_obj,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Create Ref(1) for Wrapper type alias
+    let wrapper_ref = interner.reference(SymbolRef(1));
+
+    // Create Application: Wrapper<string>
+    let wrapper_string = interner.application(wrapper_ref, vec![TypeId::STRING]);
+
+    // Set up resolver with type parameters
+    let mut env = TypeEnvironment::new();
+    env.insert_with_params(SymbolRef(1), wrapper_body, vec![t_param]);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(wrapper_string);
+
+    // Expected inner object: { value: string }
+    let expected_inner = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Expected: { inner: { value: string } }
+    let expected = interner.object(vec![PropertyInfo {
+        name: inner_name,
+        type_id: expected_inner,
+        write_type: expected_inner,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert_eq!(
+        result, expected,
+        "Wrapper<string> should expand to {{ inner: {{ value: string }} }}"
+    );
+}
+
 // =============================================================================
 // Conditional Type Edge Cases
 // =============================================================================
