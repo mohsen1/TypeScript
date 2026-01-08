@@ -20528,3 +20528,545 @@ console.log(settings);"#;
         "expected mappings to reference source file"
     );
 }
+
+// ============================================================================
+// ES5 Exponentiation Operator Source Map Tests
+// ============================================================================
+
+#[test]
+fn test_source_map_exponentiation_basic() {
+    // Test basic exponentiation operator (**)
+    let source = r#"const result = 2 ** 10;
+console.log(result);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify output contains variable name
+    assert!(
+        output.contains("result"),
+        "expected output to contain variable name. output: {output}"
+    );
+
+    // Verify we have source mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for basic exponentiation"
+    );
+
+    // Verify at least some mappings reference the source file
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_exponentiation_with_variables() {
+    // Test exponentiation with variables
+    let source = r#"const base = 2;
+const exponent = 8;
+const result = base ** exponent;
+console.log(result);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify output contains variable names
+    assert!(
+        output.contains("base"),
+        "expected output to contain variable name. output: {output}"
+    );
+
+    // Verify we have source mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for exponentiation with variables"
+    );
+
+    // Verify at least some mappings reference the source file
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_exponentiation_assignment() {
+    // Test exponentiation assignment operator (**=)
+    let source = r#"let value = 2;
+value **= 3;
+console.log(value);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify output contains variable name
+    assert!(
+        output.contains("value"),
+        "expected output to contain variable name. output: {output}"
+    );
+
+    // Verify we have source mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for exponentiation assignment"
+    );
+
+    // Verify at least some mappings reference the source file
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_exponentiation_chained() {
+    // Test chained exponentiation (right-associative)
+    let source = r#"const result = 2 ** 3 ** 2;
+console.log(result);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify output contains variable name
+    assert!(
+        output.contains("result"),
+        "expected output to contain variable name. output: {output}"
+    );
+
+    // Verify we have source mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for chained exponentiation"
+    );
+
+    // Verify at least some mappings reference the source file
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_exponentiation_negative_exponent() {
+    // Test exponentiation with negative exponent
+    let source = r#"const result = 10 ** -2;
+console.log(result);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify output contains variable name
+    assert!(
+        output.contains("result"),
+        "expected output to contain variable name. output: {output}"
+    );
+
+    // Verify we have source mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for exponentiation with negative exponent"
+    );
+
+    // Verify at least some mappings reference the source file
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_exponentiation_in_expression() {
+    // Test exponentiation in larger expression
+    let source = r#"const a = 2;
+const b = 3;
+const result = a * (b ** 2) + 1;
+console.log(result);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify output contains variable name
+    assert!(
+        output.contains("result"),
+        "expected output to contain variable name. output: {output}"
+    );
+
+    // Verify we have source mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for exponentiation in expression"
+    );
+
+    // Verify at least some mappings reference the source file
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_exponentiation_precedence() {
+    // Test exponentiation with parentheses for precedence
+    let source = r#"const a = (2 ** 3) ** 2;
+const b = 2 ** (3 ** 2);
+console.log(a, b);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify output contains console
+    assert!(
+        output.contains("console"),
+        "expected output to contain console. output: {output}"
+    );
+
+    // Verify we have source mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for exponentiation precedence"
+    );
+
+    // Verify at least some mappings reference the source file
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_exponentiation_in_function() {
+    // Test exponentiation in function body
+    let source = r#"function power(base: number, exp: number): number {
+    return base ** exp;
+}
+const result = power(2, 10);
+console.log(result);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify output contains function name
+    assert!(
+        output.contains("power"),
+        "expected output to contain function name. output: {output}"
+    );
+
+    // Verify we have source mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for exponentiation in function"
+    );
+
+    // Verify at least some mappings reference the source file
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_exponentiation_with_method_call() {
+    // Test exponentiation with method call
+    let source = r#"function getExponent(): number {
+    return 3;
+}
+const base = 2;
+const result = base ** getExponent();
+console.log(result);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify output contains function name
+    assert!(
+        output.contains("getExponent"),
+        "expected output to contain function name. output: {output}"
+    );
+
+    // Verify we have source mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for exponentiation with method call"
+    );
+
+    // Verify at least some mappings reference the source file
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_exponentiation_combined() {
+    // Test combined exponentiation patterns
+    let source = r#"const base = 2;
+let accumulator = 1;
+accumulator **= base;
+const squared = base ** 2;
+const cubed = base ** 3;
+const complex = (squared ** 2) + (cubed ** 2);
+console.log(accumulator, squared, cubed, complex);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify output contains variable names
+    assert!(
+        output.contains("accumulator"),
+        "expected output to contain variable name. output: {output}"
+    );
+
+    // Verify we have source mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for combined exponentiation"
+    );
+
+    // Verify at least some mappings reference the source file
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
