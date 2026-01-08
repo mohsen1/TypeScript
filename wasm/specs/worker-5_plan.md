@@ -25,6 +25,8 @@ Priority: 5
       Tests: `./wasm/test.sh test_source_map_es5_transform_async_await_return_mapping`.
 - [x] Added ES5 async/await property access mapping test in `wasm/src/source_map_tests.rs`.
       Tests: `./wasm/test.sh test_source_map_es5_transform_async_await_property_access_mapping`.
+- [x] Added ES5 async arrow function source map mapping test in `wasm/src/source_map_tests.rs`.
+      Tests: `./wasm/test.sh test_source_map_es5_transform_async_arrow_mapping`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
