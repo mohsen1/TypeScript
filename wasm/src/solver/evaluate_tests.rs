@@ -9759,3 +9759,339 @@ fn test_conditional_extract_string_from_union() {
     let result_boolean = evaluate_conditional(&interner, &cond_boolean);
     assert_eq!(result_boolean, TypeId::NEVER, "boolean extends string should produce never");
 }
+
+#[test]
+fn test_conditional_parameters_pattern() {
+    let interner = TypeInterner::new();
+
+    // Parameters<T> = T extends (...args: infer P) => any ? P : never
+    // For a function type (x: string, y: number) => boolean, should produce [string, number]
+
+    // Create a function type: (x: string, y: number) => boolean
+    let fn_shape = FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo {
+                name: Some(interner.intern_string("x")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("y")),
+                type_id: TypeId::NUMBER,
+                optional: false,
+                rest: false,
+            },
+        ],
+        this_type: None,
+        return_type: TypeId::BOOLEAN,
+        type_predicate: None,
+        is_constructor: false,
+    };
+    let fn_type = interner.function(fn_shape);
+
+    // Create infer type for P (the parameters tuple)
+    let infer_p = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("P"),
+        constraint: None,
+        default: None,
+    }));
+
+    // Create the extends type: (...args: infer P) => any
+    let extends_fn_shape = FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: infer_p,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: TypeId::ANY,
+        type_predicate: None,
+        is_constructor: false,
+    };
+    let extends_fn = interner.function(extends_fn_shape);
+
+    // Parameters pattern: T extends (...args: infer P) => any ? P : never
+    let cond = ConditionalType {
+        check_type: fn_type,
+        extends_type: extends_fn,
+        true_type: infer_p,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+
+    // The conditional should evaluate without error
+    assert!(result != TypeId::ERROR, "Parameters pattern should not produce error type");
+}
+
+#[test]
+fn test_conditional_constructor_parameters_pattern() {
+    let interner = TypeInterner::new();
+
+    // ConstructorParameters<T> = T extends abstract new (...args: infer P) => any ? P : never
+    // For a constructor type new (x: string) => object, should produce [string]
+
+    // Create a constructor type: new (x: string) => object
+    let ctor_shape = FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: interner.intern(TypeKey::Intrinsic(IntrinsicKind::Object)),
+        type_predicate: None,
+        is_constructor: true, // This is a constructor
+    };
+    let ctor_type = interner.function(ctor_shape);
+
+    // Create infer type for P
+    let infer_p = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("P"),
+        constraint: None,
+        default: None,
+    }));
+
+    // Create the extends type: new (...args: infer P) => any
+    let extends_ctor_shape = FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: infer_p,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: TypeId::ANY,
+        type_predicate: None,
+        is_constructor: true,
+    };
+    let extends_ctor = interner.function(extends_ctor_shape);
+
+    // ConstructorParameters pattern: T extends new (...args: infer P) => any ? P : never
+    let cond = ConditionalType {
+        check_type: ctor_type,
+        extends_type: extends_ctor,
+        true_type: infer_p,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+
+    // The conditional should evaluate without error
+    assert!(result != TypeId::ERROR, "ConstructorParameters pattern should not produce error type");
+}
+
+#[test]
+fn test_conditional_instancetype_pattern() {
+    let interner = TypeInterner::new();
+
+    // InstanceType<T> = T extends abstract new (...args: any) => infer R ? R : any
+    // For a constructor type new () => MyClass, should produce MyClass (the return type)
+
+    // Create an object type to represent the instance type
+    let instance_type = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("value"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Create a constructor type: new () => InstanceType
+    let ctor_shape = FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: instance_type,
+        type_predicate: None,
+        is_constructor: true,
+    };
+    let ctor_type = interner.function(ctor_shape);
+
+    // Create infer type for R (the instance type)
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("R"),
+        constraint: None,
+        default: None,
+    }));
+
+    // Create the extends type: new (...args: any) => infer R
+    let extends_ctor_shape = FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: TypeId::ANY,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: infer_r,
+        type_predicate: None,
+        is_constructor: true,
+    };
+    let extends_ctor = interner.function(extends_ctor_shape);
+
+    // InstanceType pattern: T extends new (...args: any) => infer R ? R : any
+    let cond = ConditionalType {
+        check_type: ctor_type,
+        extends_type: extends_ctor,
+        true_type: infer_r,
+        false_type: TypeId::ANY,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+
+    // The conditional should evaluate without error
+    assert!(result != TypeId::ERROR, "InstanceType pattern should not produce error type");
+}
+
+#[test]
+fn test_conditional_parameters_with_optional() {
+    let interner = TypeInterner::new();
+
+    // Test Parameters with optional parameters
+    // For (x: string, y?: number) => void, should handle optional param
+
+    let fn_shape = FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo {
+                name: Some(interner.intern_string("x")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("y")),
+                type_id: TypeId::NUMBER,
+                optional: true, // Optional parameter
+                rest: false,
+            },
+        ],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    };
+    let fn_type = interner.function(fn_shape);
+
+    // Verify the function type was created without error
+    assert!(fn_type != TypeId::ERROR, "Function with optional param should be valid");
+
+    // Create infer type for P
+    let infer_p = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("P"),
+        constraint: None,
+        default: None,
+    }));
+
+    // Create the extends type: (...args: infer P) => any
+    let extends_fn_shape = FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: infer_p,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: TypeId::ANY,
+        type_predicate: None,
+        is_constructor: false,
+    };
+    let extends_fn = interner.function(extends_fn_shape);
+
+    let cond = ConditionalType {
+        check_type: fn_type,
+        extends_type: extends_fn,
+        true_type: infer_p,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert!(result != TypeId::ERROR, "Parameters with optional should not produce error");
+}
+
+#[test]
+fn test_conditional_parameters_with_rest() {
+    let interner = TypeInterner::new();
+
+    // Test Parameters with rest parameters
+    // For (x: string, ...rest: number[]) => void
+
+    let number_array = interner.array(TypeId::NUMBER);
+
+    let fn_shape = FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo {
+                name: Some(interner.intern_string("x")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("rest")),
+                type_id: number_array,
+                optional: false,
+                rest: true, // Rest parameter
+            },
+        ],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    };
+    let fn_type = interner.function(fn_shape);
+
+    // Verify the function type was created without error
+    assert!(fn_type != TypeId::ERROR, "Function with rest param should be valid");
+
+    // Create infer type for P
+    let infer_p = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("P"),
+        constraint: None,
+        default: None,
+    }));
+
+    // Create the extends type
+    let extends_fn_shape = FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: infer_p,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: TypeId::ANY,
+        type_predicate: None,
+        is_constructor: false,
+    };
+    let extends_fn = interner.function(extends_fn_shape);
+
+    let cond = ConditionalType {
+        check_type: fn_type,
+        extends_type: extends_fn,
+        true_type: infer_p,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert!(result != TypeId::ERROR, "Parameters with rest should not produce error");
+}
