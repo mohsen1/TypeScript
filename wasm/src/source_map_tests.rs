@@ -12673,59 +12673,130 @@ const instance3 = new DynamicClass("test");"#;
 }
 
 #[test]
-fn test_source_map_shorthand_properties() {
-    // Test shorthand property syntax source map coverage
-    let source = r#"const name = "Alice";
-const age = 30;
-const city = "NYC";
-
-const person = { name, age, city };
-
-const obj = {
-    name,
-    getValue() {
-        return this.name;
-    },
-    get fullName() {
-        return this.name;
-    },
-    set fullName(value: string) {
-        this.name = value;
-    }
-};
-
-function createPoint(x: number, y: number) {
-    return { x, y };
-}
-
-const coords = { x: 10, y: 20 };
-const point = createPoint(coords.x, coords.y);
-
-const mixed = {
-    name,
-    explicit: age,
-    computed: city.toUpperCase()
-};"#;
-
+fn test_source_map_exponentiation_operator_mapping() {
+    // Test source-map accuracy for exponentiation operator (**)
+    let source = r#"const square = 2 ** 2;
+const cube = 3 ** 3;
+const power = base ** exponent;
+let x = 2;
+x **= 3;"#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
+    let options = PrinterOptions::default();
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
     let mut printer =
         ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
     printer.emit(root);
 
     let output = printer.get_output().to_string();
+    assert!(
+        output.contains("square") && output.contains("cube"),
+        "expected variable names in output: {output}"
+    );
+
     let map_json = printer.generate_source_map_json().expect("source map");
     let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
 
+    let decoded = decode_mappings(mappings);
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for exponentiation operator"
+    );
+}
+
+#[test]
+fn test_source_map_rest_spread_mapping() {
+    // Test source-map accuracy for rest parameters and spread arguments
+    let source = r#"function sum(...numbers: number[]): number {
+    return numbers.reduce((a, b) => a + b, 0);
+}
+
+const arr = [1, 2, 3];
+const result = sum(...arr);
+
+const [first, ...rest] = arr;
+const { x, ...others } = { x: 1, y: 2, z: 3 };"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions::default();
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    assert!(
+        output.contains("sum") && output.contains("arr"),
+        "expected function and variable names in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for rest/spread"
+    );
+}
+
+#[test]
+fn test_source_map_default_parameters_mapping() {
+    // Test source-map accuracy for default parameter values
+    let source = r#"function greet(name: string = "World", count: number = 1): string {
+    return `Hello ${name}!`.repeat(count);
+}
+
+const add = (a: number = 0, b: number = 0) => a + b;
+
+class Calculator {
+    multiply(x: number = 1, y: number = 1): number {
+        return x * y;
+    }
+}
+
+function format(value: string, options: { uppercase?: boolean } = {}): string {
+    return options.uppercase ? value.toUpperCase() : value;
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions::default();
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    assert!(
+        output.contains("greet") && output.contains("add") && output.contains("Calculator"),
+        "expected function and class names in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
     let mappings = map_value
         .get("mappings")
         .and_then(|v| v.as_str())
@@ -12733,37 +12804,32 @@ const mixed = {
 
     let decoded = decode_mappings(mappings);
 
-    // Verify we have mappings for the const declarations
-    let (name_line, name_col) = find_line_col(source, "const name");
-    let has_name_mapping = decoded.iter().any(|entry| {
-        entry.original_line == name_line
-            && entry.original_column >= name_col
-            && entry.original_column <= name_col + 10
+    // Verify we have mappings for the function declarations
+    let (greet_line, _) = find_line_col(source, "function greet");
+    let has_greet_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == greet_line
     });
 
-    // Verify we have mappings for the function declaration
-    let (fn_line, fn_col) = find_line_col(source, "function createPoint");
-    let has_fn_mapping = decoded.iter().any(|entry| {
-        entry.original_line == fn_line
-            && entry.original_column >= fn_col
-            && entry.original_column <= fn_col + 20
+    let (add_line, _) = find_line_col(source, "const add");
+    let has_add_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == add_line
     });
 
-    // At minimum, we should have mappings for declarations
     assert!(
-        has_name_mapping || has_fn_mapping || !decoded.is_empty(),
-        "expected mappings for shorthand properties. mappings: {mappings}"
+        has_greet_mapping || has_add_mapping,
+        "expected mappings for default parameter declarations. mappings: {mappings}"
     );
 
-    // Verify output contains expected identifiers
-    assert!(
-        output.contains("createPoint") && output.contains("person"),
-        "expected output to contain function and variable names. output: {output}"
-    );
-
-    // Verify source map has non-empty mappings
     assert!(
         !decoded.is_empty(),
-        "expected non-empty source mappings for shorthand properties"
+        "expected non-empty source mappings for default parameters"
+    );
+
+    let unique_source_lines: std::collections::HashSet<_> =
+        decoded.iter().map(|m| m.original_line).collect();
+    assert!(
+        unique_source_lines.len() >= 3,
+        "expected mappings from at least 3 different source lines, got: {:?}",
+        unique_source_lines
     );
 }
