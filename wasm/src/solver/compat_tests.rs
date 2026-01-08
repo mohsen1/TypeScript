@@ -1060,10 +1060,17 @@ fn test_explain_failure_reports_rest_mismatch() {
         is_constructor: false,
     });
 
+    let reason = checker.explain_failure(source, target);
     assert!(matches!(
-        checker.explain_failure(source, target),
+        reason,
         Some(SubtypeFailureReason::ParameterTypeMismatch { .. })
     ));
+    if let Some(SubtypeFailureReason::ParameterTypeMismatch { param_index, source_param, target_param }) = reason
+    {
+        assert_eq!(param_index, 1);
+        assert_eq!(source_param, TypeId::STRING);
+        assert_eq!(target_param, TypeId::NUMBER);
+    }
 }
 
 #[test]
@@ -1099,10 +1106,17 @@ fn test_explain_failure_reports_rest_mismatch_source_rest() {
         is_constructor: false,
     });
 
+    let reason = checker.explain_failure(source, target);
     assert!(matches!(
-        checker.explain_failure(source, target),
+        reason,
         Some(SubtypeFailureReason::ParameterTypeMismatch { .. })
     ));
+    if let Some(SubtypeFailureReason::ParameterTypeMismatch { param_index, source_param, target_param }) = reason
+    {
+        assert_eq!(param_index, 0);
+        assert_eq!(source_param, TypeId::STRING);
+        assert_eq!(target_param, TypeId::NUMBER);
+    }
 }
 
 #[test]
