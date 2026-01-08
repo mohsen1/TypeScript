@@ -40,3 +40,4 @@ Priority: 5
 - Update this plan after each task and keep it accurate.
 - Re-ran `./wasm/test.sh test_source_map_es5_transform_async_await_property_access_mapping`.
 - Re-ran `./wasm/test.sh test_source_map_es5_transform_async_await_conditional_mapping`.
+- Re-ran `./wasm/test.sh test_source_map_es5_transform_async_arrow_captures_this_mapping`.
