@@ -109,7 +109,6 @@ Priority: 2
 - [x] Added function parameter infer test with non-function union branch (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_function_param_non_function_union_branch`.
 
 ## Notes
-- Ready for merge.
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
 - Use Docker for Rust tests (`./wasm/test.sh`), never `cargo test` directly.
 - Update this plan after each task and keep it accurate.
