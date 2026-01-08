@@ -1474,3 +1474,63 @@ class DynamicObject {
         output
     );
 }
+
+#[test]
+fn test_class_es5_inheritance_extends() {
+    let source = r#"
+class Animal {
+    name: string;
+    constructor(name: string) {
+        this.name = name;
+    }
+    speak() {
+        return this.name;
+    }
+}
+class Dog extends Animal {
+    constructor(name: string) {
+        super(name);
+    }
+    speak() {
+        return "Woof! " + super.speak();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected Dog class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Should use __extends helper for inheritance
+    assert!(
+        output.contains("__extends") || output.contains("extends"),
+        "Expected __extends helper for ES5 inheritance: {}",
+        output
+    );
+
+    // Should call super constructor
+    assert!(
+        output.contains("_super") || output.contains(".call("),
+        "Expected super constructor call pattern: {}",
+        output
+    );
+
+    // Should have Dog function
+    assert!(
+        output.contains("function Dog") || output.contains("Dog ="),
+        "Expected Dog constructor function: {}",
+        output
+    );
+}
