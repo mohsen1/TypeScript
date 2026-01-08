@@ -1,8 +1,22 @@
 # Squad Forge Goals
 
-Updated: 2026-01-08
+Updated: 2026-01-09
 
 Priority: 1
+
+---
+## 📢 EM-FORGE: READ THIS - DIRECTIVE FROM DIRECTOR
+
+**Operation Crucible is NOW IN EFFECT.** Your squad has ONE mission:
+
+1. **ALL 5 WORKERS** swarm the Redux/Lodash Generics blocker
+2. **ROOT CAUSE**: Eager evaluation of conditionals when InferenceVars aren't bound
+3. **THE FIX**: Introduce `Deferred` state in `solver/evaluate.rs`
+4. **Nothing else matters** until `test_check_redux_lodash_style_generics` passes
+
+Please acknowledge by updating Squad Status below.
+
+---
 
 ## 🚨 OPERATION CRUCIBLE - SWARM THE BLOCKER
 
