@@ -5187,6 +5187,152 @@ fn test_conditional_infer_object_call_signature_distributive() {
 }
 
 #[test]
+fn test_conditional_infer_call_signature_param_from_function_distributive() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends { (x: infer R): void } ? R : never, with T = ((x: string) => void)
+    // | ((x: number) => void).
+    let extends_callable = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+            params: vec![ParamInfo {
+                name: None,
+                type_id: infer_r,
+                optional: false,
+                rest: false,
+            }],
+            this_type: None,
+            return_type: TypeId::VOID,
+            type_predicate: None,
+            type_params: Vec::new(),
+        }],
+        construct_signatures: Vec::new(),
+        properties: Vec::new(),
+    });
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_callable,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let string_fn = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let number_fn = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    subst.insert(t_name, interner.union(vec![string_fn, number_fn]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_conditional_infer_call_signature_return_from_function_distributive() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends { (): infer R } ? R : never, with T = (() => string) | (() => number).
+    let extends_callable = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+            params: Vec::new(),
+            this_type: None,
+            return_type: infer_r,
+            type_predicate: None,
+            type_params: Vec::new(),
+        }],
+        construct_signatures: Vec::new(),
+        properties: Vec::new(),
+    });
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_callable,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let string_fn = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let number_fn = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::NUMBER,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    subst.insert(t_name, interner.union(vec![string_fn, number_fn]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert_eq!(result, expected);
+}
+
+#[test]
 fn test_conditional_infer_object_call_signature_non_distributive_union_input() {
     let interner = TypeInterner::new();
 
