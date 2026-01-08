@@ -460,6 +460,62 @@ class Derived extends Base {
 }
 
 #[test]
+fn test_two_phase_emission_es5_class_async_derived_prop_arrow_capture() {
+    let source = r#"
+class Base {}
+class Derived extends Base {
+    foo = () => this.x;
+    constructor() {
+        super();
+    }
+    async method() {
+        await this.foo();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    let super_pos = output.find("var _this = _super.call(this");
+    let prop_pos = output.find("_this.foo = function");
+    assert!(
+        super_pos.is_some() && prop_pos.is_some(),
+        "ES5 output should include super call and arrow initializer: {}",
+        output
+    );
+    assert!(
+        super_pos.unwrap() < prop_pos.unwrap(),
+        "ES5 output should emit arrow initializer after super: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.x"),
+        "ES5 output should capture this inside arrow: {}",
+        output
+    );
+    assert!(
+        output.contains("return __awaiter"),
+        "ES5 output should emit __awaiter for async method: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should downlevel arrow: {}",
+        output
+    );
+}
+
+#[test]
 fn test_two_phase_emission_es6_class_no_transform() {
     // Parse source
     let source = "class Point { constructor(x, y) { this.x = x; this.y = y; } }";
