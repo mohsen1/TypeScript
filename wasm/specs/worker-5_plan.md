@@ -39,6 +39,8 @@ Priority: 5
       Tests: `./wasm/test.sh test_source_map_es5_transform_async_try_finally_mapping`.
 - [x] Added ES5 async try/catch/finally source map mapping test in `wasm/src/source_map_tests.rs`.
       Tests: `./wasm/test.sh test_source_map_es5_transform_async_try_catch_finally_mapping`.
+- [x] Added ES5 async nested arrow capture source map mapping test in `wasm/src/source_map_tests.rs`.
+      Tests: `./wasm/test.sh test_source_map_es5_transform_async_nested_arrow_capture_mapping`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
