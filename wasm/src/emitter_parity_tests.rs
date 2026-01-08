@@ -3544,3 +3544,155 @@ fn test_parity_es5_optional_chaining_call() {
         output
     );
 }
+
+/// Parity test for ES5 nullish coalescing with function call.
+/// Nullish coalescing with function call as fallback.
+#[test]
+fn test_parity_es5_nullish_coalescing_call() {
+    let source = "const value = config ?? getDefault();";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify variable declaration
+    assert!(
+        output.contains("value"),
+        "ES5 output should define value: {}",
+        output
+    );
+    // Function call should be preserved
+    assert!(
+        output.contains("getDefault"),
+        "ES5 output should preserve fallback function call: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 nullish coalescing assignment operator.
+/// The ??= operator should be downleveled.
+#[test]
+fn test_parity_es5_nullish_assignment() {
+    let source = "x ??= defaultValue;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify identifiers exist
+    assert!(
+        output.contains("x") && output.contains("defaultValue"),
+        "ES5 output should preserve identifiers: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 chained nullish coalescing.
+/// Multiple ?? operators in chain.
+#[test]
+fn test_parity_es5_nullish_chained() {
+    let source = "const result = a ?? b ?? c ?? 'fallback';";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify variable declaration
+    assert!(
+        output.contains("result"),
+        "ES5 output should define result: {}",
+        output
+    );
+    // All identifiers should be preserved
+    assert!(
+        output.contains("a") && output.contains("b") && output.contains("c"),
+        "ES5 output should preserve all identifiers: {}",
+        output
+    );
+    // Fallback should be preserved
+    assert!(
+        output.contains("fallback"),
+        "ES5 output should preserve fallback value: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 nullish coalescing with object property.
+/// Nullish coalescing on object property access.
+#[test]
+fn test_parity_es5_nullish_property() {
+    let source = "const name = obj.name ?? obj.defaultName ?? 'Unknown';";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify variable declaration
+    assert!(
+        output.contains("name"),
+        "ES5 output should define name: {}",
+        output
+    );
+    // Property accesses should be preserved
+    assert!(
+        output.contains("obj") && output.contains("defaultName"),
+        "ES5 output should preserve property accesses: {}",
+        output
+    );
+}
