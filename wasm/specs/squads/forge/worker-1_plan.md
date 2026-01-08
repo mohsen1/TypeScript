@@ -7,12 +7,13 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-- [ ] Validate function return inference in conditional types and fix any mismatches in `wasm/src/solver/evaluate.rs`.
+- [ ] [EM: Add queued tasks]
 
 ## Task Queue
 - [ ] [EM: Add queued tasks]
 
 ## Completed
+- [x] Validated conditional return inference for call signatures vs function sources; added regressions and updated matching in `wasm/src/solver/evaluate.rs` + `wasm/src/solver/evaluate_tests.rs`. Ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `src/transforms/async_es5.rs`).
 - [x] Added callable-parameter inference regressions for non-callable union branches (distributive + non-distributive) in `wasm/src/solver/evaluate_tests.rs`. Ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `src/transforms/async_es5.rs`).
 - [x] Added callable-parameter inference regressions for optional/rest parameters (distributive + non-distributive) in `wasm/src/solver/evaluate_tests.rs`. Ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `src/transforms/async_es5.rs`).
 - [x] Added callable-parameter inference regressions (union inputs + overload shapes) in `wasm/src/solver/evaluate_tests.rs`. Ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `src/transforms/async_es5.rs`).
