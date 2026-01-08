@@ -423,6 +423,38 @@ fn test_primitive_boxing_assignability() {
 }
 
 #[test]
+fn test_primitive_boxing_bigint_assignability() {
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let to_string = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let bigint_interface = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("toString"),
+        type_id: to_string,
+        write_type: to_string,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let sym = SymbolRef(3);
+    env.insert(sym, bigint_interface);
+    let bigint_ref = interner.reference(sym);
+
+    let mut checker = SubtypeChecker::with_resolver(&interner, &env);
+
+    assert!(checker.is_subtype_of(TypeId::BIGINT, bigint_ref));
+    assert!(!checker.is_subtype_of(bigint_ref, TypeId::BIGINT));
+}
+
+#[test]
 fn test_weak_type_detection_requires_overlap() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
