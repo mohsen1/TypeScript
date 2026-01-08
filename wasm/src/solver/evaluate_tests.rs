@@ -774,7 +774,6 @@ fn test_conditional_infer_array_element_non_distributive_tuple_wrapper() {
     }));
 
     // [T] extends [(infer R)[]] ? R : never, with T = string[] | number[].
-    // TODO: Non-distributive tuple wrapper inference does not extract union elements yet.
     let check_tuple = interner.tuple(vec![TupleElement {
         type_id: t_param,
         name: None,
@@ -807,8 +806,9 @@ fn test_conditional_infer_array_element_non_distributive_tuple_wrapper() {
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
 
-    assert_eq!(result, TypeId::NEVER);
+    assert_eq!(result, expected);
 }
 
 #[test]

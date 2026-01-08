@@ -2003,6 +2003,36 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     visited,
                     checker,
                 ),
+                Some(TypeKey::Union(members)) => {
+                    let members = self.interner.type_list(members);
+                    let mut combined = FxHashMap::default();
+                    for &member in members.iter() {
+                        let Some(TypeKey::Array(source_elem)) = self.interner.lookup(member) else {
+                            return false;
+                        };
+                        let mut member_bindings = FxHashMap::default();
+                        let mut local_visited = FxHashSet::default();
+                        if !self.match_infer_pattern(
+                            source_elem,
+                            pattern_elem,
+                            &mut member_bindings,
+                            &mut local_visited,
+                            checker,
+                        ) {
+                            return false;
+                        }
+                        for (name, ty) in member_bindings {
+                            combined
+                                .entry(name)
+                                .and_modify(|existing| {
+                                    *existing = self.interner.union2(*existing, ty);
+                                })
+                                .or_insert(ty);
+                        }
+                    }
+                    bindings.extend(combined);
+                    true
+                }
                 _ => false,
             },
             TypeKey::Tuple(pattern_elems) => match self.interner.lookup(source) {
