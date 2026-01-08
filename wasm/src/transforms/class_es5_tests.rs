@@ -4107,3 +4107,353 @@ class EventProcessor {
         output
     );
 }
+
+#[test]
+fn test_class_es5_getter_with_decorator() {
+    // Test getter with method decorator
+    let source = r#"
+function readonly(target: any, key: string, descriptor: PropertyDescriptor) {
+    descriptor.writable = false;
+    return descriptor;
+}
+
+class Config {
+    private _value: string = "default";
+
+    @readonly
+    get value(): string {
+        return this._value;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Get the class (second statement after function declaration)
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function Config"),
+        "Expected Config class to emit as function: {}",
+        output
+    );
+
+    // Should use Object.defineProperty for getter
+    assert!(
+        output.contains("Object.defineProperty") || output.contains("get:"),
+        "Expected Object.defineProperty or getter syntax for accessor: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_setter_with_decorator() {
+    // Test setter with method decorator
+    let source = r#"
+function validate(target: any, key: string, descriptor: PropertyDescriptor) {
+    return descriptor;
+}
+
+class User {
+    private _name: string = "";
+
+    @validate
+    set name(value: string) {
+        this._name = value.trim();
+    }
+
+    get name(): string {
+        return this._name;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Get the class (second statement after function declaration)
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function User"),
+        "Expected User class to emit as function: {}",
+        output
+    );
+
+    // Should use Object.defineProperty for setter
+    assert!(
+        output.contains("Object.defineProperty") || output.contains("set:"),
+        "Expected Object.defineProperty or setter syntax for accessor: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_getter_setter_pair_with_decorators() {
+    // Test getter/setter pair both with decorators
+    let source = r#"
+function log(target: any, key: string, descriptor: PropertyDescriptor) {
+    return descriptor;
+}
+
+function validate(target: any, key: string, descriptor: PropertyDescriptor) {
+    return descriptor;
+}
+
+class Counter {
+    private _count: number = 0;
+
+    @log
+    get count(): number {
+        return this._count;
+    }
+
+    @validate
+    set count(value: number) {
+        if (value >= 0) {
+            this._count = value;
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Get the class (third statement after two function declarations)
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(2)
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function Counter"),
+        "Expected Counter class to emit as function: {}",
+        output
+    );
+
+    // Should use Object.defineProperty for accessors
+    assert!(
+        output.contains("Object.defineProperty"),
+        "Expected Object.defineProperty for accessor pair: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_static_getter_with_decorator() {
+    // Test static getter with decorator
+    let source = r#"
+function cached(target: any, key: string, descriptor: PropertyDescriptor) {
+    return descriptor;
+}
+
+class AppConfig {
+    private static _instance: any = null;
+
+    @cached
+    static get instance(): any {
+        if (!AppConfig._instance) {
+            AppConfig._instance = {};
+        }
+        return AppConfig._instance;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Get the class (second statement after function declaration)
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function AppConfig"),
+        "Expected AppConfig class to emit as function: {}",
+        output
+    );
+
+    // Static getter should reference the class
+    assert!(
+        output.contains("AppConfig") && (output.contains("Object.defineProperty") || output.contains("get")),
+        "Expected static getter definition: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_accessor_with_multiple_decorators() {
+    // Test accessor with multiple decorators
+    let source = r#"
+function enumerable(value: boolean) {
+    return function(target: any, key: string, descriptor: PropertyDescriptor) {
+        descriptor.enumerable = value;
+        return descriptor;
+    };
+}
+
+function configurable(value: boolean) {
+    return function(target: any, key: string, descriptor: PropertyDescriptor) {
+        descriptor.configurable = value;
+        return descriptor;
+    };
+}
+
+class Settings {
+    private _theme: string = "light";
+
+    @enumerable(true)
+    @configurable(false)
+    get theme(): string {
+        return this._theme;
+    }
+
+    set theme(value: string) {
+        this._theme = value;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Get the class (third statement after two function declarations)
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(2)
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function Settings"),
+        "Expected Settings class to emit as function: {}",
+        output
+    );
+
+    // Should use Object.defineProperty for accessor
+    assert!(
+        output.contains("Object.defineProperty"),
+        "Expected Object.defineProperty for accessor with decorators: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_accessor_in_derived_class() {
+    // Test accessor with decorator in derived class
+    let source = r#"
+function override(target: any, key: string, descriptor: PropertyDescriptor) {
+    return descriptor;
+}
+
+class Base {
+    protected _value: number = 0;
+
+    get value(): number {
+        return this._value;
+    }
+}
+
+class Derived extends Base {
+    @override
+    get value(): number {
+        return this._value * 2;
+    }
+
+    set value(v: number) {
+        this._value = v;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Get the Derived class (third statement)
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(2)
+        .expect("expected Derived class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function Derived"),
+        "Expected Derived class to emit as function: {}",
+        output
+    );
+
+    // Should use __extends for inheritance
+    assert!(
+        output.contains("__extends") || output.contains("_super"),
+        "Expected inheritance pattern in derived class: {}",
+        output
+    );
+}
