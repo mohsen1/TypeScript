@@ -1787,6 +1787,33 @@ fn test_object_with_index_named_property_mismatch_string_index() {
 }
 
 #[test]
+fn test_object_to_indexed_property_mismatch_string_index() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let source = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let target = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        number_index: None,
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    assert!(!checker.is_subtype_of(source, target));
+}
+
+#[test]
 fn test_object_with_index_satisfies_numeric_property_number_index() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);

@@ -37,6 +37,7 @@ Priority: 3
 - [x] Solver unsoundness: apparent string member regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_apparent_string_member_subtyping`.
 - [x] Solver unsoundness: keyof union disjoint keys regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_keyof_union_disjoint_object_keys_is_never`.
 - [x] Solver unsoundness: mapped type over primitive string keys regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_over_string_keys_subtyping`.
+- [x] Solver unsoundness: index signature consistency regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_object_to_indexed_property_mismatch_string_index`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
