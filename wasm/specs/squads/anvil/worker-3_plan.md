@@ -7,7 +7,7 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] (awaiting)
+- [ ] Add source map tests for destructuring transforms in `wasm/src/source_map_tests.rs`. Run `./wasm/test.sh source_map`.
 
 ## Task Queue
 - [ ] (empty)
