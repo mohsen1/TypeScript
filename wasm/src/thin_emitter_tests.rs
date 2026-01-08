@@ -2422,6 +2422,7 @@ fn test_commonjs_export_class() {
     printer.emit(root);
 
     let output = printer.get_output();
+    assert!(output.contains("__esModule"), "Expected __esModule marker in CommonJS output: {}", output);
     // ES5 emits class as IIFE, so check for var Foo
     assert!(output.contains("var Foo") || output.contains("class Foo"),
             "Expected class Foo definition in CommonJS output: {}", output);
