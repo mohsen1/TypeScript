@@ -7,7 +7,7 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- Solver hardening: add conditional infer extraction coverage for readonly array/tuple patterns.
+- Await next assignment.
 
 ## Task Queue
 - [ ] Await next assignment.
@@ -19,6 +19,7 @@ Priority: 2
 - [x] Added infer extraction for array conditional evaluation. Tests: `./wasm/test.sh test_conditional_infer_array_element_extraction`.
 - [x] Added infer extraction for tuple conditional evaluation. Tests: `./wasm/test.sh test_conditional_infer_tuple_element_extraction`.
 - [x] Added readonly array/tuple infer extraction tests and unwrapped readonly in evaluation. Tests: `./wasm/test.sh test_conditional_infer_readonly_`.
+- [x] Added mixed readonly/mutable array infer extraction test. Tests: `./wasm/test.sh test_conditional_infer_readonly_array_mixed_input`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
