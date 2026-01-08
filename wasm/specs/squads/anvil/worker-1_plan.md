@@ -7,7 +7,7 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-- Complete: Fixed ES5 computed property field initializers; ran `./wasm/test.sh class_es5_tests` (all 13 pass).
+- Complete: Added static async arrow field tests; ran `./wasm/test.sh emitter_transform_integration_tests` (all 123 pass).
 
 ## Task Queue
 - [x] Inspect `wasm/src/emitter_edge_case_tests.rs` to capture the failing case and expected output.
@@ -15,6 +15,7 @@ Priority: 1
 - [x] Add/update a focused regression if needed; run `./wasm/test.sh`.
 
 ## Completed
+- [x] Added static async arrow field tests (3 tests for static field with async arrow: basic, integration, nested arrow). Verified correct __awaiter usage and this preservation. Ran `./wasm/test.sh emitter_transform_integration_tests` (all 123 pass).
 - [x] Fixed ES5 computed property field initializers (previously silently skipped `[key] = value` in all constructor paths); added `emit_property_receiver_and_name` helper; added 3 regression tests; ran `./wasm/test.sh class_es5_tests` (all 13 pass). Pre-existing failures: `parallel::tests::test_check_redux_lodash_style_generics` (Forge domain).
 - [x] Implemented derived `super()` ordering adjustment and broader `this`/`super` capture in field initializers; added integration regression for nested async arrow in derived field; ran `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_parse_error_tolerance`).
 - [x] Implemented async/nested arrow `this` capture handling in ES5 class emission, added derived async field regression; ran `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
