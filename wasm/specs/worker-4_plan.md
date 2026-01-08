@@ -13,6 +13,7 @@ Priority: 4
 - [ ] Stand by for next emitter fidelity task.
 
 ## Completed
+- [x] ES5 async class nested arrow super + this capture; test `./wasm/test.sh class_async_nested_arrow_super_this_capture`.
 - [x] ES5 async class nested arrow super + arguments capture; test `./wasm/test.sh class_async_nested_arrow_super_arguments`.
 - [x] ES5 async class method arrow super + this + arguments capture; test `./wasm/test.sh class_async_arrow_super_this_arguments_capture`.
 - [x] ES5 async class method arrow super + arguments capture; test `./wasm/test.sh class_async_arrow_super_arguments_capture`.
