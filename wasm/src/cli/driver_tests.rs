@@ -152,6 +152,25 @@ fn compile_with_source_map_emits_map_outputs() {
     assert!(js_contents.contains("sourceMappingURL=index.js.map"));
     let map_contents = std::fs::read_to_string(&map_path).expect("read map output");
     let map_json: Value = serde_json::from_str(&map_contents).expect("parse map json");
+    let file_field = map_json
+        .get("file")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+    assert_eq!(file_field, "index.js");
+    let source_root = map_json
+        .get("sourceRoot")
+        .and_then(|value| value.as_str())
+        .unwrap_or("__missing__");
+    assert_eq!(source_root, "");
+    let sources_content = map_json
+        .get("sourcesContent")
+        .and_then(|value| value.as_array())
+        .expect("expected sourcesContent");
+    assert_eq!(sources_content.len(), 1);
+    assert_eq!(
+        sources_content[0].as_str().unwrap_or(""),
+        "export const value = 1;"
+    );
     let mappings = map_json
         .get("mappings")
         .and_then(|value| value.as_str())
@@ -192,6 +211,25 @@ fn compile_with_declaration_map_emits_map_outputs() {
     assert!(dts_contents.contains("sourceMappingURL=index.d.ts.map"));
     let map_contents = std::fs::read_to_string(&map_path).expect("read map output");
     let map_json: Value = serde_json::from_str(&map_contents).expect("parse map json");
+    let file_field = map_json
+        .get("file")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+    assert_eq!(file_field, "index.d.ts");
+    let source_root = map_json
+        .get("sourceRoot")
+        .and_then(|value| value.as_str())
+        .unwrap_or("__missing__");
+    assert_eq!(source_root, "");
+    let sources_content = map_json
+        .get("sourcesContent")
+        .and_then(|value| value.as_array())
+        .expect("expected sourcesContent");
+    assert_eq!(sources_content.len(), 1);
+    assert_eq!(
+        sources_content[0].as_str().unwrap_or(""),
+        "export const value = 1;"
+    );
     let mappings = map_json
         .get("mappings")
         .and_then(|value| value.as_str())
