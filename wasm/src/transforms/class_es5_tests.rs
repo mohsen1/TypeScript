@@ -2381,3 +2381,210 @@ class IterableCollection<T> {
         output
     );
 }
+
+#[test]
+fn test_class_es5_switch_case_statement() {
+    // Test class method with switch/case statement
+    let source = r#"
+class Router {
+    route(action: string): string {
+        switch (action) {
+            case "home":
+                return "/";
+            case "about":
+                return "/about";
+            case "contact":
+                return "/contact";
+            default:
+                return "/404";
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function Router"),
+        "Expected class to emit as function: {}",
+        output
+    );
+
+    // Should preserve switch statement
+    assert!(
+        output.contains("switch"),
+        "Expected switch statement in output: {}",
+        output
+    );
+
+    // Should preserve case clauses
+    assert!(
+        output.contains("case \"home\"") || output.contains("case 'home'"),
+        "Expected case clause for home: {}",
+        output
+    );
+
+    // Should preserve default clause
+    assert!(
+        output.contains("default"),
+        "Expected default clause in output: {}",
+        output
+    );
+
+    // Method should be on prototype
+    assert!(
+        output.contains(".prototype.route"),
+        "Expected route method on prototype: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_while_do_while_loops() {
+    // Test class method with while and do-while loops
+    let source = r#"
+class Counter {
+    countUp(max: number): number[] {
+        const results: number[] = [];
+        let i = 0;
+        while (i < max) {
+            results.push(i);
+            i++;
+        }
+        return results;
+    }
+
+    countDown(start: number): number[] {
+        const results: number[] = [];
+        let j = start;
+        do {
+            results.push(j);
+            j--;
+        } while (j >= 0);
+        return results;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function Counter"),
+        "Expected class to emit as function: {}",
+        output
+    );
+
+    // Should preserve while loop
+    assert!(
+        output.contains("while"),
+        "Expected while loop in output: {}",
+        output
+    );
+
+    // Should preserve do keyword for do-while
+    assert!(
+        output.contains("do {") || output.contains("do{"),
+        "Expected do-while loop in output: {}",
+        output
+    );
+
+    // Methods should be on prototype
+    assert!(
+        output.contains(".prototype.countUp"),
+        "Expected countUp method on prototype: {}",
+        output
+    );
+    assert!(
+        output.contains(".prototype.countDown"),
+        "Expected countDown method on prototype: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_ternary_expression() {
+    // Test class method with ternary/conditional expressions
+    let source = r#"
+class Validator {
+    isValid(value: number): boolean {
+        return value >= 0 ? true : false;
+    }
+
+    getStatus(score: number): string {
+        return score >= 90 ? "excellent" : score >= 70 ? "good" : score >= 50 ? "pass" : "fail";
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit as function
+    assert!(
+        output.contains("function Validator"),
+        "Expected class to emit as function: {}",
+        output
+    );
+
+    // Should preserve ternary expressions (? and :)
+    assert!(
+        output.contains("?") && output.contains(":"),
+        "Expected ternary expression in output: {}",
+        output
+    );
+
+    // Methods should be on prototype
+    assert!(
+        output.contains(".prototype.isValid"),
+        "Expected isValid method on prototype: {}",
+        output
+    );
+    assert!(
+        output.contains(".prototype.getStatus"),
+        "Expected getStatus method on prototype: {}",
+        output
+    );
+}
