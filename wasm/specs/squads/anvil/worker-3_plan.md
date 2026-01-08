@@ -69,6 +69,7 @@ Priority: 3
 - [x] Added comprehensive generic utility library e2e tests (array utils, type utilities, multi-file with re-exports, constrained generics, generic classes); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 - [x] Added comprehensive module re-export tests (named, renamed, star, chained, mixed, type-only, default, barrel file); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 - [x] Added generic class compilation test (constructor pattern, type preservation in declarations); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
+- [x] Added namespace export compilation tests (basic, nested, with class); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 
 ## Ready for Merge
 Yes
