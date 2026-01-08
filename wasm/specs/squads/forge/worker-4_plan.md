@@ -41,6 +41,7 @@ Priority: 4
 - [x] Added binder coverage for namespace/function merge reverse order. Tests: `./wasm/test.sh`.
 - [x] Added binder coverage for namespace/class merge reverse order. Tests: `./wasm/test.sh`.
 - [x] Added checker coverage for class/namespace merged type member access reverse order. Tests: `./wasm/test.sh`.
+- [x] Added checker coverage for class/namespace merged value member access reverse order. Tests: `./wasm/test.sh`.
 
 ## Ready for Merge
 Yes
