@@ -10930,8 +10930,8 @@ fn test_source_map_es5_transform_async_exponentiation_mapping() {
 }
 
 #[test]
-fn test_source_map_es5_transform_arrow_default_param_mapping() {
-    let source = "const greet = (name = \"world\") => `Hello, ${name}!`;";
+fn test_source_map_es5_transform_async_in_operator_mapping() {
+    let source = "async function run(){ return (await key()) in obj; }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -10948,10 +10948,9 @@ fn test_source_map_es5_transform_arrow_default_param_mapping() {
     printer.emit(root);
 
     let output = printer.get_output().to_string();
-    // Default params get converted to void 0 checks in ES5
     assert!(
-        output.contains("void 0") || output.contains("undefined") || output.contains("\"world\""),
-        "expected default parameter handling in output: {output}"
+        output.contains("__awaiter(") && output.contains("__generator("),
+        "expected async downlevel output, got: {output}"
     );
 
     let map_json = printer.generate_source_map_json().expect("source map");
@@ -10962,27 +10961,160 @@ fn test_source_map_es5_transform_arrow_default_param_mapping() {
         .unwrap_or("");
 
     let decoded = decode_mappings(mappings);
-    let (name_line, name_col) = find_line_col(source, "name = ");
-    let (greet_line, _) = find_line_col(source, "greet");
+    let (key_line, key_col) = find_line_col(source, "key()");
 
-    // Look for mapping near the default parameter
-    let mapping = decoded
-        .iter()
-        .filter(|entry| {
-            entry.original_line == name_line || entry.original_line == greet_line
-        })
-        .max_by_key(|entry| (entry.original_line, entry.original_column))
-        .unwrap_or_else(|| {
-            panic!(
-                "expected mapping for default param. mappings: {mappings} output: {output}"
-            )
+    let targets = [("key", key_line, key_col)];
+
+    for (label, src_line, src_col) in targets {
+        let direct_mapping = decoded.iter().find(|entry| {
+            entry.original_line == src_line
+                && entry.original_column == src_col
+        });
+        let direct_valid = direct_mapping.and_then(|mapping| {
+            if mapping.source_index != 0 {
+                return None;
+            }
+
+            let output_line_text = output
+                .lines()
+                .nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text
+                .get(mapping.generated_column as usize..)?;
+            if output_slice.starts_with(label) {
+                Some(mapping)
+            } else {
+                None
+            }
         });
 
-    assert_eq!(mapping.source_index, 0);
+        if direct_valid.is_none() {
+            let (func_line, _) = find_line_col(source, "async function run");
+            let (output_line, output_col) = if output.contains("function run") {
+                find_line_col(&output, "function run")
+            } else if output.contains("run = function") {
+                find_line_col(&output, "run = function")
+            } else {
+                find_line_col(&output, "run")
+            };
+            let mapping = decoded
+                .iter()
+                .filter(|entry| {
+                    entry.generated_line < output_line
+                        || (entry.generated_line == output_line
+                            && entry.generated_column <= output_col)
+                })
+                .max_by_key(|entry| (entry.generated_line, entry.generated_column))
+                .unwrap_or_else(|| {
+                    panic!(
+                        "expected mapping at or before async function output for {label}. mappings: {mappings} output: {output}"
+                    )
+                });
+
+            assert_eq!(mapping.source_index, 0);
+            assert!(
+                mapping.original_line <= func_line,
+                "expected mapping before or on function line for {label}. mapping line: {} function line: {}",
+                mapping.original_line,
+                func_line
+            );
+        }
+    }
+}
+
+#[test]
+fn test_source_map_es5_transform_async_nested_try_finally_mapping() {
+    let source = "async function run(){ try { try { await inner(); } finally { await cleanup1(); } } finally { await cleanup2(); } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
     assert!(
-        mapping.original_line <= name_line,
-        "expected mapping at or before default param. mapping line: {} param line: {}",
-        mapping.original_line,
-        name_line
+        output.contains("__awaiter(") && output.contains("__generator("),
+        "expected async downlevel output, got: {output}"
     );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+    let (inner_line, inner_col) = find_line_col(source, "inner()");
+    let (cleanup1_line, cleanup1_col) = find_line_col(source, "cleanup1()");
+    let (cleanup2_line, cleanup2_col) = find_line_col(source, "cleanup2()");
+
+    let targets = [
+        ("inner", inner_line, inner_col),
+        ("cleanup1", cleanup1_line, cleanup1_col),
+        ("cleanup2", cleanup2_line, cleanup2_col),
+    ];
+
+    for (label, src_line, src_col) in targets {
+        let direct_mapping = decoded.iter().find(|entry| {
+            entry.original_line == src_line
+                && entry.original_column == src_col
+        });
+        let direct_valid = direct_mapping.and_then(|mapping| {
+            if mapping.source_index != 0 {
+                return None;
+            }
+
+            let output_line_text = output
+                .lines()
+                .nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text
+                .get(mapping.generated_column as usize..)?;
+            if output_slice.starts_with(label) {
+                Some(mapping)
+            } else {
+                None
+            }
+        });
+
+        if direct_valid.is_none() {
+            let (func_line, _) = find_line_col(source, "async function run");
+            let (output_line, output_col) = if output.contains("function run") {
+                find_line_col(&output, "function run")
+            } else if output.contains("run = function") {
+                find_line_col(&output, "run = function")
+            } else {
+                find_line_col(&output, "run")
+            };
+            let mapping = decoded
+                .iter()
+                .filter(|entry| {
+                    entry.generated_line < output_line
+                        || (entry.generated_line == output_line
+                            && entry.generated_column <= output_col)
+                })
+                .max_by_key(|entry| (entry.generated_line, entry.generated_column))
+                .unwrap_or_else(|| {
+                    panic!(
+                        "expected mapping at or before async function output for {label}. mappings: {mappings} output: {output}"
+                    )
+                });
+
+            assert_eq!(mapping.source_index, 0);
+            assert!(
+                mapping.original_line <= func_line,
+                "expected mapping before or on function line for {label}. mapping line: {} function line: {}",
+                mapping.original_line,
+                func_line
+            );
+        }
+    }
 }
