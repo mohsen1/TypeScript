@@ -17,7 +17,6 @@ Priority: 2
 - [x] Added distributive template literal infer over template-literal union input (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_union_input_distributive`.
 - [x] Added template literal infer from `string`/`` `${string}` `` inputs (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_from_string_input`.
 - [x] Added tuple rest inference test (current behavior yields number). Tests: `./wasm/test.sh test_conditional_infer_tuple_rest_with_head_infer_distributive`.
-- [ ] TODO: Add function param infer with non-function union branch (e.g., T = (x: string) => void | number) expected `string`.
 
 ## Completed
 - [x] Added optional/rest/`this` assignability edge cases and tightened parameter matching; ran `./wasm/test.sh optional_parameter_assignability`, `./wasm/test.sh this_parameter_assignability`, `./wasm/test.sh rest_parameter_assignability`.
@@ -107,6 +106,7 @@ Priority: 2
 - [x] Added non-distributive template literal suffix infer test with non-string union branch (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_with_suffix_non_distributive_non_string_union_branch`.
 - [x] Added non-distributive template literal middle infer test with non-string union branch (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_with_middle_non_distributive_non_string_union_branch`.
 - [x] Added object call-signature infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_object_call_signature_distributive`.
+- [x] Added function parameter infer test with non-function union branch (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_function_param_non_function_union_branch`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
