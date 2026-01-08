@@ -17,7 +17,6 @@ Priority: 2
 - [x] Added distributive template literal infer over template-literal union input (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_union_input_distributive`.
 - [x] Added template literal infer from `string`/`` `${string}` `` inputs (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_from_string_input`.
 - [x] Added tuple rest inference test (current behavior yields number). Tests: `./wasm/test.sh test_conditional_infer_tuple_rest_with_head_infer_distributive`.
-- [ ] TODO: Add function optional-parameter infer test (e.g., T extends (x?: infer R) => void) expected `string | number | undefined` (confirm).
 - [ ] TODO: Add function param infer with non-function union branch (e.g., T = (x: string) => void | number) expected `string`.
 
 ## Completed
@@ -83,6 +82,7 @@ Priority: 2
 - [x] Added template literal prefix infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_with_prefix_distributive`.
 - [x] Added template literal suffix infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_with_suffix_distributive`.
 - [x] Added function rest parameter infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_function_rest_param_distributive`.
+- [x] Added function optional-parameter infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_function_optional_param_distributive`.
 - [x] Added non-distributive template literal infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_non_distributive_union_input`.
 - [x] Added template literal middle infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_with_middle_infer_distributive`.
 - [x] Added optional property infer test with constraint. Tests: `./wasm/test.sh test_conditional_infer_optional_property_with_constraint`.
