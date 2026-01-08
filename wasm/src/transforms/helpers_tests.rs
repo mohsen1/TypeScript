@@ -74,3 +74,16 @@ fn test_emit_import_star_orders_set_module_default() {
     let import_star_pos = output.find("__importStar").expect("Expected __importStar helper");
     assert!(set_module_default_pos < import_star_pos, "__setModuleDefault should precede __importStar");
 }
+
+#[test]
+fn test_emit_create_binding_before_import_star_helpers() {
+    let mut helpers = HelpersNeeded::default();
+    helpers.create_binding = true;
+    helpers.import_star = true;
+    let output = emit_helpers(&helpers);
+    let create_binding_pos = output.find("__createBinding").expect("Expected __createBinding helper");
+    let set_module_default_pos = output.find("__setModuleDefault").expect("Expected __setModuleDefault helper");
+    let import_star_pos = output.find("__importStar").expect("Expected __importStar helper");
+    assert!(create_binding_pos < set_module_default_pos, "__createBinding should precede __setModuleDefault");
+    assert!(create_binding_pos < import_star_pos, "__createBinding should precede __importStar");
+}
