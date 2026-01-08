@@ -102,6 +102,8 @@ Priority: 4
 - [x] Add ES5 Symbol-keyed methods test. Tests: `./wasm/test.sh symbol_keyed_methods`
 - [x] Add ES5 nested class test. Tests: `./wasm/test.sh nested_class`
 - [x] Add ES5 generator methods test. Tests: `./wasm/test.sh generator_methods`
+- [x] Add ES5 deep inheritance chain test. Tests: `./wasm/test.sh deep_inheritance_chain`
+- [x] Add ES5 mixin pattern test. Tests: `./wasm/test.sh mixin_pattern`
 
 ## Ready for Merge
 Yes

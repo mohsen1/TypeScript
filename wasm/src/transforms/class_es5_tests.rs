@@ -2783,3 +2783,151 @@ class LogicalOps {
         output
     );
 }
+
+#[test]
+fn test_class_es5_deep_inheritance_chain() {
+    // Test class with multiple inheritance levels (grandparent -> parent -> child)
+    let source = r#"
+class Animal {
+    name: string;
+    constructor(name: string) {
+        this.name = name;
+    }
+    speak() {
+        return this.name + " makes a sound";
+    }
+}
+
+class Dog extends Animal {
+    breed: string;
+    constructor(name: string, breed: string) {
+        super(name);
+        this.breed = breed;
+    }
+    speak() {
+        return this.name + " barks";
+    }
+}
+
+class GermanShepherd extends Dog {
+    isPolice: boolean;
+    constructor(name: string, isPolice: boolean = false) {
+        super(name, "German Shepherd");
+        this.isPolice = isPolice;
+    }
+    guard() {
+        return this.name + " is guarding";
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Get the last class (GermanShepherd)
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .last()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // GermanShepherd should emit as function
+    assert!(
+        output.contains("function GermanShepherd"),
+        "Expected GermanShepherd class to emit as function: {}",
+        output
+    );
+
+    // Should extend Dog
+    assert!(
+        output.contains("__extends") || output.contains("Dog.call"),
+        "Expected extends helper or super call to Dog: {}",
+        output
+    );
+
+    // Should have guard method on prototype
+    assert!(
+        output.contains(".prototype.guard") || output.contains("prototype[\"guard\"]"),
+        "Expected guard method on prototype: {}",
+        output
+    );
+
+    // Constructor should initialize isPolice
+    assert!(
+        output.contains("this.isPolice"),
+        "Expected isPolice field initialization: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_mixin_pattern() {
+    // Test class extending a mixin function call
+    let source = r#"
+function Timestamped<T extends new(...args: any[]) => object>(Base: T) {
+    return class extends Base {
+        timestamp = Date.now();
+    };
+}
+
+class User {
+    constructor(public name: string) {}
+}
+
+class TimestampedUser extends Timestamped(User) {
+    constructor(name: string) {
+        super(name);
+    }
+    getInfo() {
+        return this.name + " created at " + this.timestamp;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Get the last class (TimestampedUser)
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .last()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // TimestampedUser should emit as function
+    assert!(
+        output.contains("function TimestampedUser"),
+        "Expected TimestampedUser class to emit as function: {}",
+        output
+    );
+
+    // Should have getInfo method on prototype
+    assert!(
+        output.contains(".prototype.getInfo") || output.contains("prototype[\"getInfo\"]"),
+        "Expected getInfo method on prototype: {}",
+        output
+    );
+
+    // The extends clause should reference the super constructor
+    assert!(
+        output.contains("__extends") || output.contains("_super(") || output.contains("_super.call"),
+        "Expected extends pattern with super call: {}",
+        output
+    );
+}
