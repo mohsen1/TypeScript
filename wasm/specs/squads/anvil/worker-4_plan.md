@@ -1,30 +1,26 @@
 # Worker 4 Plan
 
-## 🔥 CRUCIBLE TASK - TEST PORTING
-
-**Reassigned from Anvil emitter work to Crucible test porting.**
-
 ## Mission
-Port mapped type tests from the official TypeScript repo into `tests/cases/`.
+Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transforms, cli, lsp).
 
 Status: Active
 Priority: 4
-Mode: **CRUCIBLE - TEST PORTING**
 
 ## Current Assignment
-- [ ] Port 15-20 mapped type tests from official TypeScript repo (`tests/cases/conformance/types/mapped/`) into `tests/cases/`.
+- [ ] Add ES5 class tests for parameter properties in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
 
 ## Task Queue
-- [ ] Port `mappedTypes1.ts` - basic mapped type tests
-- [ ] Port `mappedTypes2.ts` - mapped type modifiers
-- [ ] Port `mappedTypeConstraints.ts` - constraint handling
-- [ ] Port `keyRemappingKeyof.ts` - key remapping tests
-- [ ] Target: 50 total solver test cases this week (shared with workers 3, 5)
-
-## Goal
-Give Forge workers failing tests to triangulate correct behavior for the Redux blocker.
+- [ ] (empty)
 
 ## Completed
+- [x] Add ES5 class tests for constructor overloads. Tests: `./wasm/test.sh class_es5_tests`
+- [x] Add ES5 class tests for method overloads. Tests: `./wasm/test.sh class_es5_tests`
+- [x] Add ES5 class tests for accessor keyword (ES2022). Tests: `./wasm/test.sh class_es5_tests`
+- [x] Add ES5 class expression anonymous test. Tests: `./wasm/test.sh class_expression_anonymous`
+- [x] Add ES5 class expression named test. Tests: `./wasm/test.sh class_expression_named`
+- [x] Add ES5 class expression in return test. Tests: `./wasm/test.sh class_expression_in_return`
+- [x] Add ES5 class expression extends test. Tests: `./wasm/test.sh class_expression_extends`
+- [x] Add ES5 class expression with static test. Tests: `./wasm/test.sh class_expression_with_static`
 - [x] Add ES5 super with conditional field init test. Tests: `./wasm/test.sh super_with_conditional_field`
 - [x] Add ES5 super with arrow field init test. Tests: `./wasm/test.sh super_with_arrow_field`
 - [x] Add ES5 super with computed field init test. Tests: `./wasm/test.sh super_with_computed_field`

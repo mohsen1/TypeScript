@@ -1,30 +1,23 @@
 # Worker 3 Plan
 
-## 🔥 CRUCIBLE TASK - TEST PORTING
-
-**Reassigned from Anvil emitter work to Crucible test porting.**
-
 ## Mission
-Port conditional type tests from the official TypeScript repo into `tests/cases/`.
+Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transforms, cli, lsp).
 
 Status: Active
 Priority: 3
-Mode: **CRUCIBLE - TEST PORTING**
 
 ## Current Assignment
-- [ ] Port 15-20 conditional type tests from official TypeScript repo (`tests/cases/conformance/types/conditional/`) into `tests/cases/`.
+- [ ] Add source map tests for nullish coalescing transforms in `wasm/src/source_map_tests.rs`. Run `./wasm/test.sh source_map`.
 
 ## Task Queue
-- [ ] Port `conditionalTypes1.ts` - basic conditional type tests
-- [ ] Port `conditionalTypes2.ts` - distributive conditional types
-- [ ] Port `inferTypes1.ts` - infer keyword tests
-- [ ] Port `inferTypes2.ts` - advanced infer patterns
-- [ ] Target: 50 total solver test cases this week (shared with workers 4-5)
-
-## Goal
-Give Forge workers failing tests to triangulate correct behavior for the Redux blocker.
+- [ ] (empty)
 
 ## Completed
+- [x] Added optional chaining transform source map tests (property access, method call, element access, nested, with nullish coalescing, in function, with method chain, delete, call expression, combined); `./wasm/test.sh source_map` passes.
+- [x] Added destructuring transform source map tests (object basic, array basic, object with rename, array with skip, nested object, nested array, object with defaults, array with defaults, function parameters, mixed); `./wasm/test.sh source_map` passes.
+- [x] Added template literal transform source map tests (simple, with expression, multiple expressions, nested, tagged, in function, with method calls, conditional, multiline, in class); `./wasm/test.sh source_map` passes.
+- [x] Added spread and rest parameter transform source map tests (rest param function/arrow, spread function call/array/object literal, rest array/object destructuring, class method, new expression, combined); `./wasm/test.sh source_map` passes.
+- [x] Added namespace transform source map tests (functions, class, enum, nested dot notation, merging, variables, exported, nested declaration, interface-only, mixed content); `./wasm/test.sh source_map` passes.
 - [x] Added generator transform source map tests (basic yield, multiple yields, yield in loop, yield delegation, return value, class method, try/catch, parameters, object yield, generator expression); `./wasm/test.sh source_map` passes.
 - [x] Added ES5 class transform source map tests (basic IIFE, constructor, instance methods, static methods, accessors, inheritance, super method calls, computed properties, multi-level inheritance, class expressions); `./wasm/test.sh source_map` passes.
 - [x] Added async/await transform source map tests (multiple awaits, try/catch, for-of loop, IIFE, rest/default params, destructuring, nested functions, static method, while loop); `./wasm/test.sh source_map` passes.

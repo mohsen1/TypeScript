@@ -3544,3 +3544,695 @@ fn test_parity_es5_optional_chaining_call() {
         output
     );
 }
+
+/// Parity test for ES5 nullish coalescing with function call.
+/// Nullish coalescing with function call as fallback.
+#[test]
+fn test_parity_es5_nullish_coalescing_call() {
+    let source = "const value = config ?? getDefault();";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify variable declaration
+    assert!(
+        output.contains("value"),
+        "ES5 output should define value: {}",
+        output
+    );
+    // Function call should be preserved
+    assert!(
+        output.contains("getDefault"),
+        "ES5 output should preserve fallback function call: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 nullish coalescing assignment operator.
+/// The ??= operator should be downleveled.
+#[test]
+fn test_parity_es5_nullish_assignment() {
+    let source = "x ??= defaultValue;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify identifiers exist
+    assert!(
+        output.contains("x") && output.contains("defaultValue"),
+        "ES5 output should preserve identifiers: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 chained nullish coalescing.
+/// Multiple ?? operators in chain.
+#[test]
+fn test_parity_es5_nullish_chained() {
+    let source = "const result = a ?? b ?? c ?? 'fallback';";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify variable declaration
+    assert!(
+        output.contains("result"),
+        "ES5 output should define result: {}",
+        output
+    );
+    // All identifiers should be preserved
+    assert!(
+        output.contains("a") && output.contains("b") && output.contains("c"),
+        "ES5 output should preserve all identifiers: {}",
+        output
+    );
+    // Fallback should be preserved
+    assert!(
+        output.contains("fallback"),
+        "ES5 output should preserve fallback value: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 nullish coalescing with object property.
+/// Nullish coalescing on object property access.
+#[test]
+fn test_parity_es5_nullish_property() {
+    let source = "const name = obj.name ?? obj.defaultName ?? 'Unknown';";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify variable declaration
+    assert!(
+        output.contains("name"),
+        "ES5 output should define name: {}",
+        output
+    );
+    // Property accesses should be preserved
+    assert!(
+        output.contains("obj") && output.contains("defaultName"),
+        "ES5 output should preserve property accesses: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 template literal with multiple expressions.
+/// Multiple expressions should all be concatenated.
+#[test]
+fn test_parity_es5_template_multi_expr() {
+    let source = r#"const msg = `Hello ${first} ${middle} ${last}!`;"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify variable declaration
+    assert!(
+        output.contains("msg"),
+        "ES5 output should define msg: {}",
+        output
+    );
+    // All identifiers should be preserved
+    assert!(
+        output.contains("first") && output.contains("middle") && output.contains("last"),
+        "ES5 output should preserve all identifiers: {}",
+        output
+    );
+    // Template literal syntax should not appear
+    assert!(
+        !output.contains("`"),
+        "ES5 output should not contain backticks: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 tagged template literal.
+/// Tagged templates should be converted to function calls.
+#[test]
+fn test_parity_es5_tagged_template() {
+    let source = r#"const result = tag`Hello ${name}!`;"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify variable declaration
+    assert!(
+        output.contains("result"),
+        "ES5 output should define result: {}",
+        output
+    );
+    // Tag function should be preserved
+    assert!(
+        output.contains("tag"),
+        "ES5 output should preserve tag function: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 template literal with function call expression.
+/// Function calls in template expressions should be preserved.
+#[test]
+fn test_parity_es5_template_with_call() {
+    let source = r#"const msg = `Result: ${compute(x, y)}`;"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify variable declaration
+    assert!(
+        output.contains("msg"),
+        "ES5 output should define msg: {}",
+        output
+    );
+    // Function call should be preserved
+    assert!(
+        output.contains("compute"),
+        "ES5 output should preserve function call: {}",
+        output
+    );
+    // Template literal syntax should not appear
+    assert!(
+        !output.contains("`"),
+        "ES5 output should not contain backticks: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 nested template literals.
+/// Nested templates should all be converted.
+#[test]
+fn test_parity_es5_template_nested() {
+    let source = r#"const msg = `outer ${`inner ${value}`}`;"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify variable declaration
+    assert!(
+        output.contains("msg"),
+        "ES5 output should define msg: {}",
+        output
+    );
+    // Value should be preserved
+    assert!(
+        output.contains("value"),
+        "ES5 output should preserve value: {}",
+        output
+    );
+    // Template literal syntax should not appear
+    assert!(
+        !output.contains("`"),
+        "ES5 output should not contain backticks: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 for-of with array destructuring.
+/// for (const [a, b] of pairs) should downlevel both for-of and destructuring.
+#[test]
+fn test_parity_es5_for_of_array_destructuring() {
+    let source = "const pairs = [[1,2],[3,4]]; for (const [a, b] of pairs) { console.log(a + b); }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 for-of with array destructuring downlevel
+    assert!(
+        output.contains("var pairs"),
+        "ES5 output should define pairs: {}",
+        output
+    );
+    // Should have for loop structure
+    assert!(
+        output.contains("for (") || output.contains("for("),
+        "ES5 output should contain for loop: {}",
+        output
+    );
+    // No for...of syntax
+    assert!(
+        !output.contains(" of pairs") && !output.contains(" of pairs)"),
+        "ES5 output should not contain for...of syntax: {}",
+        output
+    );
+    // No destructuring pattern in loop header
+    assert!(
+        !output.contains("const [a, b]") && !output.contains("var [a, b]"),
+        "ES5 output should not contain destructuring pattern: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 for-of with object destructuring.
+/// for (const {x, y} of points) should downlevel both for-of and destructuring.
+#[test]
+fn test_parity_es5_for_of_object_destructuring() {
+    let source = "const points = [{x:1,y:2},{x:3,y:4}]; for (const {x, y} of points) { console.log(x, y); }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 for-of with object destructuring downlevel
+    assert!(
+        output.contains("var points"),
+        "ES5 output should define points: {}",
+        output
+    );
+    // Should have for loop structure
+    assert!(
+        output.contains("for (") || output.contains("for("),
+        "ES5 output should contain for loop: {}",
+        output
+    );
+    // No for...of syntax
+    assert!(
+        !output.contains(" of points") && !output.contains(" of points)"),
+        "ES5 output should not contain for...of syntax: {}",
+        output
+    );
+    // No destructuring pattern in loop header
+    assert!(
+        !output.contains("const {x, y}") && !output.contains("var {x, y}"),
+        "ES5 output should not contain object destructuring pattern: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 nested for-of loops.
+/// Nested for-of should both be downleveled correctly.
+#[test]
+fn test_parity_es5_for_of_nested() {
+    let source = "const matrix = [[1,2],[3,4]]; for (const row of matrix) { for (const cell of row) { console.log(cell); } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 nested for-of downlevel
+    assert!(
+        output.contains("var matrix"),
+        "ES5 output should define matrix: {}",
+        output
+    );
+    // Should have console.log preserved
+    assert!(
+        output.contains("console.log"),
+        "ES5 output should contain console.log: {}",
+        output
+    );
+    // No for...of syntax
+    assert!(
+        !output.contains(" of matrix") && !output.contains(" of row"),
+        "ES5 output should not contain for...of syntax: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 for-of with let binding.
+/// for (let x of arr) should downlevel to var in ES5.
+#[test]
+fn test_parity_es5_for_of_let() {
+    let source = "const items = [1, 2, 3]; for (let item of items) { item++; console.log(item); }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 for-of with let downlevel
+    assert!(
+        output.contains("var items"),
+        "ES5 output should define items with var: {}",
+        output
+    );
+    // Should have for loop structure
+    assert!(
+        output.contains("for (") || output.contains("for("),
+        "ES5 output should contain for loop: {}",
+        output
+    );
+    // No for...of syntax
+    assert!(
+        !output.contains(" of items") && !output.contains(" of items)"),
+        "ES5 output should not contain for...of syntax: {}",
+        output
+    );
+    // No let keyword in ES5
+    assert!(
+        !output.contains("let "),
+        "ES5 output should not contain let keyword: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 logical OR assignment (||=).
+/// x ||= y should downlevel to x || (x = y) or equivalent.
+#[test]
+fn test_parity_es5_logical_or_assignment() {
+    let source = "let x = null; x ||= 'default';";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 logical OR assignment downlevel
+    assert!(
+        output.contains("var x"),
+        "ES5 output should define x with var: {}",
+        output
+    );
+    // Should contain 'default' value
+    assert!(
+        output.contains("default") || output.contains("\"default\""),
+        "ES5 output should contain default value: {}",
+        output
+    );
+    // No ||= syntax in ES5
+    assert!(
+        !output.contains("||="),
+        "ES5 output should not contain ||= syntax: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 logical AND assignment (&&=).
+/// x &&= y should downlevel to x && (x = y) or equivalent.
+#[test]
+fn test_parity_es5_logical_and_assignment() {
+    let source = "let obj = { value: 1 }; obj.value &&= 42;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 logical AND assignment downlevel
+    assert!(
+        output.contains("var obj"),
+        "ES5 output should define obj with var: {}",
+        output
+    );
+    // Should contain 42 value
+    assert!(
+        output.contains("42"),
+        "ES5 output should contain 42: {}",
+        output
+    );
+    // No &&= syntax in ES5
+    assert!(
+        !output.contains("&&="),
+        "ES5 output should not contain &&= syntax: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 nullish coalescing assignment (??=).
+/// x ??= y should downlevel to x ?? (x = y) or null check equivalent.
+#[test]
+fn test_parity_es5_nullish_assignment_operator() {
+    let source = "let config = { timeout: undefined }; config.timeout ??= 5000;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 nullish coalescing assignment downlevel
+    assert!(
+        output.contains("var config"),
+        "ES5 output should define config with var: {}",
+        output
+    );
+    // Should contain 5000 value
+    assert!(
+        output.contains("5000"),
+        "ES5 output should contain 5000: {}",
+        output
+    );
+    // No ??= syntax in ES5
+    assert!(
+        !output.contains("??="),
+        "ES5 output should not contain ??= syntax: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 logical assignment with property access.
+/// obj.prop ||= value should downlevel correctly.
+#[test]
+fn test_parity_es5_logical_assignment_property() {
+    let source = "const settings = {}; settings.theme ||= 'dark'; settings.debug &&= false;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 logical assignment with property downlevel
+    assert!(
+        output.contains("var settings"),
+        "ES5 output should define settings with var: {}",
+        output
+    );
+    // Should contain theme and debug
+    assert!(
+        output.contains("theme") && output.contains("debug"),
+        "ES5 output should contain theme and debug: {}",
+        output
+    );
+    // No logical assignment syntax in ES5
+    assert!(
+        !output.contains("||=") && !output.contains("&&="),
+        "ES5 output should not contain logical assignment syntax: {}",
+        output
+    );
+}
