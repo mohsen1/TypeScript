@@ -12073,3 +12073,84 @@ const myStatus = Status.Active;"#;
         "expected non-empty source mappings for TypeScript enums"
     );
 }
+
+#[test]
+fn test_source_map_typescript_namespaces() {
+    // Test TypeScript namespace declarations (downleveled to IIFE)
+    let source = r#"namespace Shapes {
+    export const PI = 3.14159;
+
+    export function area(radius: number): number {
+        return PI * radius * radius;
+    }
+
+    export namespace Circle {
+        export function circumference(radius: number): number {
+            return 2 * PI * radius;
+        }
+    }
+}
+
+const a = Shapes.area(5);
+const c = Shapes.Circle.circumference(5);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the namespace declaration
+    let (ns_line, ns_col) = find_line_col(source, "namespace Shapes");
+    let has_ns_mapping = decoded.iter().any(|entry| {
+        entry.original_line == ns_line
+            && entry.original_column >= ns_col
+            && entry.original_column <= ns_col + 16
+    });
+
+    // Verify we have mappings for the variable declaration
+    let (var_line, var_col) = find_line_col(source, "const a");
+    let has_var_mapping = decoded.iter().any(|entry| {
+        entry.original_line == var_line
+            && entry.original_column >= var_col
+            && entry.original_column <= var_col + 7
+    });
+
+    // At minimum, we should have mappings for namespace or variable
+    assert!(
+        has_ns_mapping || has_var_mapping,
+        "expected mappings for namespace declarations. mappings: {mappings}"
+    );
+
+    // Verify output contains the namespace name
+    assert!(
+        output.contains("Shapes"),
+        "expected output to contain namespace name. output: {output}"
+    );
+
+    // Verify source map has non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for TypeScript namespaces"
+    );
+}
