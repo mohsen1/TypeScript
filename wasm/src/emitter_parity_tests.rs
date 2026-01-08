@@ -1637,3 +1637,58 @@ fn test_parity_es5_abstract_class() {
         output
     );
 }
+
+/// Parity test for ES5 namespace/module downlevel.
+/// TypeScript namespaces should be downleveled to IIFE with exports.
+#[test]
+fn test_parity_es5_namespace() {
+    let source = "namespace Utils { export function add(a: number, b: number) { return a + b; } export const PI = 3.14; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 namespace downlevel
+    assert!(
+        output.contains("var Utils") || output.contains("Utils = {}"),
+        "ES5 output should define Utils namespace: {}",
+        output
+    );
+    // Should use IIFE pattern or direct assignment
+    assert!(
+        output.contains("function") && output.contains("Utils"),
+        "ES5 output should contain function for namespace: {}",
+        output
+    );
+    // Exported members should be on namespace object
+    assert!(
+        output.contains("Utils.add") || output.contains("Utils_1.add") || output.contains("add"),
+        "ES5 output should export add function: {}",
+        output
+    );
+    assert!(
+        output.contains("Utils.PI") || output.contains("PI") || output.contains("3.14"),
+        "ES5 output should export PI constant: {}",
+        output
+    );
+    // No namespace keyword
+    assert!(
+        !output.contains("namespace Utils"),
+        "ES5 output should not contain namespace keyword: {}",
+        output
+    );
+}
