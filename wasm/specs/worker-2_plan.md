@@ -35,6 +35,7 @@ Priority: 2
 - [x] Added index signature infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_object_index_signature_distributive`.
 - [x] Added tuple rest infer extraction test for array element conditional. Tests: `./wasm/test.sh test_conditional_infer_array_element_from_tuple_rest`.
 - [x] Added optional property infer test for missing object (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_optional_property_missing_object`.
+- [x] Added tuple rest tuple infer test for array element conditional (current behavior keeps rest tuple). Tests: `./wasm/test.sh test_conditional_infer_array_element_from_tuple_rest_tuple`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.

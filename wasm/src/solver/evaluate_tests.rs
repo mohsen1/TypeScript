@@ -473,6 +473,74 @@ fn test_conditional_infer_array_element_from_tuple_rest() {
 }
 
 #[test]
+fn test_conditional_infer_array_element_from_tuple_rest_tuple() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends (infer R)[] ? R : never, with T = [string, ...[number, boolean]].
+    // TODO: Current inference keeps the rest tuple as a single element (string | [number, boolean]).
+    let extends_array = interner.array(infer_r);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_array,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let rest_tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: rest_tuple,
+            name: None,
+            optional: false,
+            rest: true,
+        },
+    ]);
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, tuple);
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![TypeId::STRING, rest_tuple]);
+
+    assert_eq!(result, expected);
+}
+
+#[test]
 fn test_conditional_infer_array_element_with_constraint() {
     let interner = TypeInterner::new();
 
