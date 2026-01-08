@@ -299,11 +299,151 @@ impl<'a> InferenceContext<'a> {
     }
 
     fn upper_bound_cycles_param(&mut self, bound: TypeId, targets: &[Atom]) -> bool {
-        let Some(TypeKey::TypeParameter(info)) = self.interner.lookup(bound) else {
-            return false;
-        };
+        let mut params = FxHashSet::default();
         let mut visited = FxHashSet::default();
-        self.param_depends_on_targets(info.name, targets, &mut visited)
+        self.collect_type_params(bound, &mut params, &mut visited);
+
+        for name in params {
+            let mut seen = FxHashSet::default();
+            if self.param_depends_on_targets(name, targets, &mut seen) {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    fn collect_type_params(
+        &self,
+        ty: TypeId,
+        params: &mut FxHashSet<Atom>,
+        visited: &mut FxHashSet<TypeId>,
+    ) {
+        if !visited.insert(ty) {
+            return;
+        }
+        let Some(key) = self.interner.lookup(ty) else {
+            return;
+        };
+
+        match key {
+            TypeKey::TypeParameter(info) | TypeKey::Infer(info) => {
+                params.insert(info.name);
+            }
+            TypeKey::Array(elem) => {
+                self.collect_type_params(elem, params, visited);
+            }
+            TypeKey::Tuple(elements) => {
+                let elements = self.interner.tuple_list(elements);
+                for element in elements.iter() {
+                    self.collect_type_params(element.type_id, params, visited);
+                }
+            }
+            TypeKey::Union(members) | TypeKey::Intersection(members) => {
+                let members = self.interner.type_list(members);
+                for &member in members.iter() {
+                    self.collect_type_params(member, params, visited);
+                }
+            }
+            TypeKey::Object(shape_id) => {
+                let shape = self.interner.object_shape(shape_id);
+                for prop in shape.properties.iter() {
+                    self.collect_type_params(prop.type_id, params, visited);
+                }
+            }
+            TypeKey::ObjectWithIndex(shape_id) => {
+                let shape = self.interner.object_shape(shape_id);
+                for prop in shape.properties.iter() {
+                    self.collect_type_params(prop.type_id, params, visited);
+                }
+                if let Some(index) = shape.string_index.as_ref() {
+                    self.collect_type_params(index.key_type, params, visited);
+                    self.collect_type_params(index.value_type, params, visited);
+                }
+                if let Some(index) = shape.number_index.as_ref() {
+                    self.collect_type_params(index.key_type, params, visited);
+                    self.collect_type_params(index.value_type, params, visited);
+                }
+            }
+            TypeKey::Application(app_id) => {
+                let app = self.interner.type_application(app_id);
+                self.collect_type_params(app.base, params, visited);
+                for &arg in app.args.iter() {
+                    self.collect_type_params(arg, params, visited);
+                }
+            }
+            TypeKey::Function(shape_id) => {
+                let shape = self.interner.function_shape(shape_id);
+                for param in shape.params.iter() {
+                    self.collect_type_params(param.type_id, params, visited);
+                }
+                if let Some(this_type) = shape.this_type {
+                    self.collect_type_params(this_type, params, visited);
+                }
+                self.collect_type_params(shape.return_type, params, visited);
+            }
+            TypeKey::Callable(shape_id) => {
+                let shape = self.interner.callable_shape(shape_id);
+                for sig in shape.call_signatures.iter() {
+                    for param in sig.params.iter() {
+                        self.collect_type_params(param.type_id, params, visited);
+                    }
+                    if let Some(this_type) = sig.this_type {
+                        self.collect_type_params(this_type, params, visited);
+                    }
+                    self.collect_type_params(sig.return_type, params, visited);
+                }
+                for sig in shape.construct_signatures.iter() {
+                    for param in sig.params.iter() {
+                        self.collect_type_params(param.type_id, params, visited);
+                    }
+                    if let Some(this_type) = sig.this_type {
+                        self.collect_type_params(this_type, params, visited);
+                    }
+                    self.collect_type_params(sig.return_type, params, visited);
+                }
+                for prop in shape.properties.iter() {
+                    self.collect_type_params(prop.type_id, params, visited);
+                }
+            }
+            TypeKey::Conditional(cond_id) => {
+                let cond = self.interner.conditional_type(cond_id);
+                self.collect_type_params(cond.check_type, params, visited);
+                self.collect_type_params(cond.extends_type, params, visited);
+                self.collect_type_params(cond.true_type, params, visited);
+                self.collect_type_params(cond.false_type, params, visited);
+            }
+            TypeKey::Mapped(mapped_id) => {
+                let mapped = self.interner.mapped_type(mapped_id);
+                self.collect_type_params(mapped.constraint, params, visited);
+                if let Some(name_type) = mapped.name_type {
+                    self.collect_type_params(name_type, params, visited);
+                }
+                self.collect_type_params(mapped.template, params, visited);
+            }
+            TypeKey::IndexAccess(obj, idx) => {
+                self.collect_type_params(obj, params, visited);
+                self.collect_type_params(idx, params, visited);
+            }
+            TypeKey::KeyOf(operand) | TypeKey::ReadonlyType(operand) => {
+                self.collect_type_params(operand, params, visited);
+            }
+            TypeKey::TemplateLiteral(spans) => {
+                let spans = self.interner.template_list(spans);
+                for span in spans.iter() {
+                    if let TemplateSpan::Type(inner) = span {
+                        self.collect_type_params(*inner, params, visited);
+                    }
+                }
+            }
+            TypeKey::Intrinsic(_)
+            | TypeKey::Literal(_)
+            | TypeKey::Ref(_)
+            | TypeKey::TypeQuery(_)
+            | TypeKey::UniqueSymbol(_)
+            | TypeKey::ThisType
+            | TypeKey::Error => {}
+        }
     }
 
     fn param_depends_on_targets(
