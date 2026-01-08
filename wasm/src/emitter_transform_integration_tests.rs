@@ -1535,6 +1535,34 @@ fn test_two_phase_emission_es5_async_function_let_arrow_this_capture() {
 }
 
 #[test]
+fn test_two_phase_emission_es5_async_function_deep_nested_arrow_this_capture() {
+    let source = "async function foo() { const bar = () => () => this.x; await bar()(); }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("_this.x"),
+        "ES5 async output should capture this inside nested arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 async output should downlevel nested arrow: {}",
+        output
+    );
+}
+
+#[test]
 fn test_two_phase_emission_amd_module_wrapper() {
     let source = "import { foo } from \"./bar\"; export const x = foo;";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
