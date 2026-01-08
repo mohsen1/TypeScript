@@ -12328,3 +12328,85 @@ c.increment();"#;
         "expected non-empty source mappings for private class fields"
     );
 }
+
+#[test]
+fn test_source_map_class_static_block_mapping() {
+    // Test source-map accuracy for class static blocks
+    let source = r#"class Config {
+    static initialized = false;
+    static settings: Record<string, string> = {};
+
+    static {
+        Config.initialized = true;
+        Config.settings["mode"] = "production";
+    }
+
+    static {
+        console.log("Config loaded");
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Verify class name is in output
+    assert!(
+        output.contains("Config"),
+        "expected class name in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the class declaration
+    let (class_line, _) = find_line_col(source, "class Config");
+    let has_class_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == class_line
+    });
+
+    // Verify we have mappings for static properties
+    let (initialized_line, _) = find_line_col(source, "static initialized");
+    let has_initialized_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == initialized_line
+    });
+
+    // We should have mappings for the class and static members
+    assert!(
+        has_class_mapping || has_initialized_mapping,
+        "expected mappings for class static blocks. mappings: {mappings}"
+    );
+
+    // Verify non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for class static blocks"
+    );
+
+    // Verify we have mappings (at least one source line covered)
+    let unique_source_lines: std::collections::HashSet<_> =
+        decoded.iter().map(|m| m.original_line).collect();
+    assert!(
+        !unique_source_lines.is_empty(),
+        "expected at least one source line covered in mappings, got: {:?}",
+        unique_source_lines
+    );
+}
