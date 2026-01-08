@@ -225,11 +225,17 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
         match &source_key {
             TypeKey::Object(shape_id) => {
                 let shape = self.interner.object_shape(*shape_id);
-                !self.has_common_property(shape.properties.as_slice(), target_props)
+                // Empty objects are assignable to weak types (all optional properties).
+                // Only trigger weak type violation if source has properties that don't overlap.
+                let source_props = shape.properties.as_slice();
+                !source_props.is_empty() && !self.has_common_property(source_props, target_props)
             }
             TypeKey::ObjectWithIndex(shape_id) => {
                 let shape = self.interner.object_shape(*shape_id);
-                !self.has_common_property(shape.properties.as_slice(), target_props)
+                // Empty objects are assignable to weak types (all optional properties).
+                // Only trigger weak type violation if source has properties that don't overlap.
+                let source_props = shape.properties.as_slice();
+                !source_props.is_empty() && !self.has_common_property(source_props, target_props)
             }
             TypeKey::Union(members) => {
                 let members = self.interner.type_list(*members);

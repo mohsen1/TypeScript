@@ -79,6 +79,7 @@ Priority: 3
 - [x] Correlated Unions (TS unsoundness #38): added 4 tests for cross-product limitation. Tests cover basic union property access (passes), discriminant narrowing (passes), index access with union key (passes), and common property access on union (passes). Tests: `./wasm/test.sh -- test_correlated_unions`.
 - [x] CFA Invalidation in Closures (TS unsoundness #42): added 4 tests for narrowing reset in closures. Tests cover mutable variable invalidation (passes), const narrowing maintenance (expected improvement once implemented), arrow function closure (passes), and callback parameter (passes). Tests: `./wasm/test.sh -- test_cfa_`.
 - [x] String enum opaque assignability fix (TS unsoundness #34): added string enum rejection in enum_assignability_override. String literals cannot be assigned to string enum types (test_string_enum_rejects_string_literal now passes). Tests: `./wasm/test.sh` (52 failures, down from 53).
+- [x] Weak type empty object fix (TS unsoundness #13): fixed violates_weak_type_with_target_props to allow empty objects `{}` to be assigned to weak types (all optional properties). Only trigger weak type violation when source has properties that don't overlap. Tests: `./wasm/test.sh` (51 failures, down from 52).
 
 ## Ready for Merge
 Yes
