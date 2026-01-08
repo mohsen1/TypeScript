@@ -339,6 +339,13 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                         for &member in members.iter() {
                             match self.interner.lookup(member) {
                                 Some(TypeKey::Array(elem)) => parts.push(elem),
+                                Some(TypeKey::ReadonlyType(inner)) => {
+                                    let Some(TypeKey::Array(elem)) = self.interner.lookup(inner)
+                                    else {
+                                        return self.evaluate(cond.false_type);
+                                    };
+                                    parts.push(elem);
+                                }
                                 _ => return self.evaluate(cond.false_type),
                             }
                         }
@@ -416,16 +423,23 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                                 None
                             }
                         }
-                        Some(TypeKey::Union(members)) if extends_elements[0].optional => {
+                        Some(TypeKey::Union(members)) => {
                             let members = self.interner.type_list(members);
                             let mut inferred_members = Vec::new();
                             for &member in members.iter() {
-                                match self.interner.lookup(member) {
+                                let member_type = match self.interner.lookup(member) {
+                                    Some(TypeKey::ReadonlyType(inner)) => inner,
+                                    _ => member,
+                                };
+                                match self.interner.lookup(member_type) {
                                     Some(TypeKey::Tuple(check_elements)) => {
                                         let check_elements = self.interner.tuple_list(check_elements);
                                         if check_elements.is_empty() {
-                                            inferred_members.push(TypeId::UNDEFINED);
-                                            continue;
+                                            if extends_elements[0].optional {
+                                                inferred_members.push(TypeId::UNDEFINED);
+                                                continue;
+                                            }
+                                            return self.evaluate(cond.false_type);
                                         }
                                         if check_elements.len() == 1 && !check_elements[0].rest {
                                             let elem = &check_elements[0];

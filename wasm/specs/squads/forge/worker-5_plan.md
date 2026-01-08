@@ -7,14 +7,15 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- [ ] Awaiting EM-Forge follow-up; latest inference changes landed but `./wasm/test.sh` fails on unrelated emitter test (`emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
+- [ ] Follow up with remaining `infer` placeholder vs `never` TODOs in solver tests that block non-distributive inference.
 
 ## Task Queue
 - [x] Add tests for function `this`-parameter inference (contextual typing + call-site inference) in `wasm/src/solver/infer_tests.rs`.
 - [x] Convert TODOs in `wasm/src/solver/evaluate_tests.rs` for optional property inference (missing vs `undefined`) and optional tuple element inference (undefined inclusion).
-- [ ] Follow up with remaining `infer` placeholder vs `never` TODOs in solver tests that block non-distributive inference.
+- [ ] [EM: Add queued tasks]
 
 ## Completed
+- [x] Enabled non-distributive readonly array/tuple inference over union inputs and updated tests in `wasm/src/solver/evaluate_tests.rs`; `./wasm/test.sh` failed: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`.
 - [x] Implemented conditional infer constraint filtering + optional tuple/property inference; updated tuple optional expectations and added `this`-parameter tests; `./wasm/test.sh` failed: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`.
 - [x] Fixed FunctionId typo in `wasm/src/solver/evaluate.rs`; `./wasm/test.sh` failed: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`.
 - [x] Updated infer TODO expectations in `wasm/src/solver/evaluate_tests.rs` (tuple rest inference note + this-parameter TODO cleanup); `./wasm/test.sh` failed: missing `FunctionId` in `wasm/src/solver/evaluate.rs`.
