@@ -135,3 +135,30 @@ fn test_no_await_in_simple_function() {
         }
     }
 }
+
+#[test]
+fn test_emit_lexical_this_capture_in_return() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "async function foo() { return this.value; }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&func_idx) = source_file.statements.nodes.first() {
+                if let Some(func_node) = parser.arena.get(func_idx) {
+                    if let Some(func) = parser.arena.get_function(func_node) {
+                        let mut emitter = AsyncES5Emitter::new(&parser.arena);
+                        emitter.set_use_this_capture(true);
+                        let output = emitter.emit_simple_generator_body(func.body);
+                        assert!(
+                            output.contains("_this.value"),
+                            "expected lexical this capture in output: {output}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
