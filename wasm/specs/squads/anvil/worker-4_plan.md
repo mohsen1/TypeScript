@@ -7,23 +7,21 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- Add an end-to-end compile test for a small multi-file generic library (interfaces, generics, conditional types) in `wasm/src/cli/driver_tests.rs`; assert no diagnostics/panics and outputs written; run `./wasm/test.sh`.
+- [ ] Await EM assignment.
 
 ## Task Queue
-- [ ] Create a multi-file fixture (e.g., `src/index.ts`, `src/types.ts`) in the temp dir with imports/exports and generic constraints.
-- [ ] Assert JS output exists for each input file and (if enabled) map files are emitted.
-- [ ] If compile fails, isolate the panic/diagnostic and add the minimal regression coverage.
+- [ ] [EM: Add queued tasks]
 
 ## Completed
-- [x] (Move finished items here with brief notes and tests run)
+- [x] Add async/class ES5 transform source-map mappings and offsets. Tests: `./wasm/test.sh source_map`
 
 ## Ready for Merge
-No
+Yes - branch `worker/anvil-4` is ready for merge.
 
 ## Notes
-- Project Direction: integration and conformance-first; prioritize emitter fidelity (ES5 downleveling/source maps) before new features.
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
+- Conformance focus: tie regressions to official TypeScript conformance cases when possible.
 - Commit format: `[wasm] emitter: <description>` or `[wasm] cli: <description>`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/anvil-4`
