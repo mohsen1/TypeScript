@@ -10,10 +10,23 @@ Priority: 1
 - Awaiting next assignment.
 
 ## Task Queue
+- [ ] Investigate and resolve Docker build failure in `wasm/src/cli/driver.rs` (E0515 in latest rust merge).
 - [ ] Add mixed-case exponent negative leading zeros test (`1Ee-0001`).
 - [ ] Add mixed-case exponent missing sign with leading zeros test (`1Ee01`).
 - [ ] Add mixed-case exponent trailing double-minus test (`1Ee--`).
 - [ ] Add uppercase exponent leading zeros with zero exponent test (`1E+00`).
+- [ ] Add lowercase exponent plus missing digits test (`1e+`).
+- [ ] Add uppercase exponent plus missing digits test (`1E+`).
+- [ ] Add numeric separator underscore name test (`1_0` or `1_0e1`).
+- [ ] Add numeric separator in integer name test (`1_000`).
+- [ ] Add numeric separator in fractional name test (`1.0_0`).
+- [ ] Add numeric separator adjacent to decimal point test (`1_.0`).
+- [ ] Add numeric separator in exponent digits test (`1e1_0`).
+- [ ] Add numeric separator in exponent sign/digits test (`1e+_1`).
+- [ ] Add multiple underscore name test (`1__0`).
+- [ ] Add trailing underscore name test (`1_`).
+- [ ] Add leading-zero with underscore name test (`0_1`).
+- [ ] Add numeric separator in hex/binary name test (`0x1_0`, `0b1_0`, `0o1_0`).
 
 ## Completed
 - [x] Conditional infer object coverage in `wasm/src/solver/evaluate.rs` with tests in `wasm/src/solver/evaluate_tests.rs`. Tests: `./wasm/test.sh test_conditional_infer_object_`.
