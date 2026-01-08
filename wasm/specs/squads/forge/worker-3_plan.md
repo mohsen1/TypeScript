@@ -7,7 +7,7 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] Structural compatibility/variance: fix covariance/contravariance edge cases in `wasm/src/solver/subtype.rs`; add tests in `wasm/src/solver/subtype_tests.rs`; run `./wasm/test.sh`.
+- [x] Structural compatibility/variance: fix covariance/contravariance edge cases in `wasm/src/solver/subtype.rs`; add tests in `wasm/src/solver/subtype_tests.rs`; run `./wasm/test.sh`.
 
 ## Task Queue
 - [ ] Add regressions for function parameter variance across unions/intersections in `wasm/src/solver/subtype_tests.rs`.
@@ -15,7 +15,7 @@ Priority: 3
 - [ ] Pull next unsoundness case from `wasm/specs/TS_UNSOUNDNESS_CATALOG.md` and add a subtype regression test.
 
 ## Completed
-- [x] (Move finished items here with brief notes and tests run)
+- [x] Structural property/method variance: allow bivariant checks when either side is a method; added mixed method vs function-property test. Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
 
 ## Ready for Merge
 No
