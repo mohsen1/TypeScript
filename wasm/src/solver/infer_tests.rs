@@ -238,6 +238,22 @@ fn test_resolve_multiple_lower_bounds_union() {
 }
 
 #[test]
+fn test_resolve_lower_bounds_ignores_never() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var = ctx.fresh_type_param(t_name);
+    let hello = interner.literal_string("hello");
+
+    ctx.add_lower_bound(var, TypeId::NEVER);
+    ctx.add_lower_bound(var, hello);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, hello);
+}
+
+#[test]
 fn test_resolve_upper_bound_only() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);

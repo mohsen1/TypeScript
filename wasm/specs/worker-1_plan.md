@@ -39,6 +39,7 @@ Priority: 1
 - [x] Unified vars reuse merged constraints; added `test_resolve_unified_vars_merged_constraints`. Tests: `./wasm/test.sh test_resolve_unified_vars_merged_constraints`.
 - [x] Self upper bound with concrete upper resolves to concrete; added `test_resolve_self_upper_bound_with_concrete`. Tests: `./wasm/test.sh test_resolve_self_upper_bound_with_concrete`.
 - [x] Union lower bound violating string upper errors; added `test_resolve_bounds_union_lower_vs_string_upper`. Tests: `./wasm/test.sh test_resolve_bounds_union_lower_vs_string_upper`.
+- [x] Lower bounds ignore `never`; added `test_resolve_lower_bounds_ignores_never`. Tests: `./wasm/test.sh test_resolve_lower_bounds_ignores_never`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
