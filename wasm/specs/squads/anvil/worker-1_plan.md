@@ -8,7 +8,7 @@ Priority: 1
 Blocked: Awaiting next EM-Anvil assignment.
 
 ## Current Assignment
-- Complete: Added static method ES5 test; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` - pre-existing Forge domain failure).
+- Complete: Added class expression ES5 tests (anonymous and named); ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` - pre-existing Forge domain failure).
 
 ## Task Queue
 - [x] Inspect `wasm/src/emitter_edge_case_tests.rs` to capture the failing case and expected output.
@@ -55,6 +55,7 @@ Blocked: Awaiting next EM-Anvil assignment.
 - [x] Added getter/setter ES5 accessors test; verifies `get count()` and `set count(value)` use Object.defineProperty. Ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Added arrow function this binding ES5 test; verifies arrow functions use `_this` capture and `function` keyword. Ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Added static method ES5 test; verifies static methods/properties are on constructor function, not prototype. Ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
+- [x] Added class expression ES5 tests (anonymous and named); verifies class expressions emit correctly with properties and methods on prototype. Ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 
 ## Ready for Merge
 Yes

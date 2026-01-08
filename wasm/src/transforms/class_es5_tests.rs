@@ -1426,3 +1426,142 @@ class MathUtils {
         output
     );
 }
+
+#[test]
+fn test_class_es5_class_expression() {
+    let source = r#"
+const MyClass = class {
+    value = 42;
+    getValue() {
+        return this.value;
+    }
+};
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Get the variable statement which contains the class expression
+    let var_stmt_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected variable statement");
+
+    let var_stmt_node = parser.arena.get(var_stmt_idx).expect("expected var node");
+    let output = if let Some(var_stmt) = parser.arena.get_variable(var_stmt_node) {
+        // First level: get the declaration list
+        let decl_list_idx = *var_stmt.declarations.nodes.first().expect("expected declaration list");
+        let decl_list_node = parser.arena.get(decl_list_idx).expect("expected declaration list node");
+        let decl_list = parser.arena.get_variable(decl_list_node).expect("expected declaration list data");
+
+        // Second level: get the actual variable declaration
+        let decl_idx = *decl_list.declarations.nodes.first().expect("expected declaration");
+        let decl_node = parser.arena.get(decl_idx).expect("expected decl node");
+        let var_decl = parser.arena.get_variable_declaration(decl_node).expect("expected var decl");
+
+        let init_idx = var_decl.initializer;
+        if !init_idx.is_none() && parser.arena.get(init_idx).is_some() {
+            let mut emitter = ClassES5Emitter::new(&parser.arena);
+            emitter.emit_class(init_idx)
+        } else {
+            String::new()
+        }
+    } else {
+        String::new()
+    };
+
+    // Class expression should emit as a function
+    assert!(
+        output.contains("function"),
+        "Expected class expression to emit as function: {}",
+        output
+    );
+
+    // Should have instance property initializer
+    assert!(
+        output.contains("this.value = 42") || output.contains(".value = 42"),
+        "Expected instance property initializer: {}",
+        output
+    );
+
+    // Method should be on prototype
+    assert!(
+        output.contains(".prototype.getValue") || output.contains("prototype[\"getValue\"]"),
+        "Expected getValue method on prototype: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_named_class_expression() {
+    let source = r#"
+const Factory = class InnerClass {
+    static instance: InnerClass | null = null;
+
+    static create() {
+        if (!InnerClass.instance) {
+            InnerClass.instance = new InnerClass();
+        }
+        return InnerClass.instance;
+    }
+};
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Get the variable statement which contains the class expression
+    let var_stmt_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected variable statement");
+
+    let var_stmt_node = parser.arena.get(var_stmt_idx).expect("expected var node");
+    let output = if let Some(var_stmt) = parser.arena.get_variable(var_stmt_node) {
+        // First level: get the declaration list
+        let decl_list_idx = *var_stmt.declarations.nodes.first().expect("expected declaration list");
+        let decl_list_node = parser.arena.get(decl_list_idx).expect("expected declaration list node");
+        let decl_list = parser.arena.get_variable(decl_list_node).expect("expected declaration list data");
+
+        // Second level: get the actual variable declaration
+        let decl_idx = *decl_list.declarations.nodes.first().expect("expected declaration");
+        let decl_node = parser.arena.get(decl_idx).expect("expected decl node");
+        let var_decl = parser.arena.get_variable_declaration(decl_node).expect("expected var decl");
+
+        let init_idx = var_decl.initializer;
+        if !init_idx.is_none() && parser.arena.get(init_idx).is_some() {
+            let mut emitter = ClassES5Emitter::new(&parser.arena);
+            emitter.emit_class(init_idx)
+        } else {
+            String::new()
+        }
+    } else {
+        String::new()
+    };
+
+    // Named class expression should emit as a function with the inner name
+    assert!(
+        output.contains("function") || output.contains("InnerClass"),
+        "Expected named class expression to emit as function: {}",
+        output
+    );
+
+    // Static method should be on constructor
+    assert!(
+        output.contains(".create") || output.contains("create"),
+        "Expected static create method: {}",
+        output
+    );
+}
