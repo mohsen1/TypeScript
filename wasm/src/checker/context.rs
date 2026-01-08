@@ -6,12 +6,13 @@
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::cell::RefCell;
+use std::sync::Arc;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::parser::NodeIndex;
 use crate::parser::thin_node::ThinNodeArena;
 use crate::thin_binder::ThinBinderState;
-use crate::solver::{TypeId, TypeInterner, TypeEnvironment};
+use crate::solver::{TypeEnvironment, TypeId, TypeInterner};
 use crate::checker::types::diagnostics::Diagnostic;
 use crate::binder::SymbolId;
 
@@ -119,6 +120,9 @@ pub struct CheckerContext<'a> {
     /// Cache for type relation results.
     pub relation_cache: RefCell<FxHashMap<(TypeId, TypeId, u8), bool>>,
 
+    /// Cached type environment for resolving Ref types during assignability checks.
+    pub type_environment: RefCell<Option<TypeEnvironment>>,
+
     /// Symbol dependency graph (symbol -> referenced symbols).
     pub symbol_dependencies: FxHashMap<SymbolId, FxHashSet<SymbolId>>,
 
@@ -165,6 +169,10 @@ pub struct CheckerContext<'a> {
     /// Type environment for symbol resolution with type parameters.
     /// Used by the evaluator to expand Application types.
     pub type_env: RefCell<TypeEnvironment>,
+
+    /// All arenas for cross-file resolution (indexed by file_idx from Symbol.decl_file_idx).
+    /// Set during multi-file type checking to allow resolving declarations across files.
+    pub all_arenas: Option<Vec<Arc<ThinNodeArena>>>,
 }
 
 impl<'a> CheckerContext<'a> {
@@ -184,6 +192,7 @@ impl<'a> CheckerContext<'a> {
             node_types: FxHashMap::default(),
             type_parameter_names: FxHashMap::default(),
             relation_cache: RefCell::new(FxHashMap::default()),
+            type_environment: RefCell::new(None),
             symbol_dependencies: FxHashMap::default(),
             symbol_dependency_stack: Vec::new(),
             diagnostics: Vec::new(),
@@ -198,6 +207,7 @@ impl<'a> CheckerContext<'a> {
             return_type_stack: Vec::new(),
             enclosing_class: None,
             type_env: RefCell::new(TypeEnvironment::new()),
+            all_arenas: None,
         }
     }
 
@@ -219,6 +229,7 @@ impl<'a> CheckerContext<'a> {
             node_types: cache.node_types,
             type_parameter_names: cache.type_parameter_names,
             relation_cache: RefCell::new(cache.relation_cache),
+            type_environment: RefCell::new(None),
             symbol_dependencies: cache.symbol_dependencies,
             symbol_dependency_stack: Vec::new(),
             diagnostics: Vec::new(),
@@ -233,7 +244,27 @@ impl<'a> CheckerContext<'a> {
             return_type_stack: Vec::new(),
             enclosing_class: None,
             type_env: RefCell::new(TypeEnvironment::new()),
+            all_arenas: None,
         }
+    }
+
+    /// Set all arenas for cross-file resolution.
+    pub fn set_all_arenas(&mut self, arenas: Vec<Arc<ThinNodeArena>>) {
+        self.all_arenas = Some(arenas);
+    }
+
+    /// Get the arena for a specific file index.
+    /// Returns the current arena if file_idx is u32::MAX (single-file mode).
+    pub fn get_arena_for_file(&self, file_idx: u32) -> &ThinNodeArena {
+        if file_idx == u32::MAX {
+            return self.arena;
+        }
+        if let Some(ref arenas) = self.all_arenas {
+            if let Some(arena) = arenas.get(file_idx as usize) {
+                return arena.as_ref();
+            }
+        }
+        self.arena
     }
 
     /// Extract the persistent cache from this context.

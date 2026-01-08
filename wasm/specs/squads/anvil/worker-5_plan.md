@@ -7,12 +7,16 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- Complete: Re-added TypeScript namespaces source map test in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
+- Complete: Added 7 nested arrow `this` capture tests for async methods in `wasm/src/transforms/class_es5_tests.rs`; ran `./wasm/test.sh class_es5_tests` (42 tests PASS).
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added 7 nested arrow `this` capture tests for async methods in `wasm/src/transforms/class_es5_tests.rs`; ran `./wasm/test.sh class_es5_tests` (42 tests PASS).
+- [x] Added for-await-of loops source map test in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (174 tests PASS).
+- [x] Added object literal methods and accessors source map test in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (173 tests PASS).
+- [x] Added async generators source map test in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (170 tests PASS).
 - [x] Added source map for class inheritance and super() calls test in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
 - [x] Added source map for conditional expressions and switch statements test in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
 - [x] Added source map for ES module exports test in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).

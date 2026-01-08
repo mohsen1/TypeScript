@@ -16,6 +16,7 @@ use crate::binder::{
 };
 use crate::parser::node_flags;
 use rustc_hash::{FxHashMap, FxHashSet};
+use std::sync::Arc;
 
 /// Binder state using ThinNodeArena.
 pub struct ThinBinderState {
@@ -39,6 +40,8 @@ pub struct ThinBinderState {
     current_scope_idx: usize,
     /// Node-to-symbol mapping
     pub node_symbols: FxHashMap<u32, SymbolId>,
+    /// Symbol-to-arena mapping for cross-file declaration lookup
+    pub symbol_arenas: FxHashMap<SymbolId, Arc<ThinNodeArena>>,
     /// Node-to-flow mapping: tracks which flow node was active at each AST node
     /// Used by the checker for control flow analysis (type narrowing)
     pub node_flow: FxHashMap<u32, FlowNodeId>,
@@ -76,6 +79,7 @@ impl ThinBinderState {
             scope_chain: Vec::new(),
             current_scope_idx: 0,
             node_symbols: FxHashMap::default(),
+            symbol_arenas: FxHashMap::default(),
             node_flow: FxHashMap::default(),
             top_level_flow: FxHashMap::default(),
             switch_clause_to_switch: FxHashMap::default(),
@@ -98,6 +102,7 @@ impl ThinBinderState {
         self.scope_chain.clear();
         self.current_scope_idx = 0;
         self.node_symbols.clear();
+        self.symbol_arenas.clear();
         self.node_flow.clear();
         self.top_level_flow.clear();
         self.switch_clause_to_switch.clear();
@@ -131,6 +136,7 @@ impl ThinBinderState {
             scope_chain: Vec::new(),
             current_scope_idx: 0,
             node_symbols,
+            symbol_arenas: FxHashMap::default(),
             node_flow: FxHashMap::default(),
             top_level_flow: FxHashMap::default(),
             switch_clause_to_switch: FxHashMap::default(),
@@ -164,6 +170,7 @@ impl ThinBinderState {
             scope_chain: Vec::new(),
             current_scope_idx: 0,
             node_symbols,
+            symbol_arenas: FxHashMap::default(),
             node_flow: FxHashMap::default(),
             top_level_flow: FxHashMap::default(),
             switch_clause_to_switch: FxHashMap::default(),
