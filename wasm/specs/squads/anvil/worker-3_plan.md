@@ -7,7 +7,7 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- Fix async ES5 computed super element access (async emitter + ThinPrinter), update emitter integration tests, run `./wasm/test.sh`.
+- [EM: Assign next task]
 
 ## Task Queue
 - [ ] Audit remaining async ES5 computed-super cases for source map coverage.
@@ -17,7 +17,7 @@ Priority: 3
 - [x] Lowered async ES5 computed `super[...]` calls (async emitter + ThinPrinter) and updated integration tests; `./wasm/test.sh` fails at `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`.
 
 ## Ready for Merge
-No
+Yes - worker/anvil-3 ready for merge.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
