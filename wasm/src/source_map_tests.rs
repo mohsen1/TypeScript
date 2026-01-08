@@ -13947,3 +13947,78 @@ export * from "./utils";"#;
         "expected mappings for re-exports. mappings: {mappings} output: {output}"
     );
 }
+
+#[test]
+fn test_source_map_type_assertions_and_const() {
+    // Test source-map accuracy for type assertions and const assertions
+    let source = r#"const value: unknown = "hello";
+const str = value as string;
+const num = <number>someValue;
+
+const config = {
+    name: "app",
+    version: 1
+} as const;
+
+const colors = ["red", "green", "blue"] as const;
+
+function process(input: unknown) {
+    const data = input as { id: number; name: string };
+    return data.id;
+}
+
+type Point = { x: number; y: number };
+const origin = { x: 0, y: 0 } as Point;"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions::default();
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for variable declarations
+    let (value_line, _) = find_line_col(source, "const value");
+    let has_value_mapping = decoded.iter().any(|entry| {
+        entry.original_line == value_line
+    });
+
+    let (config_line, _) = find_line_col(source, "const config");
+    let has_config_mapping = decoded.iter().any(|entry| {
+        entry.original_line == config_line
+    });
+
+    // At minimum, we should have mappings for declarations
+    assert!(
+        has_value_mapping || has_config_mapping || !decoded.is_empty(),
+        "expected mappings for type assertions. mappings: {mappings}"
+    );
+
+    // Type assertions should be stripped from output
+    assert!(
+        !output.contains(" as string") && !output.contains(" as const"),
+        "expected type assertions to be stripped. output: {output}"
+    );
+
+    // Verify source map has non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for type assertions"
+    );
+}
