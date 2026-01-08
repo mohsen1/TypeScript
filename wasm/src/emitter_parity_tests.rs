@@ -764,3 +764,54 @@ fn test_parity_es5_for_await_of_destructuring() {
         output
     );
 }
+
+/// Parity test for ES5 template literals.
+/// Template literals should be downleveled to string concatenation.
+#[test]
+fn test_parity_es5_template_literal() {
+    let source = r#"const greeting = `Hello, ${name}!`;"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 template literal downlevel
+    assert!(
+        output.contains("var greeting"),
+        "ES5 output should define greeting variable: {}",
+        output
+    );
+    // Should reference name
+    assert!(
+        output.contains("name"),
+        "ES5 output should reference name: {}",
+        output
+    );
+    // Template literal should be converted to string concatenation or kept with quotes
+    // tsc converts `Hello, ${name}!` to "Hello, " + name + "!"
+    assert!(
+        output.contains("+") || output.contains("\"Hello"),
+        "ES5 output should use string concatenation or converted string: {}",
+        output
+    );
+    // No template literal syntax
+    assert!(
+        !output.contains("`"),
+        "ES5 output should not contain template literal backticks: {}",
+        output
+    );
+}
