@@ -70,6 +70,7 @@ Priority: 3
 - [x] Solver unsoundness: mapped optional+readonly add yields optional readonly properties in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_optional_readonly_add_subtyping`.
 - [x] Solver unsoundness: mapped optional+readonly remove yields mutable required properties in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_optional_readonly_remove_subtyping`.
 - [x] Solver unsoundness: key remap with optional add yields optional properties in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_key_remap_optional_add_subtyping`.
+- [x] Solver unsoundness: key remap with readonly add yields readonly properties in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_mapped_type_key_remap_readonly_add_subtyping`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
