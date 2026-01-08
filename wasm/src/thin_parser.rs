@@ -1035,7 +1035,15 @@ impl ThinParserState {
 
         // Parse optional initializer
         let initializer = if self.parse_optional(SyntaxKind::EqualsToken) {
-            self.parse_assignment_expression()
+            if self.is_token(SyntaxKind::ConstKeyword)
+                || self.is_token(SyntaxKind::LetKeyword)
+                || self.is_token(SyntaxKind::VarKeyword)
+            {
+                self.error_expression_expected();
+                NodeIndex::NONE
+            } else {
+                self.parse_assignment_expression()
+            }
         } else {
             NodeIndex::NONE
         };
