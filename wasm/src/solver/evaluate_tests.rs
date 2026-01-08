@@ -1307,6 +1307,53 @@ fn test_conditional_infer_object_index_signature_distributive() {
 }
 
 #[test]
+fn test_conditional_infer_optional_property_missing_object() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends { a?: infer R } ? R : never, with T = {}.
+    // TODO: Optional property inference currently treats missing properties as non-matches.
+    let extends_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: infer_r,
+        write_type: infer_r,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_obj,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let empty_obj = interner.object(Vec::new());
+    subst.insert(t_name, empty_obj);
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
 fn test_conditional_infer_object_property_non_distributive_union_branch() {
     let interner = TypeInterner::new();
 
