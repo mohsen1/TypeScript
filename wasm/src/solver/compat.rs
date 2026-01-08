@@ -112,12 +112,7 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
             // `{}` accepts any non-nullish value (including primitives). See https://github.com/microsoft/TypeScript/issues/60582.
             self.is_assignable_to_empty_object(source)
         } else {
-            self.subtype.strict_function_types = self.strict_function_types;
-            self.subtype.allow_void_return = true;
-            self.subtype.allow_bivariant_rest = true;
-            self.subtype.exact_optional_property_types = self.exact_optional_property_types;
-            self.subtype.strict_null_checks = self.strict_null_checks;
-            self.subtype.no_unchecked_indexed_access = self.no_unchecked_indexed_access;
+            self.configure_subtype(self.strict_function_types);
             self.subtype.is_subtype_of(source, target)
         };
 
@@ -149,12 +144,7 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
         }
 
         let prev = self.subtype.strict_function_types;
-        self.subtype.strict_function_types = true;
-        self.subtype.allow_void_return = true;
-        self.subtype.allow_bivariant_rest = true;
-        self.subtype.exact_optional_property_types = self.exact_optional_property_types;
-        self.subtype.strict_null_checks = self.strict_null_checks;
-        self.subtype.no_unchecked_indexed_access = self.no_unchecked_indexed_access;
+        self.configure_subtype(true);
         let result = self.subtype.is_subtype_of(source, target);
         self.subtype.strict_function_types = prev;
         result
@@ -183,13 +173,17 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
             }
         }
 
-        self.subtype.strict_function_types = self.strict_function_types;
+        self.configure_subtype(self.strict_function_types);
+        self.subtype.explain_failure(source, target)
+    }
+
+    fn configure_subtype(&mut self, strict_function_types: bool) {
+        self.subtype.strict_function_types = strict_function_types;
         self.subtype.allow_void_return = true;
         self.subtype.allow_bivariant_rest = true;
         self.subtype.exact_optional_property_types = self.exact_optional_property_types;
         self.subtype.strict_null_checks = self.strict_null_checks;
         self.subtype.no_unchecked_indexed_access = self.no_unchecked_indexed_access;
-        self.subtype.explain_failure(source, target)
     }
 
     fn violates_weak_type(&self, source: TypeId, target: TypeId) -> bool {
