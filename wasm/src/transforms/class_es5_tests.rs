@@ -5608,3 +5608,268 @@ class SecureValue {
         output
     );
 }
+
+#[test]
+fn test_class_es5_method_overloads_basic() {
+    // Test basic method overloads with different parameter types
+    let source = r#"
+class Calculator {
+    add(a: number, b: number): number;
+    add(a: string, b: string): string;
+    add(a: any, b: any): any {
+        return a + b;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should transform class to function
+    assert!(
+        output.contains("function Calculator") || output.contains("var Calculator"),
+        "Expected Calculator class transformation: {}",
+        output
+    );
+
+    // Only implementation should be emitted, not overload signatures
+    assert!(
+        output.contains("add"),
+        "Expected add method: {}",
+        output
+    );
+
+    // Method should be on prototype
+    assert!(
+        output.contains("prototype") || output.contains("Calculator"),
+        "Expected prototype assignment: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_method_overloads_optional_params() {
+    // Test method overloads with optional parameters
+    let source = r#"
+class Formatter {
+    format(value: number): string;
+    format(value: number, decimals: number): string;
+    format(value: number, decimals: number, prefix: string): string;
+    format(value: number, decimals?: number, prefix?: string): string {
+        let result = value.toFixed(decimals || 0);
+        return prefix ? prefix + result : result;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should transform class
+    assert!(
+        output.contains("function Formatter") || output.contains("var Formatter"),
+        "Expected Formatter class transformation: {}",
+        output
+    );
+
+    // Format method should be present
+    assert!(
+        output.contains("format"),
+        "Expected format method: {}",
+        output
+    );
+
+    // Implementation should have the method body
+    assert!(
+        output.contains("toFixed") || output.contains("result"),
+        "Expected method implementation: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_method_overloads_generic() {
+    // Test method overloads with generic types
+    let source = r#"
+class Container<T> {
+    getValue(): T;
+    getValue(defaultValue: T): T;
+    getValue(defaultValue?: T): T {
+        return this.value !== undefined ? this.value : defaultValue!;
+    }
+
+    private value: T | undefined;
+
+    setValue(value: T): void {
+        this.value = value;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should transform class
+    assert!(
+        output.contains("function Container") || output.contains("var Container"),
+        "Expected Container class transformation: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("getValue") && output.contains("setValue"),
+        "Expected getValue and setValue methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_method_overloads_static() {
+    // Test static method overloads
+    let source = r#"
+class Factory {
+    static create(): Factory;
+    static create(config: object): Factory;
+    static create(config?: object): Factory {
+        const instance = new Factory();
+        if (config) {
+            instance.configure(config);
+        }
+        return instance;
+    }
+
+    private config: object = {};
+
+    configure(config: object): void {
+        this.config = config;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should transform class
+    assert!(
+        output.contains("function Factory") || output.contains("var Factory"),
+        "Expected Factory class transformation: {}",
+        output
+    );
+
+    // Static method should be on constructor
+    assert!(
+        output.contains("create"),
+        "Expected static create method: {}",
+        output
+    );
+
+    // Instance method should be present
+    assert!(
+        output.contains("configure"),
+        "Expected configure method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_method_overloads_inheritance() {
+    // Test method overloads with inheritance
+    let source = r#"
+class BaseService {
+    fetch(url: string): Promise<any>;
+    fetch(url: string, options: object): Promise<any>;
+    fetch(url: string, options?: object): Promise<any> {
+        return Promise.resolve({ url, options });
+    }
+}
+
+class ExtendedService extends BaseService {
+    fetch(url: string): Promise<any>;
+    fetch(url: string, options: object): Promise<any>;
+    fetch(url: string, options: object, timeout: number): Promise<any>;
+    fetch(url: string, options?: object, timeout?: number): Promise<any> {
+        return super.fetch(url, options || {});
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Both classes should be transformed
+    assert!(
+        output.contains("BaseService") && output.contains("ExtendedService"),
+        "Expected both class transformations: {}",
+        output
+    );
+
+    // Inheritance pattern should be present
+    assert!(
+        output.contains("__extends") || output.contains("prototype"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+
+    // Fetch method should be present
+    assert!(
+        output.contains("fetch"),
+        "Expected fetch method: {}",
+        output
+    );
+}
