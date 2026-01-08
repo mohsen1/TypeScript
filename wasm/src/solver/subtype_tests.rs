@@ -201,6 +201,38 @@ fn test_object_trifecta_object_interface_accepts_primitives() {
 }
 
 #[test]
+fn test_primitive_boxing_assignability() {
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let to_fixed = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let number_interface = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("toFixed"),
+        type_id: to_fixed,
+        write_type: to_fixed,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let sym = SymbolRef(2);
+    env.insert(sym, number_interface);
+    let number_ref = interner.reference(sym);
+
+    let mut checker = SubtypeChecker::with_resolver(&interner, &env);
+
+    assert!(checker.is_subtype_of(TypeId::NUMBER, number_ref));
+    assert!(!checker.is_subtype_of(number_ref, TypeId::NUMBER));
+}
+
+#[test]
 fn test_weak_type_detection_requires_overlap() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
