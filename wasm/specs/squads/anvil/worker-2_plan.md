@@ -13,6 +13,7 @@ Priority: 2
 - [ ] [EM: Add queued tasks]
 
 ## Completed
+- [x] Added helper-ordering coverage for `__awaiter` before `__generator` in `helpers_tests.rs`; `./wasm/test.sh test_emit_awaiter_before_generator_helpers` passed.
 - [x] Added CommonJS coverage to ensure type-only namespace imports are erased in `thin_emitter_tests.rs`; `./wasm/test.sh test_commonjs_type_only_namespace_import_is_erased` passed.
 - [x] Added CommonJS ordering coverage to ensure `__esModule` precedes export init in `thin_emitter_tests.rs`; `./wasm/test.sh test_commonjs_esmodule_marker_before_exports_init` passed.
 - [x] Added CommonJS helper ordering coverage before `__esModule` in `thin_emitter_tests.rs`; `./wasm/test.sh test_commonjs_helpers_before_esmodule_marker` passed.
