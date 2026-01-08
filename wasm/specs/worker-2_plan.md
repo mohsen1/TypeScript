@@ -16,7 +16,7 @@ Priority: 2
 - [ ] TODO: Add non-distributive template literal infer with numeric constraint to document current behavior.
 - [x] Added distributive template literal infer over template-literal union input (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_union_input_distributive`.
 - [x] Added template literal infer from `string`/`` `${string}` `` inputs (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_from_string_input`.
-- [ ] TODO: Add tuple rest inference test (e.g., T extends [infer H, ...infer R] ? R : never) with T = [string, number] | [boolean], expected `[number] | []`.
+- [x] Added tuple rest inference test (current behavior yields number). Tests: `./wasm/test.sh test_conditional_infer_tuple_rest_with_head_infer_distributive`.
 - [ ] TODO: Add object call-signature infer test (e.g., T extends { (x: infer R): void } ? R : never) expected union of parameter types.
 - [ ] TODO: Add function optional-parameter infer test (e.g., T extends (x?: infer R) => void) expected `string | number | undefined` (confirm).
 - [ ] TODO: Add function param infer with non-function union branch (e.g., T = (x: string) => void | number) expected `string`.

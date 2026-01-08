@@ -4216,6 +4216,48 @@ fn test_mapped_type_over_string_keys_subtyping() {
 }
 
 #[test]
+fn test_mapped_type_over_string_keys_number_index_subtyping() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let constraint = interner.intern(TypeKey::KeyOf(TypeId::STRING));
+    let mapped = interner.mapped(MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint,
+        name_type: None,
+        template: TypeId::BOOLEAN,
+        readonly_modifier: None,
+        optional_modifier: None,
+    });
+
+    let number_index = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::BOOLEAN,
+            readonly: false,
+        }),
+    });
+    let mismatch = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+    });
+
+    assert!(checker.is_subtype_of(mapped, number_index));
+    assert!(!checker.is_subtype_of(mapped, mismatch));
+}
+
+#[test]
 fn test_mapped_type_over_string_keys_key_remap_omit_length() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
