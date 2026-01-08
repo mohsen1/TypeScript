@@ -263,6 +263,19 @@ fn test_function_variance_strict() {
 }
 
 #[test]
+fn test_array_covariance_assignability() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let (animal, dog) = make_animal_dog(&interner);
+    let dog_array = interner.array(dog);
+    let animal_array = interner.array(animal);
+
+    assert!(checker.is_assignable(dog_array, animal_array));
+    assert!(!checker.is_assignable(animal_array, dog_array));
+}
+
+#[test]
 fn test_optional_parameter_assignability_allows_extra_optional() {
     let interner = TypeInterner::new();
     let mut checker = CompatChecker::new(&interner);
