@@ -58,6 +58,7 @@ Priority: 2
 - [x] Added template literal infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_template_literal_distributive`.
 - [x] Added readonly object property infer test. Tests: `./wasm/test.sh test_conditional_infer_object_property_readonly`.
 - [x] Added array infer test with non-array union branch. Tests: `./wasm/test.sh test_conditional_infer_array_element_non_array_union_branch`.
+- [x] Added optional tuple element infer test. Tests: `./wasm/test.sh test_conditional_infer_tuple_optional_element_distributive`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.

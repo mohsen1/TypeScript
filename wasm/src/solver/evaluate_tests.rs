@@ -2544,6 +2544,56 @@ fn test_conditional_infer_tuple_element_extraction() {
 }
 
 #[test]
+fn test_conditional_infer_tuple_optional_element_distributive() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends [infer R?] ? R : never, with T = [string] | [].
+    let extends_tuple = interner.tuple(vec![TupleElement {
+        type_id: infer_r,
+        name: None,
+        optional: true,
+        rest: false,
+    }]);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_tuple,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let string_tuple = interner.tuple(vec![TupleElement {
+        type_id: TypeId::STRING,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
+    let empty_tuple = interner.tuple(Vec::new());
+    subst.insert(t_name, interner.union(vec![string_tuple, empty_tuple]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
 fn test_conditional_infer_tuple_element_non_distributive_union_input() {
     let interner = TypeInterner::new();
 
