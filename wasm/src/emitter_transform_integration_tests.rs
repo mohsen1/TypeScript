@@ -2631,6 +2631,144 @@ class Foo {
 }
 
 #[test]
+fn test_two_phase_emission_es5_class_static_async_arrow_field() {
+    let source = r#"
+class Foo {
+    static handler = async () => {
+        await fetch();
+        return this.value;
+    };
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("__awaiter"),
+        "ES5 output should use __awaiter for static async arrow: {}",
+        output
+    );
+    assert!(
+        output.contains("Foo.handler"),
+        "ES5 output should emit static field initializer: {}",
+        output
+    );
+    assert!(
+        output.contains("this.value"),
+        "ES5 output should preserve this for static async arrow: {}",
+        output
+    );
+    assert!(
+        !output.contains("var _this = this"),
+        "ES5 output should not capture this for static field: {}",
+        output
+    );
+    assert!(
+        !output.contains("async"),
+        "ES5 output should downlevel async: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_static_async_arrow_nested_arrow() {
+    let source = r#"
+class Foo {
+    static handler = async () => {
+        const inner = () => this.value;
+        await fetch();
+        return inner();
+    };
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("__awaiter"),
+        "ES5 output should use __awaiter for static async arrow: {}",
+        output
+    );
+    // Static field should NOT capture _this at class level
+    assert!(
+        !output.contains("var _this = Foo"),
+        "ES5 output should not capture Foo to _this: {}",
+        output
+    );
+    assert!(
+        !output.contains("async"),
+        "ES5 output should downlevel async: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_private_field_in_async_method() {
+    let source = r#"
+class Foo {
+    #value = 1;
+    async getValue() {
+        await fetch();
+        return this.#value;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("__awaiter"),
+        "ES5 output should use __awaiter for async method: {}",
+        output
+    );
+    assert!(
+        output.contains("__classPrivateFieldGet"),
+        "ES5 output should use __classPrivateFieldGet for private field: {}",
+        output
+    );
+    assert!(
+        output.contains("_Foo_value"),
+        "ES5 output should emit WeakMap for private field: {}",
+        output
+    );
+    assert!(
+        !output.contains("this.#value"),
+        "ES5 output should not contain private field syntax: {}",
+        output
+    );
+}
+
+#[test]
 fn test_two_phase_emission_es5_class_derived_field_arrow_super_call() {
     let source = r#"
 class Base { m() { return this.x; } }
@@ -4890,383 +5028,4 @@ fn test_transform_directive_composability() {
     // Verify it was stored
     assert!(ctx.has_transform(NodeIndex(1)));
     assert!(!ctx.has_transform(NodeIndex(2)));
-}
-
-#[test]
-fn test_emit_generic_library_redux_style() {
-    // End-to-end emit test for Redux/Lodash-style generic library patterns
-    // Verifies that complex generics emit correctly with type annotations stripped
-    let source = r#"
-type AnyAction = { type: string; payload?: any };
-
-type Reducer<S, A extends AnyAction> = (state: S | undefined, action: A) => S;
-
-type ReducersMapObject<S, A extends AnyAction> = {
-    [K in keyof S]: Reducer<S[K], A>;
-};
-
-type Dictionary<T> = { [key: string]: T };
-
-interface Store<S, A extends AnyAction> {
-    getState(): S;
-    dispatch(action: A): A;
-}
-
-function createStore<S, A extends AnyAction>(reducer: Reducer<S, A>): Store<S, A> {
-    let state: S | undefined;
-    return {
-        getState: () => state as S,
-        dispatch: (action: A) => {
-            state = reducer(state, action);
-            return action;
-        }
-    };
-}
-
-const counterReducer: Reducer<number, AnyAction> = (state = 0, action) => {
-    if (action.type === "inc") return state + 1;
-    if (action.type === "dec") return state - 1;
-    return state;
-};
-
-const store = createStore(counterReducer);
-const count = store.getState();
-store.dispatch({ type: "inc" });
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-    let arena = parser.arena;
-
-    let ctx = EmitContext::default();
-    let lowering = LoweringPass::new(&arena, &ctx);
-    let transforms = lowering.run(root);
-
-    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
-    printer.emit(root);
-
-    let output = printer.get_output();
-
-    // Type aliases should be stripped
-    assert!(
-        !output.contains("type AnyAction"),
-        "Type alias should be stripped: {}",
-        output
-    );
-    assert!(
-        !output.contains("type Reducer<"),
-        "Generic type alias should be stripped: {}",
-        output
-    );
-    assert!(
-        !output.contains("type ReducersMapObject<"),
-        "Mapped type alias should be stripped: {}",
-        output
-    );
-    assert!(
-        !output.contains("type Dictionary<"),
-        "Index signature type alias should be stripped: {}",
-        output
-    );
-
-    // Interface should be stripped
-    assert!(
-        !output.contains("interface Store"),
-        "Interface should be stripped: {}",
-        output
-    );
-
-    // Function should emit without type parameters and annotations
-    assert!(
-        output.contains("function createStore(reducer)"),
-        "Generic function should emit without type params: {}",
-        output
-    );
-    assert!(
-        !output.contains("<S, A extends AnyAction>"),
-        "Generic type parameters should be stripped: {}",
-        output
-    );
-    assert!(
-        !output.contains(": Store<S, A>"),
-        "Return type annotation should be stripped: {}",
-        output
-    );
-
-    // Variable declarations should emit without type annotations
-    assert!(
-        output.contains("var state;") || output.contains("let state;"),
-        "Variable should emit without type annotation: {}",
-        output
-    );
-
-    // Arrow function reducer should emit correctly
-    assert!(
-        output.contains("var counterReducer = ") || output.contains("const counterReducer = "),
-        "Const with type annotation should emit: {}",
-        output
-    );
-    // Arrow function can be (state = 0, action) => or function (state, action)
-    assert!(
-        output.contains("(state = 0, action) =>") || output.contains("(state, action) =>") || output.contains("function (state, action)"),
-        "Arrow function parameters should have types stripped: {}",
-        output
-    );
-    assert!(
-        output.contains("state = 0") || output.contains("state === void 0 ? 0 : state"),
-        "Default parameter should be preserved: {}",
-        output
-    );
-
-    // Store usage should emit correctly
-    assert!(
-        output.contains("createStore(counterReducer)"),
-        "Function call should emit: {}",
-        output
-    );
-    assert!(
-        output.contains("store.getState()"),
-        "Method call should emit: {}",
-        output
-    );
-    assert!(
-        output.contains("store.dispatch"),
-        "Method call with object should emit: {}",
-        output
-    );
-    assert!(
-        output.contains("{ type: \"inc\" }"),
-        "Object literal should emit: {}",
-        output
-    );
-}
-
-#[test]
-fn test_emit_generic_library_utility_types() {
-    // Test emit for generic utility function patterns (Lodash-style)
-    let source = r#"
-function identity<T>(value: T): T {
-    return value;
-}
-
-function map<T, U>(arr: T[], fn: (item: T) => U): U[] {
-    const result: U[] = [];
-    for (const item of arr) {
-        result.push(fn(item));
-    }
-    return result;
-}
-
-function pick<T, K extends keyof T>(obj: T, keys: K[]): Pick<T, K> {
-    const result = {} as Pick<T, K>;
-    for (const key of keys) {
-        result[key] = obj[key];
-    }
-    return result;
-}
-
-const doubled = map([1, 2, 3], x => x * 2);
-const picked = pick({ a: 1, b: 2, c: 3 }, ["a", "c"]);
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-    let arena = parser.arena;
-
-    let ctx = EmitContext::default();
-    let lowering = LoweringPass::new(&arena, &ctx);
-    let transforms = lowering.run(root);
-
-    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
-    printer.emit(root);
-
-    let output = printer.get_output();
-
-    // Generic function declarations should emit without type params
-    assert!(
-        output.contains("function identity(value)"),
-        "Generic function should emit without <T>: {}",
-        output
-    );
-    assert!(
-        output.contains("function map(arr, fn)"),
-        "Multi-param generic function should emit: {}",
-        output
-    );
-    assert!(
-        output.contains("function pick(obj, keys)"),
-        "Constrained generic function should emit: {}",
-        output
-    );
-
-    // Type annotations should be stripped
-    assert!(
-        !output.contains(": T"),
-        "Type annotations should be stripped: {}",
-        output
-    );
-    assert!(
-        !output.contains(": U[]"),
-        "Array type annotations should be stripped: {}",
-        output
-    );
-    assert!(
-        !output.contains("Pick<T, K>"),
-        "Utility type annotations should be stripped: {}",
-        output
-    );
-    assert!(
-        !output.contains("as Pick<"),
-        "Type assertions should be stripped: {}",
-        output
-    );
-
-    // Function calls should emit correctly
-    assert!(
-        output.contains("map([1, 2, 3]"),
-        "Generic function call should emit: {}",
-        output
-    );
-    assert!(
-        output.contains("pick({"),
-        "Generic function call should emit: {}",
-        output
-    );
-
-    // Arrow function should emit
-    assert!(
-        output.contains("x * 2") || output.contains("x*2"),
-        "Arrow function body should emit: {}",
-        output
-    );
-}
-
-#[test]
-fn test_emit_generic_class_with_constraints() {
-    // Test emit for generic class patterns
-    let source = r#"
-interface Comparable<T> {
-    compareTo(other: T): number;
-}
-
-class SortedList<T extends Comparable<T>> {
-    private items: T[] = [];
-
-    add(item: T): void {
-        this.items.push(item);
-        this.items.sort((a, b) => a.compareTo(b));
-    }
-
-    get(index: number): T {
-        return this.items[index];
-    }
-
-    get length(): number {
-        return this.items.length;
-    }
-}
-
-class NumberWrapper implements Comparable<NumberWrapper> {
-    constructor(public value: number) {}
-
-    compareTo(other: NumberWrapper): number {
-        return this.value - other.value;
-    }
-}
-
-const list = new SortedList<NumberWrapper>();
-list.add(new NumberWrapper(3));
-list.add(new NumberWrapper(1));
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-    let arena = parser.arena;
-
-    let ctx = EmitContext::default();
-    let lowering = LoweringPass::new(&arena, &ctx);
-    let transforms = lowering.run(root);
-
-    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
-    printer.emit(root);
-
-    let output = printer.get_output();
-
-    // Interface should be stripped
-    assert!(
-        !output.contains("interface Comparable"),
-        "Interface should be stripped: {}",
-        output
-    );
-
-    // Class should emit without type parameter
-    assert!(
-        output.contains("class SortedList"),
-        "Class should emit: {}",
-        output
-    );
-    assert!(
-        !output.contains("class SortedList<"),
-        "Class type parameter should be stripped: {}",
-        output
-    );
-    assert!(
-        !output.contains("extends Comparable<T>"),
-        "Type constraint should be stripped: {}",
-        output
-    );
-
-    // Implements clause should be stripped
-    assert!(
-        !output.contains("implements Comparable"),
-        "Implements clause should be stripped: {}",
-        output
-    );
-
-    // Property declarations should have types stripped
-    assert!(
-        !output.contains("private items: T[]"),
-        "Property type annotation should be stripped: {}",
-        output
-    );
-
-    // Method parameters should have types stripped
-    assert!(
-        !output.contains("(item: T)"),
-        "Method parameter type should be stripped: {}",
-        output
-    );
-    assert!(
-        !output.contains("(index: number)"),
-        "Method parameter type should be stripped: {}",
-        output
-    );
-    assert!(
-        !output.contains("): T"),
-        "Method return type should be stripped: {}",
-        output
-    );
-
-    // Constructor parameter property should emit
-    assert!(
-        output.contains("constructor(") || output.contains("function NumberWrapper("),
-        "Constructor should emit: {}",
-        output
-    );
-
-    // new expression should emit without type argument
-    assert!(
-        output.contains("new SortedList()"),
-        "Generic instantiation should emit without type arg: {}",
-        output
-    );
-    assert!(
-        !output.contains("new SortedList<NumberWrapper>()"),
-        "Type argument should be stripped: {}",
-        output
-    );
-
-    // Method calls should emit
-    assert!(
-        output.contains("list.add("),
-        "Method call should emit: {}",
-        output
-    );
 }

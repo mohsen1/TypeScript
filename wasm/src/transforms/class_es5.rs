@@ -448,24 +448,20 @@ impl<'a> ClassES5Emitter<'a> {
                 for &prop_idx in &instance_props {
                     let Some(prop_node) = self.arena.get(prop_idx) else { continue };
                     let Some(prop_data) = self.arena.get_property_decl(prop_node) else { continue };
-                    if !self.has_identifier_text(prop_data.name) {
-                        continue;
-                    }
                     self.write_indent();
-                self.write("_this.");
-                self.write_identifier_text(prop_data.name);
-                self.write(" = ");
-                let needs_capture =
-                    contains_this_reference(self.arena, prop_data.initializer);
-                let prev = self.use_this_capture;
-                if needs_capture {
-                    self.use_this_capture = true;
+                    self.emit_property_receiver_and_name("_this", prop_data.name);
+                    self.write(" = ");
+                    let needs_capture =
+                        contains_this_reference(self.arena, prop_data.initializer);
+                    let prev = self.use_this_capture;
+                    if needs_capture {
+                        self.use_this_capture = true;
+                    }
+                    self.emit_expression(prop_data.initializer);
+                    self.use_this_capture = prev;
+                    self.write(";");
+                    self.write_line();
                 }
-                self.emit_expression(prop_data.initializer);
-                self.use_this_capture = prev;
-                self.write(";");
-                self.write_line();
-            }
 
                 // Return _this
                 self.write_indent();
@@ -485,12 +481,8 @@ impl<'a> ClassES5Emitter<'a> {
                 for &prop_idx in &instance_props {
                     let Some(prop_node) = self.arena.get(prop_idx) else { continue };
                     let Some(prop_data) = self.arena.get_property_decl(prop_node) else { continue };
-                    if !self.has_identifier_text(prop_data.name) {
-                        continue;
-                    }
                     self.write_indent();
-                    self.write("this.");
-                    self.write_identifier_text(prop_data.name);
+                    self.emit_property_receiver_and_name("this", prop_data.name);
                     self.write(" = ");
                     self.emit_expression(prop_data.initializer);
                     self.write(";");
@@ -528,24 +520,48 @@ impl<'a> ClassES5Emitter<'a> {
         false
     }
 
-    /// Emit instance property initializers as this.prop = value;
+    /// Emit instance property initializers as this.prop = value; or this[key] = value;
     fn emit_instance_property_initializers(&mut self, props: &[NodeIndex]) {
         for &prop_idx in props {
             let Some(prop_node) = self.arena.get(prop_idx) else { continue };
             let Some(prop_data) = self.arena.get_property_decl(prop_node) else { continue };
 
-            if !self.has_identifier_text(prop_data.name) {
-                continue;
-            }
-
             self.write_indent();
             self.record_mapping_for_node(prop_node);
-            self.write("this.");
-            self.write_identifier_text(prop_data.name);
+            self.emit_property_receiver_and_name("this", prop_data.name);
             self.write(" = ");
             self.emit_expression(prop_data.initializer);
             self.write(";");
             self.write_line();
+        }
+    }
+
+    /// Emit a property access with the given receiver: receiver.prop or receiver[key]
+    fn emit_property_receiver_and_name(&mut self, receiver: &str, name_idx: NodeIndex) {
+        self.write(receiver);
+        let Some(name_node) = self.arena.get(name_idx) else { return };
+
+        if name_node.kind == syntax_kind_ext::COMPUTED_PROPERTY_NAME {
+            if let Some(computed) = self.arena.get_computed_property(name_node) {
+                self.write("[");
+                self.emit_expression(computed.expression);
+                self.write("]");
+            }
+        } else if name_node.kind == SyntaxKind::Identifier as u16 {
+            self.write(".");
+            self.write_identifier_text(name_idx);
+        } else if name_node.kind == SyntaxKind::StringLiteral as u16 {
+            if let Some(lit) = self.arena.get_literal(name_node) {
+                self.write("[\"");
+                self.write(&lit.text);
+                self.write("\"]");
+            }
+        } else if name_node.kind == SyntaxKind::NumericLiteral as u16 {
+            if let Some(lit) = self.arena.get_literal(name_node) {
+                self.write("[");
+                self.write(&lit.text);
+                self.write("]");
+            }
         }
     }
 
@@ -774,14 +790,9 @@ impl<'a> ClassES5Emitter<'a> {
                 continue;
             }
 
-            if !self.has_identifier_text(prop_data.name) {
-                continue;
-            }
-
             self.write_indent();
             self.record_mapping_for_node(prop_node);
-            self.write("_this.");
-            self.write_identifier_text(prop_data.name);
+            self.emit_property_receiver_and_name("_this", prop_data.name);
             self.write(" = ");
 
             // Check if this initializer contains `this` or `super` that needs capture.
@@ -1396,6 +1407,7 @@ impl<'a> ClassES5Emitter<'a> {
         let mut async_emitter = AsyncES5Emitter::new(self.arena);
         async_emitter.set_indent_level(self.indent_level + 1);
         async_emitter.set_lexical_this(self.use_this_capture);
+        async_emitter.set_class_name(&self.class_name);
 
         let generator_body = if async_emitter.body_contains_await(body) {
             async_emitter.emit_generator_body_with_await(body)
@@ -1433,6 +1445,7 @@ impl<'a> ClassES5Emitter<'a> {
         let mut async_emitter = AsyncES5Emitter::new(self.arena);
         async_emitter.set_indent_level(self.indent_level + 1);
         async_emitter.set_lexical_this(this_expr != "this");
+        async_emitter.set_class_name(&self.class_name);
 
         let generator_body = if async_emitter.body_contains_await(func.body) {
             async_emitter.emit_generator_body_with_await(func.body)

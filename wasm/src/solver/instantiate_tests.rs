@@ -463,3 +463,27 @@ fn test_instantiate_mapped_type_shadowed_param() {
     });
     assert_eq!(result, expected);
 }
+
+#[test]
+fn test_instantiation_depth_limit_returns_error() {
+    let interner = TypeInterner::new();
+    let t_name = interner.intern_string("T");
+
+    let type_param_t = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let mut deep_type = type_param_t;
+    let limit = (MAX_INSTANTIATION_DEPTH + 5) as usize;
+    for _ in 0..limit {
+        deep_type = interner.array(deep_type);
+    }
+
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, TypeId::NUMBER);
+    let result = instantiate_type(&interner, deep_type, &subst);
+
+    assert_eq!(result, TypeId::ERROR);
+}
