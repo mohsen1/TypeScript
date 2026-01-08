@@ -13,6 +13,7 @@ Priority: 4
 - [ ] Stand by for next emitter fidelity task.
 
 ## Completed
+- [x] Async ES5 let declaration regression test for arrow this capture; test `./wasm/test.sh let_arrow_this_capture`.
 - [x] Async ES5 multi-declarator var statement regression test (await + arrow this capture); test `./wasm/test.sh multi_decl_this_capture`.
 - [x] Async ES5 variable statement emission: handle declaration lists so const/let initializers emit in async bodies; test `./wasm/test.sh nested_arrow_this_capture`.
 - [x] Async ES5 parity investigation: parity test passed; fixed nested arrow `this` capture in async ES5 emission; tests `./wasm/test.sh test_parity_async_es5`, `./wasm/test.sh nested_arrow`.
