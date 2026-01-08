@@ -61,6 +61,7 @@ Priority: 2
 - [x] Added optional tuple element infer test. Tests: `./wasm/test.sh test_conditional_infer_tuple_optional_element_distributive`.
 - [x] Added non-distributive optional tuple infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_tuple_optional_element_non_distributive_union_input`.
 - [x] Added non-distributive optional property infer test (current behavior yields never). Tests: `./wasm/test.sh test_conditional_infer_optional_property_non_distributive_union_input`.
+- [x] Added optional tuple element array infer test (current behavior omits undefined). Tests: `./wasm/test.sh test_conditional_infer_array_element_from_optional_tuple_element`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
