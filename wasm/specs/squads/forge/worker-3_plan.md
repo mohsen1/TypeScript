@@ -70,6 +70,7 @@ Priority: 3
 - [x] Global Function type (TS unsoundness #29): added 3 tests for untyped callable supertype. Tests cover callable-to-Function assignability, Function-to-specific assignability (with any), and function type hierarchy. Tests: `./wasm/test.sh -- test_global_function_type\|test_function_not_assignable\|test_function_type_hierarchy`.
 - [x] Best Common Type inference (TS unsoundness #32): added 3 tests for array literal type inference. Tests cover mixed array literals, class hierarchy (1 expected error until class inheritance works), and literal widening. Tests: `./wasm/test.sh -- test_best_common_type`.
 - [x] Module Augmentation Merging (TS unsoundness #44): added 6 tests for declaration merging. Tests cover interface merging, method overloads, extend+merge, namespace-interface merging (2 expected errors), class-namespace merging, and enum-namespace merging (4 expected errors). Tests: `./wasm/test.sh -- test_interface_merging\|test_namespace_interface\|test_class_namespace\|test_enum_namespace`.
+- [x] Application type expansion in evaluate(): added TypeResolver.get_type_params(), TypeEnvironment.insert_with_params(), evaluate_application() handler, and eager base symbol resolution. test_redux_pattern_extract_state_with_infer now passes. Tests: `./wasm/test.sh -- test_redux_pattern`.
 
 ## Ready for Merge
 Yes
