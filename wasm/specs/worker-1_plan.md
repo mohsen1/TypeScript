@@ -27,6 +27,7 @@ Priority: 1
 - [x] Union function context keeps literal return; added `test_contextual_union_function_return_preserves_literal`. Tests: `./wasm/test.sh test_contextual_union_function_return_preserves_literal`.
 - [x] Union function param/return context keeps literal; added `test_contextual_union_function_param_return_preserves_literal`. Tests: `./wasm/test.sh test_contextual_union_function_param_return_preserves_literal`.
 - [x] Union parameter context keeps literal; added `test_contextual_union_param_preserves_literal`. Tests: `./wasm/test.sh test_contextual_union_param_preserves_literal`.
+- [x] Union arity context preserves literal param; added `test_contextual_union_arity_param_preserves_literal`. Tests: `./wasm/test.sh test_contextual_union_arity_param_preserves_literal`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
