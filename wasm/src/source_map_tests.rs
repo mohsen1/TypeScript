@@ -10195,3 +10195,62 @@ fn test_source_map_multiple_files() {
     assert!(has_file1_mapping, "expected mapping from utils.ts (index 0)");
     assert!(has_file2_mapping, "expected mapping from main.ts (index 1)");
 }
+
+#[test]
+fn test_source_map_inline_generation() {
+    use crate::source_map::SourceMapGenerator;
+
+    let mut generator = SourceMapGenerator::new("output.js".to_string());
+    generator.add_source_with_content(
+        "input.ts".to_string(),
+        "const x = 1;\nconst y = 2;".to_string(),
+    );
+
+    // Add mappings
+    generator.add_simple_mapping(0, 0, 0, 0, 0); // const x
+    generator.add_simple_mapping(0, 6, 0, 0, 6); // x
+    generator.add_simple_mapping(1, 0, 0, 1, 0); // const y
+    generator.add_simple_mapping(1, 6, 0, 1, 6); // y
+
+    let inline = generator.generate_inline();
+
+    // Verify inline format
+    let prefix = "//# sourceMappingURL=data:application/json;base64,";
+    assert!(
+        inline.starts_with(prefix),
+        "expected inline source map prefix, got: {inline}"
+    );
+
+    // Verify base64 portion is non-empty and contains valid base64 chars
+    let base64_part = &inline[prefix.len()..];
+    assert!(
+        !base64_part.is_empty(),
+        "expected non-empty base64 content"
+    );
+    assert!(
+        base64_part.chars().all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '='),
+        "expected valid base64 characters"
+    );
+
+    // Also verify generate_json produces valid JSON
+    let mut generator2 = SourceMapGenerator::new("output.js".to_string());
+    generator2.add_source_with_content(
+        "input.ts".to_string(),
+        "const x = 1;\nconst y = 2;".to_string(),
+    );
+    generator2.add_simple_mapping(0, 0, 0, 0, 0);
+    generator2.add_simple_mapping(1, 0, 0, 1, 0);
+
+    let json = generator2.generate_json();
+    let map_value: Value = serde_json::from_str(&json).expect("expected valid JSON from generate_json");
+
+    // Verify source map structure
+    assert_eq!(map_value["version"], 3);
+    assert_eq!(map_value["file"], "output.js");
+    assert_eq!(map_value["sources"][0], "input.ts");
+    assert_eq!(map_value["sourcesContent"][0], "const x = 1;\nconst y = 2;");
+    assert!(
+        map_value["mappings"].as_str().map(|s| !s.is_empty()).unwrap_or(false),
+        "expected non-empty mappings"
+    );
+}
