@@ -10,12 +10,13 @@ Priority: 3
 - [x] Structural compatibility/variance: fix covariance/contravariance edge cases in `wasm/src/solver/subtype.rs`; add tests in `wasm/src/solver/subtype_tests.rs`; run `./wasm/test.sh`.
 
 ## Task Queue
-- [ ] Add regressions for function parameter variance across unions/intersections in `wasm/src/solver/subtype_tests.rs`.
+- [x] Add regressions for function parameter variance across unions/intersections in `wasm/src/solver/subtype_tests.rs`.
 - [ ] Confirm method vs function-property variance in `wasm/src/solver/subtype.rs` matches `tsc`, add coverage if missing.
 - [ ] Pull next unsoundness case from `wasm/specs/TS_UNSOUNDNESS_CATALOG.md` and add a subtype regression test.
 
 ## Completed
 - [x] Structural property/method variance: allow bivariant checks when either side is a method; added mixed method vs function-property test. Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
+- [x] Function variance across union/intersection targets regression test. Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
 
 ## Ready for Merge
 Yes

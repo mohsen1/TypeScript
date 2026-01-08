@@ -2759,6 +2759,40 @@ fn test_strict_function_variance() {
 }
 
 #[test]
+fn test_function_variance_union_intersection_targets() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let fn_with_param = |param| {
+        interner.function(FunctionShape {
+            type_params: vec![],
+            params: vec![ParamInfo {
+                name: Some(interner.intern_string("x")),
+                type_id: param,
+                optional: false,
+                rest: false,
+            }],
+            this_type: None,
+            return_type: TypeId::VOID,
+            type_predicate: None,
+            is_constructor: false,
+        })
+    };
+
+    let fn_string = fn_with_param(TypeId::STRING);
+    let fn_number = fn_with_param(TypeId::NUMBER);
+    let fn_union_param = fn_with_param(interner.union(vec![TypeId::STRING, TypeId::NUMBER]));
+
+    let union_target = interner.union(vec![fn_string, fn_number]);
+    let intersection_target = interner.intersection(vec![fn_string, fn_number]);
+
+    assert!(checker.is_subtype_of(fn_union_param, union_target));
+    assert!(checker.is_subtype_of(fn_union_param, intersection_target));
+    assert!(!checker.is_subtype_of(fn_string, intersection_target));
+    assert!(!checker.is_subtype_of(union_target, fn_union_param));
+}
+
+#[test]
 fn test_callable_rest_parameter_contravariance() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
