@@ -2396,3 +2396,202 @@ fn test_async_method_expr_conditional() {
         output
     );
 }
+
+// =============================================================================
+// Async generator function tests (async function*)
+// =============================================================================
+
+/// Helper to parse an async generator function and emit its body
+fn parse_and_emit_async_generator(source: &str) -> String {
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&func_idx) = source_file.statements.nodes.first() {
+                if let Some(func_node) = parser.arena.get(func_idx) {
+                    if let Some(func) = parser.arena.get_function(func_node) {
+                        // Async generators have both is_async and asterisk_token
+                        let emitter = AsyncES5Emitter::new(&parser.arena);
+                        let has_await = emitter.body_contains_await(func.body);
+                        let mut emitter = AsyncES5Emitter::new(&parser.arena);
+                        if has_await {
+                            return emitter.emit_generator_body_with_await(func.body);
+                        } else {
+                            return emitter.emit_simple_generator_body(func.body);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    String::new()
+}
+
+/// Helper to check if async generator body contains await
+fn async_generator_body_contains_await(source: &str) -> bool {
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&func_idx) = source_file.statements.nodes.first() {
+                if let Some(func_node) = parser.arena.get(func_idx) {
+                    if let Some(func) = parser.arena.get_function(func_node) {
+                        let emitter = AsyncES5Emitter::new(&parser.arena);
+                        return emitter.body_contains_await(func.body);
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+#[test]
+fn test_async_generator_basic_yield() {
+    let output = parse_and_emit_async_generator(
+        "async function* gen() { yield 1; yield 2; }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Async generator should have generator wrapper: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_generator_with_await() {
+    let output = parse_and_emit_async_generator(
+        "async function* fetchItems() { const data = await fetch(); yield data; }",
+    );
+    assert!(
+        output.contains("case 1:"),
+        "Async generator with await should have case labels: {}",
+        output
+    );
+    assert!(
+        output.contains("[4 /*yield*/"),
+        "Should have yield instruction for await: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_generator_yield_await() {
+    // yield await pattern - emitter produces generator wrapper
+    let output = parse_and_emit_async_generator(
+        "async function* stream() { yield await getData(); }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "yield await should have generator wrapper: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_generator_multiple_yields() {
+    let output = parse_and_emit_async_generator(
+        "async function* numbers() { yield 1; yield 2; yield 3; }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Multiple yields should have generator: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_generator_yield_in_loop() {
+    // yield in loop with await - emit the generator
+    let output = parse_and_emit_async_generator(
+        "async function* paginate() { while (hasMore) { const page = await fetchPage(); yield page; } }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Async generator with yield in loop should have generator: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_generator_body_contains_await() {
+    assert!(
+        async_generator_body_contains_await(
+            "async function* gen() { await setup(); yield 1; }"
+        ),
+        "Should detect await in async generator body"
+    );
+}
+
+#[test]
+fn test_async_generator_body_no_await() {
+    assert!(
+        !async_generator_body_contains_await(
+            "async function* gen() { yield 1; yield 2; }"
+        ),
+        "Should not detect await when only yields present"
+    );
+}
+
+#[test]
+fn test_async_generator_ignores_nested_async() {
+    assert!(
+        !async_generator_body_contains_await(
+            "async function* gen() { const fn = async () => { await x; }; yield 1; }"
+        ),
+        "Should ignore await in nested async arrow"
+    );
+}
+
+#[test]
+fn test_async_generator_with_for_await_of() {
+    // for-await-of in async generator - emit the generator wrapper
+    let output = parse_and_emit_async_generator(
+        "async function* transform(source) { for await (const item of source) { yield process(item); } }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "for-await-of in async generator should have generator wrapper: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_generator_try_catch() {
+    // Test emit with try/catch rather than body_contains_await since try blocks
+    // may have different detection behavior with yield statements
+    let output = parse_and_emit_async_generator(
+        "async function* safe() { try { const x = await risky(); yield x; } catch (e) { yield fallback; } }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "Try/catch in async generator should have generator: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_generator_yield_star() {
+    let output = parse_and_emit_async_generator(
+        "async function* delegate() { yield* otherGen(); }",
+    );
+    assert!(
+        output.contains("__generator"),
+        "yield* should have generator wrapper: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_generator_return_value() {
+    let output = parse_and_emit_async_generator(
+        "async function* withReturn() { yield 1; return await getFinal(); }",
+    );
+    assert!(
+        output.contains("[4 /*yield*/"),
+        "return await should have yield instruction: {}",
+        output
+    );
+}
