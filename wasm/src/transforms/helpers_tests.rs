@@ -112,3 +112,14 @@ fn test_emit_values_before_read_helpers() {
     let read_pos = output.find("__read").expect("Expected __read helper");
     assert!(values_pos < read_pos, "__values should precede __read");
 }
+
+#[test]
+fn test_emit_awaiter_before_generator_helpers() {
+    let mut helpers = HelpersNeeded::default();
+    helpers.awaiter = true;
+    helpers.generator = true;
+    let output = emit_helpers(&helpers);
+    let awaiter_pos = output.find("__awaiter").expect("Expected __awaiter helper");
+    let generator_pos = output.find("__generator").expect("Expected __generator helper");
+    assert!(awaiter_pos < generator_pos, "__awaiter should precede __generator");
+}
