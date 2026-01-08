@@ -6870,3 +6870,324 @@ class User {
         output
     );
 }
+
+#[test]
+fn test_class_es5_static_getter() {
+    // Test static getter
+    let source = r#"
+class Config {
+    private static _version: string = "1.0.0";
+
+    static get version(): string {
+        return Config._version;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should transform class to function
+    assert!(
+        output.contains("function Config") || output.contains("var Config"),
+        "Expected Config class transformation: {}",
+        output
+    );
+
+    // Static getter should use Object.defineProperty or similar pattern
+    assert!(
+        output.contains("version") || output.contains("defineProperty"),
+        "Expected static getter: {}",
+        output
+    );
+
+    // Private static field should be present
+    assert!(
+        output.contains("_version"),
+        "Expected _version backing field: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_static_getter_setter() {
+    // Test static getter and setter pair
+    let source = r#"
+class Counter {
+    private static _count: number = 0;
+
+    static get count(): number {
+        return Counter._count;
+    }
+
+    static set count(value: number) {
+        if (value >= 0) {
+            Counter._count = value;
+        }
+    }
+
+    static increment(): void {
+        Counter.count++;
+    }
+
+    static reset(): void {
+        Counter.count = 0;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should transform class
+    assert!(
+        output.contains("function Counter") || output.contains("var Counter"),
+        "Expected Counter class transformation: {}",
+        output
+    );
+
+    // Static accessor should be present
+    assert!(
+        output.contains("count"),
+        "Expected count accessor: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("increment") && output.contains("reset"),
+        "Expected static methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_static_accessor_computed() {
+    // Test static accessor with computed value
+    let source = r#"
+class Cache {
+    private static _data: Map<string, any> = new Map();
+    private static _hits: number = 0;
+    private static _misses: number = 0;
+
+    static get hitRate(): number {
+        const total = Cache._hits + Cache._misses;
+        return total > 0 ? Cache._hits / total : 0;
+    }
+
+    static get size(): number {
+        return Cache._data.size;
+    }
+
+    static set(key: string, value: any): void {
+        Cache._data.set(key, value);
+    }
+
+    static get(key: string): any {
+        if (Cache._data.has(key)) {
+            Cache._hits++;
+            return Cache._data.get(key);
+        }
+        Cache._misses++;
+        return undefined;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should transform class
+    assert!(
+        output.contains("function Cache") || output.contains("var Cache"),
+        "Expected Cache class transformation: {}",
+        output
+    );
+
+    // Static accessors should be present
+    assert!(
+        output.contains("hitRate") || output.contains("size"),
+        "Expected static accessors: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("set") && output.contains("get"),
+        "Expected static methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_static_accessor_inheritance() {
+    // Test static accessor with inheritance
+    let source = r#"
+class BaseLogger {
+    protected static _level: number = 1;
+
+    static get level(): number {
+        return BaseLogger._level;
+    }
+
+    static set level(value: number) {
+        BaseLogger._level = value;
+    }
+}
+
+class DebugLogger extends BaseLogger {
+    static get level(): number {
+        return BaseLogger._level + 1;
+    }
+
+    static debug(msg: string): void {
+        if (DebugLogger.level > 0) {
+            console.log("[DEBUG] " + msg);
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Both classes should be transformed
+    assert!(
+        output.contains("BaseLogger") && output.contains("DebugLogger"),
+        "Expected both class transformations: {}",
+        output
+    );
+
+    // Inheritance pattern should be present
+    assert!(
+        output.contains("__extends") || output.contains("prototype"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+
+    // Static accessor should be present
+    assert!(
+        output.contains("level"),
+        "Expected level accessor: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_static_and_instance_accessors() {
+    // Test mixed static and instance accessors
+    let source = r#"
+class Registry {
+    private static _instanceCount: number = 0;
+    private _id: number;
+    private _name: string;
+
+    static get instanceCount(): number {
+        return Registry._instanceCount;
+    }
+
+    get id(): number {
+        return this._id;
+    }
+
+    get name(): string {
+        return this._name;
+    }
+
+    set name(value: string) {
+        this._name = value;
+    }
+
+    constructor(name: string) {
+        this._id = ++Registry._instanceCount;
+        this._name = name;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should transform class
+    assert!(
+        output.contains("function Registry") || output.contains("var Registry"),
+        "Expected Registry class transformation: {}",
+        output
+    );
+
+    // Static accessor should be present
+    assert!(
+        output.contains("instanceCount"),
+        "Expected static instanceCount accessor: {}",
+        output
+    );
+
+    // Instance accessors should be present
+    assert!(
+        output.contains("id") && output.contains("name"),
+        "Expected instance accessors: {}",
+        output
+    );
+
+    // Private fields should be present
+    assert!(
+        output.contains("_id") && output.contains("_name"),
+        "Expected private backing fields: {}",
+        output
+    );
+}
