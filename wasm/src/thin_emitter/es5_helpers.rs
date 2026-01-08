@@ -517,12 +517,19 @@ impl<'a> ThinPrinter<'a> {
         let mut async_emitter = crate::transforms::async_es5::AsyncES5Emitter::new(self.arena);
         // Transform emitter handles its own indentation inside __awaiter
         async_emitter.set_indent_level(self.writer.indent_level() + 1);
+        if let Some(text) = self.source_text_for_map() {
+            if self.writer.has_source_map() {
+                async_emitter.set_source_map_context(text, self.writer.current_source_index());
+            }
+        }
+        async_emitter.set_lexical_this(this_expr != "this");
 
         let generator_body = if async_emitter.body_contains_await(body) {
             async_emitter.emit_generator_body_with_await(body)
         } else {
             async_emitter.emit_simple_generator_body(body)
         };
+        let generator_mappings = async_emitter.take_mappings();
 
         // Write with surrounding __awaiter wrapper
         self.write("return __awaiter(");
@@ -530,7 +537,16 @@ impl<'a> ThinPrinter<'a> {
         self.write(", void 0, void 0, function () {");
         self.write_line();
         self.increase_indent();
-        self.write(&generator_body);
+        if !generator_mappings.is_empty() && self.writer.has_source_map() {
+            self.writer.write("");
+            let base_line = self.writer.current_line();
+            let base_column = self.writer.current_column();
+            self.writer
+                .add_offset_mappings(base_line, base_column, &generator_mappings);
+            self.writer.write(&generator_body);
+        } else {
+            self.write(&generator_body);
+        }
         self.decrease_indent();
         self.write_line();
         self.write("});");
@@ -627,8 +643,12 @@ impl<'a> ThinPrinter<'a> {
 
         let mut es5_emitter = ClassES5Emitter::new(self.arena);
         es5_emitter.set_indent_level(0);
-        if let Some(source_text) = self.source_text {
-            es5_emitter.set_source_text(source_text);
+        if let Some(text) = self.source_text_for_map() {
+            if self.writer.has_source_map() {
+                es5_emitter.set_source_map_context(text, self.writer.current_source_index());
+            } else {
+                es5_emitter.set_source_text(text);
+            }
         }
 
         let (class_name, es5_output) = if !class_data.name.is_none() {
@@ -646,10 +666,21 @@ impl<'a> ThinPrinter<'a> {
             let output = es5_emitter.emit_class_with_name(class_node, &temp_name);
             (temp_name, output)
         };
+        let es5_mappings = es5_emitter.take_mappings();
 
         self.write("(function () {");
         self.write_line();
         self.increase_indent();
+
+        if !es5_mappings.is_empty() && self.writer.has_source_map() {
+            let base_line = self.writer.current_line();
+            let column_offset = self.writer.indent_width();
+            self.writer.add_mappings_with_line_column_offset(
+                base_line,
+                column_offset,
+                &es5_mappings,
+            );
+        }
 
         for line in es5_output.lines() {
             if !line.is_empty() {

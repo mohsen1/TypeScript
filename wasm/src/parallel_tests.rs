@@ -318,6 +318,132 @@ fn test_compile_with_exports() {
 // =========================================================================
 
 #[test]
+fn test_check_redux_lodash_style_generics() {
+    let files = vec![
+        ("types.ts".to_string(), r#"
+type AnyAction = { type: string; payload?: any };
+
+type Reducer<S, A extends AnyAction> = (state: S | undefined, action: A) => S;
+
+type ReducersMapObject<S, A extends AnyAction> = {
+  [K in keyof S]: Reducer<S[K], A>;
+};
+
+type ExtractState<R> = R extends Reducer<infer S, AnyAction> ? S : never;
+type ExtractAction<R> = R extends Reducer<any, infer A> ? A : never;
+
+type StateFromReducers<R> = { [K in keyof R]: ExtractState<R[K]> };
+type ActionFromReducers<R> = { [K in keyof R]: ExtractAction<R[K]> }[keyof R];
+
+type DeepPartial<T> = {
+  [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K];
+};
+
+type Dictionary<T> = { [key: string]: T };
+type ValueOf<T> = T[keyof T];
+type PickValue<T, V> = { [K in keyof T]: T[K] extends V ? T[K] : never };
+type ActionByType<A extends AnyAction, T extends string> = A extends { type: T } ? A : never;
+"#.to_string()),
+        ("reducers.ts".to_string(), r#"
+type CounterAction = { type: "inc" } | { type: "dec" };
+type MessageAction = { type: "set"; payload: string };
+type AppAction = CounterAction | MessageAction;
+
+const counterReducer: Reducer<number, AnyAction> = (state = 0, action) => {
+  if (action.type == "inc") return state + 1;
+  if (action.type == "dec") return state - 1;
+  return state;
+};
+
+const messageReducer: Reducer<string, AnyAction> = (state = "", action) => {
+  if (action.type == "set") return action.payload;
+  return state;
+};
+
+type RootState = {
+  count: number;
+  message: string;
+  tags: Dictionary<number>;
+};
+
+type RootReducers = ReducersMapObject<RootState, AnyAction>;
+
+const rootReducers: RootReducers = {
+  count: counterReducer,
+  message: messageReducer,
+  tags: (state = {}, _action) => state,
+};
+
+const incAction: ActionByType<AppAction, "inc"> = { type: "inc" };
+"#.to_string()),
+        ("store.ts".to_string(), r#"
+interface Store<S, A> {
+  getState: () => S;
+  dispatch: (action: A) => A;
+  replaceState: (next: DeepPartial<S>) => void;
+}
+
+type StateFromReducer<R> = R extends Reducer<infer S, AnyAction> ? S : never;
+type ActionFromReducer<R> = R extends Reducer<any, infer A> ? A : AnyAction;
+
+function combineReducers<R extends ReducersMapObject<any, AnyAction>>(
+  reducers: R
+): Reducer<StateFromReducers<R>, ActionFromReducers<R>> {
+  return (state: StateFromReducers<R> | undefined, action: ActionFromReducers<R>) => {
+    const next = {} as StateFromReducers<R>;
+    return next;
+  };
+}
+
+function createStore<R extends Reducer<any, AnyAction>>(
+  reducer: R
+): Store<StateFromReducer<R>, ActionFromReducer<R>> {
+  return {
+    getState: () => ({} as StateFromReducer<R>),
+    dispatch: (action: ActionFromReducer<R>) => action,
+    replaceState: (_next: DeepPartial<StateFromReducer<R>>) => {},
+  };
+}
+"#.to_string()),
+        ("app.ts".to_string(), r#"
+const rootReducer = combineReducers(rootReducers);
+
+function runApp() {
+  const store = createStore(rootReducer);
+  const state = store.getState();
+  const count: number = state.count;
+  const message: string = state.message;
+  const patch: DeepPartial<RootState> = { message: "ok" };
+
+  store.replaceState(patch);
+
+  const action: ActionFromReducers<typeof rootReducers> = { type: "inc" };
+  store.dispatch(action);
+
+  const sample: ValueOf<PickValue<RootState, number>> = count;
+  return sample + count + state.tags["a"];
+}
+"#.to_string()),
+    ];
+
+    let program = compile_files(files);
+
+    for file in &program.files {
+        assert!(
+            file.parse_diagnostics.is_empty(),
+            "Unexpected parse diagnostics in {}",
+            file.file_name
+        );
+    }
+
+    let (result, stats) = check_functions_with_stats(&program);
+
+    assert_eq!(stats.file_count, 4);
+    assert!(stats.function_count >= 5, "Expected at least 5 functions");
+    assert_eq!(result.diagnostic_count, 0);
+}
+
+#[test]
 fn test_check_single_function() {
     let files = vec![
         ("a.ts".to_string(), "function add(x: number, y: number): number { return x + y; }".to_string()),

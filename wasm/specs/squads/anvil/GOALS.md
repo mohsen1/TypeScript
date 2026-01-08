@@ -5,7 +5,7 @@ Updated: 2026-01-08
 Priority: 2
 
 ## Current Milestone
-Phase 8 - Conformance, Convergence, and Hardening: Output fidelity across the integrated pipeline.
+Phase 8 - Conformance, Convergence, and Hardening: Output fidelity across the integrated pipeline, driven by conformance tests.
 
 ## Project Direction Alignment
 - Strategic shift: integration and correctness across the pipeline; conformance tests drive work.
@@ -27,24 +27,24 @@ Phase 8 - Conformance, Convergence, and Hardening: Output fidelity across the in
 
 2. **Source Map Validation**
    - Context: Source maps must be valid and usable by debuggers
-   - Success Criteria: Generated source maps validate and attach correctly in debuggers
+   - Success Criteria: Generated source maps validate and attach correctly in debuggers, including async ES5 mappings
    - Key Files: `thin_emitter/source_writer.rs`, `thin_emitter/source_map.rs`
    - Estimated Complexity: Medium
 
-3. **End-to-End Compilation**
+3. **End-to-End Conformance Validation**
    - Context: Stop adding AST nodes; compile real code end-to-end
-   - Success Criteria: Compile a non-trivial generic library (e.g., redux/lodash types) without panics and track JS parity deltas in conformance runs
+   - Success Criteria: Compile a non-trivial generic library (e.g., redux/lodash types) without panics, advance conformance pass rate, and track JS parity deltas
    - Key Files: `cli/driver.rs`, `thin_emitter/mod.rs`
    - Estimated Complexity: Medium
 
 ## Anti-Priorities
 - New LSP features (Semantic Tokens, Code Actions)
 - CLI argument parsing or fancy terminal output
-- Performance micro-optimizations
+- Performance micro-optimizations (unless regression)
 - New AST nodes or isolated features outside emitter correctness
 
 ## Cross-Squad Dependencies
-- Forge squad owns type checking; emitter may expose Forge bugs
+- Forge squad owns type checking; emitter may expose Forge bugs; coordinate on shared conformance regressions
 
 ## Notes to EM
 - Re-anchor worker tasks to conformance-driven integration; avoid feature work that does not close emitter fidelity gaps.
@@ -53,9 +53,9 @@ Phase 8 - Conformance, Convergence, and Hardening: Output fidelity across the in
 - Focus on regression tests to guard against breakage
 
 ## Squad Status
-- Last EM Report: Not yet started
+- Last EM Report: Conformance-driven focus confirmed; prioritize ES5 emitter regressions and source-map fidelity.
 - Workers Active: 0/5
 - Branches Pending Merge: None
-- Current Focus: Awaiting EM assignment
+- Current Focus: Conformance-driven emitter regressions and ES5 fidelity
 - Direction: Conformance-first integration; emitter fidelity before feature work
 - Blockers: None

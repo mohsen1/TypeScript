@@ -1,5 +1,9 @@
 # TypeScript → Rust/WASM Migration
 
+> **This file is for WORKERS only.** It is copied to `.role/AGENTS.md` in each worker worktree.
+> If you are an EM (Engineering Manager), read `SQUAD_LEAD_AGENT.md` instead.
+> If you are the Director, read `DIRECTOR_AGENT.md`.
+
 ## Mission
 Migrate TypeScript compiler to Rust/WASM. **Beat TypeScript-Go in performance.**
 
@@ -18,12 +22,14 @@ Your branch is: `worker/$SQUAD_NAME-$WORKER_NUM` (e.g., `worker/forge-1`)
 
 ## Squad Structure
 
-| Squad | Focus Areas |
-|-------|-------------|
+| Squad | Primary Focus |
+|-------|---------------|
 | **Forge** | Type system: `solver/`, `checker/`, `binder/`, `types/` |
 | **Anvil** | Output: `thin_emitter/`, `transforms/`, `cli/`, `lsp/` |
 
 Each squad has 1 EM (Engineering Manager) + 5 Workers.
+
+**Cross-squad work is OK.** Compiler work often requires touching multiple subsystems. If fixing a bug or implementing a feature requires changes outside your squad's primary focus, go ahead and make them. The squad structure is for organizing work, not restricting it.
 
 ## Worker Plans
 
@@ -66,13 +72,12 @@ This ensures:
 
 ## Workflow (loop)
 
-1. **Sync first**: `git fetch origin && git merge origin/rust --no-edit` (resolve conflicts if any)
-2. Read your worker *_plan.md and manager assignment.
-3. Execute the highest-impact assigned task (no self-switching).
-4. Add tests and run `./wasm/test.sh` (Docker only).
-5. Update your plan, commit, and push to your worker branch.
-6. **Signal manager**: After pushing, note in your plan that branch is ready for merge.
-7. Repeat from step 1 (sync again before next task).
+1. **Sync first**: `git fetch origin && git merge origin/rust --no-edit`
+2. Read your plan file.
+3. Write code, add tests, run `./wasm/test.sh`.
+4. Commit and push to your worker branch.
+5. Mark "Ready for Merge: Yes" in your plan.
+6. Repeat.
 
 
 ## ✅ Commit Format
@@ -95,5 +100,13 @@ Commit frequently and atomically
 
 ## 🎯 If Blocked
 
-- Ask the EM for the next assignment and propose high-impact tasks.
-- Add tests, tighten architecture compliance, and polish performance or diagnostics.
+- Dirty worktree? `git stash` and continue.
+- No assignment in plan? Pick the first item from Task Queue.
+- Task Queue empty? Add a test for existing code.
+- Build error? Fix it.
+- Merge conflict? Resolve it.
+- Wrong branch? Switch to the right one.
+
+## 💡 Exploration is OK
+
+This is a complex compiler project. Take time to understand the code before making changes. Reading architecture docs, tracing call paths, and understanding existing patterns is valuable work - not wasted time.
