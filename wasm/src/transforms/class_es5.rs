@@ -3074,18 +3074,32 @@ impl<'a> ClassES5Emitter<'a> {
             }
             k if k == syntax_kind_ext::ARRAY_LITERAL_EXPRESSION => {
                 if let Some(arr) = self.arena.get_literal_expr(expr_node) {
-                    self.write("[");
-                    let mut first = true;
-                    for &elem_idx in &arr.elements.nodes {
-                        if !first { self.write(", "); }
-                        first = false;
-                        self.emit_expression(elem_idx);
+                    // Check if array has spread elements
+                    let has_spread = arr.elements.nodes.iter().any(|&elem_idx| {
+                        self.arena.get(elem_idx).map_or(false, |n| n.kind == syntax_kind_ext::SPREAD_ELEMENT)
+                    });
+
+                    if has_spread {
+                        // ES5: [].concat(part1, part2, ...)
+                        self.emit_array_with_spread_es5(&arr.elements.nodes);
+                    } else {
+                        // No spread, emit normally
+                        self.write("[");
+                        let mut first = true;
+                        for &elem_idx in &arr.elements.nodes {
+                            if !first { self.write(", "); }
+                            first = false;
+                            self.emit_expression(elem_idx);
+                        }
+                        self.write("]");
                     }
-                    self.write("]");
                 }
             }
             k if k == syntax_kind_ext::SPREAD_ELEMENT => {
+                // This case is for spread in function arguments, not arrays
+                // For arrays, we handle it in emit_array_with_spread_es5
                 if let Some(spread) = self.arena.unary_exprs_ex.get(expr_node.data_index as usize) {
+                    // In ES5 context for call arguments, use apply pattern
                     self.write("...");
                     self.emit_expression(spread.expression);
                 }
@@ -3310,6 +3324,60 @@ impl<'a> ClassES5Emitter<'a> {
             self.emit_string_literal_text(part);
         }
         self.write("]");
+    }
+
+    /// Emit array with spread elements as ES5: [].concat(part1, part2, ...)
+    fn emit_array_with_spread_es5(&mut self, elements: &[NodeIndex]) {
+        // Group consecutive non-spread elements into arrays
+        // [...a, 1, 2, ...b, 3] => [].concat(a, [1, 2], b, [3])
+        self.write("[].concat(");
+
+        let mut first_part = true;
+        let mut current_group: Vec<NodeIndex> = Vec::new();
+
+        for &elem_idx in elements {
+            let is_spread = self.arena.get(elem_idx).map_or(false, |n| n.kind == syntax_kind_ext::SPREAD_ELEMENT);
+
+            if is_spread {
+                // Flush current group first
+                if !current_group.is_empty() {
+                    if !first_part { self.write(", "); }
+                    first_part = false;
+                    self.write("[");
+                    for (i, &idx) in current_group.iter().enumerate() {
+                        if i > 0 { self.write(", "); }
+                        self.emit_expression(idx);
+                    }
+                    self.write("]");
+                    current_group.clear();
+                }
+
+                // Emit spread expression (without the ...)
+                if !first_part { self.write(", "); }
+                first_part = false;
+                if let Some(spread_node) = self.arena.get(elem_idx) {
+                    if let Some(spread) = self.arena.unary_exprs_ex.get(spread_node.data_index as usize) {
+                        self.emit_expression(spread.expression);
+                    }
+                }
+            } else {
+                // Add to current group
+                current_group.push(elem_idx);
+            }
+        }
+
+        // Flush remaining group
+        if !current_group.is_empty() {
+            if !first_part { self.write(", "); }
+            self.write("[");
+            for (i, &idx) in current_group.iter().enumerate() {
+                if i > 0 { self.write(", "); }
+                self.emit_expression(idx);
+            }
+            self.write("]");
+        }
+
+        self.write(")");
     }
 
     fn collect_template_parts(&self, template_idx: NodeIndex) -> Option<TemplateParts> {

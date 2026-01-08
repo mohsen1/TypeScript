@@ -771,3 +771,47 @@ class Foo {
         output
     );
 }
+
+#[test]
+fn test_class_es5_spread_element_in_array_literal() {
+    let source = r#"
+class Foo {
+    items = [1, 2, 3];
+
+    getAll() {
+        const extra = [4, 5];
+        return [...this.items, ...extra, 6];
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Should NOT contain spread syntax (ES5 doesn't support it)
+    assert!(
+        !output.contains("...this.items") && !output.contains("...extra"),
+        "Expected spread to be transformed, not raw spread syntax: {}",
+        output
+    );
+
+    // Should use __spreadArray or concat for ES5 spread
+    assert!(
+        output.contains("__spreadArray") || output.contains(".concat(") || output.contains("slice.call"),
+        "Expected ES5 spread transformation using __spreadArray or concat: {}",
+        output
+    );
+}
