@@ -361,13 +361,15 @@ impl<'a> ClassES5Emitter<'a> {
                     );
                 } else {
                     // Non-derived class: check if we need _this capture for arrow functions
-                    let needs_capture = self.needs_this_capture(&instance_props);
+                    // Check both field initializers AND constructor body for arrows with `this`
+                    let needs_capture = self.needs_this_capture(&instance_props)
+                        || self.body_contains_arrow_with_this(ctor_data.body);
                     if needs_capture {
                         self.write_indent();
                         self.write("var _this = this;");
                         self.write_line();
                         self.this_capture_available = true;
-                        // Note: use_this_capture is set per-arrow-function, not globally
+                        self.use_this_capture = true;
                     }
 
                     self.emit_param_destructuring_prologue(&param_transforms);
@@ -379,6 +381,11 @@ impl<'a> ClassES5Emitter<'a> {
                     self.emit_instance_property_initializers(&instance_props);
                     self.emit_parameter_properties(&ctor_data.parameters);
                     self.emit_block_contents(ctor_data.body);
+
+                    // Reset use_this_capture after constructor body
+                    if needs_capture {
+                        self.use_this_capture = false;
+                    }
                 }
 
                 self.decrease_indent();
@@ -520,15 +527,113 @@ impl<'a> ClassES5Emitter<'a> {
         false
     }
 
+    /// Check if a block body contains arrow functions that reference `this`
+    fn body_contains_arrow_with_this(&self, body_idx: NodeIndex) -> bool {
+        self.node_contains_arrow_with_this(body_idx)
+    }
+
+    /// Recursively check if a node contains an arrow function that references `this`
+    fn node_contains_arrow_with_this(&self, node_idx: NodeIndex) -> bool {
+        let Some(node) = self.arena.get(node_idx) else { return false };
+
+        // If this is an arrow function, check if it references `this`
+        if node.kind == syntax_kind_ext::ARROW_FUNCTION {
+            return contains_this_reference(self.arena, node_idx);
+        }
+
+        // Don't recurse into regular functions (they have their own `this`)
+        if node.kind == syntax_kind_ext::FUNCTION_EXPRESSION
+            || node.kind == syntax_kind_ext::FUNCTION_DECLARATION
+        {
+            return false;
+        }
+
+        // Check children based on node type
+        match node.kind {
+            k if k == syntax_kind_ext::BLOCK || k == syntax_kind_ext::CLASS_STATIC_BLOCK_DECLARATION => {
+                if let Some(block) = self.arena.get_block(node) {
+                    for &stmt_idx in &block.statements.nodes {
+                        if self.node_contains_arrow_with_this(stmt_idx) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::EXPRESSION_STATEMENT => {
+                if let Some(expr_stmt) = self.arena.get_expression_statement(node) {
+                    if self.node_contains_arrow_with_this(expr_stmt.expression) {
+                        return true;
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::VARIABLE_STATEMENT => {
+                if let Some(var_data) = self.arena.get_variable(node) {
+                    for &decl_idx in &var_data.declarations.nodes {
+                        if let Some(decl_node) = self.arena.get(decl_idx) {
+                            if let Some(decl) = self.arena.get_variable_declaration(decl_node) {
+                                if self.node_contains_arrow_with_this(decl.initializer) {
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::BINARY_EXPRESSION => {
+                if let Some(bin) = self.arena.get_binary_expr(node) {
+                    if self.node_contains_arrow_with_this(bin.left) {
+                        return true;
+                    }
+                    if self.node_contains_arrow_with_this(bin.right) {
+                        return true;
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::CALL_EXPRESSION || k == syntax_kind_ext::NEW_EXPRESSION => {
+                if let Some(call) = self.arena.get_call_expr(node) {
+                    if self.node_contains_arrow_with_this(call.expression) {
+                        return true;
+                    }
+                    if let Some(ref args) = call.arguments {
+                        for &arg_idx in &args.nodes {
+                            if self.node_contains_arrow_with_this(arg_idx) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION
+                || k == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION =>
+            {
+                if let Some(access) = self.arena.get_access_expr(node) {
+                    if self.node_contains_arrow_with_this(access.expression) {
+                        return true;
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::PARENTHESIZED_EXPRESSION => {
+                if let Some(paren) = self.arena.get_parenthesized(node) {
+                    if self.node_contains_arrow_with_this(paren.expression) {
+                        return true;
+                    }
+                }
+            }
+            _ => {}
+        }
+        false
+    }
+
     /// Emit instance property initializers as this.prop = value; or this[key] = value;
     fn emit_instance_property_initializers(&mut self, props: &[NodeIndex]) {
+        let receiver = if self.use_this_capture { "_this" } else { "this" };
         for &prop_idx in props {
             let Some(prop_node) = self.arena.get(prop_idx) else { continue };
             let Some(prop_data) = self.arena.get_property_decl(prop_node) else { continue };
 
             self.write_indent();
             self.record_mapping_for_node(prop_node);
-            self.emit_property_receiver_and_name("this", prop_data.name);
+            self.emit_property_receiver_and_name(receiver, prop_data.name);
             self.write(" = ");
             self.emit_expression(prop_data.initializer);
             self.write(";");

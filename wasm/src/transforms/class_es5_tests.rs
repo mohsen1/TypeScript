@@ -652,3 +652,64 @@ class Derived extends Base {
         output
     );
 }
+
+#[test]
+fn test_class_es5_nested_async_arrow_in_constructor_with_field() {
+    let source = r#"
+class Foo {
+    field = 1;
+    constructor() {
+        this.handler = async () => {
+            const inner = async () => {
+                return this.field;
+            };
+            return await inner();
+        };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Field initializer should use _this
+    assert!(
+        output.contains("_this.field = 1"),
+        "Expected field initializer to use _this: {}",
+        output
+    );
+
+    // Async arrow in constructor should use __awaiter
+    assert!(
+        output.contains("__awaiter"),
+        "Expected async arrow to use __awaiter: {}",
+        output
+    );
+
+    // Nested async arrow should capture _this.field
+    assert!(
+        output.contains("_this.field") && output.matches("_this.field").count() >= 2,
+        "Expected nested async arrow to capture _this.field: {}",
+        output
+    );
+
+    // Handler assignment should use _this
+    assert!(
+        output.contains("_this.handler"),
+        "Expected handler assignment to use _this: {}",
+        output
+    );
+}
