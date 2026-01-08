@@ -12009,7 +12009,7 @@ fn test_application_ref_expansion_box_string() {
         constraint: None,
         default: None,
     };
-    let t_type = interner.intern(TypeKey::TypeParameter(t_param));
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
 
     // Define: type Box<T> = { value: T }
     let value_name = interner.intern_string("value");
@@ -12028,11 +12028,9 @@ fn test_application_ref_expansion_box_string() {
     // Create Application: Box<string> = Application(Ref(1), [string])
     let box_string = interner.application(box_ref, vec![TypeId::STRING]);
 
-    // Set up a resolver that maps Ref(1) -> box_body
-    // Note: This is a simplified resolver that just returns the body.
-    // The real fix needs to also track type parameters for substitution.
+    // Set up resolver with both body type and type parameters
     let mut env = TypeEnvironment::new();
-    env.insert(SymbolRef(1), box_body);
+    env.insert_with_params(SymbolRef(1), box_body, vec![t_param]);
 
     // Evaluate the Application type
     let evaluator = TypeEvaluator::with_resolver(&interner, &env);
@@ -12048,14 +12046,10 @@ fn test_application_ref_expansion_box_string() {
         is_method: false,
     }]);
 
-    // TODO: When Application expansion is implemented (Worker 2/3 fix),
-    // change this assertion to: assert_eq!(result, expected);
-    // Currently, Application types pass through unchanged.
+    // With Application expansion implemented, Box<string> should expand to { value: string }
     assert_eq!(
-        result, box_string,
-        "Current behavior: Application passes through unchanged. \
-         After fix, should equal expected: {:?}",
-        expected
+        result, expected,
+        "Box<string> should expand to {{ value: string }}"
     );
 }
 
@@ -12733,7 +12727,7 @@ fn test_application_ref_expansion_recursive() {
         constraint: None,
         default: None,
     };
-    let t_type = interner.intern(TypeKey::TypeParameter(t_param));
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
 
     // Create Ref(1) for List type alias (self-reference)
     let list_ref = interner.reference(SymbolRef(1));
@@ -12769,21 +12763,39 @@ fn test_application_ref_expansion_recursive() {
     // Create Application: List<string>
     let list_string = interner.application(list_ref, vec![TypeId::STRING]);
 
-    // Set up resolver
+    // Set up resolver with type parameters
     let mut env = TypeEnvironment::new();
-    env.insert(SymbolRef(1), list_body);
+    env.insert_with_params(SymbolRef(1), list_body, vec![t_param]);
 
     let evaluator = TypeEvaluator::with_resolver(&interner, &env);
     let result = evaluator.evaluate(list_string);
 
-    // TODO: When Application expansion is implemented,
-    // recursive types should be handled with proper termination.
     // Expected: { value: string, next: List<string> | null }
-    // (The inner List<string> may remain as Application to prevent infinite expansion)
+    // The inner List<string> remains as Application to prevent infinite expansion
+    let list_string_inner = interner.application(list_ref, vec![TypeId::STRING]);
+    let next_type_expected = interner.union(vec![list_string_inner, TypeId::NULL]);
+    let expected = interner.object(vec![
+        PropertyInfo {
+            name: value_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: next_name,
+            type_id: next_type_expected,
+            write_type: next_type_expected,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
     assert_eq!(
-        result, list_string,
-        "Current behavior: Application passes through unchanged. \
-         After fix, List<string> should expand with proper recursion handling."
+        result, expected,
+        "List<string> should expand to {{ value: string, next: List<string> | null }}"
     );
 }
 
@@ -12804,7 +12816,7 @@ fn test_application_ref_expansion_with_intersection_arg() {
         constraint: None,
         default: None,
     };
-    let t_type = interner.intern(TypeKey::TypeParameter(t_param));
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
 
     // Define: type Box<T> = { value: T }
     let value_name = interner.intern_string("value");
@@ -12835,9 +12847,9 @@ fn test_application_ref_expansion_with_intersection_arg() {
     // Create Application: Box<string & { length: number }>
     let box_intersection = interner.application(box_ref, vec![string_with_length]);
 
-    // Set up resolver
+    // Set up resolver with type parameters
     let mut env = TypeEnvironment::new();
-    env.insert(SymbolRef(1), box_body);
+    env.insert_with_params(SymbolRef(1), box_body, vec![t_param]);
 
     let evaluator = TypeEvaluator::with_resolver(&interner, &env);
     let result = evaluator.evaluate(box_intersection);
@@ -12852,15 +12864,10 @@ fn test_application_ref_expansion_with_intersection_arg() {
         is_method: false,
     }]);
 
-    // TODO: When Application expansion is implemented,
-    // update assertion to: assert_eq!(result, expected);
     assert_eq!(
-        result, box_intersection,
-        "Current behavior: Application passes through unchanged. \
-         After fix, Box<string & {{ length: number }}> should be {{ value: string & {{ length: number }} }}"
+        result, expected,
+        "Box<string & {{ length: number }}> should expand to {{ value: string & {{ length: number }} }}"
     );
-
-    let _ = expected;
 }
 
 /// Test multi-parameter Application (Map<K, V> style).
@@ -12880,7 +12887,7 @@ fn test_application_ref_expansion_multi_param() {
         constraint: None,
         default: None,
     };
-    let k_type = interner.intern(TypeKey::TypeParameter(k_param));
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
 
     // Define type parameter V
     let v_name = interner.intern_string("V");
@@ -12889,7 +12896,7 @@ fn test_application_ref_expansion_multi_param() {
         constraint: None,
         default: None,
     };
-    let v_type = interner.intern(TypeKey::TypeParameter(v_param));
+    let v_type = interner.intern(TypeKey::TypeParameter(v_param.clone()));
 
     // Define: type Map<K, V> = { key: K, value: V }
     let key_name = interner.intern_string("key");
@@ -12919,9 +12926,9 @@ fn test_application_ref_expansion_multi_param() {
     // Create Application: Map<string, number>
     let map_string_number = interner.application(map_ref, vec![TypeId::STRING, TypeId::NUMBER]);
 
-    // Set up resolver
+    // Set up resolver with type parameters (K, V in order)
     let mut env = TypeEnvironment::new();
-    env.insert(SymbolRef(1), map_body);
+    env.insert_with_params(SymbolRef(1), map_body, vec![k_param, v_param]);
 
     let evaluator = TypeEvaluator::with_resolver(&interner, &env);
     let result = evaluator.evaluate(map_string_number);
@@ -12946,15 +12953,10 @@ fn test_application_ref_expansion_multi_param() {
         },
     ]);
 
-    // TODO: When Application expansion is implemented,
-    // update assertion to: assert_eq!(result, expected);
     assert_eq!(
-        result, map_string_number,
-        "Current behavior: Application passes through unchanged. \
-         After fix, Map<string, number> should be {{ key: string, value: number }}"
+        result, expected,
+        "Map<string, number> should expand to {{ key: string, value: number }}"
     );
-
-    let _ = expected;
 }
 
 /// Test Application with conditional type body.
@@ -12976,19 +12978,18 @@ fn test_application_ref_expansion_with_conditional_body() {
         constraint: None,
         default: None,
     };
-    let t_type = interner.intern(TypeKey::TypeParameter(t_param));
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
 
     // For simplicity, we'll use a basic conditional that we can verify:
-    // type IsString<T> = T extends string ? true : false
-    // (Represented as a conditional type in the body)
+    // type IsString<T> = T extends string ? string : number
 
     // Create the conditional type body:
-    // T extends string ? true : false
+    // T extends string ? string : number
     let conditional_body = interner.conditional(ConditionalType {
         check_type: t_type,
         extends_type: TypeId::STRING,
-        true_type: TypeId::TRUE,
-        false_type: TypeId::FALSE,
+        true_type: TypeId::STRING,  // true branch returns string
+        false_type: TypeId::NUMBER, // false branch returns number
         is_distributive: false,
     });
 
@@ -13001,27 +13002,24 @@ fn test_application_ref_expansion_with_conditional_body() {
     // Create Application: IsString<number>
     let is_string_number = interner.application(is_string_ref, vec![TypeId::NUMBER]);
 
-    // Set up resolver
+    // Set up resolver with type parameters
     let mut env = TypeEnvironment::new();
-    env.insert(SymbolRef(1), conditional_body);
+    env.insert_with_params(SymbolRef(1), conditional_body, vec![t_param]);
 
     let evaluator = TypeEvaluator::with_resolver(&interner, &env);
 
     let result_string = evaluator.evaluate(is_string_string);
     let result_number = evaluator.evaluate(is_string_number);
 
-    // TODO: When Application expansion is implemented,
-    // IsString<string> should evaluate to true (TypeId::TRUE)
-    // IsString<number> should evaluate to false (TypeId::FALSE)
+    // IsString<string> should evaluate to string (true branch: string extends string)
+    // IsString<number> should evaluate to number (false branch: number doesn't extend string)
     assert_eq!(
-        result_string, is_string_string,
-        "Current behavior: Application passes through unchanged. \
-         After fix, IsString<string> should evaluate to true."
+        result_string, TypeId::STRING,
+        "IsString<string> should evaluate to string (true branch)"
     );
     assert_eq!(
-        result_number, is_string_number,
-        "Current behavior: Application passes through unchanged. \
-         After fix, IsString<number> should evaluate to false."
+        result_number, TypeId::NUMBER,
+        "IsString<number> should evaluate to number (false branch)"
     );
 }
 
@@ -13042,7 +13040,7 @@ fn test_application_ref_expansion_with_tuple_arg() {
         constraint: None,
         default: None,
     };
-    let t_type = interner.intern(TypeKey::TypeParameter(t_param));
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
 
     // Define: type Box<T> = { value: T }
     let value_name = interner.intern_string("value");
@@ -13067,9 +13065,9 @@ fn test_application_ref_expansion_with_tuple_arg() {
     // Create Application: Box<[string, number]>
     let box_tuple = interner.application(box_ref, vec![tuple_type]);
 
-    // Set up resolver
+    // Set up resolver with type parameters
     let mut env = TypeEnvironment::new();
-    env.insert(SymbolRef(1), box_body);
+    env.insert_with_params(SymbolRef(1), box_body, vec![t_param]);
 
     let evaluator = TypeEvaluator::with_resolver(&interner, &env);
     let result = evaluator.evaluate(box_tuple);
@@ -13084,13 +13082,8 @@ fn test_application_ref_expansion_with_tuple_arg() {
         is_method: false,
     }]);
 
-    // TODO: When Application expansion is implemented,
-    // update assertion to: assert_eq!(result, expected);
     assert_eq!(
-        result, box_tuple,
-        "Current behavior: Application passes through unchanged. \
-         After fix, Box<[string, number]> should be {{ value: [string, number] }}"
+        result, expected,
+        "Box<[string, number]> should expand to {{ value: [string, number] }}"
     );
-
-    let _ = expected;
 }

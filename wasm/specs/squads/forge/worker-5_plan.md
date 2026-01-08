@@ -22,6 +22,8 @@ Priority: 5
 - [x] **Application Type Expansion Analysis for Worker 2**: Investigated Ref(5)/Ref(6) not expanding in redux test. Root cause: `TypeEvaluator::evaluate()` in `evaluate.rs:210-241` doesn't handle `TypeKey::Application` - Application types pass through unchanged. Added detailed doc comment with fix approach.
 - [x] Added 3 Application type expansion tests in `evaluate_tests.rs` for Worker 2/3 fix validation: `test_application_ref_expansion_box_string`, `test_application_ref_expansion_reducer_function`, `test_application_ref_expansion_nested`. Tests document current behavior with TODO comments for expected behavior after fix.
 - [x] Added 7 Application expansion edge case tests: with defaults, with constraints, with never/unknown/any args, with union args, and non-Ref base passthrough.
+- [x] Added 5 more Application expansion edge case tests: recursive type alias, intersection arg, multi-parameter (Map<K,V>), conditional type body, tuple arg.
+- [x] Updated all new edge case tests to use `insert_with_params` for proper Application expansion testing now that Worker 2/3's fix is merged.
 
 ### Circular Reference Root Cause (for Worker 1)
 
