@@ -18,6 +18,7 @@ Priority: 5
 - [x] Added `this`-parameter inference tests in `wasm/src/solver/infer_tests.rs` (tests not run).
 - [x] Added non-distributive union array inference for conditional types (tests not run).
 - [x] Added non-distributive tuple wrapper array inference for conditional types (tests not run).
+- [x] Made optional property inference include missing/undefined cases (tests not run).
 
 ## Ready for Merge
 Yes

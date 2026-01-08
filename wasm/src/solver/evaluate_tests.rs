@@ -3697,7 +3697,6 @@ fn test_conditional_infer_optional_property_missing_object() {
     }));
 
     // T extends { a?: infer R } ? R : never, with T = {}.
-    // TODO: Optional property inference currently treats missing properties as non-matches.
     let extends_obj = interner.object(vec![PropertyInfo {
         name: interner.intern_string("a"),
         type_id: infer_r,
@@ -3722,7 +3721,7 @@ fn test_conditional_infer_optional_property_missing_object() {
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::NEVER);
+    assert_eq!(result, TypeId::UNDEFINED);
 }
 
 #[test]
@@ -3744,7 +3743,6 @@ fn test_conditional_infer_optional_property_present_distributive() {
     }));
 
     // T extends { a?: infer R } ? R : never, with T = { a?: string } | { a?: number }.
-    // TODO: Optional property inference currently omits undefined.
     let extends_obj = interner.object(vec![PropertyInfo {
         name: interner.intern_string("a"),
         type_id: infer_r,
@@ -3783,7 +3781,7 @@ fn test_conditional_infer_optional_property_present_distributive() {
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
-    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::UNDEFINED]);
 
     assert_eq!(result, expected);
 }

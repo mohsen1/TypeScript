@@ -522,7 +522,14 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                             .properties
                             .iter()
                             .find(|prop| prop.name == prop_name)
-                            .map(|prop| prop.type_id)
+                            .map(|prop| {
+                                if prop_optional {
+                                    self.optional_property_type(prop)
+                                } else {
+                                    prop.type_id
+                                }
+                            })
+                            .or_else(|| prop_optional.then_some(TypeId::UNDEFINED))
                     }
                     Some(TypeKey::Union(members)) if prop_optional => {
                         let members = self.interner.type_list(members);
@@ -534,7 +541,9 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                                     if let Some(prop) =
                                         shape.properties.iter().find(|prop| prop.name == prop_name)
                                     {
-                                        inferred_members.push(prop.type_id);
+                                        inferred_members.push(self.optional_property_type(prop));
+                                    } else {
+                                        inferred_members.push(TypeId::UNDEFINED);
                                     }
                                 }
                                 _ => return self.evaluate(cond.false_type),
