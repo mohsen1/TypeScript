@@ -4031,7 +4031,6 @@ fn test_conditional_infer_function_param_distributive() {
 
     // T extends (arg: infer R) => void ? R : never, with T = ((arg: string) => void)
     // | ((arg: number) => void).
-    // TODO: Function parameter inference is not implemented; current behavior yields never.
     let extends_fn = interner.function(FunctionShape {
         params: vec![ParamInfo {
             name: None,
@@ -4086,7 +4085,8 @@ fn test_conditional_infer_function_param_distributive() {
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::NEVER);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -4109,7 +4109,6 @@ fn test_conditional_infer_function_optional_param_distributive() {
 
     // T extends (arg?: infer R) => void ? R : never, with T = ((arg?: string) => void)
     // | ((arg?: number) => void).
-    // TODO: Function optional-parameter inference is not implemented; current behavior yields never.
     let extends_fn = interner.function(FunctionShape {
         params: vec![ParamInfo {
             name: None,
@@ -4164,7 +4163,8 @@ fn test_conditional_infer_function_optional_param_distributive() {
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::NEVER);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::UNDEFINED]);
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -4186,7 +4186,6 @@ fn test_conditional_infer_function_param_non_function_union_branch() {
     }));
 
     // T extends (arg: infer R) => void ? R : never, with T = ((arg: string) => void) | number.
-    // TODO: Function parameter inference is not implemented; current behavior yields never.
     let extends_fn = interner.function(FunctionShape {
         params: vec![ParamInfo {
             name: None,
@@ -4228,7 +4227,7 @@ fn test_conditional_infer_function_param_non_function_union_branch() {
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::NEVER);
+    assert_eq!(result, TypeId::STRING);
 }
 
 #[test]
@@ -4251,7 +4250,6 @@ fn test_conditional_infer_function_param_non_distributive_union_input() {
 
     // [T] extends [(arg: infer R) => void] ? R : never, with T = ((arg: string) => void)
     // | ((arg: number) => void).
-    // TODO: Non-distributive function parameter inference is not implemented; current behavior yields never.
     let extends_fn = interner.function(FunctionShape {
         params: vec![ParamInfo {
             name: None,
@@ -4316,7 +4314,8 @@ fn test_conditional_infer_function_param_non_distributive_union_input() {
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::NEVER);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -4339,7 +4338,6 @@ fn test_conditional_infer_function_rest_param_distributive() {
 
     // T extends (...args: infer R) => void ? R : never, with T = ((...args: string[]) => void)
     // | ((...args: number[]) => void).
-    // TODO: Function rest parameter inference is not implemented; current behavior yields never.
     let extends_fn = interner.function(FunctionShape {
         params: vec![ParamInfo {
             name: None,
@@ -4394,7 +4392,11 @@ fn test_conditional_infer_function_rest_param_distributive() {
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::NEVER);
+    let expected = interner.union(vec![
+        interner.array(TypeId::STRING),
+        interner.array(TypeId::NUMBER),
+    ]);
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -4687,7 +4689,6 @@ fn test_conditional_infer_object_call_signature_distributive() {
 
     // T extends { (x: infer R): void } ? R : never, with T = { (x: string): void }
     // | { (x: number): void }.
-    // TODO: Callable parameter inference is not implemented; current behavior yields never.
     let extends_callable = interner.callable(CallableShape {
         call_signatures: vec![CallSignature {
             params: vec![ParamInfo {
@@ -4751,7 +4752,8 @@ fn test_conditional_infer_object_call_signature_distributive() {
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::NEVER);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert_eq!(result, expected);
 }
 
 #[test]
