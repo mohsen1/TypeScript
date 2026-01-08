@@ -7,7 +7,7 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [ ] Investigate `DeepPartial<T>` and `PickValue<T, V>` mapped type patterns from `test_check_redux_lodash_style_generics`. Test these patterns in isolation in `wasm/src/solver/evaluate_tests.rs` to identify if they contribute to the 6 diagnostics.
+- [x] Investigate `DeepPartial<T>` and `PickValue<T, V>` mapped type patterns from `test_check_redux_lodash_style_generics`. Test these patterns in isolation in `wasm/src/solver/evaluate_tests.rs` to identify if they contribute to the 6 diagnostics. **Result:** The 6 diagnostics issue is now fixed (test passes with 0 diagnostics). Added solver tests for both patterns.
 
 ## Task Queue
 - [ ] Add additional end-to-end tests for other lodash-style utility types (Omit, Pick, Required, Readonly).
@@ -47,6 +47,8 @@ Priority: 4
 - [x] Added checker coverage for typeof namespace alias member type queries. Tests: `./wasm/test.sh`.
 - [x] Added checker coverage for class/namespace merged element access. Tests: `./wasm/test.sh`.
 - [x] Added solver coverage for mapped type with conditional value filter (PickValue pattern). Tests: `./wasm/test.sh`.
+- [x] Investigated DeepPartial/PickValue patterns - 6 diagnostics issue is now fixed. Tests: `./wasm/test.sh`.
+- [x] Added solver coverage for mapped type with optional modifier and conditional (DeepPartial pattern). Tests: `./wasm/test.sh`.
 
 ## Ready for Merge
 Yes
