@@ -2344,6 +2344,48 @@ fn test_mapped_type_over_string_keys_assignable() {
 }
 
 #[test]
+fn test_mapped_type_over_boolean_keys_assignable() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let constraint = interner.intern(TypeKey::KeyOf(TypeId::BOOLEAN));
+    let mapped = interner.mapped(MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint,
+        name_type: None,
+        template: TypeId::NUMBER,
+        readonly_modifier: None,
+        optional_modifier: None,
+    });
+
+    let to_string = interner.intern_string("toString");
+    let expected = interner.object(vec![PropertyInfo {
+        name: to_string,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let mismatch = interner.object(vec![PropertyInfo {
+        name: to_string,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(checker.is_assignable(mapped, expected));
+    assert!(!checker.is_assignable(mapped, mismatch));
+    assert!(!checker.is_assignable(expected, mapped));
+}
+
+#[test]
 fn test_mapped_type_key_remap_filters_keys() {
     let interner = TypeInterner::new();
     let mut checker = CompatChecker::new(&interner);
@@ -2587,4 +2629,18 @@ fn test_intersection_reduction_disjoint_primitives() {
     let intersection = interner.intersection(vec![TypeId::STRING, TypeId::NUMBER]);
 
     assert_eq!(intersection, TypeId::NEVER);
+}
+
+#[test]
+fn test_unique_symbol_nominal_assignability() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let sym_a = interner.intern(TypeKey::UniqueSymbol(SymbolRef(1)));
+    let sym_b = interner.intern(TypeKey::UniqueSymbol(SymbolRef(2)));
+
+    assert!(checker.is_assignable(sym_a, TypeId::SYMBOL));
+    assert!(!checker.is_assignable(TypeId::SYMBOL, sym_a));
+    assert!(checker.is_assignable(sym_a, sym_a));
+    assert!(!checker.is_assignable(sym_a, sym_b));
 }
