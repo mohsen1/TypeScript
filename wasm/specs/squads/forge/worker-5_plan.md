@@ -56,6 +56,8 @@ Added 5 tests in `evaluate_tests.rs`:
 - `test_indexed_access_with_single_key` - single key indexed access baseline
 
 ## Completed
+- [x] Added StateFromReducers mapped type test coverage (6 tests) for mapped type + conditional infer patterns; `./wasm/test.sh` (fails: `test_check_redux_lodash_style_generics` pre-existing).
+- [x] Added ActionFromReducers indexed access test coverage (5 tests) for mapped type + keyof indexed access patterns; `./wasm/test.sh` (fails: `test_check_redux_lodash_style_generics` pre-existing).
 - [x] Added never-input readonly array infer regression; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
 - [x] Added never-input multi-template infer regression; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
 - [x] Added never-input tuple infer regression; ran `./wasm/test.sh` (fails: missing `set_use_this_capture` in `async_es5`).
