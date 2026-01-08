@@ -13,6 +13,7 @@ Priority: 2
 - [ ] [EM: Add queued tasks]
 
 ## Completed
+- [x] Added coverage for `__importDefault` helper emission in `helpers_tests.rs`; `./wasm/test.sh test_emit_import_default_helper` passed.
 - [x] Added CommonJS coverage ensuring export assignment suppresses `__esModule` in `thin_emitter_tests.rs`; `./wasm/test.sh test_commonjs_export_assignment_skips_esmodule_marker` passed.
 - [x] Added helper-ordering coverage for `__awaiter` before `__generator` in `helpers_tests.rs`; `./wasm/test.sh test_emit_awaiter_before_generator_helpers` passed.
 - [x] Added CommonJS coverage to ensure type-only namespace imports are erased in `thin_emitter_tests.rs`; `./wasm/test.sh test_commonjs_type_only_namespace_import_is_erased` passed.
