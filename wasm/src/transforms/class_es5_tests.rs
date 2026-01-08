@@ -1324,3 +1324,105 @@ class Counter {
         output
     );
 }
+
+#[test]
+fn test_class_es5_arrow_function_this_binding() {
+    let source = r#"
+class Handler {
+    name = "handler";
+
+    getCallback() {
+        return () => {
+            return this.name;
+        };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Should NOT contain arrow function syntax (ES5 doesn't support it)
+    assert!(
+        !output.contains("=>"),
+        "Expected arrow function to be transformed, not raw => syntax: {}",
+        output
+    );
+
+    // Should capture this for arrow function (var _this = this or similar)
+    assert!(
+        output.contains("_this") || output.contains("self") || output.contains("that"),
+        "Expected this capture for arrow function (_this, self, or that): {}",
+        output
+    );
+
+    // Should use function keyword instead of arrow
+    assert!(
+        output.contains("function"),
+        "Expected arrow to be converted to function keyword: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_static_method() {
+    let source = r#"
+class MathUtils {
+    static add(a: number, b: number) {
+        return a + b;
+    }
+
+    static PI = 3.14159;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Static method should be on constructor, not prototype
+    assert!(
+        output.contains("MathUtils.add") || output.contains(".add ="),
+        "Expected static method on constructor function: {}",
+        output
+    );
+
+    // Static property should be on constructor
+    assert!(
+        output.contains("MathUtils.PI") || output.contains(".PI ="),
+        "Expected static property on constructor function: {}",
+        output
+    );
+
+    // Should contain the PI value
+    assert!(
+        output.contains("3.14159"),
+        "Expected PI value 3.14159 in output: {}",
+        output
+    );
+}

@@ -74,6 +74,8 @@ Priority: 3
 - [x] Added arrow function compilation E2E tests (basic, rest params, default params, class properties); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 - [x] Added spread operator compilation E2E tests (array spread, object spread, function call spread); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 - [x] Added template literal compilation E2E tests (basic, with variable, nested); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
+- [x] Added destructuring assignment compilation E2E tests (object, array, defaults); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
+- [x] Added optional chaining and nullish coalescing E2E tests (property access, method calls, defaults); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 
 ## Ready for Merge
 Yes
