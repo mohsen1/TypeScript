@@ -7,10 +7,10 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] Add regression coverage for CFA invalidation in closures (TS unsoundness #42) or confirm existing behavior in `wasm/src/checker/control_flow_tests.rs`.
+- [ ] Pick another unsoundness case from `wasm/specs/TS_UNSOUNDNESS_CATALOG.md` and add coverage if missing.
 
 ## Task Queue
-- [ ] If CFA invalidation is already covered, pick another unsoundness case from `wasm/specs/TS_UNSOUNDNESS_CATALOG.md` and add coverage.
+- [ ] Coordinate with manager if unsure which unsoundness case to prioritize next.
 
 ## Completed
 - [x] Structural property/method variance: allow bivariant checks when either side is a method; added mixed method vs function-property test. Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
@@ -22,6 +22,7 @@ Priority: 3
 - [x] Added class-like subtyping regression for `this`-typed parameters (base vs derived). Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
 - [x] Added mixed method/function-property variance tests for `this` parameters. Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
 - [x] Added void-return exception coverage for method properties. Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
+- [x] Reset flow at function boundaries to avoid narrowing in closures; added CFA invalidation test. Tests: `./wasm/test.sh` (fails: `wasm/src/transforms/async_es5.rs:749` unexpected closing delimiter after sync).
 
 ## Ready for Merge
 No
