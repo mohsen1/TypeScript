@@ -1,5 +1,7 @@
 # TypeScript → Rust/WASM Migration
 
+> **This file is for WORKERS only.** If you are an EM (Engineering Manager), read `SQUAD_LEAD_AGENT.md` instead. If you are the Director, read `DIRECTOR_AGENT.md`.
+
 ## Mission
 Migrate TypeScript compiler to Rust/WASM. **Beat TypeScript-Go in performance.**
 
