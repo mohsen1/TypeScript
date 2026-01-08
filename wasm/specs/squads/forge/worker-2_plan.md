@@ -7,10 +7,9 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [x] Fix compat regression `solver::compat::tests::test_explain_failure_reports_rest_mismatch` in `wasm/src/solver/compat.rs`; adjust diagnostics in `wasm/src/solver/compat_tests.rs` if needed; run `./wasm/test.sh`.
+- [ ] Investigate and fix `test_check_redux_lodash_style_generics` failure (6 diagnostics instead of 0). Run the test with verbose output to see which lines produce diagnostics. Focus on mapped type + conditional infer interactions (`StateFromReducers`, `ActionFromReducers`).
 
 ## Task Queue
-- [x] Reproduce the rest-parameter mismatch failure and confirm expected `SubtypeFailureReason`.
 - [ ] Ensure rest-parameter assignability still matches `tsc` for both `unknown[]` and `number[]` cases.
 
 ## Completed
