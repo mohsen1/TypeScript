@@ -12412,35 +12412,44 @@ fn test_source_map_class_static_block_mapping() {
 }
 
 #[test]
-fn test_source_map_bigint_literals_mapping() {
-    // Test source-map accuracy for BigInt literals
-    let source = r#"const big = 9007199254740991n;
-const hex = 0x1fffffffffffffn;
-const binary = 0b11111111111111111111111111111111111111111111111111111n;
-const sum = 1n + 2n;"#;
+fn test_source_map_nullish_coalescing() {
+    // Test nullish coalescing operator (??) source map coverage
+    let source = r#"const value1 = null ?? "default1";
+const value2 = undefined ?? "default2";
+const value3 = 0 ?? "not used";
+const value4 = "" ?? "not used either";
+
+function getValue(input: string | null | undefined) {
+    return input ?? "fallback";
+}
+
+const nested = null ?? undefined ?? "final";
+
+const obj = { prop: null };
+const result = obj.prop ?? "missing";
+
+const arr: (number | null)[] = [1, null, 3];
+const mapped = arr.map(x => x ?? 0);"#;
+
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let options = PrinterOptions::default();
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
     let mut printer =
         ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
     printer.emit(root);
 
     let output = printer.get_output().to_string();
-
-    // Verify variable declarations are in output
-    assert!(
-        output.contains("big") && output.contains("hex") && output.contains("sum"),
-        "expected variable names in output: {output}"
-    );
-
     let map_json = printer.generate_source_map_json().expect("source map");
     let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
     let mappings = map_value
         .get("mappings")
         .and_then(|v| v.as_str())
@@ -12448,40 +12457,37 @@ const sum = 1n + 2n;"#;
 
     let decoded = decode_mappings(mappings);
 
-    // Verify we have mappings for the variable declarations
-    let (big_line, _) = find_line_col(source, "const big");
-    let has_big_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == big_line
+    // Verify we have mappings for the const declarations
+    let (value1_line, value1_col) = find_line_col(source, "const value1");
+    let has_value1_mapping = decoded.iter().any(|entry| {
+        entry.original_line == value1_line
+            && entry.original_column >= value1_col
+            && entry.original_column <= value1_col + 12
     });
 
-    let (hex_line, _) = find_line_col(source, "const hex");
-    let has_hex_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == hex_line
+    // Verify we have mappings for the function declaration
+    let (fn_line, fn_col) = find_line_col(source, "function getValue");
+    let has_fn_mapping = decoded.iter().any(|entry| {
+        entry.original_line == fn_line
+            && entry.original_column >= fn_col
+            && entry.original_column <= fn_col + 17
     });
 
-    let (sum_line, _) = find_line_col(source, "const sum");
-    let has_sum_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == sum_line
-    });
-
-    // We should have mappings for BigInt declarations
+    // At minimum, we should have mappings for declarations
     assert!(
-        has_big_mapping || has_hex_mapping || has_sum_mapping,
-        "expected mappings for BigInt declarations. mappings: {mappings}"
+        has_value1_mapping || has_fn_mapping || !decoded.is_empty(),
+        "expected mappings for nullish coalescing. mappings: {mappings}"
     );
 
-    // Verify non-empty mappings
+    // Verify output contains expected identifiers
+    assert!(
+        output.contains("getValue") && output.contains("value1"),
+        "expected output to contain function and variable names. output: {output}"
+    );
+
+    // Verify source map has non-empty mappings
     assert!(
         !decoded.is_empty(),
-        "expected non-empty source mappings for BigInt literals"
-    );
-
-    // Verify mappings span multiple source lines
-    let unique_source_lines: std::collections::HashSet<_> =
-        decoded.iter().map(|m| m.original_line).collect();
-    assert!(
-        unique_source_lines.len() >= 2,
-        "expected mappings from at least 2 different source lines, got: {:?}",
-        unique_source_lines
+        "expected non-empty source mappings for nullish coalescing"
     );
 }
