@@ -121,6 +121,54 @@ fn find_line_col(text: &str, needle: &str) -> (u32, u32) {
     (line, col)
 }
 
+fn assert_mapping_for_prefixes(
+    decoded: &[DecodedMapping],
+    output: &str,
+    source: &str,
+    needle: &str,
+    prefixes: &[&str],
+    mappings: &str,
+) {
+    let (target_line, target_col) = find_line_col(source, needle);
+    let needle_len = needle.len() as u32;
+    let lower_bound = target_col.saturating_sub(6);
+    let upper_bound = target_col + needle_len;
+    let mut mapped = false;
+
+    for entry in decoded.iter() {
+        if entry.source_index != 0 {
+            continue;
+        }
+        if entry.original_line != target_line {
+            continue;
+        }
+        if entry.original_column < lower_bound || entry.original_column > upper_bound {
+            continue;
+        }
+
+        let output_line_text = match output.lines().nth(entry.generated_line as usize)
+        {
+            Some(line) => line,
+            None => continue,
+        };
+        let output_slice = match output_line_text
+            .get(entry.generated_column as usize..)
+        {
+            Some(slice) => slice,
+            None => continue,
+        };
+        if prefixes.iter().any(|prefix| output_slice.starts_with(prefix)) {
+            mapped = true;
+            break;
+        }
+    }
+
+    assert!(
+        mapped,
+        "expected mapping for {needle} near line {target_line} col {target_col}. mappings: {mappings} output: {output}"
+    );
+}
+
 #[test]
 fn test_vlq_encode_positive() {
     // Simple positive numbers
@@ -5184,6 +5232,64 @@ fn test_source_map_es5_transform_async_try_finally_await_mapping() {
 }
 
 #[test]
+fn test_source_map_es5_transform_async_try_finally_await_in_finally_direct_mapping() {
+    let source = "async function run() {\n    try {\n        await work();\n    } finally {\n        const done = await cleanup();\n        report(done);\n    }\n}";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    assert!(
+        output.contains("__awaiter(") && output.contains("__generator("),
+        "expected async downlevel output, got: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+    assert_mapping_for_prefixes(
+        &decoded,
+        &output,
+        source,
+        "work()",
+        &["work"],
+        mappings,
+    );
+    assert_mapping_for_prefixes(
+        &decoded,
+        &output,
+        source,
+        "cleanup()",
+        &["cleanup"],
+        mappings,
+    );
+    assert_mapping_for_prefixes(
+        &decoded,
+        &output,
+        source,
+        "report(done)",
+        &["report"],
+        mappings,
+    );
+}
+
+#[test]
 fn test_source_map_es5_transform_async_try_finally_return_mapping() {
     let source =
         "async function run() { try { return await foo(); } finally { await bar(); } }";
@@ -7865,6 +7971,72 @@ fn test_source_map_es5_transform_async_for_loop_await_update_mapping() {
 }
 
 #[test]
+fn test_source_map_es5_transform_async_for_loop_header_awaits_mapping() {
+    let source = "async function run() {\n    for (let i = await init(); await cond(i); i = await step(i)) {\n        await body(i);\n    }\n}";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    assert!(
+        output.contains("__awaiter(") && output.contains("__generator("),
+        "expected async downlevel output, got: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+    assert_mapping_for_prefixes(
+        &decoded,
+        &output,
+        source,
+        "init()",
+        &["init"],
+        mappings,
+    );
+    assert_mapping_for_prefixes(
+        &decoded,
+        &output,
+        source,
+        "cond(i)",
+        &["cond"],
+        mappings,
+    );
+    assert_mapping_for_prefixes(
+        &decoded,
+        &output,
+        source,
+        "step(i)",
+        &["step"],
+        mappings,
+    );
+    assert_mapping_for_prefixes(
+        &decoded,
+        &output,
+        source,
+        "body(i)",
+        &["body"],
+        mappings,
+    );
+}
+
+#[test]
 fn test_source_map_es5_transform_async_while_loop_mapping() {
     let source = "async function run(cond){ while (cond) { await foo(); } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -8118,6 +8290,48 @@ fn test_source_map_es5_transform_async_do_while_await_condition_mapping() {
             func_line
         );
     }
+}
+
+#[test]
+fn test_source_map_es5_transform_async_do_while_await_condition_direct_mapping() {
+    let source = "async function run(flag) {\n    do {\n        tick(flag);\n    } while (await shouldContinue(flag));\n}";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    assert!(
+        output.contains("__awaiter(") && output.contains("__generator("),
+        "expected async downlevel output, got: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+    assert_mapping_for_prefixes(
+        &decoded,
+        &output,
+        source,
+        "shouldContinue(flag)",
+        &["shouldContinue"],
+        mappings,
+    );
 }
 
 #[test]
