@@ -7,7 +7,7 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- Complete: Added 3 private class feature tests (private method in async, static private method, private accessors) in `wasm/src/transforms/class_es5_tests.rs`; ran `./wasm/test.sh class_es5_tests` (54 tests PASS).
+- [ ] Add ES5 async iterator tests for `for-await-of` with destructuring patterns in `wasm/src/transforms/async_es5_tests.rs`. Run `./wasm/test.sh async_es5_tests`.
 
 ## Task Queue
 - [ ] (empty)
