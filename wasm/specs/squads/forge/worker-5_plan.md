@@ -7,15 +7,29 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- [ ] Inference edge cases: implement `this`-parameter inference and non-distributive optional tuple/property inference in `wasm/src/solver/infer.rs` and `wasm/src/solver/evaluate.rs`; add tests in `wasm/src/solver/infer_tests.rs` and `wasm/src/solver/evaluate_tests.rs` (convert TODOs for optional property/tuple inference); run `./wasm/test.sh`.
-
-## Task Queue
-- [ ] Add tests for function `this`-parameter inference (contextual typing + call-site inference) in `wasm/src/solver/infer_tests.rs`.
-- [ ] Convert TODOs in `wasm/src/solver/evaluate_tests.rs` for optional property inference (missing vs `undefined`) and optional tuple element inference (undefined inclusion).
 - [ ] Follow up with remaining `infer` placeholder vs `never` TODOs in solver tests that block non-distributive inference.
 
+## Task Queue
+- [x] Add tests for function `this`-parameter inference (contextual typing + call-site inference) in `wasm/src/solver/infer_tests.rs`.
+- [x] Convert TODOs in `wasm/src/solver/evaluate_tests.rs` for optional property inference (missing vs `undefined`) and optional tuple element inference (undefined inclusion).
+- [ ] [EM: Add queued tasks]
+
 ## Completed
-- [x] (Move finished items here with brief notes and tests run)
+- [x] Enabled non-distributive readonly array/tuple inference over union inputs and updated tests in `wasm/src/solver/evaluate_tests.rs`; `./wasm/test.sh` failed: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`.
+- [x] Implemented conditional infer constraint filtering + optional tuple/property inference; updated tuple optional expectations and added `this`-parameter tests; `./wasm/test.sh` failed: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`.
+- [x] Fixed FunctionId typo in `wasm/src/solver/evaluate.rs`; `./wasm/test.sh` failed: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`.
+- [x] Updated infer TODO expectations in `wasm/src/solver/evaluate_tests.rs` (tuple rest inference note + this-parameter TODO cleanup); `./wasm/test.sh` failed: missing `FunctionId` in `wasm/src/solver/evaluate.rs`.
+- [x] Implemented this-parameter bounds checking + conditional inference; added non-distributive optional tuple/property inference; updated tests (tests not run).
+- [x] Added `this`-parameter inference tests in `wasm/src/solver/infer_tests.rs` (tests not run).
+- [x] Added non-distributive union array inference for conditional types (tests not run).
+- [x] Added non-distributive tuple wrapper array inference for conditional types (tests not run).
+- [x] Made optional property inference include missing/undefined cases (tests not run).
+- [x] Flattened tuple rest and optional elements for array element inference (tests not run).
+- [x] Added non-distributive tuple union inference (tests not run).
+- [x] Updated non-distributive optional property inference expectation (tests not run).
+- [x] Added index signature inference from object properties (tests not run).
+- [x] Updated non-distributive nested object inference expectation (tests not run).
+- [x] Updated non-distributive union object inference expectation (tests not run).
 
 ## Ready for Merge
 No
