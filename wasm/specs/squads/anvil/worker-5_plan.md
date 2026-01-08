@@ -7,7 +7,7 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- Complete: Added variable-initializer await coverage in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (PASS).
+- Complete: Added async variable-initializer await source-map coverage in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
 
 ## Task Queue
 - [ ] (empty)
@@ -28,6 +28,7 @@ Priority: 5
 - [x] Reverted `wasm/src/parallel_tests.rs` changes to stay in anvil scope.
 - [x] Added for-loop initializer/incrementor await coverage and variable-declaration-list await detection in `wasm/src/transforms/async_es5.rs` and `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (PASS).
 - [x] Added variable-initializer await coverage in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (PASS).
+- [x] Added async variable-initializer await source-map coverage in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
 
 ## Ready for Merge
 Yes
