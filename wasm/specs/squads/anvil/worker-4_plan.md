@@ -14,6 +14,7 @@ Priority: 4
 
 ## Completed
 - [x] Add async/class ES5 transform source-map mappings and offsets. Tests: `./wasm/test.sh source_map`
+- [x] Add async nested function source-map offset coverage. Tests: `./wasm/test.sh source_map`
 
 ## Ready for Merge
 Yes - branch `worker/anvil-4` is ready for merge.
