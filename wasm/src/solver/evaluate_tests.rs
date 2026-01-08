@@ -9455,3 +9455,290 @@ fn test_conditional_infer_extract_state_union_distributive() {
     // Current behavior: returns never because function parameter infer binding isn't working.
     assert_eq!(result, TypeId::NEVER);
 }
+
+// =============================================================================
+// Application Type Expansion Tests (Worker 2/3 fix validation)
+// =============================================================================
+// These tests verify that Application(Ref(TypeAlias), [args]) gets properly
+// expanded to the instantiated type body.
+
+/// Test that Application types with Ref base should be expanded.
+///
+/// This test documents the expected behavior after the Application expansion fix:
+/// - `Application(Ref(Box), [string])` where `Box<T> = { value: T }`
+/// - Should expand to `{ value: string }`
+///
+/// Current behavior: Application types pass through unchanged.
+/// Expected behavior: Application types should expand to instantiated body.
+#[test]
+fn test_application_ref_expansion_box_string() {
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    // Define type parameter T
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param));
+
+    // Define: type Box<T> = { value: T }
+    let value_name = interner.intern_string("value");
+    let box_body = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: t_type,
+        write_type: t_type,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Create Ref(1) for Box type alias
+    let box_ref = interner.reference(SymbolRef(1));
+
+    // Create Application: Box<string> = Application(Ref(1), [string])
+    let box_string = interner.application(box_ref, vec![TypeId::STRING]);
+
+    // Set up a resolver that maps Ref(1) -> box_body
+    // Note: This is a simplified resolver that just returns the body.
+    // The real fix needs to also track type parameters for substitution.
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(1), box_body);
+
+    // Evaluate the Application type
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(box_string);
+
+    // Expected: { value: string }
+    let expected = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // TODO: When Application expansion is implemented (Worker 2/3 fix),
+    // change this assertion to: assert_eq!(result, expected);
+    // Currently, Application types pass through unchanged.
+    assert_eq!(
+        result, box_string,
+        "Current behavior: Application passes through unchanged. \
+         After fix, should equal expected: {:?}",
+        expected
+    );
+}
+
+/// Test that Application types with function body should expand correctly.
+///
+/// This simulates the Redux Reducer case:
+/// - `type Reducer<S, A> = (state: S | undefined, action: A) => S`
+/// - `Application(Ref(Reducer), [number, AnyAction])`
+/// - Should expand to `(state: number | undefined, action: AnyAction) => number`
+#[test]
+fn test_application_ref_expansion_reducer_function() {
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    // Define type parameters S and A
+    let s_name = interner.intern_string("S");
+    let a_name = interner.intern_string("A");
+    let s_param = TypeParamInfo {
+        name: s_name,
+        constraint: None,
+        default: None,
+    };
+    let a_param = TypeParamInfo {
+        name: a_name,
+        constraint: None,
+        default: None,
+    };
+    let s_type = interner.intern(TypeKey::TypeParameter(s_param));
+    let a_type = interner.intern(TypeKey::TypeParameter(a_param));
+
+    // Define: type Reducer<S, A> = (state: S | undefined, action: A) => S
+    let state_name = interner.intern_string("state");
+    let action_name = interner.intern_string("action");
+    let s_or_undefined = interner.union(vec![s_type, TypeId::UNDEFINED]);
+
+    let reducer_body = interner.function(FunctionShape {
+        type_params: vec![],  // Body has no additional type params
+        params: vec![
+            ParamInfo {
+                name: Some(state_name),
+                type_id: s_or_undefined,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(action_name),
+                type_id: a_type,
+                optional: false,
+                rest: false,
+            },
+        ],
+        this_type: None,
+        return_type: s_type,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Create Ref(1) for Reducer type alias
+    let reducer_ref = interner.reference(SymbolRef(1));
+
+    // Create AnyAction type: { type: string }
+    let type_name = interner.intern_string("type");
+    let any_action = interner.object(vec![PropertyInfo {
+        name: type_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Create Application: Reducer<number, AnyAction> = Application(Ref(1), [number, AnyAction])
+    let reducer_number_action = interner.application(reducer_ref, vec![TypeId::NUMBER, any_action]);
+
+    // Set up a resolver that maps Ref(1) -> reducer_body
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(1), reducer_body);
+
+    // Evaluate the Application type
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(reducer_number_action);
+
+    // Expected: (state: number | undefined, action: AnyAction) => number
+    let number_or_undefined = interner.union(vec![TypeId::NUMBER, TypeId::UNDEFINED]);
+    let expected = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo {
+                name: Some(state_name),
+                type_id: number_or_undefined,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(action_name),
+                type_id: any_action,
+                optional: false,
+                rest: false,
+            },
+        ],
+        this_type: None,
+        return_type: TypeId::NUMBER,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // TODO: When Application expansion is implemented (Worker 2/3 fix),
+    // change this assertion to: assert_eq!(result, expected);
+    // Currently, Application types pass through unchanged.
+    assert_eq!(
+        result, reducer_number_action,
+        "Current behavior: Application passes through unchanged. \
+         After fix, should equal expected function type"
+    );
+
+    // Store expected for reference when implementing the fix
+    let _ = expected;
+}
+
+/// Test that nested Application types should expand recursively.
+///
+/// Example: `Promise<Box<string>>` where both Promise and Box are type aliases
+/// Should expand to the fully instantiated structure.
+#[test]
+fn test_application_ref_expansion_nested() {
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    // Define type parameter T for both Box and Promise
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param));
+
+    // Define: type Box<T> = { value: T }
+    let value_name = interner.intern_string("value");
+    let box_body = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: t_type,
+        write_type: t_type,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Define: type Promise<T> = { then: (cb: (value: T) => void) => void }
+    // Simplified: type Promise<T> = { result: T }
+    let result_name = interner.intern_string("result");
+    let promise_body = interner.object(vec![PropertyInfo {
+        name: result_name,
+        type_id: t_type,
+        write_type: t_type,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Create Refs
+    let box_ref = interner.reference(SymbolRef(1));
+    let promise_ref = interner.reference(SymbolRef(2));
+
+    // Create: Box<string>
+    let box_string = interner.application(box_ref, vec![TypeId::STRING]);
+
+    // Create: Promise<Box<string>> = Application(Ref(2), [Application(Ref(1), [string])])
+    let promise_box_string = interner.application(promise_ref, vec![box_string]);
+
+    // Set up resolver
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(1), box_body);
+    env.insert(SymbolRef(2), promise_body);
+
+    // Evaluate
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(promise_box_string);
+
+    // Expected: { result: { value: string } }
+    let inner_box = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let expected = interner.object(vec![PropertyInfo {
+        name: result_name,
+        type_id: inner_box,
+        write_type: inner_box,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // TODO: When Application expansion is implemented (Worker 2/3 fix),
+    // change this assertion to: assert_eq!(result, expected);
+    assert_eq!(
+        result, promise_box_string,
+        "Current behavior: Application passes through unchanged. \
+         After fix, should expand nested Applications recursively"
+    );
+
+    let _ = expected;
+}
