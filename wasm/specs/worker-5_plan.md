@@ -30,3 +30,4 @@ Priority: 5
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
 - Use Docker for Rust tests (`./wasm/test.sh`), never `cargo test` directly.
 - Update this plan after each task and keep it accurate.
+- Re-ran `./wasm/test.sh test_source_map_es5_transform_async_await_property_access_mapping`.
