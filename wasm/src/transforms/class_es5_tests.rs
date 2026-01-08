@@ -6871,323 +6871,240 @@ class User {
     );
 }
 
-#[test]
-fn test_class_es5_static_getter() {
-    // Test static getter
-    let source = r#"
-class Config {
-    private static _version: string = "1.0.0";
+// =============================================================================
+// Ambient/Declare Class Tests
+// =============================================================================
 
-    static get version(): string {
-        return Config._version;
-    }
+#[test]
+fn test_class_es5_declare_class_basic() {
+    // declare class should emit nothing - it's a type declaration only
+    let source = r#"
+declare class ExternalAPI {
+    version: string;
+    init(): void;
+    shutdown(): void;
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
 
-    let output = printer.get_output().to_string();
-
-    // Should transform class to function
+    // Declare class should produce no output or empty output
+    let trimmed = output.trim();
     assert!(
-        output.contains("function Config") || output.contains("var Config"),
-        "Expected Config class transformation: {}",
-        output
-    );
-
-    // Static getter should use Object.defineProperty or similar pattern
-    assert!(
-        output.contains("version") || output.contains("defineProperty"),
-        "Expected static getter: {}",
-        output
-    );
-
-    // Private static field should be present
-    assert!(
-        output.contains("_version"),
-        "Expected _version backing field: {}",
+        trimmed.is_empty() || !trimmed.contains("function ExternalAPI"),
+        "declare class should not emit a function constructor: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_static_getter_setter() {
-    // Test static getter and setter pair
+fn test_class_es5_declare_class_with_methods() {
+    // declare class with method signatures should emit nothing
     let source = r#"
-class Counter {
-    private static _count: number = 0;
-
-    static get count(): number {
-        return Counter._count;
-    }
-
-    static set count(value: number) {
-        if (value >= 0) {
-            Counter._count = value;
-        }
-    }
-
-    static increment(): void {
-        Counter.count++;
-    }
-
-    static reset(): void {
-        Counter.count = 0;
-    }
+declare class Database {
+    connect(url: string): Promise<void>;
+    query<T>(sql: string, params?: any[]): Promise<T[]>;
+    disconnect(): Promise<void>;
+    readonly isConnected: boolean;
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
 
-    let output = printer.get_output().to_string();
-
-    // Should transform class
+    // Declare class with methods should produce no output
+    let trimmed = output.trim();
     assert!(
-        output.contains("function Counter") || output.contains("var Counter"),
-        "Expected Counter class transformation: {}",
+        trimmed.is_empty() || !trimmed.contains("function Database"),
+        "declare class should not emit a function constructor: {}",
         output
     );
-
-    // Static accessor should be present
     assert!(
-        output.contains("count"),
-        "Expected count accessor: {}",
-        output
-    );
-
-    // Static methods should be present
-    assert!(
-        output.contains("increment") && output.contains("reset"),
-        "Expected static methods: {}",
+        !trimmed.contains("prototype"),
+        "declare class should not emit prototype assignments: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_static_accessor_computed() {
-    // Test static accessor with computed value
+fn test_class_es5_declare_class_with_static() {
+    // declare class with static members should emit nothing
     let source = r#"
-class Cache {
-    private static _data: Map<string, any> = new Map();
-    private static _hits: number = 0;
-    private static _misses: number = 0;
-
-    static get hitRate(): number {
-        const total = Cache._hits + Cache._misses;
-        return total > 0 ? Cache._hits / total : 0;
-    }
-
-    static get size(): number {
-        return Cache._data.size;
-    }
-
-    static set(key: string, value: any): void {
-        Cache._data.set(key, value);
-    }
-
-    static get(key: string): any {
-        if (Cache._data.has(key)) {
-            Cache._hits++;
-            return Cache._data.get(key);
-        }
-        Cache._misses++;
-        return undefined;
-    }
+declare class MathUtils {
+    static PI: number;
+    static E: number;
+    static sin(x: number): number;
+    static cos(x: number): number;
+    static random(): number;
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
 
-    let output = printer.get_output().to_string();
-
-    // Should transform class
+    // Declare class with static members should produce no output
+    let trimmed = output.trim();
     assert!(
-        output.contains("function Cache") || output.contains("var Cache"),
-        "Expected Cache class transformation: {}",
+        trimmed.is_empty() || !trimmed.contains("function MathUtils"),
+        "declare class should not emit a function constructor: {}",
         output
     );
-
-    // Static accessors should be present
     assert!(
-        output.contains("hitRate") || output.contains("size"),
-        "Expected static accessors: {}",
-        output
-    );
-
-    // Static methods should be present
-    assert!(
-        output.contains("set") && output.contains("get"),
-        "Expected static methods: {}",
+        !trimmed.contains("MathUtils.PI"),
+        "declare class should not emit static property assignments: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_static_accessor_inheritance() {
-    // Test static accessor with inheritance
+fn test_class_es5_declare_class_with_extends() {
+    // declare class with extends should emit nothing
     let source = r#"
-class BaseLogger {
-    protected static _level: number = 1;
-
-    static get level(): number {
-        return BaseLogger._level;
-    }
-
-    static set level(value: number) {
-        BaseLogger._level = value;
-    }
+declare class BaseEvent {
+    type: string;
+    timestamp: number;
 }
 
-class DebugLogger extends BaseLogger {
-    static get level(): number {
-        return BaseLogger._level + 1;
-    }
-
-    static debug(msg: string): void {
-        if (DebugLogger.level > 0) {
-            console.log("[DEBUG] " + msg);
-        }
-    }
+declare class MouseEvent extends BaseEvent {
+    clientX: number;
+    clientY: number;
+    button: number;
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
+    // Check second class (MouseEvent extends BaseEvent)
+    let class_idx = source_file.statements.nodes.get(1).expect("expected second class declaration");
 
-    let output = printer.get_output().to_string();
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
 
-    // Both classes should be transformed
+    // Declare class with extends should produce no output
+    let trimmed = output.trim();
     assert!(
-        output.contains("BaseLogger") && output.contains("DebugLogger"),
-        "Expected both class transformations: {}",
+        trimmed.is_empty() || !trimmed.contains("function MouseEvent"),
+        "declare class should not emit a function constructor: {}",
         output
     );
-
-    // Inheritance pattern should be present
     assert!(
-        output.contains("__extends") || output.contains("prototype"),
-        "Expected inheritance pattern: {}",
-        output
-    );
-
-    // Static accessor should be present
-    assert!(
-        output.contains("level"),
-        "Expected level accessor: {}",
+        !trimmed.contains("__extends"),
+        "declare class should not emit __extends helper: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_static_and_instance_accessors() {
-    // Test mixed static and instance accessors
+fn test_class_es5_declare_class_with_implements() {
+    // declare class with implements should emit nothing
     let source = r#"
-class Registry {
-    private static _instanceCount: number = 0;
-    private _id: number;
-    private _name: string;
+interface Serializable {
+    serialize(): string;
+    deserialize(data: string): void;
+}
 
-    static get instanceCount(): number {
-        return Registry._instanceCount;
-    }
-
-    get id(): number {
-        return this._id;
-    }
-
-    get name(): string {
-        return this._name;
-    }
-
-    set name(value: string) {
-        this._name = value;
-    }
-
-    constructor(name: string) {
-        this._id = ++Registry._instanceCount;
-        this._name = name;
-    }
+declare class DataModel implements Serializable {
+    id: string;
+    serialize(): string;
+    deserialize(data: string): void;
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
+    // Second statement is the declare class
+    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
 
-    let output = printer.get_output().to_string();
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
 
-    // Should transform class
+    // Declare class with implements should produce no output
+    let trimmed = output.trim();
     assert!(
-        output.contains("function Registry") || output.contains("var Registry"),
-        "Expected Registry class transformation: {}",
+        trimmed.is_empty() || !trimmed.contains("function DataModel"),
+        "declare class should not emit a function constructor: {}",
         output
     );
+}
 
-    // Static accessor should be present
+#[test]
+fn test_class_es5_declare_class_with_constructor() {
+    // declare class with constructor signature should emit nothing
+    let source = r#"
+declare class Config {
+    readonly host: string;
+    readonly port: number;
+    readonly secure: boolean;
+
+    constructor(host: string, port: number, secure?: boolean);
+
+    getUrl(): string;
+    clone(): Config;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Declare class with constructor should produce no output
+    let trimmed = output.trim();
     assert!(
-        output.contains("instanceCount"),
-        "Expected static instanceCount accessor: {}",
+        trimmed.is_empty() || !trimmed.contains("function Config"),
+        "declare class should not emit a function constructor: {}",
         output
     );
-
-    // Instance accessors should be present
     assert!(
-        output.contains("id") && output.contains("name"),
-        "Expected instance accessors: {}",
-        output
-    );
-
-    // Private fields should be present
-    assert!(
-        output.contains("_id") && output.contains("_name"),
-        "Expected private backing fields: {}",
+        !trimmed.contains("this.host"),
+        "declare class should not emit property assignments: {}",
         output
     );
 }

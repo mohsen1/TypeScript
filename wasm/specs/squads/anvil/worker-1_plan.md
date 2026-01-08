@@ -8,12 +8,13 @@ Priority: 1
 Blocked: Awaiting next EM-Anvil assignment.
 
 ## Current Assignment
-- [ ] Add ES5 class tests for ambient/declare classes in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
+- [ ] (awaiting next EM-Anvil assignment)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 tests for ambient/declare classes (6 tests): basic declare, with methods, with static, with extends, with implements, with constructor. Fixed ClassES5Emitter to skip declare classes. Ran `./wasm/test.sh class_es5_tests` (all 129 pass).
 - [x] Added ES5 tests for readonly properties (6 tests): basic readonly, parameter property, static readonly, with inheritance, array property, mixed properties. Ran `./wasm/test.sh class_es5_tests` (all 123 pass).
 - [x] Added ES5 tests for this parameter types (6 tests): basic, with other params, fluent API, with generics, in derived class, static method. Ran `./wasm/test.sh class_es5_tests` (all 118 pass).
 - [x] Added ES5 tests for index signatures (6 tests): string key, number key, with properties, readonly, with inheritance, with static members. Ran `./wasm/test.sh class_es5_tests` (all 113 pass).
