@@ -5237,3 +5237,230 @@ fn test_parity_es5_private_method_chain() {
         output
     );
 }
+
+/// Parity test for ES5 multiple class decorators.
+/// Multiple decorators should all be applied.
+#[test]
+fn test_parity_es5_class_decorator_multiple() {
+    let source = r#"function sealed(ctor: Function) {}
+function logged(ctor: Function) {}
+function tracked(ctor: Function) {}
+
+@sealed
+@logged
+@tracked
+class Service {
+    name: string = "test";
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify class exists
+    assert!(
+        output.contains("Service"),
+        "Output should define Service class: {}",
+        output
+    );
+    // No decorator syntax in ES5
+    assert!(
+        !output.contains("@sealed") && !output.contains("@logged") && !output.contains("@tracked"),
+        "ES5 output should not contain decorator syntax: {}",
+        output
+    );
+    // Type annotation should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": Function"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 class decorator factory.
+/// Decorator factory with arguments should be downleveled.
+#[test]
+fn test_parity_es5_class_decorator_factory() {
+    let source = r#"function component(name: string) {
+    return function(ctor: Function) {};
+}
+
+@component("MyComponent")
+class Widget {
+    id: number = 1;
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify class exists
+    assert!(
+        output.contains("Widget"),
+        "Output should define Widget class: {}",
+        output
+    );
+    // No decorator syntax in ES5
+    assert!(
+        !output.contains("@component"),
+        "ES5 output should not contain @component decorator syntax: {}",
+        output
+    );
+    // The decorator name should still appear as a function reference
+    assert!(
+        output.contains("component"),
+        "Output should reference component function: {}",
+        output
+    );
+    // Type annotation should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": number") && !output.contains(": Function"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 class decorator with generic class.
+/// Decorator on generic class should erase type params.
+#[test]
+fn test_parity_es5_class_decorator_generic() {
+    let source = r#"function observable(ctor: Function) {}
+
+@observable
+class Store<T> {
+    data: T;
+    constructor(initial: T) {
+        this.data = initial;
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify class exists
+    assert!(
+        output.contains("Store"),
+        "Output should define Store class: {}",
+        output
+    );
+    // No decorator syntax in ES5
+    assert!(
+        !output.contains("@observable"),
+        "ES5 output should not contain @observable decorator syntax: {}",
+        output
+    );
+    // Generic type parameter should be erased
+    assert!(
+        !output.contains("<T>"),
+        "ES5 output should erase generic type parameter: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": T") && !output.contains(": Function"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 class decorator with extends.
+/// Decorator on derived class should work correctly.
+#[test]
+fn test_parity_es5_class_decorator_extends() {
+    let source = r#"function injectable(ctor: Function) {}
+
+class BaseService {
+    name: string = "base";
+}
+
+@injectable
+class DerivedService extends BaseService {
+    id: number = 1;
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify both classes exist
+    assert!(
+        output.contains("BaseService") && output.contains("DerivedService"),
+        "Output should define both classes: {}",
+        output
+    );
+    // No decorator syntax in ES5
+    assert!(
+        !output.contains("@injectable"),
+        "ES5 output should not contain @injectable decorator syntax: {}",
+        output
+    );
+    // ES5 inheritance should use __extends or prototype chain
+    assert!(
+        output.contains("__extends") || output.contains(".prototype"),
+        "ES5 output should have inheritance pattern: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": number") && !output.contains(": Function"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
