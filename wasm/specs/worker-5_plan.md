@@ -161,6 +161,8 @@ Priority: 5
       Tests: `./wasm/test.sh test_source_map_es5_transform_async_binary_shift_left_mapping`.
 - [x] Added ES5 async binary shift-right await source map mapping test in `wasm/src/source_map_tests.rs`.
       Tests: `./wasm/test.sh test_source_map_es5_transform_async_binary_shift_right_mapping`.
+- [x] Added ES5 async binary unsigned shift-right await source map mapping test in `wasm/src/source_map_tests.rs`.
+      Tests: `./wasm/test.sh test_source_map_es5_transform_async_binary_unsigned_shift_right_mapping`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
