@@ -38,6 +38,25 @@ Priority: 5
 - [x] Add coverage for `StateFromReducers<R>` mapped type that uses `ExtractState` on each property.
 - [x] Add coverage for `ActionFromReducers<R>` that uses indexed access `[keyof R]` on a mapped type.
 - [x] Fix `test_redux_pattern_generic_function_with_conditional_return` - conditional type in function return.
+- [ ] Fix cross-file type alias resolution in `test_check_redux_lodash_style_generics` (currently 4 errors, down from 6).
+
+### Cross-File Type Alias Resolution Issue
+**Status:** Partial progress (6 errors → 4 errors)
+
+**Root Cause Analysis:**
+When checking files in parallel, each `ThinCheckerState` only has access to its own file's `NodeArena`. Type alias symbols from other files (e.g., `Reducer`, `StateFromReducers` from types.ts) have their declarations stored as `NodeIndex` values that point to nodes in the source file's arena. Accessing these nodes from a different file's arena returns garbage data.
+
+**Changes Made:**
+1. **Symbol merge fix** (parallel.rs): Modified `merge_bind_results` to copy all symbol fields (declarations, value_declaration, exports, members) instead of just flags and name.
+2. **File tracking** (binder.rs): Added `source_file_idx: Option<usize>` to `Symbol` struct to track which file each symbol originated from.
+3. **Application expansion** (subtype.rs): Added `try_expand_application` method and handlers for `(TypeKey::Application, _)` cases to structurally expand type aliases before subtype checking.
+4. **Symbol pre-resolution** (thin_checker.rs): Added `ensure_application_symbols_resolved` to walk types and resolve Application type symbols before assignability checks.
+
+**Remaining Issue:**
+Cross-file type aliases still resolve to `any` because `ThinCheckerState` only has access to the current file's arena. When `get_type_alias()` is called with a `NodeIndex` from a different file, it can't retrieve the type alias declaration node.
+
+**Required Fix:**
+Need to give `ThinCheckerState` access to all file arenas (via `MergedProgram.files`), and use `symbol.source_file_idx` to look up nodes from the correct file's arena.
 
 ### Generic Function Conditional Return Fix
 **Issue:** `createStore(numberReducer)` returning `Store<ExtractState<Reducer<number>>>` failed to resolve properties because `Application` types weren't being evaluated before property access.

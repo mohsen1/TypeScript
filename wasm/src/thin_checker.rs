@@ -503,6 +503,7 @@ impl<'a> ThinCheckerState<'a> {
                     // Ensure the base type symbol is resolved first so its type params
                     // are available in the type_env for Application expansion
                     let _ = self.get_type_of_symbol(sym_id);
+                    let type_param_bindings = self.get_type_param_bindings();
                     let type_resolver = |node_idx: NodeIndex| self.resolve_type_symbol_for_lowering(node_idx);
                     let value_resolver = |node_idx: NodeIndex| self.resolve_value_symbol_for_lowering(node_idx);
                     let lowering = crate::solver::TypeLowering::with_resolvers(
@@ -510,7 +511,7 @@ impl<'a> ThinCheckerState<'a> {
                         self.ctx.types,
                         &type_resolver,
                         &value_resolver,
-                    );
+                    ).with_type_param_bindings(type_param_bindings);
                     return lowering.lower_type(idx);
                 }
                 return self.resolve_qualified_name(type_name_idx);
@@ -552,6 +553,7 @@ impl<'a> ThinCheckerState<'a> {
                             let _ = self.get_type_from_type_node(arg_idx);
                         }
                     }
+                    let type_param_bindings = self.get_type_param_bindings();
                     let type_resolver = |node_idx: NodeIndex| self.resolve_type_symbol_for_lowering(node_idx);
                     let value_resolver = |node_idx: NodeIndex| self.resolve_value_symbol_for_lowering(node_idx);
                     let lowering = crate::solver::TypeLowering::with_resolvers(
@@ -559,7 +561,7 @@ impl<'a> ThinCheckerState<'a> {
                         self.ctx.types,
                         &type_resolver,
                         &value_resolver,
-                    );
+                    ).with_type_param_bindings(type_param_bindings);
                     return lowering.lower_type(idx);
                 }
 
@@ -628,6 +630,14 @@ impl<'a> ThinCheckerState<'a> {
 
     fn lookup_type_parameter(&self, name: &str) -> Option<TypeId> {
         self.ctx.type_parameter_scope.get(name).copied()
+    }
+
+    /// Get all type parameter bindings for passing to TypeLowering.
+    fn get_type_param_bindings(&self) -> Vec<(crate::interner::Atom, TypeId)> {
+        self.ctx.type_parameter_scope
+            .iter()
+            .map(|(name, &type_id)| (self.ctx.types.intern_string(name), type_id))
+            .collect()
     }
 
     /// Resolve a qualified name or identifier to a symbol ID.
@@ -1045,6 +1055,7 @@ impl<'a> ThinCheckerState<'a> {
     fn get_type_from_function_type(&mut self, idx: NodeIndex) -> TypeId {
         use crate::solver::TypeLowering;
 
+        let type_param_bindings = self.get_type_param_bindings();
         let type_resolver = |node_idx: NodeIndex| self.resolve_type_symbol_for_lowering(node_idx);
         let value_resolver = |node_idx: NodeIndex| self.resolve_value_symbol_for_lowering(node_idx);
         let lowering = TypeLowering::with_resolvers(
@@ -1052,7 +1063,7 @@ impl<'a> ThinCheckerState<'a> {
             self.ctx.types,
             &type_resolver,
             &value_resolver,
-        );
+        ).with_type_param_bindings(type_param_bindings);
 
         lowering.lower_type(idx)
     }
@@ -3125,6 +3136,7 @@ impl<'a> ThinCheckerState<'a> {
         // Interface - return interface type with call signatures
         if flags & symbol_flags::INTERFACE != 0 {
             if !symbol.declarations.is_empty() {
+                let type_param_bindings = self.get_type_param_bindings();
                 let type_resolver = |node_idx: NodeIndex| self.resolve_type_symbol_for_lowering(node_idx);
                 let value_resolver = |node_idx: NodeIndex| self.resolve_value_symbol_for_lowering(node_idx);
                 let lowering = TypeLowering::with_resolvers(
@@ -3132,7 +3144,7 @@ impl<'a> ThinCheckerState<'a> {
                     self.ctx.types,
                     &type_resolver,
                     &value_resolver,
-                );
+                ).with_type_param_bindings(type_param_bindings);
                 let interface_type = lowering.lower_interface_declarations(&symbol.declarations);
                 // TODO: interfaces can have type parameters too - handle them properly
                 return (self.merge_interface_heritage_types(&symbol.declarations, interface_type), Vec::new());
@@ -4618,6 +4630,10 @@ impl<'a> ThinCheckerState<'a> {
             (TypeId::ANY, None)
         };
 
+        // Evaluate Application types in return type to get their structural form
+        // This allows proper comparison of return expressions against type alias applications like Reducer<S, A>
+        return_type = self.evaluate_application_type(return_type);
+
         // Check the function body (for type errors within the body)
         if !func.body.is_none() {
             self.cache_parameter_types(&func.parameters.nodes, Some(&param_types));
@@ -5180,6 +5196,118 @@ impl<'a> ThinCheckerState<'a> {
         self.evaluate_application_type(instantiated)
     }
 
+    /// Ensure all symbols referenced in Application types are resolved in the type_env.
+    /// This walks the type structure and calls get_type_of_symbol for any Application base symbols.
+    fn ensure_application_symbols_resolved(&mut self, type_id: TypeId) {
+        use crate::solver::TypeKey;
+        use crate::binder::SymbolId;
+        use std::collections::HashSet;
+
+        let mut visited: HashSet<TypeId> = HashSet::new();
+        self.ensure_application_symbols_resolved_inner(type_id, &mut visited);
+    }
+
+    fn ensure_application_symbols_resolved_inner(&mut self, type_id: TypeId, visited: &mut std::collections::HashSet<TypeId>) {
+        use crate::solver::{TypeKey, SymbolRef};
+        use crate::binder::SymbolId;
+
+        if !visited.insert(type_id) {
+            return;
+        }
+
+        let Some(key) = self.ctx.types.lookup(type_id) else {
+            return;
+        };
+
+        match key {
+            TypeKey::Application(app_id) => {
+                let app = self.ctx.types.type_application(app_id);
+
+                // If the base is a Ref, resolve the symbol
+                if let Some(TypeKey::Ref(SymbolRef(sym_id))) = self.ctx.types.lookup(app.base) {
+                    // This populates the type_env as a side effect
+                    let _ = self.get_type_of_symbol(SymbolId(sym_id));
+                }
+
+                // Recursively process base and args
+                self.ensure_application_symbols_resolved_inner(app.base, visited);
+                for &arg in &app.args {
+                    self.ensure_application_symbols_resolved_inner(arg, visited);
+                }
+            }
+            TypeKey::Ref(SymbolRef(sym_id)) => {
+                // Resolve ref symbols too
+                let _ = self.get_type_of_symbol(SymbolId(sym_id));
+            }
+            TypeKey::Union(members_id) => {
+                let members = self.ctx.types.type_list(members_id);
+                for member in members.iter() {
+                    self.ensure_application_symbols_resolved_inner(*member, visited);
+                }
+            }
+            TypeKey::Intersection(members_id) => {
+                let members = self.ctx.types.type_list(members_id);
+                for member in members.iter() {
+                    self.ensure_application_symbols_resolved_inner(*member, visited);
+                }
+            }
+            TypeKey::Function(shape_id) => {
+                let shape = self.ctx.types.function_shape(shape_id);
+                for param in shape.params.iter() {
+                    self.ensure_application_symbols_resolved_inner(param.type_id, visited);
+                }
+                self.ensure_application_symbols_resolved_inner(shape.return_type, visited);
+            }
+            TypeKey::Object(shape_id) | TypeKey::ObjectWithIndex(shape_id) => {
+                let shape = self.ctx.types.object_shape(shape_id);
+                for prop in shape.properties.iter() {
+                    self.ensure_application_symbols_resolved_inner(prop.type_id, visited);
+                }
+                if let Some(ref idx) = shape.string_index {
+                    self.ensure_application_symbols_resolved_inner(idx.value_type, visited);
+                }
+                if let Some(ref idx) = shape.number_index {
+                    self.ensure_application_symbols_resolved_inner(idx.value_type, visited);
+                }
+            }
+            TypeKey::Array(elem) => {
+                self.ensure_application_symbols_resolved_inner(elem, visited);
+            }
+            TypeKey::Tuple(elems_id) => {
+                let elems = self.ctx.types.tuple_list(elems_id);
+                for elem in elems.iter() {
+                    self.ensure_application_symbols_resolved_inner(elem.type_id, visited);
+                }
+            }
+            TypeKey::Conditional(cond_id) => {
+                let cond = self.ctx.types.conditional_type(cond_id);
+                self.ensure_application_symbols_resolved_inner(cond.check_type, visited);
+                self.ensure_application_symbols_resolved_inner(cond.extends_type, visited);
+                self.ensure_application_symbols_resolved_inner(cond.true_type, visited);
+                self.ensure_application_symbols_resolved_inner(cond.false_type, visited);
+            }
+            TypeKey::Mapped(mapped_id) => {
+                let mapped = self.ctx.types.mapped_type(mapped_id);
+                self.ensure_application_symbols_resolved_inner(mapped.constraint, visited);
+                self.ensure_application_symbols_resolved_inner(mapped.template, visited);
+                if let Some(name_type) = mapped.name_type {
+                    self.ensure_application_symbols_resolved_inner(name_type, visited);
+                }
+            }
+            TypeKey::ReadonlyType(inner) => {
+                self.ensure_application_symbols_resolved_inner(inner, visited);
+            }
+            TypeKey::IndexAccess(obj, idx) => {
+                self.ensure_application_symbols_resolved_inner(obj, visited);
+                self.ensure_application_symbols_resolved_inner(idx, visited);
+            }
+            TypeKey::KeyOf(inner) => {
+                self.ensure_application_symbols_resolved_inner(inner, visited);
+            }
+            _ => {}
+        }
+    }
+
     /// Create a TypeEnvironment populated with resolved symbol types.
     ///
     /// This can be passed to `is_assignable_to_with_env` for type checking
@@ -5388,6 +5516,7 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         // Use TypeLowering which handles all type nodes
+        let type_param_bindings = self.get_type_param_bindings();
         let type_resolver = |node_idx: NodeIndex| self.resolve_type_symbol_for_lowering(node_idx);
         let value_resolver = |node_idx: NodeIndex| self.resolve_value_symbol_for_lowering(node_idx);
         let lowering = TypeLowering::with_resolvers(
@@ -5395,14 +5524,7 @@ impl<'a> ThinCheckerState<'a> {
             self.ctx.types,
             &type_resolver,
             &value_resolver,
-        );
-        // Pass current type param scope to TypeLowering so it can resolve type parameters
-        let params: Vec<_> = self.ctx.type_parameter_scope.iter()
-            .map(|(name, &type_id)| (self.ctx.types.intern_string(name), type_id))
-            .collect();
-        if !params.is_empty() {
-            lowering.seed_type_params(&params);
-        }
+        ).with_type_param_bindings(type_param_bindings);
         lowering.lower_type(idx)
     }
 
@@ -6523,6 +6645,10 @@ impl<'a> ThinCheckerState<'a> {
             // `return;` without expression returns undefined
             TypeId::UNDEFINED
         };
+
+        // Ensure all Application type symbols are resolved before assignability check
+        self.ensure_application_symbols_resolved(return_type);
+        self.ensure_application_symbols_resolved(expected_type);
 
         // Check if the return type is assignable to the expected type
         if expected_type != TypeId::ANY && !self.is_assignable_to(return_type, expected_type) {
