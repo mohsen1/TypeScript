@@ -1973,6 +1973,32 @@ fn test_commonjs_import_side_effect() {
 }
 
 #[test]
+fn test_commonjs_export_assignment_skips_esmodule_marker() {
+    let source = r#"import "./module"; const foo = 1; export = foo;"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("module.exports = foo"),
+        "Expected export assignment in CommonJS output: {}",
+        output
+    );
+    assert!(
+        !output.contains("__esModule"),
+        "Export assignment should suppress __esModule marker: {}",
+        output
+    );
+}
+
+#[test]
 fn test_commonjs_import_namespace() {
     let source = r#"import * as ns from "./module";"#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
