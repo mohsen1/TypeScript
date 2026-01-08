@@ -3390,7 +3390,6 @@ fn test_conditional_infer_object_index_signature_distributive() {
     }));
 
     // T extends { [key: string]: infer R } ? R : never, with T = { a: string } | { b: number }.
-    // TODO: TypeScript infers R as string | number; solver currently yields never (no index signature inference).
     let extends_obj = interner.object_with_index(ObjectShape {
         properties: Vec::new(),
         string_index: Some(IndexSignature {
@@ -3430,8 +3429,9 @@ fn test_conditional_infer_object_index_signature_distributive() {
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
 
-    assert_eq!(result, TypeId::NEVER);
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -3453,7 +3453,6 @@ fn test_conditional_infer_number_index_signature_distributive() {
     }));
 
     // T extends { [key: number]: infer R } ? R : never, with T = { 0: string } | { 1: number }.
-    // TODO: TypeScript infers R as string | number; solver currently yields never (no index signature inference).
     let extends_obj = interner.object_with_index(ObjectShape {
         properties: Vec::new(),
         string_index: None,
@@ -3493,8 +3492,9 @@ fn test_conditional_infer_number_index_signature_distributive() {
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
 
-    assert_eq!(result, TypeId::NEVER);
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -3516,7 +3516,6 @@ fn test_conditional_infer_number_index_signature_non_distributive_union_input() 
     }));
 
     // T extends { [key: number]: infer R } ? R : never, with T = { 0: string } | { 1: number } (no distribution).
-    // TODO: Non-distributive number index signature inference yields never.
     let extends_obj = interner.object_with_index(ObjectShape {
         properties: Vec::new(),
         string_index: None,
@@ -3556,8 +3555,9 @@ fn test_conditional_infer_number_index_signature_non_distributive_union_input() 
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
 
-    assert_eq!(result, TypeId::NEVER);
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -3579,7 +3579,6 @@ fn test_conditional_infer_object_index_signature_non_object_union_branch() {
     }));
 
     // T extends { [key: string]: infer R } ? R : never, with T = { a: string } | number.
-    // TODO: Index signature inference is not implemented; current behavior yields never.
     let extends_obj = interner.object_with_index(ObjectShape {
         properties: Vec::new(),
         string_index: Some(IndexSignature {
@@ -3612,7 +3611,7 @@ fn test_conditional_infer_object_index_signature_non_object_union_branch() {
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    assert_eq!(result, TypeId::NEVER);
+    assert_eq!(result, TypeId::STRING);
 }
 
 #[test]
@@ -3634,7 +3633,6 @@ fn test_conditional_infer_object_index_signature_non_distributive_union_input() 
     }));
 
     // T extends { [key: string]: infer R } ? R : never, with T = { a: string } | { b: number } (no distribution).
-    // TODO: Non-distributive index signature inference yields never.
     let extends_obj = interner.object_with_index(ObjectShape {
         properties: Vec::new(),
         string_index: Some(IndexSignature {
@@ -3674,8 +3672,9 @@ fn test_conditional_infer_object_index_signature_non_distributive_union_input() 
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
 
-    assert_eq!(result, TypeId::NEVER);
+    assert_eq!(result, expected);
 }
 
 #[test]
