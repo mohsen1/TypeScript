@@ -2443,6 +2443,7 @@ fn test_commonjs_export_namespace() {
     printer.emit(root);
 
     let output = printer.get_output();
+    assert!(output.contains("__esModule"), "Expected __esModule marker in CommonJS output: {}", output);
     assert!(
         output.contains("(function (N)") || output.contains("namespace N"),
         "Expected namespace emit in CommonJS output: {}",
