@@ -1792,3 +1792,47 @@ fn test_parity_es5_string_enum() {
         output
     );
 }
+
+/// Parity test for type-only import erasure.
+/// Type-only imports should be completely removed from output.
+#[test]
+fn test_parity_type_only_import_erasure() {
+    let source = "import type { Foo } from './foo'; import { bar } from './bar'; bar();";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::CommonJS;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Type-only import should be erased
+    assert!(
+        !output.contains("Foo") && !output.contains("foo"),
+        "Type-only import should be erased: {}",
+        output
+    );
+    // Value import should remain
+    assert!(
+        output.contains("bar") && output.contains("require"),
+        "Value import should remain: {}",
+        output
+    );
+    // No import type syntax
+    assert!(
+        !output.contains("import type"),
+        "Output should not contain import type syntax: {}",
+        output
+    );
+}
