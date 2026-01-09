@@ -58,3 +58,27 @@
 - [x] Added mapped eval cache + guard in `thin_checker` mapped resolution
 - [x] Added regression test: `test_recursive_mapped_type_list_widget_guard`
 - [x] Tests: `./wasm/test.sh test_recursive_mapped_type_list_widget_guard` (PASS)
+
+## Resume Notes
+
+- Branch: `worker/anvil-4`
+- Last work: mapped type resolution guard + memoization (thin checker), regression test for ListWidget recursion.
+- Latest conformance: `node wasm/differential-test/conformance-runner.mjs types/mapped --max=200` (0 crashes; metrics unchanged).
+- Regression test: `./wasm/test.sh test_recursive_mapped_type_list_widget_guard` (PASS).
+
+### Files Touched
+
+- `wasm/src/thin_checker.rs` (mapped type resolution guard + cache)
+- `wasm/src/checker/context.rs` (mapped eval cache/set fields)
+- `wasm/src/thin_checker_tests.rs` (ListWidget recursion test)
+
+### Known Gaps (recursiveMappedTypes.ts)
+
+- Missing diagnostics in conformance: TS2456, TS2313, TS2589, TS2502, TS2615.
+- Likely areas: type alias circularity, circular type parameter constraints, deep instantiation limits, mapped type self-reference.
+
+### Next Steps (if continuing)
+
+1. Trace why `type Recurse = { [K in keyof Recurse]: Recurse[K] }` does not emit TS2456/TS2313.
+2. Add diagnostics for circular constraints/type aliases in `ThinCheckerState` (look at symbol resolution guards and alias type computation).
+3. Ensure depth/excessive instantiation errors (TS2589) surface for recursive mapped types.
