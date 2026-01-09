@@ -26320,3 +26320,1135 @@ class BoundMethods {
         output
     );
 }
+
+// =============================================================================
+// VARIADIC TUPLE PATTERNS - ES5 TRANSFORMATION TESTS
+// =============================================================================
+
+/// Test: spread in tuple types
+/// Verifies that classes using spread in tuple types transform correctly to ES5
+#[test]
+fn test_class_es5_spread_in_tuples() {
+    let source = r#"
+type Concat<T extends unknown[], U extends unknown[]> = [...T, ...U];
+type Prepend<T, U extends unknown[]> = [T, ...U];
+type Append<T extends unknown[], U> = [...T, U];
+
+class TupleConcatenator {
+    concat<T extends unknown[], U extends unknown[]>(first: T, second: U): Concat<T, U> {
+        return [...first, ...second] as Concat<T, U>;
+    }
+
+    prepend<T, U extends unknown[]>(item: T, tuple: U): Prepend<T, U> {
+        return [item, ...tuple] as Prepend<T, U>;
+    }
+
+    append<T extends unknown[], U>(tuple: T, item: U): Append<T, U> {
+        return [...tuple, item] as Append<T, U>;
+    }
+}
+
+class ArraySpreadHandler {
+    private items: unknown[] = [];
+
+    spreadAndCollect<T extends unknown[]>(...args: T): T {
+        this.items.push(...args);
+        return args;
+    }
+
+    mergeArrays<T extends unknown[], U extends unknown[]>(a: T, b: U): [...T, ...U] {
+        return [...a, ...b] as [...T, ...U];
+    }
+
+    wrapInTuple<T extends unknown[]>(items: T): [string, ...T, string] {
+        return ["start", ...items, "end"] as [string, ...T, string];
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function TupleConcatenator"),
+        "Expected TupleConcatenator function: {}",
+        output
+    );
+    assert!(
+        output.contains("TupleConcatenator.prototype.concat"),
+        "Expected concat method: {}",
+        output
+    );
+    assert!(
+        output.contains("TupleConcatenator.prototype.prepend") && output.contains("TupleConcatenator.prototype.append"),
+        "Expected prepend and append methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function ArraySpreadHandler"),
+        "Expected ArraySpreadHandler function: {}",
+        output
+    );
+    assert!(
+        output.contains("ArraySpreadHandler.prototype.spreadAndCollect"),
+        "Expected spreadAndCollect method: {}",
+        output
+    );
+    assert!(
+        output.contains("ArraySpreadHandler.prototype.mergeArrays") && output.contains("ArraySpreadHandler.prototype.wrapInTuple"),
+        "Expected mergeArrays and wrapInTuple methods: {}",
+        output
+    );
+}
+
+/// Test: labeled tuple elements
+/// Verifies that classes using labeled tuple elements transform correctly to ES5
+#[test]
+fn test_class_es5_labeled_tuple_elements() {
+    let source = r#"
+type Point2D = [x: number, y: number];
+type Point3D = [x: number, y: number, z: number];
+type NamedRange = [start: number, end: number, label: string];
+
+class PointFactory {
+    create2D(x: number, y: number): Point2D {
+        return [x, y];
+    }
+
+    create3D(x: number, y: number, z: number): Point3D {
+        return [x, y, z];
+    }
+
+    distance2D(a: Point2D, b: Point2D): number {
+        const [ax, ay] = a;
+        const [bx, by] = b;
+        return Math.sqrt((bx - ax) ** 2 + (by - ay) ** 2);
+    }
+
+    to3D(point: Point2D, z: number): Point3D {
+        return [...point, z];
+    }
+}
+
+type PersonTuple = [name: string, age: number, active: boolean];
+type ExtendedPerson = [...PersonTuple, role: string];
+
+class TupleTransformer {
+    createPerson(name: string, age: number, active: boolean): PersonTuple {
+        return [name, age, active];
+    }
+
+    extendPerson(person: PersonTuple, role: string): ExtendedPerson {
+        return [...person, role];
+    }
+
+    extractName(person: PersonTuple): string {
+        const [name] = person;
+        return name;
+    }
+
+    createRange(start: number, end: number, label: string): NamedRange {
+        return [start, end, label];
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function PointFactory"),
+        "Expected PointFactory function: {}",
+        output
+    );
+    assert!(
+        output.contains("PointFactory.prototype.create2D") && output.contains("PointFactory.prototype.create3D"),
+        "Expected create2D and create3D methods: {}",
+        output
+    );
+    assert!(
+        output.contains("PointFactory.prototype.distance2D"),
+        "Expected distance2D method: {}",
+        output
+    );
+    assert!(
+        output.contains("PointFactory.prototype.to3D"),
+        "Expected to3D method: {}",
+        output
+    );
+    assert!(
+        output.contains("function TupleTransformer"),
+        "Expected TupleTransformer function: {}",
+        output
+    );
+    assert!(
+        output.contains("TupleTransformer.prototype.createPerson") && output.contains("TupleTransformer.prototype.extendPerson"),
+        "Expected TupleTransformer methods: {}",
+        output
+    );
+}
+
+/// Test: rest elements in tuple types
+/// Verifies that classes using rest elements in tuples transform correctly to ES5
+#[test]
+fn test_class_es5_rest_elements_in_tuples() {
+    let source = r#"
+type HeadAndTail<T extends unknown[]> = T extends [infer H, ...infer R] ? [H, R] : never;
+type FirstTwo<T extends unknown[]> = T extends [infer A, infer B, ...unknown[]] ? [A, B] : never;
+type Last<T extends unknown[]> = T extends [...unknown[], infer L] ? L : never;
+
+class TupleDestructor {
+    getHead<T extends [unknown, ...unknown[]]>(tuple: T): T[0] {
+        return tuple[0];
+    }
+
+    getTail<T extends [unknown, ...unknown[]]>(tuple: T): T extends [unknown, ...infer R] ? R : never {
+        const [, ...rest] = tuple;
+        return rest as any;
+    }
+
+    getFirstTwo<T extends [unknown, unknown, ...unknown[]]>(tuple: T): [T[0], T[1]] {
+        return [tuple[0], tuple[1]];
+    }
+
+    getLast<T extends [...unknown[], unknown]>(tuple: T): T extends [...unknown[], infer L] ? L : never {
+        return tuple[tuple.length - 1] as any;
+    }
+}
+
+class RestParamHandler {
+    collectRest<H, T extends unknown[]>(head: H, ...tail: T): [H, ...T] {
+        return [head, ...tail];
+    }
+
+    processWithRest<A, B, R extends unknown[]>(a: A, b: B, ...rest: R): { first: A; second: B; rest: R } {
+        return { first: a, second: b, rest };
+    }
+
+    spreadMiddle<H, M extends unknown[], T>(head: H, middle: M, tail: T): [H, ...M, T] {
+        return [head, ...middle, tail];
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function TupleDestructor"),
+        "Expected TupleDestructor function: {}",
+        output
+    );
+    assert!(
+        output.contains("TupleDestructor.prototype.getHead") && output.contains("TupleDestructor.prototype.getTail"),
+        "Expected getHead and getTail methods: {}",
+        output
+    );
+    assert!(
+        output.contains("TupleDestructor.prototype.getFirstTwo") && output.contains("TupleDestructor.prototype.getLast"),
+        "Expected getFirstTwo and getLast methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function RestParamHandler"),
+        "Expected RestParamHandler function: {}",
+        output
+    );
+    assert!(
+        output.contains("RestParamHandler.prototype.collectRest") && output.contains("RestParamHandler.prototype.processWithRest"),
+        "Expected RestParamHandler methods: {}",
+        output
+    );
+}
+
+/// Test: tuple manipulation utilities
+/// Verifies that classes using tuple manipulation types transform correctly to ES5
+#[test]
+fn test_class_es5_tuple_manipulation() {
+    let source = r#"
+type Reverse<T extends unknown[]> = T extends [infer H, ...infer R] ? [...Reverse<R>, H] : [];
+type Length<T extends unknown[]> = T["length"];
+type Pop<T extends unknown[]> = T extends [...infer R, unknown] ? R : never;
+type Shift<T extends unknown[]> = T extends [unknown, ...infer R] ? R : never;
+
+class TupleManipulator {
+    reverse<T extends unknown[]>(tuple: T): unknown[] {
+        return [...tuple].reverse();
+    }
+
+    getLength<T extends unknown[]>(tuple: T): Length<T> {
+        return tuple.length as Length<T>;
+    }
+
+    pop<T extends unknown[]>(tuple: T): Pop<T> {
+        const result = [...tuple];
+        result.pop();
+        return result as Pop<T>;
+    }
+
+    shift<T extends unknown[]>(tuple: T): Shift<T> {
+        const [, ...rest] = tuple;
+        return rest as Shift<T>;
+    }
+}
+
+type Take<T extends unknown[], N extends number, R extends unknown[] = []> =
+    R["length"] extends N ? R : T extends [infer H, ...infer T2] ? Take<T2, N, [...R, H]> : R;
+
+class TupleSlice {
+    take<T extends unknown[]>(tuple: T, count: number): unknown[] {
+        return tuple.slice(0, count);
+    }
+
+    skip<T extends unknown[]>(tuple: T, count: number): unknown[] {
+        return tuple.slice(count);
+    }
+
+    slice<T extends unknown[]>(tuple: T, start: number, end: number): unknown[] {
+        return tuple.slice(start, end);
+    }
+
+    splitAt<T extends unknown[]>(tuple: T, index: number): [unknown[], unknown[]] {
+        return [tuple.slice(0, index), tuple.slice(index)];
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function TupleManipulator"),
+        "Expected TupleManipulator function: {}",
+        output
+    );
+    assert!(
+        output.contains("TupleManipulator.prototype.reverse") && output.contains("TupleManipulator.prototype.getLength"),
+        "Expected reverse and getLength methods: {}",
+        output
+    );
+    assert!(
+        output.contains("TupleManipulator.prototype.pop") && output.contains("TupleManipulator.prototype.shift"),
+        "Expected pop and shift methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function TupleSlice"),
+        "Expected TupleSlice function: {}",
+        output
+    );
+    assert!(
+        output.contains("TupleSlice.prototype.take") && output.contains("TupleSlice.prototype.skip"),
+        "Expected take and skip methods: {}",
+        output
+    );
+    assert!(
+        output.contains("TupleSlice.prototype.splitAt"),
+        "Expected splitAt method: {}",
+        output
+    );
+}
+
+/// Test: optional tuple elements
+/// Verifies that classes using optional tuple elements transform correctly to ES5
+#[test]
+fn test_class_es5_optional_tuple_elements() {
+    let source = r#"
+type OptionalCoords = [x: number, y: number, z?: number];
+type ConfigTuple = [name: string, value: unknown, description?: string, tags?: string[]];
+
+class CoordinateHandler {
+    create(x: number, y: number, z?: number): OptionalCoords {
+        if (z !== undefined) {
+            return [x, y, z];
+        }
+        return [x, y];
+    }
+
+    is3D(coords: OptionalCoords): boolean {
+        return coords.length === 3;
+    }
+
+    normalize(coords: OptionalCoords): [number, number, number] {
+        const [x, y, z = 0] = coords;
+        return [x, y, z];
+    }
+}
+
+class ConfigBuilder {
+    private configs: ConfigTuple[] = [];
+
+    add(name: string, value: unknown, description?: string, tags?: string[]): this {
+        if (tags !== undefined) {
+            this.configs.push([name, value, description, tags]);
+        } else if (description !== undefined) {
+            this.configs.push([name, value, description]);
+        } else {
+            this.configs.push([name, value]);
+        }
+        return this;
+    }
+
+    getByName(name: string): ConfigTuple | undefined {
+        return this.configs.find(([n]) => n === name);
+    }
+
+    toObject(): Record<string, { value: unknown; description?: string; tags?: string[] }> {
+        const result: Record<string, any> = {};
+        for (const config of this.configs) {
+            const [name, value, description, tags] = config;
+            result[name] = { value, description, tags };
+        }
+        return result;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function CoordinateHandler"),
+        "Expected CoordinateHandler function: {}",
+        output
+    );
+    assert!(
+        output.contains("CoordinateHandler.prototype.create"),
+        "Expected create method: {}",
+        output
+    );
+    assert!(
+        output.contains("CoordinateHandler.prototype.is3D") && output.contains("CoordinateHandler.prototype.normalize"),
+        "Expected is3D and normalize methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function ConfigBuilder"),
+        "Expected ConfigBuilder function: {}",
+        output
+    );
+    assert!(
+        output.contains("ConfigBuilder.prototype.add") && output.contains("ConfigBuilder.prototype.getByName"),
+        "Expected add and getByName methods: {}",
+        output
+    );
+    assert!(
+        output.contains("ConfigBuilder.prototype.toObject"),
+        "Expected toObject method: {}",
+        output
+    );
+}
+
+/// Test: combined variadic tuple patterns
+/// Verifies that classes using multiple variadic tuple patterns together transform correctly to ES5
+#[test]
+fn test_class_es5_combined_variadic_tuple_patterns() {
+    let source = r#"
+type EventArgs<T extends unknown[]> = [eventName: string, ...args: T];
+type Middleware<In extends unknown[], Out extends unknown[]> = (...args: In) => Out;
+type Pipeline<T extends unknown[]> = [...T, done: boolean];
+
+class EventEmitter<Events extends Record<string, unknown[]>> {
+    private listeners: Map<string, Function[]> = new Map();
+
+    emit<K extends keyof Events>(event: K, ...args: Events[K]): void {
+        const handlers = this.listeners.get(event as string) || [];
+        handlers.forEach(h => h(...args));
+    }
+
+    on<K extends keyof Events>(event: K, handler: (...args: Events[K]) => void): void {
+        const handlers = this.listeners.get(event as string) || [];
+        handlers.push(handler);
+        this.listeners.set(event as string, handlers);
+    }
+
+    createEventArgs<K extends keyof Events>(event: K, ...args: Events[K]): EventArgs<Events[K]> {
+        return [event as string, ...args] as EventArgs<Events[K]>;
+    }
+}
+
+class PipelineBuilder<T extends unknown[]> {
+    private steps: Function[] = [];
+
+    pipe<U extends unknown[]>(fn: Middleware<T, U>): PipelineBuilder<U> {
+        this.steps.push(fn);
+        return this as unknown as PipelineBuilder<U>;
+    }
+
+    execute(...input: T): Pipeline<T> {
+        let result: unknown[] = input;
+        for (const step of this.steps) {
+            result = step(...result);
+        }
+        return [...result, true] as Pipeline<T>;
+    }
+
+    compose<A extends unknown[], B extends unknown[], C extends unknown[]>(
+        f: Middleware<A, B>,
+        g: Middleware<B, C>
+    ): Middleware<A, C> {
+        return (...args: A) => g(...f(...args));
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function EventEmitter"),
+        "Expected EventEmitter function: {}",
+        output
+    );
+    assert!(
+        output.contains("EventEmitter.prototype.emit") && output.contains("EventEmitter.prototype.on"),
+        "Expected emit and on methods: {}",
+        output
+    );
+    assert!(
+        output.contains("EventEmitter.prototype.createEventArgs"),
+        "Expected createEventArgs method: {}",
+        output
+    );
+    assert!(
+        output.contains("function PipelineBuilder"),
+        "Expected PipelineBuilder function: {}",
+        output
+    );
+    assert!(
+        output.contains("PipelineBuilder.prototype.pipe") && output.contains("PipelineBuilder.prototype.execute"),
+        "Expected pipe and execute methods: {}",
+        output
+    );
+    assert!(
+        output.contains("PipelineBuilder.prototype.compose"),
+        "Expected compose method: {}",
+        output
+    );
+}
+
+// ============================================================================
+// USING DECLARATIONS PATTERN TESTS
+// ============================================================================
+
+/// Test ES5 class with sync using declarations
+#[test]
+fn test_class_es5_using_sync() {
+    let source = r#"
+// Sync using declarations
+class FileHandle {
+    private path: string;
+    private isOpen = true;
+
+    constructor(path: string) {
+        this.path = path;
+        console.log(`Opening file: ${path}`);
+    }
+
+    read(): string {
+        if (!this.isOpen) throw new Error("File is closed");
+        return `Contents of ${this.path}`;
+    }
+
+    write(content: string): void {
+        if (!this.isOpen) throw new Error("File is closed");
+        console.log(`Writing to ${this.path}: ${content}`);
+    }
+
+    [Symbol.dispose](): void {
+        if (this.isOpen) {
+            console.log(`Closing file: ${this.path}`);
+            this.isOpen = false;
+        }
+    }
+}
+
+class DatabaseConnection {
+    private connectionString: string;
+    private connected = true;
+
+    constructor(connectionString: string) {
+        this.connectionString = connectionString;
+        console.log(`Connecting to: ${connectionString}`);
+    }
+
+    query(sql: string): any[] {
+        if (!this.connected) throw new Error("Not connected");
+        return [{ result: sql }];
+    }
+
+    [Symbol.dispose](): void {
+        if (this.connected) {
+            console.log(`Disconnecting from: ${this.connectionString}`);
+            this.connected = false;
+        }
+    }
+}
+
+class LockManager {
+    private resource: string;
+    private locked = true;
+
+    constructor(resource: string) {
+        this.resource = resource;
+        console.log(`Acquiring lock on: ${resource}`);
+    }
+
+    execute<T>(fn: () => T): T {
+        if (!this.locked) throw new Error("Lock released");
+        return fn();
+    }
+
+    [Symbol.dispose](): void {
+        if (this.locked) {
+            console.log(`Releasing lock on: ${this.resource}`);
+            this.locked = false;
+        }
+    }
+}
+
+function processFiles() {
+    using file = new FileHandle("/tmp/test.txt");
+    file.write("Hello");
+    return file.read();
+}
+
+function transactionalQuery() {
+    using db = new DatabaseConnection("postgres://localhost/test");
+    using lock = new LockManager("users_table");
+    return lock.execute(() => db.query("SELECT * FROM users"));
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("FileHandle") && output.contains("DatabaseConnection") && output.contains("LockManager"),
+        "Expected sync using declaration classes: {}",
+        output
+    );
+
+    // Functions with using should be present
+    assert!(
+        output.contains("processFiles") && output.contains("transactionalQuery"),
+        "Expected functions with using declarations: {}",
+        output
+    );
+
+    // Symbol.dispose should be present in output
+    assert!(
+        output.contains("Symbol.dispose") || output.contains("dispose"),
+        "Expected Symbol.dispose pattern: {}",
+        output
+    );
+}
+
+/// Test ES5 class with async using declarations
+#[test]
+fn test_class_es5_using_async() {
+    let source = r#"
+// Async using declarations
+class AsyncFileHandle {
+    private path: string;
+    private isOpen = true;
+
+    constructor(path: string) {
+        this.path = path;
+    }
+
+    static async open(path: string): Promise<AsyncFileHandle> {
+        await new Promise(r => setTimeout(r, 10));
+        console.log(`Async opening file: ${path}`);
+        return new AsyncFileHandle(path);
+    }
+
+    async read(): Promise<string> {
+        if (!this.isOpen) throw new Error("File is closed");
+        await new Promise(r => setTimeout(r, 10));
+        return `Contents of ${this.path}`;
+    }
+
+    async write(content: string): Promise<void> {
+        if (!this.isOpen) throw new Error("File is closed");
+        await new Promise(r => setTimeout(r, 10));
+        console.log(`Async writing to ${this.path}: ${content}`);
+    }
+
+    async [Symbol.asyncDispose](): Promise<void> {
+        if (this.isOpen) {
+            await new Promise(r => setTimeout(r, 10));
+            console.log(`Async closing file: ${this.path}`);
+            this.isOpen = false;
+        }
+    }
+}
+
+class AsyncDatabaseConnection {
+    private connectionString: string;
+    private connected = true;
+
+    private constructor(connectionString: string) {
+        this.connectionString = connectionString;
+    }
+
+    static async connect(connectionString: string): Promise<AsyncDatabaseConnection> {
+        await new Promise(r => setTimeout(r, 50));
+        console.log(`Async connecting to: ${connectionString}`);
+        return new AsyncDatabaseConnection(connectionString);
+    }
+
+    async query(sql: string): Promise<any[]> {
+        if (!this.connected) throw new Error("Not connected");
+        await new Promise(r => setTimeout(r, 20));
+        return [{ result: sql }];
+    }
+
+    async [Symbol.asyncDispose](): Promise<void> {
+        if (this.connected) {
+            await new Promise(r => setTimeout(r, 30));
+            console.log(`Async disconnecting from: ${this.connectionString}`);
+            this.connected = false;
+        }
+    }
+}
+
+class AsyncTransaction {
+    private db: AsyncDatabaseConnection;
+    private committed = false;
+    private rolledBack = false;
+
+    constructor(db: AsyncDatabaseConnection) {
+        this.db = db;
+    }
+
+    async commit(): Promise<void> {
+        await new Promise(r => setTimeout(r, 10));
+        this.committed = true;
+        console.log("Transaction committed");
+    }
+
+    async rollback(): Promise<void> {
+        await new Promise(r => setTimeout(r, 10));
+        this.rolledBack = true;
+        console.log("Transaction rolled back");
+    }
+
+    async [Symbol.asyncDispose](): Promise<void> {
+        if (!this.committed && !this.rolledBack) {
+            await this.rollback();
+        }
+    }
+}
+
+async function asyncProcessFiles() {
+    await using file = await AsyncFileHandle.open("/tmp/async.txt");
+    await file.write("Async Hello");
+    return await file.read();
+}
+
+async function asyncTransactionalQuery() {
+    await using db = await AsyncDatabaseConnection.connect("postgres://localhost/test");
+    await using tx = new AsyncTransaction(db);
+    const result = await db.query("SELECT * FROM users");
+    await tx.commit();
+    return result;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("AsyncFileHandle") && output.contains("AsyncDatabaseConnection") && output.contains("AsyncTransaction"),
+        "Expected async using declaration classes: {}",
+        output
+    );
+
+    // Async functions should be present
+    assert!(
+        output.contains("asyncProcessFiles") && output.contains("asyncTransactionalQuery"),
+        "Expected async functions: {}",
+        output
+    );
+}
+
+/// Test ES5 class with dispose patterns
+#[test]
+fn test_class_es5_using_dispose_patterns() {
+    let source = r#"
+// Dispose patterns
+interface Disposable {
+    [Symbol.dispose](): void;
+}
+
+interface AsyncDisposable {
+    [Symbol.asyncDispose](): Promise<void>;
+}
+
+class ResourcePool<T extends Disposable> {
+    private resources: T[] = [];
+    private available: T[] = [];
+
+    constructor(private factory: () => T, private maxSize: number) {
+        for (let i = 0; i < maxSize; i++) {
+            const resource = factory();
+            this.resources.push(resource);
+            this.available.push(resource);
+        }
+    }
+
+    acquire(): T {
+        const resource = this.available.pop();
+        if (!resource) throw new Error("No available resources");
+        return resource;
+    }
+
+    release(resource: T): void {
+        if (this.resources.includes(resource)) {
+            this.available.push(resource);
+        }
+    }
+
+    [Symbol.dispose](): void {
+        for (const resource of this.resources) {
+            resource[Symbol.dispose]();
+        }
+        this.resources = [];
+        this.available = [];
+    }
+}
+
+class DisposableStack {
+    private stack: Disposable[] = [];
+
+    use<T extends Disposable>(resource: T): T {
+        this.stack.push(resource);
+        return resource;
+    }
+
+    defer(fn: () => void): void {
+        this.stack.push({ [Symbol.dispose]: fn });
+    }
+
+    [Symbol.dispose](): void {
+        while (this.stack.length > 0) {
+            const resource = this.stack.pop()!;
+            try {
+                resource[Symbol.dispose]();
+            } catch (e) {
+                console.error("Error during disposal:", e);
+            }
+        }
+    }
+}
+
+class Timer implements Disposable {
+    private startTime: number;
+    private name: string;
+
+    constructor(name: string) {
+        this.name = name;
+        this.startTime = Date.now();
+        console.log(`Timer '${name}' started`);
+    }
+
+    elapsed(): number {
+        return Date.now() - this.startTime;
+    }
+
+    [Symbol.dispose](): void {
+        console.log(`Timer '${this.name}' stopped: ${this.elapsed()}ms`);
+    }
+}
+
+function timedOperation() {
+    using timer = new Timer("operation");
+    using stack = new DisposableStack();
+
+    stack.defer(() => console.log("Cleanup 1"));
+    stack.defer(() => console.log("Cleanup 2"));
+
+    // Do some work
+    let sum = 0;
+    for (let i = 0; i < 1000; i++) {
+        sum += i;
+    }
+
+    console.log(`Operation completed: ${timer.elapsed()}ms`);
+    return sum;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("ResourcePool") && output.contains("DisposableStack") && output.contains("Timer"),
+        "Expected dispose pattern classes: {}",
+        output
+    );
+
+    // Function should be present
+    assert!(
+        output.contains("timedOperation"),
+        "Expected timedOperation function: {}",
+        output
+    );
+
+    // Interfaces should be stripped
+    assert!(
+        !output.contains("interface Disposable") && !output.contains("interface AsyncDisposable"),
+        "Expected interfaces to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with Symbol.dispose implementation
+#[test]
+fn test_class_es5_using_symbol_dispose() {
+    let source = r#"
+// Symbol.dispose implementation patterns
+class ManagedBuffer {
+    private buffer: ArrayBuffer;
+    private view: DataView;
+    private disposed = false;
+
+    constructor(size: number) {
+        this.buffer = new ArrayBuffer(size);
+        this.view = new DataView(this.buffer);
+        console.log(`Allocated ${size} bytes`);
+    }
+
+    write(offset: number, value: number): void {
+        if (this.disposed) throw new Error("Buffer disposed");
+        this.view.setInt32(offset, value);
+    }
+
+    read(offset: number): number {
+        if (this.disposed) throw new Error("Buffer disposed");
+        return this.view.getInt32(offset);
+    }
+
+    get size(): number {
+        return this.buffer.byteLength;
+    }
+
+    [Symbol.dispose](): void {
+        if (!this.disposed) {
+            console.log(`Freeing ${this.size} bytes`);
+            this.disposed = true;
+        }
+    }
+}
+
+class EventSubscription {
+    private target: EventTarget;
+    private type: string;
+    private handler: EventListener;
+    private active = true;
+
+    constructor(target: EventTarget, type: string, handler: EventListener) {
+        this.target = target;
+        this.type = type;
+        this.handler = handler;
+        target.addEventListener(type, handler);
+    }
+
+    [Symbol.dispose](): void {
+        if (this.active) {
+            this.target.removeEventListener(this.type, this.handler);
+            this.active = false;
+        }
+    }
+}
+
+class IntervalHandle {
+    private id: number;
+    private active = true;
+
+    constructor(callback: () => void, ms: number) {
+        this.id = setInterval(callback, ms) as unknown as number;
+    }
+
+    [Symbol.dispose](): void {
+        if (this.active) {
+            clearInterval(this.id);
+            this.active = false;
+        }
+    }
+}
+
+class TimeoutHandle {
+    private id: number;
+    private active = true;
+
+    constructor(callback: () => void, ms: number) {
+        this.id = setTimeout(callback, ms) as unknown as number;
+    }
+
+    cancel(): void {
+        if (this.active) {
+            clearTimeout(this.id);
+            this.active = false;
+        }
+    }
+
+    [Symbol.dispose](): void {
+        this.cancel();
+    }
+}
+
+function managedBufferDemo() {
+    using buffer = new ManagedBuffer(1024);
+    buffer.write(0, 42);
+    buffer.write(4, 100);
+    return buffer.read(0) + buffer.read(4);
+}
+
+function intervalDemo(callback: () => void) {
+    using interval = new IntervalHandle(callback, 100);
+    using timeout = new TimeoutHandle(() => {
+        console.log("Timeout completed");
+    }, 500);
+    // The handles will be disposed when the function returns
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("ManagedBuffer") && output.contains("EventSubscription") && output.contains("IntervalHandle"),
+        "Expected Symbol.dispose classes: {}",
+        output
+    );
+
+    // TimeoutHandle should be present
+    assert!(
+        output.contains("TimeoutHandle"),
+        "Expected TimeoutHandle class: {}",
+        output
+    );
+
+    // Functions should be present
+    assert!(
+        output.contains("managedBufferDemo") && output.contains("intervalDemo"),
+        "Expected demo functions: {}",
+        output
+    );
+}
