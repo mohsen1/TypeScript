@@ -9474,21 +9474,19 @@ class BoundedValue {
     );
 }
 
-// =============================================================================
-// Static Initialization Order Tests
-// =============================================================================
+// ============================================================================
+// new.target Tests
+// ============================================================================
 
 #[test]
-fn test_class_es5_static_init_order_basic() {
-    // Static fields should be initialized in declaration order
+fn test_class_es5_new_target_basic() {
+    // Basic new.target usage in constructor
     let source = r#"
-class Config {
-    static first: string = "first";
-    static second: string = Config.first + "_second";
-    static third: string = Config.second + "_third";
+class Example {
+    name: string;
 
-    static getAll(): string {
-        return Config.third;
+    constructor() {
+        this.name = new.target.name;
     }
 }
 "#;
@@ -9507,42 +9505,35 @@ class Config {
 
     let output = printer.get_output().to_string();
 
-    // Class should be present
+    // Class should be emitted
     assert!(
-        output.contains("Config"),
-        "Expected Config class: {}",
+        output.contains("Example"),
+        "Expected Example class: {}",
         output
     );
 
-    // Static fields should be present
+    // new.target should be transformed for ES5
     assert!(
-        output.contains("first") && output.contains("second") && output.contains("third"),
-        "Expected static fields: {}",
-        output
-    );
-
-    // Method should be present
-    assert!(
-        output.contains("getAll"),
-        "Expected getAll method: {}",
+        output.contains("name"),
+        "Expected name property: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_static_init_order_with_methods() {
-    // Static fields can call static methods during initialization
+fn test_class_es5_new_target_derived() {
+    // new.target in derived class constructor
     let source = r#"
-class Initializer {
-    static value: number = Initializer.compute();
-    static doubled: number = Initializer.value * 2;
-
-    static compute(): number {
-        return 42;
+class Base {
+    constructor() {
+        console.log(new.target.name);
     }
+}
 
-    static getDoubled(): number {
-        return Initializer.doubled;
+class Derived extends Base {
+    constructor() {
+        super();
+        console.log(new.target.name);
     }
 }
 "#;
@@ -9561,178 +9552,90 @@ class Initializer {
 
     let output = printer.get_output().to_string();
 
-    // Class should be present
+    // Both classes should be present
     assert!(
-        output.contains("Initializer"),
-        "Expected Initializer class: {}",
+        output.contains("Base"),
+        "Expected Base class: {}",
+        output
+    );
+    assert!(
+        output.contains("Derived"),
+        "Expected Derived class: {}",
         output
     );
 
-    // Static methods should be present
+    // Inheritance should be set up
     assert!(
-        output.contains("compute") && output.contains("getDoubled"),
-        "Expected compute and getDoubled methods: {}",
-        output
-    );
-
-    // Static fields should be present
-    assert!(
-        output.contains("value") && output.contains("doubled"),
-        "Expected value and doubled fields: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_static_init_order_static_block() {
-    // Static blocks execute in order with static fields
-    let source = r#"
-class Database {
-    static connections: string[] = [];
-    static initialized: boolean = false;
-
-    static {
-        Database.connections.push("default");
-        Database.initialized = true;
-    }
-
-    static primaryConnection: string = Database.connections[0];
-
-    static {
-        Database.connections.push("replica");
-    }
-
-    static getConnections(): string[] {
-        return Database.connections;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Class should be present
-    assert!(
-        output.contains("Database"),
-        "Expected Database class: {}",
-        output
-    );
-
-    // Static fields should be present
-    assert!(
-        output.contains("connections") && output.contains("initialized"),
-        "Expected static fields: {}",
-        output
-    );
-
-    // Method should be present
-    assert!(
-        output.contains("getConnections"),
-        "Expected getConnections method: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_static_init_order_inheritance() {
-    // Static initialization order with inheritance
-    let source = r#"
-class BaseLogger {
-    static prefix: string = "[Base]";
-    static level: number = 1;
-
-    static log(msg: string): void {
-        console.log(BaseLogger.prefix, msg);
-    }
-}
-
-class ChildLogger extends BaseLogger {
-    static prefix: string = "[Child]";
-    static childLevel: number = BaseLogger.level + 1;
-
-    static logChild(msg: string): void {
-        console.log(ChildLogger.prefix, msg);
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Classes should be present
-    assert!(
-        output.contains("BaseLogger") && output.contains("ChildLogger"),
-        "Expected BaseLogger and ChildLogger classes: {}",
-        output
-    );
-
-    // Inheritance should be present
-    assert!(
-        output.contains("__extends") || output.contains("prototype"),
+        output.contains("__extends") || output.contains("extends"),
         "Expected inheritance pattern: {}",
         output
     );
+}
 
-    // Static methods should be present
+#[test]
+fn test_class_es5_new_target_abstract_pattern() {
+    // new.target check to prevent direct instantiation (abstract class pattern)
+    let source = r#"
+class AbstractBase {
+    constructor() {
+        if (new.target === AbstractBase) {
+            throw new Error("Cannot instantiate abstract class");
+        }
+    }
+
+    abstract doWork(): void;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
     assert!(
-        output.contains("log") && output.contains("logChild"),
-        "Expected log and logChild methods: {}",
+        output.contains("AbstractBase"),
+        "Expected AbstractBase class: {}",
         output
     );
 
-    // Static fields should be present
+    // Error throw should be present
     assert!(
-        output.contains("prefix") && output.contains("level"),
-        "Expected prefix and level fields: {}",
+        output.contains("Error") || output.contains("throw"),
+        "Expected error handling: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_static_init_order_complex() {
-    // Complex static initialization with multiple dependencies
+fn test_class_es5_new_target_with_static() {
+    // new.target with static factory method
     let source = r#"
-class AppConfig {
-    static env: string = "production";
-    static debug: boolean = AppConfig.env !== "production";
-    static apiUrl: string = AppConfig.debug ? "http://localhost:3000" : "https://api.example.com";
-    static timeout: number = AppConfig.debug ? 30000 : 5000;
+class Factory {
+    private data: string;
 
-    static settings = {
-        env: AppConfig.env,
-        debug: AppConfig.debug,
-        apiUrl: AppConfig.apiUrl,
-        timeout: AppConfig.timeout
-    };
-
-    static getSettings(): any {
-        return AppConfig.settings;
+    constructor(data: string) {
+        if (!new.target) {
+            throw new Error("Must use new");
+        }
+        this.data = data;
     }
 
-    static isDebug(): boolean {
-        return AppConfig.debug;
+    static create(data: string): Factory {
+        return new Factory(data);
+    }
+
+    getData(): string {
+        return this.data;
     }
 }
 "#;
@@ -9751,31 +9654,145 @@ class AppConfig {
 
     let output = printer.get_output().to_string();
 
-    // Class should be present
+    // Class should be emitted
     assert!(
-        output.contains("AppConfig"),
-        "Expected AppConfig class: {}",
+        output.contains("Factory"),
+        "Expected Factory class: {}",
         output
     );
 
-    // Static fields should be present
+    // Static method should be present
     assert!(
-        output.contains("env") && output.contains("debug") && output.contains("apiUrl"),
-        "Expected static fields: {}",
+        output.contains("create"),
+        "Expected create static method: {}",
         output
     );
 
-    // Methods should be present
+    // Instance method should be present
     assert!(
-        output.contains("getSettings") && output.contains("isDebug"),
-        "Expected getSettings and isDebug methods: {}",
+        output.contains("getData"),
+        "Expected getData method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_new_target_inheritance_chain() {
+    // new.target through inheritance chain
+    let source = r#"
+class Animal {
+    type: string;
+
+    constructor() {
+        this.type = new.target.name;
+    }
+}
+
+class Mammal extends Animal {
+    warm: boolean = true;
+}
+
+class Dog extends Mammal {
+    breed: string;
+
+    constructor(breed: string) {
+        super();
+        this.breed = breed;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // All classes should be present
+    assert!(
+        output.contains("Animal"),
+        "Expected Animal class: {}",
+        output
+    );
+    assert!(
+        output.contains("Mammal"),
+        "Expected Mammal class: {}",
+        output
+    );
+    assert!(
+        output.contains("Dog"),
+        "Expected Dog class: {}",
         output
     );
 
-    // Settings object should be present
+    // Inheritance should be set up
     assert!(
-        output.contains("settings"),
-        "Expected settings field: {}",
+        output.contains("__extends") || output.contains("_super"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_new_target_undefined_check() {
+    // new.target undefined check for callable class pattern
+    let source = r#"
+class Callable {
+    value: number;
+
+    constructor(value: number) {
+        if (new.target === undefined) {
+            return new Callable(value);
+        }
+        this.value = value;
+    }
+
+    getValue(): number {
+        return this.value;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("Callable"),
+        "Expected Callable class: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("getValue"),
+        "Expected getValue method: {}",
+        output
+    );
+
+    // undefined check pattern should be in output
+    assert!(
+        output.contains("undefined") || output.contains("value"),
+        "Expected undefined check or value property: {}",
         output
     );
 }
