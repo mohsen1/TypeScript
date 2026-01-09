@@ -6,7 +6,22 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-(awaiting assignment)
+Add ES5 class tests for BigInt integration patterns
+
+Per GOALS.md Objective 1: ES5 downleveling correctness
+
+Steps:
+1. Add 6 ES5 class tests for BigInt integration patterns to `wasm/src/transforms/class_es5_tests.rs`:
+   - BigInt class property
+   - BigInt arithmetic in methods
+   - BigInt comparison operations
+   - BigInt constructor parameter
+   - BigInt static field
+   - Combined BigInt patterns
+2. Run `./wasm/test.sh class_es5_tests` to verify all tests pass
+3. Commit with message: `[wasm] transforms: add BigInt integration ES5 class tests`
+4. Push to `origin/worker/anvil-1`
+5. Update this plan file and push
 
 ## Task Queue
 (empty)
