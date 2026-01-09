@@ -21288,3 +21288,614 @@ fn test_overload_nested_generics() {
     // Target expects string -> string
 
 }
+
+// =============================================================================
+// Array Type Tests (readonly, generic, type inference)
+// =============================================================================
+// NOTE: Tests added by worker/forge-2. File has pre-existing compilation errors
+// in lines ~19206-22872 that need to be fixed separately.
+
+#[test]
+fn test_array_basic_string() {
+    // string[] - basic string array
+    let interner = TypeInterner::new();
+
+    let string_array = interner.array(TypeId::STRING);
+
+    if let Some(TypeKey::Array(element_type)) = interner.lookup(string_array) {
+        assert_eq!(*element_type, TypeId::STRING);
+    } else {
+        panic!("Expected array type");
+    }
+}
+
+#[test]
+fn test_array_basic_number() {
+    // number[] - basic number array
+    let interner = TypeInterner::new();
+
+    let number_array = interner.array(TypeId::NUMBER);
+
+    if let Some(TypeKey::Array(element_type)) = interner.lookup(number_array) {
+        assert_eq!(*element_type, TypeId::NUMBER);
+    } else {
+        panic!("Expected array type");
+    }
+}
+
+#[test]
+fn test_array_basic_boolean() {
+    // boolean[] - basic boolean array
+    let interner = TypeInterner::new();
+
+    let boolean_array = interner.array(TypeId::BOOLEAN);
+
+    if let Some(TypeKey::Array(element_type)) = interner.lookup(boolean_array) {
+        assert_eq!(*element_type, TypeId::BOOLEAN);
+    } else {
+        panic!("Expected array type");
+    }
+}
+
+#[test]
+fn test_array_readonly_string() {
+    // readonly string[] - readonly string array
+    let interner = TypeInterner::new();
+
+    let readonly_string_array = interner.readonly_array(TypeId::STRING);
+
+    if let Some(TypeKey::ReadonlyArray(element_type)) = interner.lookup(readonly_string_array) {
+        assert_eq!(*element_type, TypeId::STRING);
+    } else {
+        panic!("Expected readonly array type");
+    }
+}
+
+#[test]
+fn test_array_readonly_number() {
+    // readonly number[] - readonly number array
+    let interner = TypeInterner::new();
+
+    let readonly_number_array = interner.readonly_array(TypeId::NUMBER);
+
+    if let Some(TypeKey::ReadonlyArray(element_type)) = interner.lookup(readonly_number_array) {
+        assert_eq!(*element_type, TypeId::NUMBER);
+    } else {
+        panic!("Expected readonly array type");
+    }
+}
+
+#[test]
+fn test_array_vs_readonly_array_distinction() {
+    // string[] vs readonly string[] are different types
+    let interner = TypeInterner::new();
+
+    let mutable_array = interner.array(TypeId::STRING);
+    let readonly_array = interner.readonly_array(TypeId::STRING);
+
+    assert_ne!(mutable_array, readonly_array);
+    assert!(matches!(interner.lookup(mutable_array), Some(TypeKey::Array(_))));
+    assert!(matches!(interner.lookup(readonly_array), Some(TypeKey::ReadonlyArray(_))));
+}
+
+#[test]
+fn test_array_of_union() {
+    // (string | number)[] - array of union type
+    let interner = TypeInterner::new();
+
+    let string_or_number = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let union_array = interner.array(string_or_number);
+
+    if let Some(TypeKey::Array(element_type)) = interner.lookup(union_array) {
+        assert!(matches!(interner.lookup(*element_type), Some(TypeKey::Union(_))));
+    } else {
+        panic!("Expected array type");
+    }
+}
+
+#[test]
+fn test_array_of_object() {
+    // { x: number }[] - array of object type
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+    let obj = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let object_array = interner.array(obj);
+
+    if let Some(TypeKey::Array(element_type)) = interner.lookup(object_array) {
+        assert!(matches!(interner.lookup(*element_type), Some(TypeKey::Object(_))));
+    } else {
+        panic!("Expected array type");
+    }
+}
+
+#[test]
+fn test_array_of_function() {
+    // (() => void)[] - array of function type
+    let interner = TypeInterner::new();
+
+    let fn_type = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let function_array = interner.array(fn_type);
+
+    if let Some(TypeKey::Array(element_type)) = interner.lookup(function_array) {
+        assert!(matches!(interner.lookup(*element_type), Some(TypeKey::Function(_))));
+    } else {
+        panic!("Expected array type");
+    }
+}
+
+#[test]
+fn test_array_of_tuple() {
+    // [string, number][] - array of tuples
+    let interner = TypeInterner::new();
+
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    let tuple_array = interner.array(tuple);
+
+    if let Some(TypeKey::Array(element_type)) = interner.lookup(tuple_array) {
+        assert!(matches!(interner.lookup(*element_type), Some(TypeKey::Tuple(_))));
+    } else {
+        panic!("Expected array type");
+    }
+}
+
+#[test]
+fn test_array_nested_2d() {
+    // number[][] - 2D array
+    let interner = TypeInterner::new();
+
+    let inner_array = interner.array(TypeId::NUMBER);
+    let outer_array = interner.array(inner_array);
+
+    if let Some(TypeKey::Array(element_type)) = interner.lookup(outer_array) {
+        assert!(matches!(interner.lookup(*element_type), Some(TypeKey::Array(_))));
+    } else {
+        panic!("Expected array type");
+    }
+}
+
+#[test]
+fn test_array_nested_3d() {
+    // string[][][] - 3D array
+    let interner = TypeInterner::new();
+
+    let level1 = interner.array(TypeId::STRING);
+    let level2 = interner.array(level1);
+    let level3 = interner.array(level2);
+
+    if let Some(TypeKey::Array(inner1)) = interner.lookup(level3) {
+        if let Some(TypeKey::Array(inner2)) = interner.lookup(*inner1) {
+            if let Some(TypeKey::Array(element)) = interner.lookup(*inner2) {
+                assert_eq!(*element, TypeId::STRING);
+            } else {
+                panic!("Expected innermost array type");
+            }
+        } else {
+            panic!("Expected middle array type");
+        }
+    } else {
+        panic!("Expected outermost array type");
+    }
+}
+
+#[test]
+fn test_array_of_any() {
+    // any[] - array of any
+    let interner = TypeInterner::new();
+
+    let any_array = interner.array(TypeId::ANY);
+
+    if let Some(TypeKey::Array(element_type)) = interner.lookup(any_array) {
+        assert_eq!(*element_type, TypeId::ANY);
+    } else {
+        panic!("Expected array type");
+    }
+}
+
+#[test]
+fn test_array_of_unknown() {
+    // unknown[] - array of unknown
+    let interner = TypeInterner::new();
+
+    let unknown_array = interner.array(TypeId::UNKNOWN);
+
+    if let Some(TypeKey::Array(element_type)) = interner.lookup(unknown_array) {
+        assert_eq!(*element_type, TypeId::UNKNOWN);
+    } else {
+        panic!("Expected array type");
+    }
+}
+
+#[test]
+fn test_array_of_never() {
+    // never[] - array of never
+    let interner = TypeInterner::new();
+
+    let never_array = interner.array(TypeId::NEVER);
+
+    if let Some(TypeKey::Array(element_type)) = interner.lookup(never_array) {
+        assert_eq!(*element_type, TypeId::NEVER);
+    } else {
+        panic!("Expected array type");
+    }
+}
+
+#[test]
+fn test_array_of_void() {
+    // void[] - array of void
+    let interner = TypeInterner::new();
+
+    let void_array = interner.array(TypeId::VOID);
+
+    if let Some(TypeKey::Array(element_type)) = interner.lookup(void_array) {
+        assert_eq!(*element_type, TypeId::VOID);
+    } else {
+        panic!("Expected array type");
+    }
+}
+
+#[test]
+fn test_array_of_null() {
+    // null[] - array of null
+    let interner = TypeInterner::new();
+
+    let null_array = interner.array(TypeId::NULL);
+
+    if let Some(TypeKey::Array(element_type)) = interner.lookup(null_array) {
+        assert_eq!(*element_type, TypeId::NULL);
+    } else {
+        panic!("Expected array type");
+    }
+}
+
+#[test]
+fn test_array_of_undefined() {
+    // undefined[] - array of undefined
+    let interner = TypeInterner::new();
+
+    let undefined_array = interner.array(TypeId::UNDEFINED);
+
+    if let Some(TypeKey::Array(element_type)) = interner.lookup(undefined_array) {
+        assert_eq!(*element_type, TypeId::UNDEFINED);
+    } else {
+        panic!("Expected array type");
+    }
+}
+
+#[test]
+fn test_array_of_string_literal() {
+    // "hello"[] - array of string literal
+    let interner = TypeInterner::new();
+
+    let hello_lit = interner.literal_string("hello");
+    let lit_array = interner.array(hello_lit);
+
+    if let Some(TypeKey::Array(element_type)) = interner.lookup(lit_array) {
+        assert_eq!(*element_type, hello_lit);
+    } else {
+        panic!("Expected array type");
+    }
+}
+
+#[test]
+fn test_array_of_number_literal() {
+    // 42[] - array of number literal
+    let interner = TypeInterner::new();
+
+    let num_lit = interner.literal_number(OrderedFloat(42.0));
+    let lit_array = interner.array(num_lit);
+
+    if let Some(TypeKey::Array(element_type)) = interner.lookup(lit_array) {
+        assert_eq!(*element_type, num_lit);
+    } else {
+        panic!("Expected array type");
+    }
+}
+
+#[test]
+fn test_array_same_element_same_type() {
+    // Array with same element should produce same TypeId
+    let interner = TypeInterner::new();
+
+    let array1 = interner.array(TypeId::STRING);
+    let array2 = interner.array(TypeId::STRING);
+
+    assert_eq!(array1, array2);
+}
+
+#[test]
+fn test_array_different_element_different_type() {
+    // Arrays with different elements should produce different TypeIds
+    let interner = TypeInterner::new();
+
+    let string_array = interner.array(TypeId::STRING);
+    let number_array = interner.array(TypeId::NUMBER);
+
+    assert_ne!(string_array, number_array);
+}
+
+#[test]
+fn test_array_of_intersection() {
+    // (A & B)[] - array of intersection type
+    let interner = TypeInterner::new();
+
+    let a_name = interner.intern_string("a");
+    let b_name = interner.intern_string("b");
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: b_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![obj_a, obj_b]);
+    let intersection_array = interner.array(intersection);
+
+    if let Some(TypeKey::Array(element_type)) = interner.lookup(intersection_array) {
+        assert!(matches!(interner.lookup(*element_type), Some(TypeKey::Intersection(_))));
+    } else {
+        panic!("Expected array type");
+    }
+}
+
+#[test]
+fn test_array_of_promise() {
+    // Promise<string>[] - array of promises
+    let interner = TypeInterner::new();
+
+    let promise_string = interner.promise(TypeId::STRING);
+    let promise_array = interner.array(promise_string);
+
+    if let Some(TypeKey::Array(element_type)) = interner.lookup(promise_array) {
+        assert!(matches!(interner.lookup(*element_type), Some(TypeKey::Promise(_))));
+    } else {
+        panic!("Expected array type");
+    }
+}
+
+#[test]
+fn test_array_of_keyof() {
+    // (keyof T)[] - array of keyof type
+    let interner = TypeInterner::new();
+
+    let keyof_string = interner.keyof(TypeId::STRING);
+    let keyof_array = interner.array(keyof_string);
+
+    if let Some(TypeKey::Array(element_type)) = interner.lookup(keyof_array) {
+        assert!(matches!(interner.lookup(*element_type), Some(TypeKey::KeyOf(_))));
+    } else {
+        panic!("Expected array type");
+    }
+}
+
+#[test]
+fn test_array_in_function_param() {
+    // (arr: string[]) => void - array as function parameter
+    let interner = TypeInterner::new();
+
+    let string_array = interner.array(TypeId::STRING);
+    let arr_name = interner.intern_string("arr");
+
+    let fn_type = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(arr_name),
+            type_id: string_array,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    if let Some(TypeKey::Function(shape)) = interner.lookup(fn_type) {
+        assert_eq!(shape.params[0].type_id, string_array);
+    } else {
+        panic!("Expected function type");
+    }
+}
+
+#[test]
+fn test_array_as_function_return() {
+    // () => number[] - function returning array
+    let interner = TypeInterner::new();
+
+    let number_array = interner.array(TypeId::NUMBER);
+
+    let fn_type = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: number_array,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    if let Some(TypeKey::Function(shape)) = interner.lookup(fn_type) {
+        assert_eq!(shape.return_type, number_array);
+    } else {
+        panic!("Expected function type");
+    }
+}
+
+#[test]
+fn test_array_rest_parameter() {
+    // (...args: string[]) => void - array as rest parameter
+    let interner = TypeInterner::new();
+
+    let string_array = interner.array(TypeId::STRING);
+    let args_name = interner.intern_string("args");
+
+    let fn_type = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(args_name),
+            type_id: string_array,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    if let Some(TypeKey::Function(shape)) = interner.lookup(fn_type) {
+        assert!(shape.params[0].rest);
+        assert_eq!(shape.params[0].type_id, string_array);
+    } else {
+        panic!("Expected function type");
+    }
+}
+
+#[test]
+fn test_array_inference_from_element() {
+    // Infer array type from element type
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Infer T as string[]
+    let string_array = interner.array(TypeId::STRING);
+    ctx.add_lower_bound(var_t, string_array);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, string_array);
+}
+
+#[test]
+fn test_readonly_array_inference() {
+    // Infer readonly array type
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Infer T as readonly number[]
+    let readonly_number_array = interner.readonly_array(TypeId::NUMBER);
+    ctx.add_lower_bound(var_t, readonly_number_array);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, readonly_number_array);
+}
+
+#[test]
+fn test_array_property_in_object() {
+    // { items: string[] } - array as object property
+    let interner = TypeInterner::new();
+
+    let string_array = interner.array(TypeId::STRING);
+    let items_name = interner.intern_string("items");
+
+    let obj_with_array = interner.object(vec![PropertyInfo {
+        name: items_name,
+        type_id: string_array,
+        write_type: string_array,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(obj_with_array) {
+        assert_eq!(props[0].type_id, string_array);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_array_optional_property() {
+    // { items?: number[] } - optional array property
+    let interner = TypeInterner::new();
+
+    let number_array = interner.array(TypeId::NUMBER);
+    let items_name = interner.intern_string("items");
+
+    let obj_with_optional_array = interner.object(vec![PropertyInfo {
+        name: items_name,
+        type_id: number_array,
+        write_type: number_array,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(obj_with_optional_array) {
+        assert!(props[0].optional);
+        assert_eq!(props[0].type_id, number_array);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_array_readonly_property() {
+    // { readonly items: string[] } - readonly array property
+    let interner = TypeInterner::new();
+
+    let string_array = interner.array(TypeId::STRING);
+    let items_name = interner.intern_string("items");
+
+    let obj_with_readonly_array = interner.object(vec![PropertyInfo {
+        name: items_name,
+        type_id: string_array,
+        write_type: string_array,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(obj_with_readonly_array) {
+        assert!(props[0].readonly);
+        assert!(matches!(interner.lookup(props[0].type_id), Some(TypeKey::Array(_))));
+    } else {
+        panic!("Expected object type");
+    }
+}
