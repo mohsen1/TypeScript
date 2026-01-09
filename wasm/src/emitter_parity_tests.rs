@@ -10570,3 +10570,271 @@ class ReverseIterator<T> extends BaseIterator<T> {
         output
     );
 }
+
+#[test]
+fn test_parity_es5_async_method_this() {
+    let source = r#"
+class DataService {
+    private baseUrl: string = "https://api.example.com";
+
+    async fetchData(endpoint: string): Promise<any> {
+        const url = this.baseUrl + endpoint;
+        return await fetch(url);
+    }
+
+    async processAndSave(data: object): Promise<void> {
+        const processed = this.transform(data);
+        await this.save(processed);
+    }
+
+    private transform(data: object): object {
+        return data;
+    }
+
+    private async save(data: object): Promise<void> {
+        console.log("saved", data);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the class
+    assert!(
+        output.contains("DataService"),
+        "Output should contain DataService class: {}",
+        output
+    );
+    // Should contain this references
+    assert!(
+        output.contains("this"),
+        "Output should contain this references: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": Promise") && !output.contains(": object"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_async_method_static() {
+    let source = r#"
+class HttpClient {
+    static async get(url: string): Promise<Response> {
+        return await fetch(url);
+    }
+
+    static async post(url: string, data: object): Promise<Response> {
+        return await fetch(url, { method: "POST", body: JSON.stringify(data) });
+    }
+
+    static async fetchJson<T>(url: string): Promise<T> {
+        const response = await fetch(url);
+        return await response.json();
+    }
+}
+
+class Utils {
+    static async delay(ms: number): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    static async retry<T>(fn: () => Promise<T>, attempts: number): Promise<T> {
+        for (let i = 0; i < attempts; i++) {
+            try {
+                return await fn();
+            } catch (e) {
+                if (i === attempts - 1) throw e;
+            }
+        }
+        throw new Error("Failed");
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the classes
+    assert!(
+        output.contains("HttpClient") && output.contains("Utils"),
+        "Output should contain classes: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": Promise") && !output.contains(": string") && !output.contains("<T>"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_async_method_params() {
+    let source = r#"
+class TaskQueue<T> {
+    private tasks: (() => Promise<T>)[] = [];
+
+    async runAll(): Promise<T[]> {
+        const results: T[] = [];
+        for (const task of this.tasks) {
+            results.push(await task());
+        }
+        return results;
+    }
+
+    async map<U>(transform: (item: T) => Promise<U>): Promise<U[]> {
+        const results: U[] = [];
+        for (const task of this.tasks) {
+            const item = await task();
+            results.push(await transform(item));
+        }
+        return results;
+    }
+
+    async filter(predicate: (item: T) => Promise<boolean>): Promise<T[]> {
+        const results: T[] = [];
+        for (const task of this.tasks) {
+            const item = await task();
+            if (await predicate(item)) {
+                results.push(item);
+            }
+        }
+        return results;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the class
+    assert!(
+        output.contains("TaskQueue"),
+        "Output should contain TaskQueue class: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains("<T>") && !output.contains("<U>") && !output.contains(": Promise"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_async_method_inheritance() {
+    let source = r#"
+abstract class BaseRepository<T> {
+    abstract async findById(id: string): Promise<T | null>;
+    abstract async save(entity: T): Promise<void>;
+}
+
+class UserRepository extends BaseRepository<User> {
+    private users: Map<string, User> = new Map();
+
+    async findById(id: string): Promise<User | null> {
+        await this.ensureConnection();
+        return this.users.get(id) || null;
+    }
+
+    async save(entity: User): Promise<void> {
+        await this.ensureConnection();
+        this.users.set(entity.id, entity);
+    }
+
+    private async ensureConnection(): Promise<void> {
+        await new Promise(r => setTimeout(r, 10));
+    }
+}
+
+interface User {
+    id: string;
+    name: string;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the classes
+    assert!(
+        output.contains("BaseRepository") && output.contains("UserRepository"),
+        "Output should contain classes: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains("<T>") && !output.contains(": Promise") && !output.contains("interface User"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
