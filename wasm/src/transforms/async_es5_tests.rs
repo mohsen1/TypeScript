@@ -6966,3 +6966,199 @@ fn test_async_function_expression_conditional() {
         output
     );
 }
+
+// ============================================================================
+// Async method decorator tests
+// ============================================================================
+
+fn parse_and_emit_async_method_decorator(source: &str) -> String {
+    use crate::parser::syntax_kind_ext;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &stmt_idx in &source_file.statements.nodes {
+                if let Some(stmt_node) = parser.arena.get(stmt_idx) {
+                    if stmt_node.kind == syntax_kind_ext::CLASS_DECLARATION {
+                        if let Some(class_data) = parser.arena.get_class(stmt_node) {
+                            for &member_idx in &class_data.members.nodes {
+                                if let Some(member_node) = parser.arena.get(member_idx) {
+                                    if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
+                                        if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                            let emitter = AsyncES5Emitter::new(&parser.arena);
+                                            let has_await = emitter.body_contains_await(method_data.body);
+                                            let mut emitter = AsyncES5Emitter::new(&parser.arena);
+                                            if has_await {
+                                                return emitter.emit_generator_body_with_await(method_data.body);
+                                            } else {
+                                                return emitter.emit_simple_generator_body(method_data.body);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    String::new()
+}
+
+fn async_method_decorator_contains_await(source: &str) -> bool {
+    use crate::parser::syntax_kind_ext;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &stmt_idx in &source_file.statements.nodes {
+                if let Some(stmt_node) = parser.arena.get(stmt_idx) {
+                    if stmt_node.kind == syntax_kind_ext::CLASS_DECLARATION {
+                        if let Some(class_data) = parser.arena.get_class(stmt_node) {
+                            for &member_idx in &class_data.members.nodes {
+                                if let Some(member_node) = parser.arena.get(member_idx) {
+                                    if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
+                                        if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                            let emitter = AsyncES5Emitter::new(&parser.arena);
+                                            return emitter.body_contains_await(method_data.body);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+#[test]
+fn test_async_method_decorator_basic() {
+    let output = parse_and_emit_async_method_decorator(
+        "class Foo { @log async bar() { await process(); } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Async method with decorator should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_method_decorator_with_await() {
+    let output = parse_and_emit_async_method_decorator(
+        "class Foo { @trace async bar() { const data = await fetchData(); return data; } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Async method decorator with await should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_method_decorator_no_await() {
+    let result = async_method_decorator_contains_await(
+        "class Foo { @memo async bar() { return 42; } }",
+    );
+    assert!(!result, "Should not detect await in decorated async method without await");
+}
+
+#[test]
+fn test_async_method_decorator_chained() {
+    let output = parse_and_emit_async_method_decorator(
+        "class Foo { @log @trace @validate async bar() { await process(); } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Chained decorators on async method should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_method_decorator_body_contains_await() {
+    let result = async_method_decorator_contains_await(
+        "class Foo { @log async bar() { await getData(); } }",
+    );
+    assert!(result, "Should detect await in decorated async method");
+}
+
+#[test]
+fn test_async_method_decorator_body_no_await() {
+    let result = async_method_decorator_contains_await(
+        "class Foo { @log async bar() { return 1; } }",
+    );
+    assert!(!result, "Should not detect await when decorated async method has no await");
+}
+
+#[test]
+fn test_async_method_decorator_ignores_nested_async() {
+    let result = async_method_decorator_contains_await(
+        "class Foo { @log async bar() { const inner = async () => { await x; }; return 1; } }",
+    );
+    assert!(!result, "Should not detect await inside nested async in decorated method");
+}
+
+#[test]
+fn test_async_method_decorator_with_params() {
+    let output = parse_and_emit_async_method_decorator(
+        "class Foo { @validate async bar(id: number, name: string) { await save(id, name); } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Decorated async method with params should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_method_decorator_with_try_catch() {
+    let output = parse_and_emit_async_method_decorator(
+        "class Foo { @errorHandler async bar() { try { await riskyOp(); } catch (e) { return null; } } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Decorated async method with try/catch should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_method_decorator_static() {
+    let output = parse_and_emit_async_method_decorator(
+        "class Foo { @singleton static async getInstance() { await init(); return instance; } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Static decorated async method should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_method_decorator_factory() {
+    let output = parse_and_emit_async_method_decorator(
+        "class Foo { @retry async bar() { await longProcess(); } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Decorator factory on async method should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_method_decorator_conditional() {
+    let output = parse_and_emit_async_method_decorator(
+        "class Foo { @log async bar(cond: boolean) { if (cond) { await process(); } return 1; } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Conditional decorated async method should have switch or yield: {}",
+        output
+    );
+}

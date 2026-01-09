@@ -7,12 +7,13 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- [ ] Add async method decorator tests in `wasm/src/transforms/async_es5_tests.rs`. Run `./wasm/test.sh async_es5_tests`.
+- [ ] Awaiting next task from EM-Anvil.
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added 12 async method decorator tests (basic, with await, no await, chained, body_contains_await, body_no_await, ignores nested async, with params, try/catch, static, factory, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (388 tests PASS).
 - [x] Added 12 async function expression tests (basic, with await, no await, named, body_contains_await, body_no_await, ignores nested await, with params, try/catch, in callback, iife, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (376 tests PASS).
 - [x] Added 12 async arrow expression tests (basic, with await, no await, concise body, body_contains_await, body_no_await, ignores nested await, with params, try/catch, destructuring params, rest params, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (364 tests PASS).
 - [x] Added 12 async generator method tests (basic, with await, no await, multiple yields, body_contains_await, body_no_await, ignores nested await, yield await, try/catch, for-await-of, in class, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (352 tests PASS).
