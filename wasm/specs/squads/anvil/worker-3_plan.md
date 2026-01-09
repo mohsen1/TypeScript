@@ -7,7 +7,26 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-Add ES5 source map tests for decorator metadata patterns: reflect, design types. Tests: `./wasm/test.sh source_map_tests`
+Add ES5 source map tests for decorator metadata patterns: reflect, design types
+
+**IMPORTANT**: Do NOT sync with origin/rust - it has corruption. Instead sync with squad/anvil:
+```
+git fetch origin && git checkout worker/anvil-3 && git reset --hard origin/squad/anvil
+```
+
+Steps:
+1. Reset your branch to squad/anvil (NOT origin/rust)
+2. Add 6 ES5 source map tests for decorator metadata patterns to `wasm/src/source_map_tests.rs`:
+   - Reflect.metadata usage
+   - Design type metadata (design:type, design:paramtypes, design:returntype)
+   - Class decorator with metadata
+   - Method decorator with metadata
+   - Parameter decorator with metadata
+   - Combined decorator metadata patterns
+3. Run `./wasm/test.sh source_map` to verify all tests pass
+4. Commit with message: `[wasm] source_map: add decorator metadata pattern tests`
+5. Push to `origin/worker/anvil-3`
+6. Update this plan file and push
 
 ## Task Queue
 - [ ] Add ES5 source map tests for private field patterns: WeakMap polyfill, accessor
