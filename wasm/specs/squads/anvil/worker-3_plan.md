@@ -7,10 +7,10 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-(none)
+Add ES5 source map tests for nullish coalescing patterns: basic, with optional chaining. Tests: `./wasm/test.sh source_map_tests`
 
 ## Task Queue
-- [ ] Add ES5 source map tests for nullish coalescing patterns: basic, with optional chaining
+- [ ] Add ES5 source map tests for logical assignment patterns: &&=, ||=, ??=
 
 ## Completed
 - [x] Added optional chaining ES5 source map tests (property access, method call, element access, nested, with nullish, function context, chained methods, delete, call expression, comprehensive); 827 tests pass.
