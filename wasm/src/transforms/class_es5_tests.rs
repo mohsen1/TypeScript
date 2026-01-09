@@ -15602,27 +15602,27 @@ class AdvancedCollection<T> {
 }
 
 #[test]
-fn test_class_es5_number_isfinite_basic() {
-    // Basic Number.isFinite usage
+fn test_class_es5_reflect_construct_basic() {
+    // Basic Reflect.construct usage for constructor invocation
     let source = r#"
-class FiniteChecker {
-    isFinite(value: unknown): boolean {
-        return Number.isFinite(value);
+class ConstructorInvoker {
+    static create<T>(ctor: new (...args: any[]) => T, args: any[]): T {
+        return Reflect.construct(ctor, args);
     }
 
-    filterFinite(values: unknown[]): number[] {
-        return values.filter(v => Number.isFinite(v)) as number[];
+    static createWithProto<T>(ctor: new (...args: any[]) => T, args: any[], proto: object): T {
+        return Reflect.construct(ctor, args, proto.constructor as any);
     }
 
-    validateFinite(value: unknown): number {
-        if (!Number.isFinite(value)) {
-            throw new Error('Value must be finite');
-        }
-        return value as number;
+    static instantiate<T extends object>(
+        target: new (...args: any[]) => T,
+        argArray: any[]
+    ): T {
+        return Reflect.construct(target, argArray);
     }
 
-    static allFinite(values: unknown[]): boolean {
-        return values.every(v => Number.isFinite(v));
+    createInstance<T>(ctor: new (...args: any[]) => T, ...args: any[]): T {
+        return Reflect.construct(ctor, args);
     }
 }
 "#;
@@ -15642,41 +15642,45 @@ class FiniteChecker {
     let output = printer.get_output().to_string();
 
     assert!(
-        output.contains("FiniteChecker"),
-        "Expected FiniteChecker class: {}",
+        output.contains("ConstructorInvoker"),
+        "Expected ConstructorInvoker class: {}",
         output
     );
     assert!(
-        output.contains("Number.isFinite"),
-        "Expected Number.isFinite: {}",
+        output.contains("Reflect.construct"),
+        "Expected Reflect.construct: {}",
         output
     );
     assert!(
-        output.contains("isFinite") && output.contains("filterFinite"),
+        output.contains("create") && output.contains("createInstance"),
         "Expected methods: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_number_isnan_basic() {
-    // Basic Number.isNaN usage
+fn test_class_es5_reflect_apply_basic() {
+    // Basic Reflect.apply usage for function application
     let source = r#"
-class NaNChecker {
-    isNaN(value: unknown): boolean {
-        return Number.isNaN(value);
+class FunctionApplier {
+    static apply<T, R>(fn: (...args: any[]) => R, thisArg: T, args: any[]): R {
+        return Reflect.apply(fn, thisArg, args);
     }
 
-    hasNaN(values: unknown[]): boolean {
-        return values.some(v => Number.isNaN(v));
+    static call<T, R>(fn: (this: T, ...args: any[]) => R, context: T, ...args: any[]): R {
+        return Reflect.apply(fn, context, args);
     }
 
-    removeNaN(values: number[]): number[] {
-        return values.filter(v => !Number.isNaN(v));
+    static bind<T, R>(fn: (this: T, ...args: any[]) => R, context: T): (...args: any[]) => R {
+        return (...args: any[]) => Reflect.apply(fn, context, args);
     }
 
-    static replaceNaN(values: number[], replacement: number): number[] {
-        return values.map(v => Number.isNaN(v) ? replacement : v);
+    invokeMethod<T, K extends keyof T>(obj: T, method: K, args: any[]): any {
+        const fn = obj[method];
+        if (typeof fn === 'function') {
+            return Reflect.apply(fn as Function, obj, args);
+        }
+        throw new Error('Not a function');
     }
 }
 "#;
@@ -15696,44 +15700,60 @@ class NaNChecker {
     let output = printer.get_output().to_string();
 
     assert!(
-        output.contains("NaNChecker"),
-        "Expected NaNChecker class: {}",
+        output.contains("FunctionApplier"),
+        "Expected FunctionApplier class: {}",
         output
     );
     assert!(
-        output.contains("Number.isNaN"),
-        "Expected Number.isNaN: {}",
+        output.contains("Reflect.apply"),
+        "Expected Reflect.apply: {}",
         output
     );
     assert!(
-        output.contains("hasNaN") && output.contains("removeNaN"),
+        output.contains("apply") && output.contains("call") && output.contains("bind"),
         "Expected methods: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_number_isinteger_basic() {
-    // Basic Number.isInteger usage
+fn test_class_es5_reflect_construct_newtarget() {
+    // Reflect.construct with newTarget parameter
     let source = r#"
-class IntegerChecker {
-    isInteger(value: unknown): boolean {
-        return Number.isInteger(value);
+class NewTargetHandler {
+    static constructAs<T, U>(
+        target: new (...args: any[]) => T,
+        args: any[],
+        newTarget: new (...args: any[]) => U
+    ): T {
+        return Reflect.construct(target, args, newTarget);
     }
 
-    filterIntegers(values: unknown[]): number[] {
-        return values.filter(v => Number.isInteger(v)) as number[];
+    static createSubclass<T>(
+        baseClass: new (...args: any[]) => T,
+        subClass: new (...args: any[]) => any,
+        args: any[]
+    ): T {
+        return Reflect.construct(baseClass, args, subClass);
     }
 
-    validateInteger(value: unknown, name: string): number {
-        if (!Number.isInteger(value)) {
-            throw new TypeError(name + ' must be an integer');
+    static extendBuiltin<T extends object>(
+        builtin: new (...args: any[]) => T,
+        args: any[],
+        customClass: Function
+    ): T {
+        return Reflect.construct(builtin, args, customClass);
+    }
+
+    createWithNewTarget<T>(
+        ctor: new (...args: any[]) => T,
+        args: any[],
+        newTarget?: Function
+    ): T {
+        if (newTarget) {
+            return Reflect.construct(ctor, args, newTarget);
         }
-        return value as number;
-    }
-
-    static countIntegers(values: unknown[]): number {
-        return values.filter(v => Number.isInteger(v)).length;
+        return Reflect.construct(ctor, args);
     }
 }
 "#;
@@ -15753,47 +15773,62 @@ class IntegerChecker {
     let output = printer.get_output().to_string();
 
     assert!(
-        output.contains("IntegerChecker"),
-        "Expected IntegerChecker class: {}",
+        output.contains("NewTargetHandler"),
+        "Expected NewTargetHandler class: {}",
         output
     );
     assert!(
-        output.contains("Number.isInteger"),
-        "Expected Number.isInteger: {}",
+        output.contains("Reflect.construct"),
+        "Expected Reflect.construct: {}",
         output
     );
     assert!(
-        output.contains("isInteger") && output.contains("filterIntegers"),
+        output.contains("constructAs") && output.contains("createSubclass"),
         "Expected methods: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_number_issafeinteger_basic() {
-    // Basic Number.isSafeInteger usage
+fn test_class_es5_reflect_apply_context() {
+    // Reflect.apply with different this context
     let source = r#"
-class SafeIntegerChecker {
-    isSafeInteger(value: unknown): boolean {
-        return Number.isSafeInteger(value);
+class ContextBinder {
+    static withContext<T, R>(fn: Function, context: T, args: any[]): R {
+        return Reflect.apply(fn, context, args) as R;
     }
 
-    validateSafeInteger(value: unknown): number {
-        if (!Number.isSafeInteger(value)) {
-            throw new RangeError('Value must be a safe integer');
+    static borrowMethod<T, U>(
+        source: T,
+        methodName: keyof T,
+        target: U,
+        args: any[]
+    ): any {
+        const method = source[methodName];
+        if (typeof method === 'function') {
+            return Reflect.apply(method as Function, target, args);
         }
-        return value as number;
+        return undefined;
     }
 
-    static allSafeIntegers(values: unknown[]): boolean {
-        return values.every(v => Number.isSafeInteger(v));
+    static chainCalls<T>(
+        context: T,
+        calls: Array<{ fn: Function; args: any[] }>
+    ): any[] {
+        return calls.map(({ fn, args }) => Reflect.apply(fn, context, args));
     }
 
-    toSafeInteger(value: number): number | null {
-        if (Number.isSafeInteger(value)) {
-            return value;
+    applyWithFallback<T, R>(
+        fn: Function,
+        context: T,
+        args: any[],
+        fallback: R
+    ): R {
+        try {
+            return Reflect.apply(fn, context, args) as R;
+        } catch {
+            return fallback;
         }
-        return null;
     }
 }
 "#;
@@ -15813,530 +15848,58 @@ class SafeIntegerChecker {
     let output = printer.get_output().to_string();
 
     assert!(
-        output.contains("SafeIntegerChecker"),
-        "Expected SafeIntegerChecker class: {}",
+        output.contains("ContextBinder"),
+        "Expected ContextBinder class: {}",
         output
     );
     assert!(
-        output.contains("Number.isSafeInteger"),
-        "Expected Number.isSafeInteger: {}",
+        output.contains("Reflect.apply"),
+        "Expected Reflect.apply: {}",
         output
     );
     assert!(
-        output.contains("isSafeInteger") && output.contains("validateSafeInteger"),
+        output.contains("withContext") && output.contains("borrowMethod"),
         "Expected methods: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_number_checks_in_constructor() {
-    // Number checking methods in constructor
+fn test_class_es5_reflect_in_constructor() {
+    // Reflect.construct/apply in constructor
     let source = r#"
-class NumberValidator {
-    private value: number;
-    private isFiniteValue: boolean;
-    private isIntegerValue: boolean;
-    private isSafeValue: boolean;
+class ReflectiveClass {
+    private instance: object;
+    private boundMethods: Map<string, Function>;
 
-    constructor(value: unknown) {
-        if (Number.isNaN(value)) {
-            throw new Error('Cannot create validator with NaN');
-        }
-        if (!Number.isFinite(value)) {
-            throw new Error('Value must be finite');
-        }
+    constructor(
+        baseClass: new (...args: any[]) => object,
+        args: any[],
+        methodsToBind: string[]
+    ) {
+        this.instance = Reflect.construct(baseClass, args);
+        this.boundMethods = new Map();
 
-        this.value = value as number;
-        this.isFiniteValue = Number.isFinite(value);
-        this.isIntegerValue = Number.isInteger(value);
-        this.isSafeValue = Number.isSafeInteger(value);
-    }
-
-    getValue(): number {
-        return this.value;
-    }
-
-    isInteger(): boolean {
-        return this.isIntegerValue;
-    }
-
-    isSafe(): boolean {
-        return this.isSafeValue;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    assert!(
-        output.contains("NumberValidator"),
-        "Expected NumberValidator class: {}",
-        output
-    );
-    assert!(
-        output.contains("Number.isNaN") && output.contains("Number.isFinite"),
-        "Expected Number.isNaN and Number.isFinite: {}",
-        output
-    );
-    assert!(
-        output.contains("Number.isInteger") && output.contains("Number.isSafeInteger"),
-        "Expected Number.isInteger and Number.isSafeInteger: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_number_checks_combined() {
-    // Combined Number checking patterns
-    let source = r#"
-class NumericAnalyzer {
-    static analyze(value: unknown): {
-        isNumber: boolean;
-        isFinite: boolean;
-        isNaN: boolean;
-        isInteger: boolean;
-        isSafeInteger: boolean;
-    } {
-        return {
-            isNumber: typeof value === 'number',
-            isFinite: Number.isFinite(value),
-            isNaN: Number.isNaN(value),
-            isInteger: Number.isInteger(value),
-            isSafeInteger: Number.isSafeInteger(value)
-        };
-    }
-
-    static categorize(values: unknown[]): {
-        finite: number[];
-        infinite: number[];
-        nan: number[];
-        integers: number[];
-        floats: number[];
-    } {
-        const numbers = values.filter(v => typeof v === 'number') as number[];
-        return {
-            finite: numbers.filter(n => Number.isFinite(n)),
-            infinite: numbers.filter(n => !Number.isFinite(n) && !Number.isNaN(n)),
-            nan: numbers.filter(n => Number.isNaN(n)),
-            integers: numbers.filter(n => Number.isInteger(n)),
-            floats: numbers.filter(n => Number.isFinite(n) && !Number.isInteger(n))
-        };
-    }
-
-    static validateRange(
-        value: unknown,
-        min: number,
-        max: number,
-        requireInteger: boolean
-    ): number {
-        if (Number.isNaN(value)) {
-            throw new Error('Value is NaN');
-        }
-        if (!Number.isFinite(value)) {
-            throw new Error('Value is not finite');
-        }
-        if (requireInteger && !Number.isInteger(value)) {
-            throw new Error('Value must be an integer');
-        }
-        const num = value as number;
-        if (num < min || num > max) {
-            throw new RangeError('Value out of range');
-        }
-        return num;
-    }
-
-    coerceToSafeInteger(value: number): number {
-        if (Number.isNaN(value)) {
-            return 0;
-        }
-        if (!Number.isFinite(value)) {
-            return value > 0 ? Number.MAX_SAFE_INTEGER : Number.MIN_SAFE_INTEGER;
-        }
-        if (Number.isSafeInteger(value)) {
-            return value;
-        }
-        return Math.round(value);
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    assert!(
-        output.contains("NumericAnalyzer"),
-        "Expected NumericAnalyzer class: {}",
-        output
-    );
-    assert!(
-        output.contains("Number.isFinite") && output.contains("Number.isNaN"),
-        "Expected Number.isFinite and Number.isNaN: {}",
-        output
-    );
-    assert!(
-        output.contains("Number.isInteger") && output.contains("Number.isSafeInteger"),
-        "Expected Number.isInteger and Number.isSafeInteger: {}",
-        output
-    );
-    assert!(
-        output.contains("analyze") && output.contains("categorize"),
-        "Expected analysis methods: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_math_trunc_basic() {
-    // Basic Math.trunc usage
-    let source = r#"
-class TruncCalculator {
-    truncate(value: number): number {
-        return Math.trunc(value);
-    }
-
-    truncateAll(values: number[]): number[] {
-        return values.map(v => Math.trunc(v));
-    }
-
-    static toInteger(value: number): number {
-        return Math.trunc(value);
-    }
-
-    divideAndTrunc(a: number, b: number): number {
-        return Math.trunc(a / b);
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    assert!(
-        output.contains("TruncCalculator"),
-        "Expected TruncCalculator class: {}",
-        output
-    );
-    assert!(
-        output.contains("Math.trunc"),
-        "Expected Math.trunc: {}",
-        output
-    );
-    assert!(
-        output.contains("truncate") && output.contains("truncateAll"),
-        "Expected methods: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_math_sign_basic() {
-    // Basic Math.sign usage
-    let source = r#"
-class SignChecker {
-    getSign(value: number): number {
-        return Math.sign(value);
-    }
-
-    isPositive(value: number): boolean {
-        return Math.sign(value) === 1;
-    }
-
-    isNegative(value: number): boolean {
-        return Math.sign(value) === -1;
-    }
-
-    static categorizeBySign(values: number[]): { positive: number[]; negative: number[]; zero: number[] } {
-        return {
-            positive: values.filter(v => Math.sign(v) === 1),
-            negative: values.filter(v => Math.sign(v) === -1),
-            zero: values.filter(v => Math.sign(v) === 0)
-        };
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    assert!(
-        output.contains("SignChecker"),
-        "Expected SignChecker class: {}",
-        output
-    );
-    assert!(
-        output.contains("Math.sign"),
-        "Expected Math.sign: {}",
-        output
-    );
-    assert!(
-        output.contains("getSign") && output.contains("isPositive"),
-        "Expected methods: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_math_cbrt_basic() {
-    // Basic Math.cbrt usage
-    let source = r#"
-class CubeRootCalculator {
-    cubeRoot(value: number): number {
-        return Math.cbrt(value);
-    }
-
-    static calculateVolumeSide(volume: number): number {
-        return Math.cbrt(volume);
-    }
-
-    inverseCube(value: number): number {
-        const root = Math.cbrt(value);
-        return root * root * root;
-    }
-
-    cubeRootSum(values: number[]): number {
-        return values.reduce((sum, v) => sum + Math.cbrt(v), 0);
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    assert!(
-        output.contains("CubeRootCalculator"),
-        "Expected CubeRootCalculator class: {}",
-        output
-    );
-    assert!(
-        output.contains("Math.cbrt"),
-        "Expected Math.cbrt: {}",
-        output
-    );
-    assert!(
-        output.contains("cubeRoot") && output.contains("cubeRootSum"),
-        "Expected methods: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_math_log2_log10_basic() {
-    // Basic Math.log2 and Math.log10 usage
-    let source = r#"
-class LogarithmCalculator {
-    log2(value: number): number {
-        return Math.log2(value);
-    }
-
-    log10(value: number): number {
-        return Math.log10(value);
-    }
-
-    static bitsNeeded(value: number): number {
-        return Math.ceil(Math.log2(value + 1));
-    }
-
-    static digitsNeeded(value: number): number {
-        return Math.floor(Math.log10(Math.abs(value))) + 1;
-    }
-
-    isPowerOf2(value: number): boolean {
-        return Number.isInteger(Math.log2(value));
-    }
-
-    isPowerOf10(value: number): boolean {
-        return Number.isInteger(Math.log10(value));
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    assert!(
-        output.contains("LogarithmCalculator"),
-        "Expected LogarithmCalculator class: {}",
-        output
-    );
-    assert!(
-        output.contains("Math.log2") && output.contains("Math.log10"),
-        "Expected Math.log2 and Math.log10: {}",
-        output
-    );
-    assert!(
-        output.contains("bitsNeeded") && output.contains("digitsNeeded"),
-        "Expected methods: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_math_expm1_basic() {
-    // Basic Math.expm1 usage
-    let source = r#"
-class ExponentialCalculator {
-    expm1(value: number): number {
-        return Math.expm1(value);
-    }
-
-    static preciseExpMinusOne(x: number): number {
-        return Math.expm1(x);
-    }
-
-    compoundInterest(principal: number, rate: number, time: number): number {
-        return principal * Math.expm1(rate * time);
-    }
-
-    growthFactor(rate: number): number {
-        return Math.expm1(rate) + 1;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    assert!(
-        output.contains("ExponentialCalculator"),
-        "Expected ExponentialCalculator class: {}",
-        output
-    );
-    assert!(
-        output.contains("Math.expm1"),
-        "Expected Math.expm1: {}",
-        output
-    );
-    assert!(
-        output.contains("expm1") && output.contains("compoundInterest"),
-        "Expected methods: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_math_es6_combined() {
-    // Combined ES6 Math methods
-    let source = r#"
-class MathUtilities {
-    static analyze(value: number): {
-        truncated: number;
-        sign: number;
-        cubeRoot: number;
-        log2: number;
-        log10: number;
-        expm1: number;
-    } {
-        return {
-            truncated: Math.trunc(value),
-            sign: Math.sign(value),
-            cubeRoot: Math.cbrt(value),
-            log2: Math.log2(Math.abs(value)),
-            log10: Math.log10(Math.abs(value)),
-            expm1: Math.expm1(value)
-        };
-    }
-
-    static normalize(values: number[]): number[] {
-        const signs = values.map(v => Math.sign(v));
-        const magnitudes = values.map(v => Math.abs(v));
-        const maxLog = Math.max(...magnitudes.map(m => Math.log10(m + 1)));
-        return values.map((v, i) => {
-            const normalized = Math.log10(Math.abs(v) + 1) / maxLog;
-            return Math.sign(v) * normalized;
+        methodsToBind.forEach(methodName => {
+            const method = (this.instance as any)[methodName];
+            if (typeof method === 'function') {
+                this.boundMethods.set(methodName, (...callArgs: any[]) => {
+                    return Reflect.apply(method, this.instance, callArgs);
+                });
+            }
         });
     }
 
-    processValue(value: number): number {
-        const truncated = Math.trunc(value);
-        const sign = Math.sign(truncated);
-        const magnitude = Math.cbrt(Math.abs(truncated));
-        return sign * magnitude;
+    callMethod(name: string, ...args: any[]): any {
+        const method = this.boundMethods.get(name);
+        if (method) {
+            return Reflect.apply(method, null, args);
+        }
+        throw new Error('Method not found');
     }
 
-    calculateComplexity(n: number): number {
-        if (n <= 0) return 0;
-        const log2n = Math.log2(n);
-        const log10n = Math.log10(n);
-        return Math.trunc(log2n * log10n);
+    getInstance(): object {
+        return this.instance;
     }
 }
 "#;
@@ -16356,23 +15919,492 @@ class MathUtilities {
     let output = printer.get_output().to_string();
 
     assert!(
-        output.contains("MathUtilities"),
-        "Expected MathUtilities class: {}",
+        output.contains("ReflectiveClass"),
+        "Expected ReflectiveClass class: {}",
         output
     );
     assert!(
-        output.contains("Math.trunc") && output.contains("Math.sign"),
-        "Expected Math.trunc and Math.sign: {}",
+        output.contains("Reflect.construct") && output.contains("Reflect.apply"),
+        "Expected Reflect methods: {}",
         output
     );
     assert!(
-        output.contains("Math.cbrt") && output.contains("Math.log2"),
-        "Expected Math.cbrt and Math.log2: {}",
+        output.contains("callMethod") && output.contains("getInstance"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_reflect_combined() {
+    // Combined Reflect.construct and Reflect.apply patterns
+    let source = r#"
+class ReflectUtilities {
+    static factory<T>(
+        ctor: new (...args: any[]) => T,
+        initializer?: (instance: T) => void
+    ): (...args: any[]) => T {
+        return (...args: any[]) => {
+            const instance = Reflect.construct(ctor, args);
+            if (initializer) {
+                Reflect.apply(initializer, null, [instance]);
+            }
+            return instance;
+        };
+    }
+
+    static memoizedConstruct<T>(
+        ctor: new (...args: any[]) => T,
+        keyFn: (...args: any[]) => string
+    ): (...args: any[]) => T {
+        const cache = new Map<string, T>();
+        return (...args: any[]) => {
+            const key = Reflect.apply(keyFn, null, args);
+            if (cache.has(key)) {
+                return cache.get(key)!;
+            }
+            const instance = Reflect.construct(ctor, args);
+            cache.set(key, instance);
+            return instance;
+        };
+    }
+
+    invokeAll<T>(
+        methods: Array<{ target: object; fn: Function; args: any[] }>
+    ): any[] {
+        return methods.map(({ target, fn, args }) => Reflect.apply(fn, target, args));
+    }
+
+    constructAll<T>(
+        ctors: Array<{ ctor: new (...args: any[]) => T; args: any[] }>
+    ): T[] {
+        return ctors.map(({ ctor, args }) => Reflect.construct(ctor, args));
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("ReflectUtilities"),
+        "Expected ReflectUtilities class: {}",
         output
     );
     assert!(
-        output.contains("analyze") && output.contains("normalize"),
-        "Expected utility methods: {}",
+        output.contains("Reflect.construct") && output.contains("Reflect.apply"),
+        "Expected Reflect methods: {}",
+        output
+    );
+    assert!(
+        output.contains("factory") && output.contains("memoizedConstruct"),
+        "Expected factory methods: {}",
+        output
+    );
+    assert!(
+        output.contains("invokeAll") && output.contains("constructAll"),
+        "Expected batch methods: {}",
+        output
+    );
+}
+
+// ============================================================================
+// Async/Await in Derived Constructor Tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_async_derived_constructor_basic() {
+    // Basic derived class with async method pattern
+    let source = r#"
+class BaseService {
+    protected name: string;
+
+    constructor(name: string) {
+        this.name = name;
+    }
+}
+
+class AsyncService extends BaseService {
+    private data: any = null;
+
+    constructor(name: string) {
+        super(name);
+    }
+
+    async initialize(): Promise<void> {
+        this.data = await this.fetchData();
+    }
+
+    private async fetchData(): Promise<any> {
+        return await Promise.resolve({ initialized: true });
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted to functions
+    assert!(
+        output.contains("function BaseService"),
+        "Expected BaseService function: {}",
+        output
+    );
+    assert!(
+        output.contains("function AsyncService"),
+        "Expected AsyncService function: {}",
+        output
+    );
+
+    // Async methods should use generator pattern
+    assert!(
+        output.contains("__awaiter") || output.contains("__generator") || output.contains("return"),
+        "Expected async transform: {}",
+        output
+    );
+
+    // super() call should be present (using _super.call pattern)
+    assert!(
+        output.contains("_super.call") || output.contains("BaseService.call") || output.contains(".call(this"),
+        "Expected super call: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_async_derived_constructor_factory() {
+    // Derived class with async static factory method
+    let source = r#"
+class Entity {
+    id: string;
+
+    constructor(id: string) {
+        this.id = id;
+    }
+}
+
+class AsyncEntity extends Entity {
+    private loaded: boolean = false;
+    private metadata: any;
+
+    constructor(id: string) {
+        super(id);
+    }
+
+    static async create(id: string): Promise<AsyncEntity> {
+        const entity = new AsyncEntity(id);
+        await entity.load();
+        return entity;
+    }
+
+    private async load(): Promise<void> {
+        this.metadata = await this.fetchMetadata();
+        this.loaded = true;
+    }
+
+    private async fetchMetadata(): Promise<any> {
+        return await Promise.resolve({ type: "entity", version: 1 });
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("function Entity") && output.contains("function AsyncEntity"),
+        "Expected class functions: {}",
+        output
+    );
+
+    // Static method should be present
+    assert!(
+        output.contains("create") || output.contains("AsyncEntity.create"),
+        "Expected static create method: {}",
+        output
+    );
+
+    // Async patterns should be present
+    assert!(
+        output.contains("load") && output.contains("fetchMetadata"),
+        "Expected async methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_async_derived_constructor_chain() {
+    // Multi-level inheritance with async patterns
+    let source = r#"
+class BaseComponent {
+    protected element: any;
+
+    constructor(tag: string) {
+        this.element = { tag };
+    }
+}
+
+class InteractiveComponent extends BaseComponent {
+    protected handlers: Map<string, Function> = new Map();
+
+    constructor(tag: string) {
+        super(tag);
+    }
+
+    async bindEvents(): Promise<void> {
+        const config = await this.loadEventConfig();
+        for (const [event, handler] of Object.entries(config)) {
+            this.handlers.set(event, handler as Function);
+        }
+    }
+
+    private async loadEventConfig(): Promise<Record<string, Function>> {
+        return await Promise.resolve({});
+    }
+}
+
+class AsyncWidget extends InteractiveComponent {
+    private state: any = {};
+
+    constructor(tag: string) {
+        super(tag);
+    }
+
+    async initialize(): Promise<void> {
+        await super.bindEvents();
+        this.state = await this.loadInitialState();
+    }
+
+    private async loadInitialState(): Promise<any> {
+        return await Promise.resolve({ ready: true });
+    }
+
+    async updateState(newState: any): Promise<void> {
+        const validated = await this.validateState(newState);
+        this.state = { ...this.state, ...validated };
+    }
+
+    private async validateState(state: any): Promise<any> {
+        return await Promise.resolve(state);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // All classes should be converted
+    assert!(
+        output.contains("function BaseComponent"),
+        "Expected BaseComponent function: {}",
+        output
+    );
+    assert!(
+        output.contains("function InteractiveComponent"),
+        "Expected InteractiveComponent function: {}",
+        output
+    );
+    assert!(
+        output.contains("function AsyncWidget"),
+        "Expected AsyncWidget function: {}",
+        output
+    );
+
+    // Inheritance chain should be established (using _super.call pattern)
+    assert!(
+        output.contains("_super.call") || output.contains("BaseComponent.call") || output.contains("InteractiveComponent.call"),
+        "Expected super calls in chain: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_async_derived_constructor_with_field_init() {
+    // Derived class with async field initializers pattern
+    let source = r#"
+class DataStore {
+    protected cache: Map<string, any> = new Map();
+
+    constructor(name: string) {}
+}
+
+class AsyncDataStore extends DataStore {
+    private pending: Promise<void>[] = [];
+    private syncInterval: number = 1000;
+
+    constructor(name: string) {
+        super(name);
+    }
+
+    async set(key: string, value: any): Promise<void> {
+        const operation = this.performSet(key, value);
+        this.pending.push(operation);
+        await operation;
+    }
+
+    private async performSet(key: string, value: any): Promise<void> {
+        await this.validate(key, value);
+        this.cache.set(key, value);
+    }
+
+    private async validate(key: string, value: any): Promise<void> {
+        if (!key) {
+            throw new Error("Invalid key");
+        }
+        await Promise.resolve();
+    }
+
+    async flush(): Promise<void> {
+        await Promise.all(this.pending);
+        this.pending = [];
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("function DataStore") && output.contains("function AsyncDataStore"),
+        "Expected class functions: {}",
+        output
+    );
+
+    // Field initializers should be present
+    assert!(
+        output.contains("pending") && output.contains("syncInterval"),
+        "Expected field initializers: {}",
+        output
+    );
+
+    // Async methods
+    assert!(
+        output.contains("set") && output.contains("flush"),
+        "Expected async methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_async_derived_constructor_protected() {
+    // Derived class with protected async methods
+    let source = r#"
+abstract class AbstractRepository<T> {
+    protected items: T[] = [];
+
+    constructor() {}
+
+    protected abstract fetchAll(): Promise<T[]>;
+}
+
+class UserRepository extends AbstractRepository<{ id: string; name: string }> {
+    constructor() {
+        super();
+    }
+
+    protected async fetchAll(): Promise<{ id: string; name: string }[]> {
+        const response = await this.makeRequest("/users");
+        return response.data;
+    }
+
+    private async makeRequest(url: string): Promise<{ data: any[] }> {
+        return await Promise.resolve({ data: [] });
+    }
+
+    async getById(id: string): Promise<{ id: string; name: string } | undefined> {
+        const all = await this.fetchAll();
+        return all.find(item => item.id === id);
+    }
+
+    async save(user: { id: string; name: string }): Promise<void> {
+        await this.makeRequest("/users/" + user.id);
+        this.items.push(user);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("AbstractRepository") || output.contains("function UserRepository"),
+        "Expected class functions: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("fetchAll") && output.contains("getById"),
+        "Expected repository methods: {}",
         output
     );
 }
