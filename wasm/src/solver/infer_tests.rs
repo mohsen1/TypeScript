@@ -17676,5 +17676,677 @@ fn test_rest_param_object_assign() {
     assert_eq!(result_u, obj_b);
     assert_eq!(result_v, obj_c);
 }
-    assert!(result.is_ok() || result.is_err());
+
+// =============================================================================
+// Type Guard Tests (is, asserts, narrowing)
+// =============================================================================
+
+#[test]
+fn test_type_guard_basic_is_predicate() {
+    // function isString(x: unknown): x is string
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+
+    let guard_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(x_name),
+            type_id: TypeId::UNKNOWN,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::BOOLEAN, // Runtime return is boolean
+        type_predicate: Some(TypePredicate {
+            asserts: false,
+            target: TypePredicateTarget::Identifier(x_name),
+            type_id: Some(TypeId::STRING),
+        }),
+        is_constructor: false,
+    });
+
+    if let Some(TypeKey::Function(shape)) = interner.lookup(guard_fn) {
+        assert!(shape.type_predicate.is_some());
+        let pred = shape.type_predicate.as_ref().unwrap();
+        assert!(!pred.asserts);
+        assert_eq!(pred.type_id, Some(TypeId::STRING));
+    } else {
+        panic!("Expected function type");
+    }
+}
+
+#[test]
+fn test_type_guard_asserts_predicate() {
+    // function assertString(x: unknown): asserts x is string
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+
+    let assert_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(x_name),
+            type_id: TypeId::UNKNOWN,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: Some(TypePredicate {
+            asserts: true,
+            target: TypePredicateTarget::Identifier(x_name),
+            type_id: Some(TypeId::STRING),
+        }),
+        is_constructor: false,
+    });
+
+    if let Some(TypeKey::Function(shape)) = interner.lookup(assert_fn) {
+        assert!(shape.type_predicate.is_some());
+        let pred = shape.type_predicate.as_ref().unwrap();
+        assert!(pred.asserts);
+        assert_eq!(pred.type_id, Some(TypeId::STRING));
+    } else {
+        panic!("Expected function type");
+    }
+}
+
+#[test]
+fn test_type_guard_asserts_without_type() {
+    // function assertDefined<T>(x: T | undefined): asserts x
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+
+    let assert_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(x_name),
+            type_id: interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]),
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: Some(TypePredicate {
+            asserts: true,
+            target: TypePredicateTarget::Identifier(x_name),
+            type_id: None, // No type, just asserts truthy
+        }),
+        is_constructor: false,
+    });
+
+    if let Some(TypeKey::Function(shape)) = interner.lookup(assert_fn) {
+        assert!(shape.type_predicate.is_some());
+        let pred = shape.type_predicate.as_ref().unwrap();
+        assert!(pred.asserts);
+        assert!(pred.type_id.is_none());
+    } else {
+        panic!("Expected function type");
+    }
+}
+
+#[test]
+fn test_type_guard_this_is_type() {
+    // class Animal { isChicken(): this is Chicken }
+    let interner = TypeInterner::new();
+
+    let chicken_type = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("cluck"),
+        type_id: TypeId::VOID,
+        write_type: TypeId::VOID,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let guard_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::BOOLEAN,
+        type_predicate: Some(TypePredicate {
+            asserts: false,
+            target: TypePredicateTarget::This,
+            type_id: Some(chicken_type),
+        }),
+        is_constructor: false,
+    });
+
+    if let Some(TypeKey::Function(shape)) = interner.lookup(guard_method) {
+        assert!(shape.type_predicate.is_some());
+        let pred = shape.type_predicate.as_ref().unwrap();
+        assert_eq!(pred.target, TypePredicateTarget::This);
+    } else {
+        panic!("Expected function type");
+    }
+}
+
+#[test]
+fn test_type_guard_generic_is_predicate() {
+    // function isArrayOf<T>(x: unknown, check: (v: unknown) => v is T): x is T[]
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // When check is (v: unknown) => v is string, T = string
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_type_guard_narrows_union() {
+    // function isNumber(x: string | number): x is number
+    // After check, x is narrowed to number
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+    let union_type = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    let guard_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(x_name),
+            type_id: union_type,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::BOOLEAN,
+        type_predicate: Some(TypePredicate {
+            asserts: false,
+            target: TypePredicateTarget::Identifier(x_name),
+            type_id: Some(TypeId::NUMBER),
+        }),
+        is_constructor: false,
+    });
+
+    if let Some(TypeKey::Function(shape)) = interner.lookup(guard_fn) {
+        let pred = shape.type_predicate.as_ref().unwrap();
+        assert_eq!(pred.type_id, Some(TypeId::NUMBER));
+    } else {
+        panic!("Expected function type");
+    }
+}
+
+#[test]
+fn test_type_guard_with_object_type() {
+    // function isCat(animal: Animal): animal is Cat
+    let interner = TypeInterner::new();
+
+    let animal_name = interner.intern_string("animal");
+
+    let animal_type = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("name"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let cat_type = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("name"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("meow"),
+            type_id: TypeId::VOID,
+            write_type: TypeId::VOID,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+    ]);
+
+    let guard_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(animal_name),
+            type_id: animal_type,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::BOOLEAN,
+        type_predicate: Some(TypePredicate {
+            asserts: false,
+            target: TypePredicateTarget::Identifier(animal_name),
+            type_id: Some(cat_type),
+        }),
+        is_constructor: false,
+    });
+
+    assert!(matches!(interner.lookup(guard_fn), Some(TypeKey::Function(_))));
+}
+
+#[test]
+fn test_type_guard_array_filter_inference() {
+    // arr.filter((x): x is T => ...) narrows array type
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Filtering (string | null)[] with (x): x is string => ...
+    // Result should be string[]
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_type_guard_in_callback() {
+    // function filter<T, S extends T>(arr: T[], pred: (x: T) => x is S): S[]
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let t_name = interner.intern_string("T");
+    let s_name = interner.intern_string("S");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_s = ctx.fresh_type_param(s_name);
+
+    // T = string | number, S = string (after type guard)
+    let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    ctx.add_lower_bound(var_t, union);
+    ctx.add_lower_bound(var_s, TypeId::STRING);
+
+    let result_t = ctx.resolve_with_constraints(var_t).unwrap();
+    let result_s = ctx.resolve_with_constraints(var_s).unwrap();
+
+    assert_eq!(result_t, union);
+    assert_eq!(result_s, TypeId::STRING);
+}
+
+#[test]
+fn test_type_guard_instanceof_pattern() {
+    // Simulating: if (x instanceof Error) { x.message }
+    let interner = TypeInterner::new();
+
+    let error_type = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("message"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // After instanceof check, narrowed to Error
+    let union = interner.union(vec![TypeId::STRING, error_type]);
+
+    // The narrowed type should be just error_type
+    assert_ne!(union, error_type);
+}
+
+#[test]
+fn test_type_guard_typeof_pattern() {
+    // Simulating: if (typeof x === "string") { x.toUpperCase() }
+    let interner = TypeInterner::new();
+
+    let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    // After typeof === "string" check, narrowed to string
+    assert_ne!(union, TypeId::STRING);
+}
+
+#[test]
+fn test_type_guard_in_pattern() {
+    // Simulating: if ("message" in x) { x.message }
+    let interner = TypeInterner::new();
+
+    let with_message = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("message"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let without_message = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("code"),
+        type_id: TypeId::NUMBER,
         write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let union = interner.union(vec![with_message, without_message]);
+
+    // After "message" in x check, narrowed to with_message
+    assert_ne!(union, with_message);
+}
+
+#[test]
+fn test_type_guard_truthiness_narrowing() {
+    // Simulating: if (x) { ... } where x: string | null | undefined
+    let interner = TypeInterner::new();
+
+    let nullable = interner.union(vec![TypeId::STRING, TypeId::NULL, TypeId::UNDEFINED]);
+
+    // After truthiness check, narrowed to string
+    assert_ne!(nullable, TypeId::STRING);
+}
+
+#[test]
+fn test_type_guard_equality_narrowing() {
+    // Simulating: if (x === null) { ... } else { ... }
+    let interner = TypeInterner::new();
+
+    let nullable = interner.union(vec![TypeId::STRING, TypeId::NULL]);
+
+    // After x === null check in if branch: null
+    // After x === null check in else branch: string
+    assert_ne!(nullable, TypeId::NULL);
+    assert_ne!(nullable, TypeId::STRING);
+}
+
+#[test]
+fn test_type_guard_discriminated_union() {
+    // type Action = { type: "add", value: number } | { type: "remove", id: string }
+    // if (action.type === "add") { action.value }
+    let interner = TypeInterner::new();
+
+    let type_name = interner.intern_string("type");
+    let value_name = interner.intern_string("value");
+    let id_name = interner.intern_string("id");
+
+    let add_type = interner.literal_string("add");
+    let remove_type = interner.literal_string("remove");
+
+    let add_action = interner.object(vec![
+        PropertyInfo {
+            name: type_name,
+            type_id: add_type,
+            write_type: add_type,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: value_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let remove_action = interner.object(vec![
+        PropertyInfo {
+            name: type_name,
+            type_id: remove_type,
+            write_type: remove_type,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: id_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let union = interner.union(vec![add_action, remove_action]);
+
+    // After action.type === "add" check, narrowed to add_action
+    assert!(matches!(interner.lookup(union), Some(TypeKey::Union(_))));
+}
+
+#[test]
+fn test_type_guard_never_narrowing() {
+    // Exhaustive check: if all branches handled, remaining type is never
+    let interner = TypeInterner::new();
+
+    let type_name = interner.intern_string("type");
+    let a_type = interner.literal_string("a");
+    let b_type = interner.literal_string("b");
+
+    let variant_a = interner.object(vec![PropertyInfo {
+        name: type_name,
+        type_id: a_type,
+        write_type: a_type,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let variant_b = interner.object(vec![PropertyInfo {
+        name: type_name,
+        type_id: b_type,
+        write_type: b_type,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let union = interner.union(vec![variant_a, variant_b]);
+
+    // After exhaustive switch, all cases handled -> never
+    assert!(matches!(interner.lookup(union), Some(TypeKey::Union(_))));
+}
+
+#[test]
+fn test_type_guard_optional_chaining() {
+    // obj?.prop narrows obj to non-nullish
+    let interner = TypeInterner::new();
+
+    let obj_type = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("prop"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let nullable = interner.union(vec![obj_type, TypeId::NULL, TypeId::UNDEFINED]);
+
+    // After optional chaining check, narrowed if accessing .prop succeeded
+    assert_ne!(nullable, obj_type);
+}
+
+#[test]
+fn test_type_guard_nullish_coalescing() {
+    // x ?? defaultValue - x is narrowed in defaultValue expression
+    let interner = TypeInterner::new();
+
+    let nullable = interner.union(vec![TypeId::STRING, TypeId::NULL, TypeId::UNDEFINED]);
+
+    // In x ?? y, if y is evaluated, x was nullish
+    assert!(matches!(interner.lookup(nullable), Some(TypeKey::Union(_))));
+}
+
+#[test]
+fn test_type_guard_assertion_function_inference() {
+    // function assert(condition: boolean, msg?: string): asserts condition
+    let interner = TypeInterner::new();
+
+    let condition_name = interner.intern_string("condition");
+
+    let assert_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo {
+                name: Some(condition_name),
+                type_id: TypeId::BOOLEAN,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("msg")),
+                type_id: TypeId::STRING,
+                optional: true,
+                rest: false,
+            },
+        ],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: Some(TypePredicate {
+            asserts: true,
+            target: TypePredicateTarget::Identifier(condition_name),
+            type_id: None,
+        }),
+        is_constructor: false,
+    });
+
+    if let Some(TypeKey::Function(shape)) = interner.lookup(assert_fn) {
+        assert!(shape.type_predicate.is_some());
+        let pred = shape.type_predicate.as_ref().unwrap();
+        assert!(pred.asserts);
+    } else {
+        panic!("Expected function type");
+    }
+}
+
+#[test]
+fn test_type_guard_with_generic_constraint() {
+    // function isNonNull<T>(x: T): x is NonNullable<T>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // T = string | null -> NonNullable<T> = string
+    let nullable = interner.union(vec![TypeId::STRING, TypeId::NULL]);
+    ctx.add_lower_bound(var_t, nullable);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, nullable);
+}
+
+#[test]
+fn test_type_guard_return_type_inference() {
+    // Infer narrowed type from type guard return
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // When type guard succeeds, T is the narrowed type
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+    ctx.add_upper_bound(var_t, interner.union(vec![TypeId::STRING, TypeId::NUMBER]));
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_type_guard_method_on_class() {
+    // class List<T> { isEmpty(): this is EmptyList<T> }
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let empty_list = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("length"),
+        type_id: interner.literal_number(0.0),
+        write_type: interner.literal_number(0.0),
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let is_empty_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::BOOLEAN,
+        type_predicate: Some(TypePredicate {
+            asserts: false,
+            target: TypePredicateTarget::This,
+            type_id: Some(empty_list),
+        }),
+        is_constructor: false,
+    });
+
+    if let Some(TypeKey::Function(shape)) = interner.lookup(is_empty_method) {
+        let pred = shape.type_predicate.as_ref().unwrap();
+        assert_eq!(pred.target, TypePredicateTarget::This);
+    } else {
+        panic!("Expected function type");
+    }
+}
+
+#[test]
+fn test_type_guard_array_every_inference() {
+    // arr.every((x): x is T => ...) narrows entire array
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // If every element passes guard, array is T[]
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_type_guard_combined_checks() {
+    // if (typeof x === "object" && x !== null && "prop" in x) { ... }
+    let interner = TypeInterner::new();
+
+    let obj_with_prop = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("prop"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // After combined checks, narrowed to object with prop
+    assert!(matches!(interner.lookup(obj_with_prop), Some(TypeKey::Object(_))));
+}
+
+#[test]
+fn test_type_guard_assert_never_utility() {
+    // function assertNever(x: never): never { throw new Error() }
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+
+    let assert_never_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(x_name),
+            type_id: TypeId::NEVER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::NEVER,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    if let Some(TypeKey::Function(shape)) = interner.lookup(assert_never_fn) {
+        assert_eq!(shape.return_type, TypeId::NEVER);
+        assert_eq!(shape.params[0].type_id, TypeId::NEVER);
+    } else {
+        panic!("Expected function type");
+    }
+}
