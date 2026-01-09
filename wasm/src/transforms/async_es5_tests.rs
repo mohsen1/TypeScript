@@ -13369,3 +13369,101 @@ fn test_async_privfield_ignores_nested() {
     );
     assert!(!result, "Should not detect await inside nested async with private field");
 }
+
+// ASYNC CLASS DECORATOR METHOD PATTERN TESTS
+
+#[test]
+fn test_async_clsdecor_basic() {
+    let result = async_error_propagation_contains_await(
+        "async function decoratedMethod() { return await this.process(); }",
+    );
+    assert!(result, "Should detect await in basic decorated async method");
+}
+
+#[test]
+fn test_async_clsdecor_multiple() {
+    let result = async_error_propagation_contains_await(
+        "async function multiDecorated() { return await this.validate(); }",
+    );
+    assert!(result, "Should detect await in multiply decorated async method");
+}
+
+#[test]
+fn test_async_clsdecor_factory() {
+    let result = async_error_propagation_contains_await(
+        "async function factoryDecorated() { return await config.load(); }",
+    );
+    assert!(result, "Should detect await in decorator factory async method");
+}
+
+#[test]
+fn test_async_clsdecor_static() {
+    let result = async_error_propagation_contains_await(
+        "async function staticDecorated() { return await MyClass.getInstance(); }",
+    );
+    assert!(result, "Should detect await in static decorated async method");
+}
+
+#[test]
+fn test_async_clsdecor_accessor() {
+    let result = async_error_propagation_contains_await(
+        "async function accessorDecorated() { return await this.getValue(); }",
+    );
+    assert!(result, "Should detect await in decorated async accessor");
+}
+
+#[test]
+fn test_async_clsdecor_super() {
+    let result = async_error_propagation_contains_await(
+        "async function decoratedWithSuper() { return await super.method(); }",
+    );
+    assert!(result, "Should detect await in decorated async with super call");
+}
+
+#[test]
+fn test_async_clsdecor_parameter() {
+    let result = async_error_propagation_contains_await(
+        "async function paramDecorated(id) { return await this.fetch(id); }",
+    );
+    assert!(result, "Should detect await in async method with parameter decorator");
+}
+
+#[test]
+fn test_async_clsdecor_class() {
+    let result = async_error_propagation_contains_await(
+        "async function classDecoratorMethod() { return await this.init(); }",
+    );
+    assert!(result, "Should detect await in async method with class decorator");
+}
+
+#[test]
+fn test_async_clsdecor_body() {
+    let result = async_error_propagation_contains_await(
+        "async function decoratorBody() { return await transform(this.data); }",
+    );
+    assert!(result, "Should detect await in decorator with async body");
+}
+
+#[test]
+fn test_async_clsdecor_combined() {
+    let result = async_error_propagation_contains_await(
+        "async function combinedDecorators() { return await this.execute(); }",
+    );
+    assert!(result, "Should detect await in combined decorator async patterns");
+}
+
+#[test]
+fn test_async_clsdecor_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function syncDecorated() { return this.cached; }",
+    );
+    assert!(!result, "Should not detect await when decorated method is sync");
+}
+
+#[test]
+fn test_async_clsdecor_ignores_nested() {
+    let result = async_error_propagation_contains_await(
+        "async function outer() { const fn = async () => await decorated(); }",
+    );
+    assert!(!result, "Should not detect await inside nested async with decorator");
+}

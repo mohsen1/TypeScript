@@ -40551,397 +40551,77 @@ class AsyncAccessorPattern {
 }
 
 // =============================================================================
-// CLASS EXPRESSION PATTERNS
+// METHOD DECORATOR THIS BINDING PATTERN TESTS
 // =============================================================================
 
-/// Test anonymous class expression with multiple classes
+/// Test ES5 class with decorated method with this access
 #[test]
-fn test_class_es5_class_expr_anonymous_multi() {
+fn test_class_es5_decorated_method_this_access() {
     let source = r#"
-const Widget = class {
-    private value: number;
-
-    constructor(value: number) {
-        this.value = value;
-    }
-
-    getValue(): number {
-        return this.value;
-    }
-
-    setValue(value: number): void {
-        this.value = value;
-    }
-
-    double(): number {
-        return this.value * 2;
-    }
-};
-
-const Handler = class {
-    private callback: () => void;
-
-    constructor(callback: () => void) {
-        this.callback = callback;
-    }
-
-    execute(): void {
-        this.callback();
-    }
-
-    setCallback(callback: () => void): void {
-        this.callback = callback;
-    }
-};
-
-const items = [
-    new Widget(10),
-    new Widget(20),
-    new Widget(30)
-];
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Should have Widget variable assignment
-    assert!(
-        output.contains("Widget") && output.contains("var"),
-        "Expected Widget class expression: {}",
-        output
-    );
-
-    // Should have Handler variable
-    assert!(
-        output.contains("Handler"),
-        "Expected Handler class expression: {}",
-        output
-    );
-
-    // Methods should be on prototype
-    assert!(
-        output.contains("getValue") && output.contains("setValue") && output.contains("double"),
-        "Expected Widget methods: {}",
-        output
-    );
-
-    // Handler methods
-    assert!(
-        output.contains("execute") && output.contains("setCallback"),
-        "Expected Handler methods: {}",
-        output
-    );
+function log(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const original = descriptor.value;
+    descriptor.value = function(this: any, ...args: any[]) {
+        console.log("Calling " + propertyKey);
+        return original.apply(this, args);
+    };
+    return descriptor;
 }
 
-/// Test named class expression with fluent API
-#[test]
-fn test_class_es5_class_expr_named_fluent() {
-    let source = r#"
-const Calculator = class CalculatorImpl {
-    private result: number;
-
-    constructor(initial: number = 0) {
-        this.result = initial;
-    }
-
-    add(value: number): CalculatorImpl {
-        this.result += value;
-        return this;
-    }
-
-    subtract(value: number): CalculatorImpl {
-        this.result -= value;
-        return this;
-    }
-
-    multiply(value: number): CalculatorImpl {
-        this.result *= value;
-        return this;
-    }
-
-    getResult(): number {
-        return this.result;
-    }
-
-    reset(): CalculatorImpl {
-        this.result = 0;
-        return this;
-    }
-};
-
-const Logger = class LoggerImpl {
-    private logs: string[];
-    private prefix: string;
-
-    constructor(prefix: string = "") {
-        this.logs = [];
-        this.prefix = prefix;
-    }
-
-    log(message: string): LoggerImpl {
-        this.logs.push(this.prefix + message);
-        return this;
-    }
-
-    getLogs(): string[] {
-        return this.logs;
-    }
-
-    clear(): LoggerImpl {
-        this.logs = [];
-        return this;
-    }
-
-    setPrefix(prefix: string): void {
-        this.prefix = prefix;
-    }
-};
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Should have Calculator variable
-    assert!(
-        output.contains("Calculator"),
-        "Expected Calculator class expression: {}",
-        output
-    );
-
-    // Should have Logger variable
-    assert!(
-        output.contains("Logger"),
-        "Expected Logger class expression: {}",
-        output
-    );
-
-    // Calculator methods should be present
-    assert!(
-        output.contains("add") && output.contains("subtract") && output.contains("multiply") && output.contains("getResult"),
-        "Expected Calculator methods: {}",
-        output
-    );
-
-    // Logger methods
-    assert!(
-        output.contains("log") && output.contains("getLogs") && output.contains("clear"),
-        "Expected Logger methods: {}",
-        output
-    );
-}
-
-/// Test class expression with extends and inheritance
-#[test]
-fn test_class_es5_class_expr_extends_component() {
-    let source = r#"
-class BaseComponent {
-    protected name: string;
-
-    constructor(name: string) {
-        this.name = name;
-    }
-
-    getName(): string {
-        return this.name;
-    }
-
-    render(): string {
-        return "<" + this.name + "/>";
-    }
-}
-
-const Button = class extends BaseComponent {
-    private label: string;
-
-    constructor(label: string) {
-        super("button");
-        this.label = label;
-    }
-
-    getLabel(): string {
-        return this.label;
-    }
-
-    setLabel(label: string): void {
-        this.label = label;
-    }
-
-    render(): string {
-        return "<button>" + this.label + "</button>";
-    }
-};
-
-const Input = class InputComponent extends BaseComponent {
-    private placeholder: string;
-    private value: string;
-
-    constructor(placeholder: string) {
-        super("input");
-        this.placeholder = placeholder;
-        this.value = "";
-    }
-
-    getValue(): string {
-        return this.value;
-    }
-
-    setValue(value: string): void {
-        this.value = value;
-    }
-
-    getPlaceholder(): string {
-        return this.placeholder;
-    }
-
-    render(): string {
-        return "<input placeholder='" + this.placeholder + "' value='" + this.value + "'/>";
-    }
-};
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // BaseComponent should be ES5 constructor
-    assert!(
-        output.contains("function BaseComponent"),
-        "Expected ES5 BaseComponent class: {}",
-        output
-    );
-
-    // Button class expression
-    assert!(
-        output.contains("Button"),
-        "Expected Button class expression: {}",
-        output
-    );
-
-    // Input class expression
-    assert!(
-        output.contains("Input"),
-        "Expected Input class expression: {}",
-        output
-    );
-
-    // Should have __extends pattern
-    assert!(
-        output.contains("__extends") || output.contains("extendStatics"),
-        "Expected __extends helper: {}",
-        output
-    );
-
-    // Methods should be present
-    assert!(
-        output.contains("getLabel") && output.contains("setLabel"),
-        "Expected Button methods: {}",
-        output
-    );
-
-    // Input methods
-    assert!(
-        output.contains("getValue") && output.contains("setValue") && output.contains("getPlaceholder"),
-        "Expected Input methods: {}",
-        output
-    );
-}
-
-/// Test class expression in function return with factory
-#[test]
-fn test_class_es5_class_expr_factory_return() {
-    let source = r#"
-function createCounter(initialValue: number) {
-    return class {
-        private count: number;
-
-        constructor() {
-            this.count = initialValue;
-        }
-
-        increment(): number {
-            return ++this.count;
-        }
-
-        decrement(): number {
-            return --this.count;
-        }
-
-        getCount(): number {
-            return this.count;
-        }
-
-        reset(): void {
-            this.count = initialValue;
+function bind(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const original = descriptor.value;
+    return {
+        configurable: true,
+        get(this: any) {
+            const bound = original.bind(this);
+            Object.defineProperty(this, propertyKey, {
+                value: bound,
+                configurable: true,
+                writable: true
+            });
+            return bound;
         }
     };
 }
 
-function createStore<T>(initial: T) {
-    return class Store {
-        private state: T;
-        private listeners: Array<(state: T) => void>;
+class UserService {
+    private users: Map<string, any> = new Map();
 
-        constructor() {
-            this.state = initial;
-            this.listeners = [];
-        }
+    @log
+    getUser(id: string): any {
+        return this.users.get(id);
+    }
 
-        getState(): T {
-            return this.state;
-        }
+    @bind
+    handleClick(): void {
+        const process = () => {
+            console.log("Users count:", this.users.size);
+        };
+        process();
+    }
 
-        setState(newState: T): void {
-            this.state = newState;
-            this.notify();
-        }
-
-        subscribe(listener: (state: T) => void): void {
-            this.listeners.push(listener);
-        }
-
-        private notify(): void {
-            this.listeners.forEach(fn => fn(this.state));
-        }
-    };
+    @log
+    addUser(id: string, data: any): void {
+        this.users.set(id, data);
+    }
 }
 
-const CounterClass = createCounter(0);
-const counter = new CounterClass();
+class DataManager {
+    private data: any[] = [];
+
+    @log
+    getData(): any[] {
+        const retrieve = () => [...this.data];
+        return retrieve();
+    }
+
+    @log
+    setData(items: any[]): void {
+        const store = () => {
+            this.data = items;
+        };
+        store();
+    }
+}
 "#;
 
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -40959,102 +40639,498 @@ const counter = new CounterClass();
 
     let output = printer.get_output().to_string();
 
-    // Function should be present
+    // Classes should be converted
     assert!(
-        output.contains("function createCounter"),
-        "Expected createCounter function: {}",
+        output.contains("UserService") && output.contains("DataManager"),
+        "Expected classes: {}",
         output
     );
 
-    // createStore function
+    // Methods should exist
     assert!(
-        output.contains("function createStore"),
-        "Expected createStore function: {}",
+        output.contains("getUser") && output.contains("handleClick") && output.contains("addUser"),
+        "Expected methods: {}",
         output
     );
 
-    // Should have return statement with class
+    // Decorator functions should be present
     assert!(
-        output.contains("return"),
-        "Expected return statement: {}",
+        output.contains("log") && output.contains("bind"),
+        "Expected decorator functions: {}",
         output
     );
 
-    // Counter methods
+    // Type annotations should be stripped
     assert!(
-        output.contains("increment") && output.contains("decrement") && output.contains("getCount"),
-        "Expected counter methods: {}",
-        output
-    );
-
-    // Store methods
-    assert!(
-        output.contains("getState") && output.contains("setState") && output.contains("subscribe"),
-        "Expected store methods: {}",
+        !output.contains("private users: Map") && !output.contains("private data: any[]"),
+        "Expected type annotations to be stripped: {}",
         output
     );
 }
 
-/// Test class expression with static members
+/// Test ES5 class with multiple decorators with this
 #[test]
-fn test_class_es5_class_expression_static_members() {
+fn test_class_es5_multiple_decorators_this() {
     let source = r#"
-const Singleton = class {
-    private static instance: Singleton | null = null;
-    private value: number;
+function first(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const original = descriptor.value;
+    descriptor.value = function(this: any, ...args: any[]) {
+        console.log("First decorator - this:", this.constructor.name);
+        return original.apply(this, args);
+    };
+    return descriptor;
+}
 
-    private constructor(value: number) {
-        this.value = value;
+function second(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const original = descriptor.value;
+    descriptor.value = function(this: any, ...args: any[]) {
+        console.log("Second decorator - this:", this.constructor.name);
+        return original.apply(this, args);
+    };
+    return descriptor;
+}
+
+function third(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const original = descriptor.value;
+    descriptor.value = function(this: any, ...args: any[]) {
+        console.log("Third decorator - this:", this.constructor.name);
+        return original.apply(this, args);
+    };
+    return descriptor;
+}
+
+class MultiDecorated {
+    private value: number = 0;
+
+    @first
+    @second
+    @third
+    process(): number {
+        const compute = () => this.value * 2;
+        return compute();
     }
 
-    static getInstance(value: number = 0): Singleton {
-        if (!Singleton.instance) {
-            Singleton.instance = new Singleton(value);
-        }
-        return Singleton.instance;
+    @first
+    @second
+    setValue(val: number): void {
+        const update = () => {
+            this.value = val;
+        };
+        update();
     }
 
-    static resetInstance(): void {
-        Singleton.instance = null;
-    }
-
+    @third
     getValue(): number {
         return this.value;
     }
+}
 
-    setValue(value: number): void {
-        this.value = value;
+class ChainedDecorators {
+    private items: string[] = [];
+
+    @first
+    @second
+    @third
+    transform(): string[] {
+        const process = () => {
+            return this.items.map(item => item.toUpperCase());
+        };
+        return process();
     }
-};
 
-const Registry = class RegistryImpl {
-    static entries: Map<string, any> = new Map();
-    static defaultKey: string = "default";
+    addItem(item: string): void {
+        this.items.push(item);
+    }
+}
+"#;
 
-    static register(key: string, value: any): void {
-        RegistryImpl.entries.set(key, value);
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("MultiDecorated") && output.contains("ChainedDecorators"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("process") && output.contains("setValue") && output.contains("getValue") && output.contains("transform"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Decorator functions should be present
+    assert!(
+        output.contains("first") && output.contains("second") && output.contains("third"),
+        "Expected decorator functions: {}",
+        output
+    );
+
+    // Type annotations should be stripped
+    assert!(
+        !output.contains("private value: number") && !output.contains("private items: string[]"),
+        "Expected type annotations to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with decorator factory with this binding
+#[test]
+fn test_class_es5_decorator_factory_this_binding() {
+    let source = r#"
+function logWithPrefix(prefix: string) {
+    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+        const original = descriptor.value;
+        descriptor.value = function(this: any, ...args: any[]) {
+            console.log(prefix + " - Calling " + propertyKey + " on " + this.constructor.name);
+            return original.apply(this, args);
+        };
+        return descriptor;
+    };
+}
+
+function debounce(delay: number) {
+    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+        const original = descriptor.value;
+        let timeout: any;
+        descriptor.value = function(this: any, ...args: any[]) {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => original.apply(this, args), delay);
+        };
+        return descriptor;
+    };
+}
+
+function memoize(maxSize: number = 100) {
+    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+        const original = descriptor.value;
+        const cache = new Map<string, any>();
+        descriptor.value = function(this: any, ...args: any[]) {
+            const key = JSON.stringify(args);
+            if (cache.has(key)) {
+                return cache.get(key);
+            }
+            const result = original.apply(this, args);
+            if (cache.size >= maxSize) {
+                const firstKey = cache.keys().next().value;
+                cache.delete(firstKey);
+            }
+            cache.set(key, result);
+            return result;
+        };
+        return descriptor;
+    };
+}
+
+class CacheService {
+    private store: Map<string, any> = new Map();
+
+    @logWithPrefix("[CACHE]")
+    get(key: string): any {
+        const retrieve = () => this.store.get(key);
+        return retrieve();
     }
 
+    @logWithPrefix("[CACHE]")
+    @debounce(100)
+    set(key: string, value: any): void {
+        const store = () => {
+            this.store.set(key, value);
+        };
+        store();
+    }
+
+    @memoize(50)
+    compute(input: string): string {
+        const process = () => {
+            return input.split("").reverse().join("");
+        };
+        return process();
+    }
+}
+
+class ApiClient {
+    private baseUrl: string;
+
+    constructor(baseUrl: string) {
+        this.baseUrl = baseUrl;
+    }
+
+    @logWithPrefix("[API]")
+    @memoize(10)
+    fetch(endpoint: string): string {
+        return this.baseUrl + endpoint;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("CacheService") && output.contains("ApiClient"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("compute") && output.contains("fetch"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Decorator factory functions should be present
+    assert!(
+        output.contains("logWithPrefix") && output.contains("debounce") && output.contains("memoize"),
+        "Expected decorator factory functions: {}",
+        output
+    );
+
+    // Type annotations should be stripped
+    assert!(
+        !output.contains("private store: Map") && !output.contains("private baseUrl: string"),
+        "Expected type annotations to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with decorated async method this
+#[test]
+fn test_class_es5_decorated_async_method_this() {
+    let source = r#"
+function asyncLog(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const original = descriptor.value;
+    descriptor.value = async function(this: any, ...args: any[]) {
+        console.log("Before async " + propertyKey);
+        const result = await original.apply(this, args);
+        console.log("After async " + propertyKey);
+        return result;
+    };
+    return descriptor;
+}
+
+function retry(attempts: number) {
+    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+        const original = descriptor.value;
+        descriptor.value = async function(this: any, ...args: any[]) {
+            for (let i = 0; i < attempts; i++) {
+                try {
+                    return await original.apply(this, args);
+                } catch (error) {
+                    if (i === attempts - 1) throw error;
+                    await new Promise(r => setTimeout(r, 100));
+                }
+            }
+        };
+        return descriptor;
+    };
+}
+
+class AsyncService {
+    private cache: Map<string, any> = new Map();
+
+    @asyncLog
+    async fetchData(url: string): Promise<any> {
+        const retrieve = async () => {
+            if (this.cache.has(url)) {
+                return this.cache.get(url);
+            }
+            const response = await fetch(url);
+            const data = await response.json();
+            this.cache.set(url, data);
+            return data;
+        };
+        return retrieve();
+    }
+
+    @asyncLog
+    @retry(3)
+    async saveData(key: string, data: any): Promise<void> {
+        const store = async () => {
+            await Promise.resolve();
+            this.cache.set(key, data);
+        };
+        await store();
+    }
+
+    @retry(5)
+    async deleteData(key: string): Promise<boolean> {
+        const remove = async () => {
+            await Promise.resolve();
+            return this.cache.delete(key);
+        };
+        return remove();
+    }
+}
+
+class DataProcessor {
+    private results: any[] = [];
+
+    @asyncLog
+    async process(items: any[]): Promise<any[]> {
+        const transform = async () => {
+            for (const item of items) {
+                await Promise.resolve();
+                this.results.push(item);
+            }
+            return this.results;
+        };
+        return transform();
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("AsyncService") && output.contains("DataProcessor"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("fetchData") && output.contains("saveData") && output.contains("deleteData") && output.contains("process"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Decorator functions should be present
+    assert!(
+        output.contains("asyncLog") && output.contains("retry"),
+        "Expected decorator functions: {}",
+        output
+    );
+
+    // Type annotations should be stripped
+    assert!(
+        !output.contains("private cache: Map") && !output.contains("private results: any[]"),
+        "Expected type annotations to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with decorated static method this
+#[test]
+fn test_class_es5_decorated_static_method_this() {
+    let source = r#"
+function staticLog(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const original = descriptor.value;
+    descriptor.value = function(this: any, ...args: any[]) {
+        console.log("Static method " + propertyKey + " called on " + this.name);
+        return original.apply(this, args);
+    };
+    return descriptor;
+}
+
+function singleton(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const original = descriptor.value;
+    let instance: any = null;
+    descriptor.value = function(this: any, ...args: any[]) {
+        if (!instance) {
+            instance = original.apply(this, args);
+        }
+        return instance;
+    };
+    return descriptor;
+}
+
+class Factory {
+    private static _registry: Map<string, any> = new Map();
+    private static _count: number = 0;
+
+    @staticLog
+    static create(type: string): any {
+        const build = () => {
+            this._count++;
+            return { type, id: this._count };
+        };
+        return build();
+    }
+
+    @staticLog
+    static register(name: string, factory: () => any): void {
+        const add = () => {
+            this._registry.set(name, factory);
+        };
+        add();
+    }
+
+    @singleton
+    static getInstance(): Factory {
+        return new Factory();
+    }
+
+    @staticLog
+    static getCount(): number {
+        return this._count;
+    }
+}
+
+class ConfigManager {
+    private static _config: Record<string, any> = {};
+
+    @staticLog
     static get(key: string): any {
-        return RegistryImpl.entries.get(key);
+        const retrieve = () => this._config[key];
+        return retrieve();
     }
 
-    static has(key: string): boolean {
-        return RegistryImpl.entries.has(key);
+    @staticLog
+    static set(key: string, value: any): void {
+        const store = () => {
+            this._config[key] = value;
+        };
+        store();
     }
 
-    static remove(key: string): boolean {
-        return RegistryImpl.entries.delete(key);
+    @staticLog
+    static getAll(): Record<string, any> {
+        return { ...this._config };
     }
-
-    static clear(): void {
-        RegistryImpl.entries.clear();
-    }
-
-    static getDefault(): any {
-        return RegistryImpl.entries.get(RegistryImpl.defaultKey);
-    }
-};
+}
 "#;
 
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -41072,148 +41148,193 @@ const Registry = class RegistryImpl {
 
     let output = printer.get_output().to_string();
 
-    // Singleton class expression
+    // Classes should be converted
     assert!(
-        output.contains("Singleton"),
-        "Expected Singleton class expression: {}",
+        output.contains("Factory") && output.contains("ConfigManager"),
+        "Expected classes: {}",
         output
     );
 
-    // Registry class expression
+    // Methods should exist
     assert!(
-        output.contains("Registry"),
-        "Expected Registry class expression: {}",
+        output.contains("create") && output.contains("register") && output.contains("getInstance"),
+        "Expected methods: {}",
         output
     );
 
-    // Static methods should be present
+    // Decorator functions should be present
     assert!(
-        output.contains("getInstance") && output.contains("resetInstance"),
-        "Expected Singleton static methods: {}",
+        output.contains("staticLog") && output.contains("singleton"),
+        "Expected decorator functions: {}",
         output
     );
 
-    // Registry static methods
+    // Type annotations should be stripped
     assert!(
-        output.contains("register") && output.contains("get") && output.contains("has") && output.contains("remove"),
-        "Expected Registry static methods: {}",
-        output
-    );
-
-    // Instance methods
-    assert!(
-        output.contains("getValue") && output.contains("setValue"),
-        "Expected Singleton instance methods: {}",
+        !output.contains("private static _registry: Map") && !output.contains("private static _config: Record"),
+        "Expected type annotations to be stripped: {}",
         output
     );
 }
 
-/// Test combined class expression patterns
+/// Test ES5 class with combined decorator this patterns
 #[test]
-fn test_class_es5_class_expression_combined() {
+fn test_class_es5_combined_decorator_this_patterns() {
     let source = r#"
-// Factory function returning class expression
-function createMixin<T extends new (...args: any[]) => any>(Base: T) {
-    return class extends Base {
-        private mixinValue: string = "mixin";
-
-        getMixinValue(): string {
-            return this.mixinValue;
-        }
-
-        setMixinValue(value: string): void {
-            this.mixinValue = value;
-        }
+function log(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const original = descriptor.value;
+    descriptor.value = function(this: any, ...args: any[]) {
+        console.log("Calling " + propertyKey);
+        return original.apply(this, args);
     };
+    return descriptor;
 }
 
-// Base class for composition
-class Entity {
-    protected id: string;
+function validate(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const original = descriptor.value;
+    descriptor.value = function(this: any, ...args: any[]) {
+        if (args.some(arg => arg === undefined || arg === null)) {
+            throw new Error("Invalid arguments");
+        }
+        return original.apply(this, args);
+    };
+    return descriptor;
+}
 
-    constructor(id: string) {
-        this.id = id;
+function measure(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const original = descriptor.value;
+    descriptor.value = function(this: any, ...args: any[]) {
+        const start = Date.now();
+        const result = original.apply(this, args);
+        const end = Date.now();
+        console.log(propertyKey + " took " + (end - start) + "ms");
+        return result;
+    };
+    return descriptor;
+}
+
+function asyncMeasure(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const original = descriptor.value;
+    descriptor.value = async function(this: any, ...args: any[]) {
+        const start = Date.now();
+        const result = await original.apply(this, args);
+        const end = Date.now();
+        console.log(propertyKey + " took " + (end - start) + "ms");
+        return result;
+    };
+    return descriptor;
+}
+
+class CompleteService<T> {
+    private items: T[] = [];
+    private cache: Map<string, T> = new Map();
+    private static _instances: CompleteService<any>[] = [];
+
+    @log
+    @validate
+    add(item: T): void {
+        const insert = () => {
+            this.items.push(item);
+        };
+        insert();
     }
 
-    getId(): string {
-        return this.id;
+    @log
+    @measure
+    findAll(): T[] {
+        const retrieve = () => {
+            return [...this.items];
+        };
+        return retrieve();
+    }
+
+    @log
+    @validate
+    @measure
+    findById(id: string): T | undefined {
+        const search = () => {
+            if (this.cache.has(id)) {
+                return this.cache.get(id);
+            }
+            return this.items.find((item: any) => item.id === id);
+        };
+        return search();
+    }
+
+    @asyncMeasure
+    async fetchRemote(url: string): Promise<T[]> {
+        const fetch = async () => {
+            await Promise.resolve();
+            return this.items;
+        };
+        return fetch();
+    }
+
+    @log
+    static register(instance: CompleteService<any>): void {
+        const add = () => {
+            this._instances.push(instance);
+        };
+        add();
+    }
+
+    @log
+    @measure
+    static getAll(): CompleteService<any>[] {
+        return [...this._instances];
     }
 }
 
-// Class expression extending base
-const User = class UserEntity extends Entity {
-    private name: string;
-    private email: string;
-    static userCount: number = 0;
+class EventEmitter {
+    private handlers: Map<string, ((data: any) => void)[]> = new Map();
 
-    constructor(id: string, name: string, email: string) {
-        super(id);
-        this.name = name;
-        this.email = email;
-        UserEntity.userCount++;
+    @log
+    on(event: string, handler: (data: any) => void): void {
+        const subscribe = () => {
+            const handlers = this.handlers.get(event) ?? [];
+            handlers.push(handler);
+            this.handlers.set(event, handlers);
+        };
+        subscribe();
     }
 
-    getName(): string {
-        return this.name;
+    @log
+    @validate
+    emit(event: string, data: any): void {
+        const dispatch = () => {
+            const handlers = this.handlers.get(event) ?? [];
+            handlers.forEach(h => {
+                const call = () => h(data);
+                call();
+            });
+        };
+        dispatch();
     }
 
-    getEmail(): string {
-        return this.email;
+    @asyncMeasure
+    async emitAsync(event: string, data: any): Promise<void> {
+        const asyncDispatch = async () => {
+            const handlers = this.handlers.get(event) ?? [];
+            for (const h of handlers) {
+                await Promise.resolve();
+                h(data);
+            }
+        };
+        await asyncDispatch();
     }
 
-    static getUserCount(): number {
-        return UserEntity.userCount;
+    @log
+    off(event: string, handler: (data: any) => void): void {
+        const unsubscribe = () => {
+            const handlers = this.handlers.get(event) ?? [];
+            const index = handlers.indexOf(handler);
+            if (index !== -1) {
+                handlers.splice(index, 1);
+            }
+        };
+        unsubscribe();
     }
-
-    static resetCount(): void {
-        UserEntity.userCount = 0;
-    }
-};
-
-// Anonymous class in array
-const handlers = [
-    class {
-        handle(data: any): void {
-            console.log("Handler 1:", data);
-        }
-    },
-    class {
-        handle(data: any): void {
-            console.log("Handler 2:", data);
-        }
-    }
-];
-
-// Class expression in object
-const components = {
-    Button: class {
-        private label: string;
-        constructor(label: string) { this.label = label; }
-        getLabel(): string { return this.label; }
-    },
-    Input: class {
-        private value: string;
-        constructor(value: string) { this.value = value; }
-        getValue(): string { return this.value; }
-    }
-};
-
-// IIFE with class expression
-const Utility = (function() {
-    return class {
-        static format(str: string): string {
-            return str.trim().toLowerCase();
-        }
-
-        static parse(str: string): string[] {
-            return str.split(",");
-        }
-
-        static join(arr: string[]): string {
-            return arr.join(",");
-        }
-    };
-})();
+}
 "#;
 
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -41231,59 +41352,38 @@ const Utility = (function() {
 
     let output = printer.get_output().to_string();
 
-    // Entity base class
+    // Classes should be converted
     assert!(
-        output.contains("function Entity"),
-        "Expected ES5 Entity class: {}",
+        output.contains("CompleteService") && output.contains("EventEmitter"),
+        "Expected classes: {}",
         output
     );
 
-    // User class expression
+    // Methods should exist
     assert!(
-        output.contains("User"),
-        "Expected User class expression: {}",
+        output.contains("add") && output.contains("findAll") && output.contains("findById") && output.contains("fetchRemote"),
+        "Expected methods: {}",
         output
     );
 
-    // createMixin function
+    // Decorator functions should be present
     assert!(
-        output.contains("function createMixin"),
-        "Expected createMixin function: {}",
+        output.contains("log") && output.contains("validate") && output.contains("measure") && output.contains("asyncMeasure"),
+        "Expected decorator functions: {}",
         output
     );
 
-    // handlers array
+    // Type annotations should be stripped
     assert!(
-        output.contains("handlers"),
-        "Expected handlers array: {}",
+        !output.contains("private items: T[]") && !output.contains("private handlers: Map"),
+        "Expected type annotations to be stripped: {}",
         output
     );
 
-    // components object
+    // Generic parameters should be stripped
     assert!(
-        output.contains("components"),
-        "Expected components object: {}",
-        output
-    );
-
-    // Utility IIFE
-    assert!(
-        output.contains("Utility"),
-        "Expected Utility IIFE: {}",
-        output
-    );
-
-    // User methods
-    assert!(
-        output.contains("getName") && output.contains("getEmail") && output.contains("getUserCount"),
-        "Expected User methods: {}",
-        output
-    );
-
-    // Utility static methods
-    assert!(
-        output.contains("format") && output.contains("parse") && output.contains("join"),
-        "Expected Utility static methods: {}",
+        !output.contains("CompleteService<T>"),
+        "Expected generic parameters to be stripped: {}",
         output
     );
 }

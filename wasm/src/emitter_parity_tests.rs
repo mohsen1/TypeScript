@@ -25331,3 +25331,701 @@ const widget = new Widget({});
         output
     );
 }
+
+/// Test private instance field with inheritance chain
+#[test]
+fn test_parity_es5_private_field_inheritance_chain() {
+    let source = r#"
+interface Identifiable {
+    getId(): string;
+}
+
+class BaseEntity implements Identifiable {
+    #id: string;
+    #createdAt: Date;
+
+    constructor(id: string) {
+        this.#id = id;
+        this.#createdAt = new Date();
+    }
+
+    getId(): string {
+        return this.#id;
+    }
+
+    protected getCreatedAt(): Date {
+        return this.#createdAt;
+    }
+}
+
+class User extends BaseEntity {
+    #email: string;
+    #password: string;
+
+    constructor(id: string, email: string, password: string) {
+        super(id);
+        this.#email = email;
+        this.#password = password;
+    }
+
+    getEmail(): string {
+        return this.#email;
+    }
+
+    #hashPassword(): string {
+        return "hashed_" + this.#password;
+    }
+
+    validatePassword(input: string): boolean {
+        return this.#hashPassword() === "hashed_" + input;
+    }
+}
+
+class Admin extends User {
+    #permissions: string[];
+
+    constructor(id: string, email: string, password: string, permissions: string[]) {
+        super(id, email, password);
+        this.#permissions = permissions;
+    }
+
+    hasPermission(permission: string): boolean {
+        return this.#permissions.includes(permission);
+    }
+}
+
+const admin = new Admin("1", "admin@test.com", "secret", ["read", "write"]);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes should be present
+    assert!(
+        output.contains("BaseEntity") && output.contains("User") && output.contains("Admin"),
+        "Classes should be present: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface Identifiable"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": Date") && !output.contains(": boolean"),
+        "Type annotations should be erased: {}",
+        output
+    );
+    // Protected modifier should be erased
+    assert!(
+        !output.contains("protected getCreatedAt"),
+        "Protected modifier should be erased: {}",
+        output
+    );
+}
+
+/// Test private static field with initialization dependencies
+#[test]
+fn test_parity_es5_private_static_initialization_order() {
+    let source = r#"
+interface Config {
+    baseUrl: string;
+    timeout: number;
+}
+
+class ApiClient {
+    static #instanceCount: number = 0;
+    static #defaultConfig: Config = { baseUrl: "https://api.example.com", timeout: 5000 };
+    static #instances: ApiClient[] = [];
+
+    #config: Config;
+    #id: number;
+
+    constructor(config?: Partial<Config>) {
+        ApiClient.#instanceCount++;
+        this.#id = ApiClient.#instanceCount;
+        this.#config = { ...ApiClient.#defaultConfig, ...config };
+        ApiClient.#instances.push(this);
+    }
+
+    static getInstanceCount(): number {
+        return ApiClient.#instanceCount;
+    }
+
+    static getAllInstances(): ApiClient[] {
+        return [...ApiClient.#instances];
+    }
+
+    static #resetInstances(): void {
+        ApiClient.#instances = [];
+        ApiClient.#instanceCount = 0;
+    }
+
+    static reset(): void {
+        ApiClient.#resetInstances();
+    }
+
+    getId(): number {
+        return this.#id;
+    }
+
+    getConfig(): Config {
+        return { ...this.#config };
+    }
+}
+
+const client1 = new ApiClient();
+const client2 = new ApiClient({ timeout: 10000 });
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Class should be present
+    assert!(
+        output.contains("ApiClient"),
+        "Class should be present: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface Config"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number") && !output.contains(": Config") && !output.contains(": ApiClient[]"),
+        "Type annotations should be erased: {}",
+        output
+    );
+    // Static modifier in type context should be erased
+    assert!(
+        !output.contains("static #instanceCount: number"),
+        "Static field type should be erased: {}",
+        output
+    );
+}
+
+/// Test private method with async patterns
+#[test]
+fn test_parity_es5_private_method_async_patterns() {
+    let source = r#"
+interface ApiResponse<T> {
+    data: T;
+    status: number;
+}
+
+class DataService {
+    #baseUrl: string;
+    #cache: Map<string, any> = new Map();
+
+    constructor(baseUrl: string) {
+        this.#baseUrl = baseUrl;
+    }
+
+    async #fetch<T>(endpoint: string): Promise<ApiResponse<T>> {
+        const response = await fetch(this.#baseUrl + endpoint);
+        const data = await response.json();
+        return { data, status: response.status };
+    }
+
+    async #fetchWithCache<T>(endpoint: string): Promise<T> {
+        if (this.#cache.has(endpoint)) {
+            return this.#cache.get(endpoint);
+        }
+        const response = await this.#fetch<T>(endpoint);
+        this.#cache.set(endpoint, response.data);
+        return response.data;
+    }
+
+    async #retry<T>(fn: () => Promise<T>, attempts: number): Promise<T> {
+        for (let i = 0; i < attempts; i++) {
+            try {
+                return await fn();
+            } catch (e) {
+                if (i === attempts - 1) throw e;
+                await this.#delay(1000 * (i + 1));
+            }
+        }
+        throw new Error("Retry failed");
+    }
+
+    async #delay(ms: number): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    async getUser(id: string): Promise<any> {
+        return this.#retry(() => this.#fetchWithCache("/users/" + id), 3);
+    }
+
+    async getUsers(): Promise<any[]> {
+        const response = await this.#fetch<any[]>("/users");
+        return response.data;
+    }
+}
+
+const service = new DataService("https://api.example.com");
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Class should be present
+    assert!(
+        output.contains("DataService"),
+        "Class should be present: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface ApiResponse"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Generic type annotations should be erased
+    assert!(
+        !output.contains("<T>") && !output.contains("Promise<ApiResponse"),
+        "Generic type annotations should be erased: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": number") && !output.contains(": Map<"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test private accessor with computed values
+#[test]
+fn test_parity_es5_private_accessor_computed_values() {
+    let source = r#"
+interface Dimensions {
+    width: number;
+    height: number;
+}
+
+class Rectangle {
+    #width: number;
+    #height: number;
+    #cachedArea: number | null = null;
+    #cachedPerimeter: number | null = null;
+
+    constructor(width: number, height: number) {
+        this.#width = width;
+        this.#height = height;
+    }
+
+    get #area(): number {
+        if (this.#cachedArea === null) {
+            this.#cachedArea = this.#width * this.#height;
+        }
+        return this.#cachedArea;
+    }
+
+    get #perimeter(): number {
+        if (this.#cachedPerimeter === null) {
+            this.#cachedPerimeter = 2 * (this.#width + this.#height);
+        }
+        return this.#cachedPerimeter;
+    }
+
+    set #dimensions(dims: Dimensions) {
+        this.#width = dims.width;
+        this.#height = dims.height;
+        this.#invalidateCache();
+    }
+
+    #invalidateCache(): void {
+        this.#cachedArea = null;
+        this.#cachedPerimeter = null;
+    }
+
+    getArea(): number {
+        return this.#area;
+    }
+
+    getPerimeter(): number {
+        return this.#perimeter;
+    }
+
+    resize(width: number, height: number): void {
+        this.#dimensions = { width, height };
+    }
+
+    scale(factor: number): void {
+        this.#dimensions = {
+            width: this.#width * factor,
+            height: this.#height * factor
+        };
+    }
+}
+
+const rect = new Rectangle(10, 20);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Class should be present
+    assert!(
+        output.contains("Rectangle"),
+        "Class should be present: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface Dimensions"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number") && !output.contains(": Dimensions") && !output.contains(": void"),
+        "Type annotations should be erased: {}",
+        output
+    );
+    // Union type should be erased
+    assert!(
+        !output.contains("number | null"),
+        "Union type should be erased: {}",
+        output
+    );
+}
+
+/// Test private field in conditional expressions
+#[test]
+fn test_parity_es5_private_field_conditional_expr() {
+    let source = r#"
+interface State {
+    isActive: boolean;
+    value: number;
+}
+
+class StateMachine {
+    #state: "idle" | "running" | "paused" | "stopped" = "idle";
+    #value: number = 0;
+    #maxValue: number;
+    #minValue: number;
+
+    constructor(min: number, max: number) {
+        this.#minValue = min;
+        this.#maxValue = max;
+    }
+
+    #isValidValue(value: number): boolean {
+        return value >= this.#minValue && value <= this.#maxValue;
+    }
+
+    #clamp(value: number): number {
+        return value < this.#minValue ? this.#minValue :
+               value > this.#maxValue ? this.#maxValue : value;
+    }
+
+    setValue(value: number): void {
+        this.#value = this.#isValidValue(value) ? value : this.#clamp(value);
+    }
+
+    getValue(): number {
+        return this.#state === "running" ? this.#value :
+               this.#state === "paused" ? this.#value :
+               this.#state === "idle" ? 0 : -1;
+    }
+
+    getState(): string {
+        return this.#state;
+    }
+
+    start(): void {
+        this.#state = this.#state === "idle" || this.#state === "stopped" ? "running" : this.#state;
+    }
+
+    pause(): void {
+        this.#state = this.#state === "running" ? "paused" : this.#state;
+    }
+
+    resume(): void {
+        this.#state = this.#state === "paused" ? "running" : this.#state;
+    }
+
+    stop(): void {
+        this.#state = this.#state !== "stopped" ? "stopped" : this.#state;
+        this.#value = this.#state === "stopped" ? 0 : this.#value;
+    }
+
+    increment(): number {
+        return this.#state === "running"
+            ? (this.#value = this.#clamp(this.#value + 1))
+            : this.#value;
+    }
+}
+
+const machine = new StateMachine(0, 100);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Class should be present
+    assert!(
+        output.contains("StateMachine"),
+        "Class should be present: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface State"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number") && !output.contains(": boolean") && !output.contains(": void"),
+        "Type annotations should be erased: {}",
+        output
+    );
+    // Union literal type should be erased
+    assert!(
+        !output.contains(r#""idle" | "running""#),
+        "Union literal type should be erased: {}",
+        output
+    );
+}
+
+/// Test combined private patterns with generics
+#[test]
+fn test_parity_es5_private_combined_generics() {
+    let source = r#"
+interface Comparable<T> {
+    compareTo(other: T): number;
+}
+
+interface Serializable {
+    serialize(): string;
+}
+
+class PrivateCollection<T extends Comparable<T> & Serializable> {
+    #items: T[] = [];
+    #maxSize: number;
+    #comparator: ((a: T, b: T) => number) | null = null;
+
+    static #defaultMaxSize: number = 100;
+    static #instanceCount: number = 0;
+
+    constructor(maxSize?: number) {
+        this.#maxSize = maxSize ?? PrivateCollection.#defaultMaxSize;
+        PrivateCollection.#instanceCount++;
+    }
+
+    static getInstanceCount(): number {
+        return PrivateCollection.#instanceCount;
+    }
+
+    #ensureCapacity(): boolean {
+        return this.#items.length < this.#maxSize;
+    }
+
+    #sort(): void {
+        if (this.#comparator) {
+            this.#items.sort(this.#comparator);
+        } else {
+            this.#items.sort((a, b) => a.compareTo(b));
+        }
+    }
+
+    get #size(): number {
+        return this.#items.length;
+    }
+
+    get #isEmpty(): boolean {
+        return this.#items.length === 0;
+    }
+
+    set #customComparator(comparator: (a: T, b: T) => number) {
+        this.#comparator = comparator;
+    }
+
+    add(item: T): boolean {
+        if (!this.#ensureCapacity()) return false;
+        this.#items.push(item);
+        this.#sort();
+        return true;
+    }
+
+    remove(item: T): boolean {
+        const index = this.#items.findIndex(i => i.compareTo(item) === 0);
+        if (index === -1) return false;
+        this.#items.splice(index, 1);
+        return true;
+    }
+
+    getSize(): number {
+        return this.#size;
+    }
+
+    isEmpty(): boolean {
+        return this.#isEmpty;
+    }
+
+    setComparator(comparator: (a: T, b: T) => number): void {
+        this.#customComparator = comparator;
+        this.#sort();
+    }
+
+    toArray(): T[] {
+        return [...this.#items];
+    }
+
+    serialize(): string {
+        return JSON.stringify(this.#items.map(item => item.serialize()));
+    }
+}
+
+class NumberWrapper implements Comparable<NumberWrapper>, Serializable {
+    constructor(public value: number) {}
+
+    compareTo(other: NumberWrapper): number {
+        return this.value - other.value;
+    }
+
+    serialize(): string {
+        return String(this.value);
+    }
+}
+
+const collection = new PrivateCollection<NumberWrapper>(50);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes should be present
+    assert!(
+        output.contains("PrivateCollection") && output.contains("NumberWrapper"),
+        "Classes should be present: {}",
+        output
+    );
+    // Interfaces should be erased
+    assert!(
+        !output.contains("interface Comparable") && !output.contains("interface Serializable"),
+        "Interfaces should be erased: {}",
+        output
+    );
+    // Generic type parameters should be erased
+    assert!(
+        !output.contains("<T extends") && !output.contains("<T>") && !output.contains("<NumberWrapper>"),
+        "Generic type parameters should be erased: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": T[]") && !output.contains(": number") && !output.contains(": boolean"),
+        "Type annotations should be erased: {}",
+        output
+    );
+    // Implements clause should be erased
+    assert!(
+        !output.contains("implements Comparable"),
+        "Implements clause should be erased: {}",
+        output
+    );
+}
