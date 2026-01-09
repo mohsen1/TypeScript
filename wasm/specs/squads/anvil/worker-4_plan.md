@@ -7,10 +7,10 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-None - ready for next task.
+Add ES5 class tests for mapped type patterns: Partial, Required, Readonly. Tests: `./wasm/test.sh class_es5_tests`
 
 ## Task Queue
-- [ ] Add ES5 class tests for mapped type patterns: Partial, Required, Readonly
+- [ ] Add ES5 class tests for conditional type patterns: Exclude, Extract, NonNullable
 
 ## Completed
 - [x] Add ES5 class tests for type alias patterns. Tests: `./wasm/test.sh class_es5_tests`

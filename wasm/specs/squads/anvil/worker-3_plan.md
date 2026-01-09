@@ -7,10 +7,10 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-(none)
+Add ES5 source map tests for logical assignment patterns: &&=, ||=, ??=. Tests: `./wasm/test.sh source_map_tests`
 
 ## Task Queue
-- [ ] Add ES5 source map tests for logical assignment patterns: &&=, ||=, ??=
+- [ ] Add ES5 source map tests for class static block patterns: init order, private access
 
 ## Completed
 - [x] Added nullish coalescing ES5 source map tests (basic, with null, with undefined, chained, function call, assignment, conditional, objects, with optional chaining, comprehensive); 837 tests pass.
