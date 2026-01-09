@@ -26029,3 +26029,679 @@ const collection = new PrivateCollection<NumberWrapper>(50);
         output
     );
 }
+
+/// Test abstract class with abstract methods
+#[test]
+fn test_parity_es5_abstract_class_abstract_methods() {
+    let source = r#"
+interface Drawable {
+    draw(ctx: CanvasRenderingContext2D): void;
+}
+
+abstract class Shape implements Drawable {
+    abstract getArea(): number;
+    abstract getPerimeter(): number;
+    abstract draw(ctx: CanvasRenderingContext2D): void;
+
+    describe(): string {
+        return "Area: " + this.getArea() + ", Perimeter: " + this.getPerimeter();
+    }
+}
+
+abstract class Polygon extends Shape {
+    abstract getSides(): number;
+
+    describe(): string {
+        return super.describe() + ", Sides: " + this.getSides();
+    }
+}
+
+class Triangle extends Polygon {
+    constructor(private a: number, private b: number, private c: number) {
+        super();
+    }
+
+    getArea(): number {
+        const s = (this.a + this.b + this.c) / 2;
+        return Math.sqrt(s * (s - this.a) * (s - this.b) * (s - this.c));
+    }
+
+    getPerimeter(): number {
+        return this.a + this.b + this.c;
+    }
+
+    getSides(): number {
+        return 3;
+    }
+
+    draw(ctx: CanvasRenderingContext2D): void {
+        console.log("Drawing triangle");
+    }
+}
+
+const triangle = new Triangle(3, 4, 5);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes should be present
+    assert!(
+        output.contains("Shape") && output.contains("Polygon") && output.contains("Triangle"),
+        "Classes should be present: {}",
+        output
+    );
+    // Abstract keyword should be erased
+    assert!(
+        !output.contains("abstract class") && !output.contains("abstract getArea"),
+        "Abstract keyword should be erased: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface Drawable"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Implements should be erased
+    assert!(
+        !output.contains("implements Drawable"),
+        "Implements should be erased: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number") && !output.contains(": string") && !output.contains(": void"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test abstract class with implemented methods
+#[test]
+fn test_parity_es5_abstract_class_implemented_methods() {
+    let source = r#"
+interface Logger {
+    log(message: string): void;
+}
+
+abstract class BaseService implements Logger {
+    protected name: string;
+
+    constructor(name: string) {
+        this.name = name;
+    }
+
+    log(message: string): void {
+        console.log("[" + this.name + "] " + message);
+    }
+
+    protected formatError(error: Error): string {
+        return "Error in " + this.name + ": " + error.message;
+    }
+
+    abstract execute(): Promise<void>;
+    abstract validate(): boolean;
+}
+
+class EmailService extends BaseService {
+    private recipients: string[];
+
+    constructor(recipients: string[]) {
+        super("EmailService");
+        this.recipients = recipients;
+    }
+
+    async execute(): Promise<void> {
+        this.log("Sending email to " + this.recipients.length + " recipients");
+        await this.sendEmails();
+    }
+
+    validate(): boolean {
+        return this.recipients.length > 0;
+    }
+
+    private async sendEmails(): Promise<void> {
+        for (const recipient of this.recipients) {
+            this.log("Sent to: " + recipient);
+        }
+    }
+}
+
+const service = new EmailService(["user@example.com"]);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes should be present
+    assert!(
+        output.contains("BaseService") && output.contains("EmailService"),
+        "Classes should be present: {}",
+        output
+    );
+    // Abstract keyword should be erased
+    assert!(
+        !output.contains("abstract class") && !output.contains("abstract execute"),
+        "Abstract keyword should be erased: {}",
+        output
+    );
+    // Protected modifier should be erased
+    assert!(
+        !output.contains("protected name") && !output.contains("protected formatError"),
+        "Protected modifier should be erased: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface Logger"),
+        "Interface should be erased: {}",
+        output
+    );
+}
+
+/// Test abstract class with static members
+#[test]
+fn test_parity_es5_abstract_class_static_members() {
+    let source = r#"
+interface Countable {
+    getCount(): number;
+}
+
+abstract class Counter implements Countable {
+    private static instanceCount: number = 0;
+    protected static readonly MAX_INSTANCES: number = 100;
+
+    protected id: number;
+
+    constructor() {
+        Counter.instanceCount++;
+        this.id = Counter.instanceCount;
+    }
+
+    static getInstanceCount(): number {
+        return Counter.instanceCount;
+    }
+
+    static resetCount(): void {
+        Counter.instanceCount = 0;
+    }
+
+    abstract getCount(): number;
+    abstract increment(): void;
+    abstract decrement(): void;
+
+    getId(): number {
+        return this.id;
+    }
+}
+
+class UpDownCounter extends Counter {
+    private count: number = 0;
+
+    getCount(): number {
+        return this.count;
+    }
+
+    increment(): void {
+        this.count++;
+    }
+
+    decrement(): void {
+        this.count--;
+    }
+
+    static create(): UpDownCounter {
+        if (Counter.getInstanceCount() >= Counter["MAX_INSTANCES"]) {
+            throw new Error("Max instances reached");
+        }
+        return new UpDownCounter();
+    }
+}
+
+const counter1 = new UpDownCounter();
+const counter2 = UpDownCounter.create();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes should be present
+    assert!(
+        output.contains("Counter") && output.contains("UpDownCounter"),
+        "Classes should be present: {}",
+        output
+    );
+    // Abstract keyword should be erased
+    assert!(
+        !output.contains("abstract class"),
+        "Abstract keyword should be erased: {}",
+        output
+    );
+    // Static methods should be present
+    assert!(
+        output.contains("getInstanceCount") && output.contains("resetCount"),
+        "Static methods should be present: {}",
+        output
+    );
+    // Private/protected/readonly modifiers should be erased
+    assert!(
+        !output.contains("private static") && !output.contains("protected static") && !output.contains("readonly MAX"),
+        "Access modifiers should be erased: {}",
+        output
+    );
+}
+
+/// Test abstract class inheritance chain
+#[test]
+fn test_parity_es5_abstract_class_inheritance_chain() {
+    let source = r#"
+interface Renderable {
+    render(): string;
+}
+
+abstract class Component implements Renderable {
+    abstract render(): string;
+
+    mount(): void {
+        console.log("Mounting component");
+    }
+}
+
+abstract class UIComponent extends Component {
+    protected styles: Record<string, string> = {};
+
+    abstract getClassName(): string;
+
+    setStyle(key: string, value: string): void {
+        this.styles[key] = value;
+    }
+}
+
+abstract class InteractiveComponent extends UIComponent {
+    protected handlers: Map<string, Function> = new Map();
+
+    abstract onClick(): void;
+    abstract onHover(): void;
+
+    addHandler(event: string, handler: Function): void {
+        this.handlers.set(event, handler);
+    }
+}
+
+class Button extends InteractiveComponent {
+    private label: string;
+
+    constructor(label: string) {
+        super();
+        this.label = label;
+    }
+
+    render(): string {
+        return "<button class='" + this.getClassName() + "'>" + this.label + "</button>";
+    }
+
+    getClassName(): string {
+        return "btn btn-primary";
+    }
+
+    onClick(): void {
+        console.log("Button clicked");
+    }
+
+    onHover(): void {
+        console.log("Button hovered");
+    }
+}
+
+const button = new Button("Submit");
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // All classes should be present
+    assert!(
+        output.contains("Component") && output.contains("UIComponent") &&
+        output.contains("InteractiveComponent") && output.contains("Button"),
+        "All classes should be present: {}",
+        output
+    );
+    // Abstract keyword should be erased
+    assert!(
+        !output.contains("abstract class") && !output.contains("abstract render"),
+        "Abstract keyword should be erased: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface Renderable"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Protected modifier should be erased
+    assert!(
+        !output.contains("protected styles") && !output.contains("protected handlers"),
+        "Protected modifier should be erased: {}",
+        output
+    );
+}
+
+/// Test abstract class with generics
+#[test]
+fn test_parity_es5_abstract_class_generics() {
+    let source = r#"
+interface Repository<T> {
+    findById(id: string): T | null;
+    save(entity: T): void;
+    delete(id: string): boolean;
+}
+
+abstract class BaseRepository<T, ID = string> implements Repository<T> {
+    protected items: Map<ID, T> = new Map();
+
+    abstract findById(id: ID): T | null;
+    abstract createId(): ID;
+
+    save(entity: T): void {
+        const id = this.createId();
+        this.items.set(id, entity);
+    }
+
+    delete(id: ID): boolean {
+        return this.items.delete(id);
+    }
+
+    getAll(): T[] {
+        return Array.from(this.items.values());
+    }
+
+    protected getItemCount(): number {
+        return this.items.size;
+    }
+}
+
+interface User {
+    name: string;
+    email: string;
+}
+
+class UserRepository extends BaseRepository<User, string> {
+    private counter: number = 0;
+
+    findById(id: string): User | null {
+        return this.items.get(id) || null;
+    }
+
+    createId(): string {
+        this.counter++;
+        return "user_" + this.counter;
+    }
+
+    findByEmail(email: string): User | null {
+        for (const user of this.items.values()) {
+            if (user.email === email) return user;
+        }
+        return null;
+    }
+}
+
+const repo = new UserRepository();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes should be present
+    assert!(
+        output.contains("BaseRepository") && output.contains("UserRepository"),
+        "Classes should be present: {}",
+        output
+    );
+    // Abstract keyword should be erased
+    assert!(
+        !output.contains("abstract class") && !output.contains("abstract findById"),
+        "Abstract keyword should be erased: {}",
+        output
+    );
+    // Generic type parameters should be erased
+    assert!(
+        !output.contains("<T>") && !output.contains("<T, ID") && !output.contains("<User"),
+        "Generic type parameters should be erased: {}",
+        output
+    );
+    // Interfaces should be erased
+    assert!(
+        !output.contains("interface Repository") && !output.contains("interface User"),
+        "Interfaces should be erased: {}",
+        output
+    );
+    // Implements clause should be erased
+    assert!(
+        !output.contains("implements Repository"),
+        "Implements clause should be erased: {}",
+        output
+    );
+}
+
+/// Test combined abstract class patterns
+#[test]
+fn test_parity_es5_abstract_class_combined_patterns() {
+    let source = r#"
+interface Identifiable {
+    getId(): string;
+}
+
+interface Timestamped {
+    getCreatedAt(): Date;
+    getUpdatedAt(): Date;
+}
+
+abstract class Entity<T extends Identifiable & Timestamped> {
+    protected static entityCount: number = 0;
+    private static readonly VERSION: string = "1.0.0";
+
+    #data: T | null = null;
+    protected readonly createdAt: Date;
+
+    constructor() {
+        Entity.entityCount++;
+        this.createdAt = new Date();
+    }
+
+    abstract validate(): boolean;
+    abstract serialize(): string;
+    abstract deserialize(data: string): T;
+
+    static getVersion(): string {
+        return Entity.VERSION;
+    }
+
+    static getEntityCount(): number {
+        return Entity.entityCount;
+    }
+
+    protected setData(data: T): void {
+        this.#data = data;
+    }
+
+    getData(): T | null {
+        return this.#data;
+    }
+
+    getAge(): number {
+        return Date.now() - this.createdAt.getTime();
+    }
+}
+
+interface UserData extends Identifiable, Timestamped {
+    name: string;
+    email: string;
+}
+
+class UserEntity extends Entity<UserData> {
+    validate(): boolean {
+        const data = this.getData();
+        return data !== null && data.name.length > 0 && data.email.includes("@");
+    }
+
+    serialize(): string {
+        const data = this.getData();
+        return data ? JSON.stringify(data) : "";
+    }
+
+    deserialize(json: string): UserData {
+        return JSON.parse(json);
+    }
+
+    updateUser(name: string, email: string): void {
+        const data = this.getData();
+        if (data) {
+            this.setData({
+                ...data,
+                name,
+                email
+            });
+        }
+    }
+}
+
+const userEntity = new UserEntity();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes should be present
+    assert!(
+        output.contains("Entity") && output.contains("UserEntity"),
+        "Classes should be present: {}",
+        output
+    );
+    // Abstract keyword should be erased
+    assert!(
+        !output.contains("abstract class") && !output.contains("abstract validate"),
+        "Abstract keyword should be erased: {}",
+        output
+    );
+    // Generic type parameters should be erased
+    assert!(
+        !output.contains("<T extends") && !output.contains("<UserData>"),
+        "Generic type parameters should be erased: {}",
+        output
+    );
+    // Interfaces should be erased
+    assert!(
+        !output.contains("interface Identifiable") && !output.contains("interface UserData"),
+        "Interfaces should be erased: {}",
+        output
+    );
+    // Protected/private/readonly modifiers should be erased
+    assert!(
+        !output.contains("protected static") && !output.contains("private static") && !output.contains("readonly VERSION"),
+        "Access modifiers should be erased: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": boolean") && !output.contains(": string") && !output.contains(": Date"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
