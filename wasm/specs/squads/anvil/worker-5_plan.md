@@ -183,7 +183,7 @@ Priority: 5
 - [x] Added async computed object literal source-map coverage in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
 
 ## Ready for Merge
-Yes
+No (merged 2026-01-10)
 
 ## Resume Notes
 - Branch: `worker/anvil-5`

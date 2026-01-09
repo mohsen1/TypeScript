@@ -166,7 +166,7 @@ Priority: 1
 - [x] Fixed TS2304 false positives (Cannot find name): Added builtin global type handling for Promise, PromiseLike, Map, Set, Iterator, Generator, and 30+ other global types. Fixed type alias type parameter scoping, heritage clause resolution, type queries. Added find-ts2304.mjs differential test script. Added regression test. Key files: thin_checker.rs.
 
 ## Ready for Merge
-Yes
+No (merged 2026-01-10)
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize emitter fidelity (ES5 downleveling/source maps) before new features.
