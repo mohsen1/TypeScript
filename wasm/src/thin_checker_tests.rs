@@ -13060,3 +13060,33 @@ x.type;
     let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
 }
+
+#[test]
+fn test_abstract_constructor_type_parses() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test that abstract constructor types parse correctly (no TS1005/TS1109 errors)
+    let source = r#"
+function Mixin<TBaseClass extends abstract new (...args: any) => any>(baseClass: TBaseClass) {
+    return baseClass;
+}
+
+type AbstractConstructor<T> = abstract new (...args: any[]) => T;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    // Check for parser errors (TS1005 = ';' expected, TS1109 = Expression expected)
+    let parse_errors: Vec<_> = parser.get_diagnostics().iter()
+        .filter(|d| d.code == 1005 || d.code == 1109)
+        .collect();
+    assert!(parse_errors.is_empty(), "Should not have parse errors for abstract new syntax: {:?}", parse_errors);
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+}

@@ -669,6 +669,9 @@ pub struct FunctionTypeData {
     pub type_parameters: Option<NodeList>,
     pub parameters: NodeList,
     pub type_annotation: NodeIndex,
+    /// True if this is an abstract constructor type: `abstract new () => T`
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub is_abstract: bool,
 }
 
 /// Data for type query (typeof)

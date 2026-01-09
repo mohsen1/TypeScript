@@ -6580,9 +6580,26 @@ impl ThinParserState {
     fn parse_primary_type(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
 
+        // Handle abstract constructor types: abstract new () => T
+        if self.is_token(SyntaxKind::AbstractKeyword) {
+            // Look ahead to see if this is "abstract new"
+            let snapshot = self.scanner.save_state();
+            let current = self.current_token;
+            self.next_token();
+            let is_abstract_new = self.is_token(SyntaxKind::NewKeyword);
+            self.scanner.restore_state(snapshot);
+            self.current_token = current;
+
+            if is_abstract_new {
+                // Consume 'abstract' and parse the constructor type
+                self.next_token();
+                return self.parse_constructor_type(true);
+            }
+        }
+
         // Handle constructor types: new () => T or new <T>() => T
         if self.is_token(SyntaxKind::NewKeyword) {
-            return self.parse_constructor_type();
+            return self.parse_constructor_type(false);
         }
 
         // Handle generic function types: <T>() => T or <T, U>(x: T) => U
@@ -7720,6 +7737,7 @@ impl ThinParserState {
                 type_parameters: None,
                 parameters,
                 type_annotation,
+                is_abstract: false,
             },
         )
     }
@@ -7752,12 +7770,14 @@ impl ThinParserState {
                 type_parameters: Some(type_parameters),
                 parameters,
                 type_annotation,
+                is_abstract: false,
             },
         )
     }
 
     /// Parse constructor type: new () => T or new <T>() => T
-    fn parse_constructor_type(&mut self) -> NodeIndex {
+    /// Also handles abstract constructor types: abstract new () => T
+    fn parse_constructor_type(&mut self, is_abstract: bool) -> NodeIndex {
         let start_pos = self.token_pos();
         self.parse_expected(SyntaxKind::NewKeyword);
 
@@ -7788,6 +7808,7 @@ impl ThinParserState {
                 type_parameters,
                 parameters,
                 type_annotation,
+                is_abstract,
             },
         )
     }
