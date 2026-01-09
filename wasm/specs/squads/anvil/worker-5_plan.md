@@ -13,6 +13,7 @@ Priority: 5
 - [ ] (empty)
 
 ## Completed
+- [x] Added 12 async conditional expression pattern tests (ternary basic, condition await, no await, body_contains_await, body_no_await, ignores nested async, nested ternary, short-circuit AND, short-circuit OR, nullish coalescing, try/catch, chained) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (520 tests PASS).
 - [x] Added 12 async switch statement pattern tests (basic, with default, no await, body_contains_await, body_no_await, ignores nested async, fallthrough, discriminant await, multiple cases, nested, try/catch, with return) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (508 tests PASS).
 - [x] Added 12 async do-while loop pattern tests (basic, with result, no await, body_contains_await, body_no_await, ignores nested async, with break, with continue, condition await, nested, try/catch, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (496 tests PASS).
 - [x] Added 12 async while loop pattern tests (basic, with result, no await, body_contains_await, body_no_await, ignores nested async, with break, with continue, condition await, nested, try/catch, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (484 tests PASS).
