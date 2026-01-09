@@ -27597,3 +27597,632 @@ class RecursiveFlattener {
         output
     );
 }
+
+// =============================================================================
+// INTERSECTION TYPE PATTERNS - ES5 TRANSFORMATION TESTS
+// =============================================================================
+
+/// Test: object intersection types
+/// Verifies that classes using object intersection types transform correctly to ES5
+#[test]
+fn test_class_es5_object_intersection_types() {
+    let source = r#"
+type Named = { name: string };
+type Aged = { age: number };
+type Person = Named & Aged;
+
+type Timestamped = { createdAt: Date; updatedAt: Date };
+type Identifiable = { id: string };
+type Entity = Identifiable & Timestamped;
+
+class PersonFactory {
+    create(name: string, age: number): Person {
+        return { name, age };
+    }
+
+    merge<T extends Named, U extends Aged>(named: T, aged: U): T & U {
+        return { ...named, ...aged };
+    }
+
+    extend<T extends Person>(person: T, extra: object): T & typeof extra {
+        return { ...person, ...extra };
+    }
+}
+
+class EntityManager {
+    private entities: Map<string, Entity> = new Map();
+
+    create(id: string): Entity {
+        const now = new Date();
+        const entity: Entity = { id, createdAt: now, updatedAt: now };
+        this.entities.set(id, entity);
+        return entity;
+    }
+
+    update(id: string): Entity | undefined {
+        const entity = this.entities.get(id);
+        if (entity) {
+            entity.updatedAt = new Date();
+        }
+        return entity;
+    }
+
+    addMetadata<T extends Entity>(entity: T, metadata: object): T & { metadata: typeof metadata } {
+        return { ...entity, metadata };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function PersonFactory"),
+        "Expected PersonFactory function: {}",
+        output
+    );
+    assert!(
+        output.contains("PersonFactory.prototype.create"),
+        "Expected create method: {}",
+        output
+    );
+    assert!(
+        output.contains("PersonFactory.prototype.merge") && output.contains("PersonFactory.prototype.extend"),
+        "Expected merge and extend methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function EntityManager"),
+        "Expected EntityManager function: {}",
+        output
+    );
+    assert!(
+        output.contains("EntityManager.prototype.create") && output.contains("EntityManager.prototype.update"),
+        "Expected EntityManager create and update methods: {}",
+        output
+    );
+    assert!(
+        output.contains("EntityManager.prototype.addMetadata"),
+        "Expected addMetadata method: {}",
+        output
+    );
+}
+
+/// Test: interface merging patterns
+/// Verifies that classes using interface merging transform correctly to ES5
+#[test]
+fn test_class_es5_interface_merging() {
+    let source = r#"
+interface Base {
+    id: string;
+    name: string;
+}
+
+interface WithTimestamp {
+    createdAt: Date;
+}
+
+interface WithVersion {
+    version: number;
+}
+
+interface Document extends Base, WithTimestamp, WithVersion {
+    content: string;
+}
+
+class DocumentBuilder {
+    private doc: Partial<Document> = {};
+
+    setId(id: string): this {
+        this.doc.id = id;
+        return this;
+    }
+
+    setName(name: string): this {
+        this.doc.name = name;
+        return this;
+    }
+
+    setContent(content: string): this {
+        this.doc.content = content;
+        return this;
+    }
+
+    setVersion(version: number): this {
+        this.doc.version = version;
+        return this;
+    }
+
+    build(): Document {
+        return {
+            id: this.doc.id || "",
+            name: this.doc.name || "",
+            content: this.doc.content || "",
+            createdAt: this.doc.createdAt || new Date(),
+            version: this.doc.version || 1
+        };
+    }
+}
+
+interface Serializable {
+    serialize(): string;
+}
+
+interface Deserializable<T> {
+    deserialize(data: string): T;
+}
+
+class JSONCodec<T> implements Serializable {
+    constructor(private data: T) {}
+
+    serialize(): string {
+        return JSON.stringify(this.data);
+    }
+
+    static deserialize<T>(data: string): T {
+        return JSON.parse(data);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function DocumentBuilder"),
+        "Expected DocumentBuilder function: {}",
+        output
+    );
+    assert!(
+        output.contains("DocumentBuilder.prototype.setId") && output.contains("DocumentBuilder.prototype.setName"),
+        "Expected setId and setName methods: {}",
+        output
+    );
+    assert!(
+        output.contains("DocumentBuilder.prototype.setContent") && output.contains("DocumentBuilder.prototype.setVersion"),
+        "Expected setContent and setVersion methods: {}",
+        output
+    );
+    assert!(
+        output.contains("DocumentBuilder.prototype.build"),
+        "Expected build method: {}",
+        output
+    );
+    assert!(
+        output.contains("function JSONCodec"),
+        "Expected JSONCodec function: {}",
+        output
+    );
+    assert!(
+        output.contains("JSONCodec.prototype.serialize"),
+        "Expected serialize method: {}",
+        output
+    );
+}
+
+/// Test: conditional intersection types
+/// Verifies that classes using conditional intersection types transform correctly to ES5
+#[test]
+fn test_class_es5_conditional_intersection() {
+    let source = r#"
+type WithId<T> = T & { id: string };
+type WithTimestamps<T> = T & { createdAt: Date; updatedAt: Date };
+type Auditable<T> = T extends { id: string } ? T & { auditLog: string[] } : never;
+
+class DataEnhancer {
+    addId<T extends object>(data: T, id: string): WithId<T> {
+        return { ...data, id };
+    }
+
+    addTimestamps<T extends object>(data: T): WithTimestamps<T> {
+        const now = new Date();
+        return { ...data, createdAt: now, updatedAt: now };
+    }
+
+    makeAuditable<T extends { id: string }>(data: T): Auditable<T> {
+        return { ...data, auditLog: [] } as Auditable<T>;
+    }
+
+    enhance<T extends object>(data: T, id: string): WithId<WithTimestamps<T>> {
+        const withTimestamps = this.addTimestamps(data);
+        return this.addId(withTimestamps, id);
+    }
+}
+
+type NonNullableIntersection<T, U> = NonNullable<T> & NonNullable<U>;
+
+class SafeMerger {
+    mergeNonNull<T, U>(a: T | null, b: U | null): NonNullableIntersection<T, U> | null {
+        if (a === null || b === null) {
+            return null;
+        }
+        return { ...a, ...b } as NonNullableIntersection<T, U>;
+    }
+
+    mergeWithDefaults<T extends object, D extends Partial<T>>(data: T, defaults: D): T & Required<D> {
+        return { ...defaults, ...data } as T & Required<D>;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function DataEnhancer"),
+        "Expected DataEnhancer function: {}",
+        output
+    );
+    assert!(
+        output.contains("DataEnhancer.prototype.addId") && output.contains("DataEnhancer.prototype.addTimestamps"),
+        "Expected addId and addTimestamps methods: {}",
+        output
+    );
+    assert!(
+        output.contains("DataEnhancer.prototype.makeAuditable") && output.contains("DataEnhancer.prototype.enhance"),
+        "Expected makeAuditable and enhance methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function SafeMerger"),
+        "Expected SafeMerger function: {}",
+        output
+    );
+    assert!(
+        output.contains("SafeMerger.prototype.mergeNonNull") && output.contains("SafeMerger.prototype.mergeWithDefaults"),
+        "Expected SafeMerger methods: {}",
+        output
+    );
+}
+
+/// Test: generic intersection types
+/// Verifies that classes using generic intersection types transform correctly to ES5
+#[test]
+fn test_class_es5_generic_intersection() {
+    let source = r#"
+type Merge<T, U> = T & U;
+
+class GenericMerger {
+    private base: object;
+
+    constructor(base: object) {
+        this.base = base;
+    }
+
+    merge(other: object): object {
+        return Object.assign({}, this.base, other);
+    }
+
+    getBase(): object {
+        return this.base;
+    }
+}
+
+type Mixin<T, U> = T & U;
+
+class MixinApplicator {
+    apply(target: object, mixin: object): object {
+        return Object.assign({}, target, mixin);
+    }
+
+    applyTwo(target: object, m1: object, m2: object): object {
+        return Object.assign({}, target, m1, m2);
+    }
+
+    combine(a: object, b: object): object {
+        return Object.assign({}, a, b);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function GenericMerger"),
+        "Expected GenericMerger function: {}",
+        output
+    );
+    assert!(
+        output.contains("this.base = base"),
+        "Expected constructor assignment: {}",
+        output
+    );
+    assert!(
+        output.contains("GenericMerger.prototype.merge") && output.contains("GenericMerger.prototype.getBase"),
+        "Expected merge and getBase methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function MixinApplicator"),
+        "Expected MixinApplicator function: {}",
+        output
+    );
+    assert!(
+        output.contains("MixinApplicator.prototype.apply") && output.contains("MixinApplicator.prototype.applyTwo"),
+        "Expected MixinApplicator apply methods: {}",
+        output
+    );
+    assert!(
+        output.contains("MixinApplicator.prototype.combine"),
+        "Expected MixinApplicator combine method: {}",
+        output
+    );
+}
+
+/// Test: mixin patterns with intersection
+/// Verifies that classes using mixin patterns with intersection types transform correctly to ES5
+#[test]
+fn test_class_es5_mixin_intersection_patterns() {
+    let source = r#"
+type Disposable = {
+    dispose(): void;
+    isDisposed: boolean;
+};
+
+type Activatable = {
+    activate(): void;
+    deactivate(): void;
+    isActive: boolean;
+};
+
+type Component = Disposable & Activatable & { name: string };
+
+class ComponentBase implements Component {
+    name: string;
+    isDisposed: boolean = false;
+    isActive: boolean = false;
+
+    constructor(name: string) {
+        this.name = name;
+    }
+
+    dispose(): void {
+        this.isDisposed = true;
+        this.isActive = false;
+    }
+
+    activate(): void {
+        if (!this.isDisposed) {
+            this.isActive = true;
+        }
+    }
+
+    deactivate(): void {
+        this.isActive = false;
+    }
+}
+
+type Logger = { log(message: string): void };
+type ErrorHandler = { handleError(error: Error): void };
+type Service = Logger & ErrorHandler & { name: string };
+
+class ServiceBase implements Service {
+    name: string;
+    private logs: string[] = [];
+
+    constructor(name: string) {
+        this.name = name;
+    }
+
+    log(message: string): void {
+        this.logs.push("[" + this.name + "] " + message);
+    }
+
+    handleError(error: Error): void {
+        this.log("Error: " + error.message);
+    }
+
+    getLogs(): string[] {
+        return [...this.logs];
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function ComponentBase"),
+        "Expected ComponentBase function: {}",
+        output
+    );
+    assert!(
+        output.contains("this.name = name"),
+        "Expected constructor assignment: {}",
+        output
+    );
+    assert!(
+        output.contains("ComponentBase.prototype.dispose") && output.contains("ComponentBase.prototype.activate"),
+        "Expected dispose and activate methods: {}",
+        output
+    );
+    assert!(
+        output.contains("ComponentBase.prototype.deactivate"),
+        "Expected deactivate method: {}",
+        output
+    );
+    assert!(
+        output.contains("function ServiceBase"),
+        "Expected ServiceBase function: {}",
+        output
+    );
+    assert!(
+        output.contains("ServiceBase.prototype.log") && output.contains("ServiceBase.prototype.handleError"),
+        "Expected log and handleError methods: {}",
+        output
+    );
+}
+
+/// Test: combined intersection type patterns
+/// Verifies that classes using multiple intersection type patterns together transform correctly to ES5
+#[test]
+fn test_class_es5_combined_intersection_patterns() {
+    let source = r#"
+type HasId = { id: string };
+type HasName = { name: string };
+type HasCreated = { createdAt: Date };
+type HasUpdated = { updatedAt: Date };
+
+type BaseEntity = HasId & HasName;
+type TimestampedEntity = BaseEntity & HasCreated & HasUpdated;
+type AuditableEntity = TimestampedEntity & { auditLog: string[]; lastModifiedBy: string };
+
+class EntityFactory {
+    createBase(id: string, name: string): BaseEntity {
+        return { id, name };
+    }
+
+    createTimestamped(id: string, name: string): TimestampedEntity {
+        const now = new Date();
+        return { id, name, createdAt: now, updatedAt: now };
+    }
+
+    createAuditable(id: string, name: string, user: string): AuditableEntity {
+        const now = new Date();
+        return {
+            id,
+            name,
+            createdAt: now,
+            updatedAt: now,
+            auditLog: ["Created by " + user],
+            lastModifiedBy: user
+        };
+    }
+
+    upgrade<T extends BaseEntity>(entity: T): T & HasCreated & HasUpdated {
+        const now = new Date();
+        return { ...entity, createdAt: now, updatedAt: now };
+    }
+}
+
+type Validator<T> = { validate(data: T): boolean };
+type Transformer<T, U> = { transform(data: T): U };
+type Processor<T, U> = Validator<T> & Transformer<T, U>;
+
+class DataProcessor<T extends object, U extends object> implements Processor<T, U> {
+    private validator: (data: T) => boolean;
+    private transformer: (data: T) => U;
+
+    constructor(validator: (data: T) => boolean, transformer: (data: T) => U) {
+        this.validator = validator;
+        this.transformer = transformer;
+    }
+
+    validate(data: T): boolean {
+        return this.validator(data);
+    }
+
+    transform(data: T): U {
+        return this.transformer(data);
+    }
+
+    process(data: T): U | null {
+        if (this.validate(data)) {
+            return this.transform(data);
+        }
+        return null;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function EntityFactory"),
+        "Expected EntityFactory function: {}",
+        output
+    );
+    assert!(
+        output.contains("EntityFactory.prototype.createBase") && output.contains("EntityFactory.prototype.createTimestamped"),
+        "Expected createBase and createTimestamped methods: {}",
+        output
+    );
+    assert!(
+        output.contains("EntityFactory.prototype.createAuditable") && output.contains("EntityFactory.prototype.upgrade"),
+        "Expected createAuditable and upgrade methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function DataProcessor"),
+        "Expected DataProcessor function: {}",
+        output
+    );
+    assert!(
+        output.contains("DataProcessor.prototype.validate") && output.contains("DataProcessor.prototype.transform"),
+        "Expected validate and transform methods: {}",
+        output
+    );
+    assert!(
+        output.contains("DataProcessor.prototype.process"),
+        "Expected process method: {}",
+        output
+    );
+}
