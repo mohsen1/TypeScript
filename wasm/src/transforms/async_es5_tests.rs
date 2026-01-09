@@ -10945,3 +10945,306 @@ fn test_async_observable_ignores_nested_async() {
     );
     assert!(!result, "Should not detect await inside nested async in observable function");
 }
+
+// ============================================================================
+// ASYNC CHANNEL PATTERN TESTS
+// Tests for channel patterns: send, receive, buffered, unbuffered
+// ============================================================================
+
+#[test]
+fn test_async_channel_send() {
+    let result = async_error_propagation_contains_await(
+        "async function send() { await channel.send(message); }",
+    );
+    assert!(result, "Should detect await in channel send");
+}
+
+#[test]
+fn test_async_channel_receive() {
+    let result = async_error_propagation_contains_await(
+        "async function receive() { return await channel.receive(); }",
+    );
+    assert!(result, "Should detect await in channel receive");
+}
+
+#[test]
+fn test_async_channel_buffered() {
+    let result = async_error_propagation_contains_await(
+        "async function buffered() { return await bufferedChannel.take(); }",
+    );
+    assert!(result, "Should detect await in buffered channel");
+}
+
+#[test]
+fn test_async_channel_unbuffered() {
+    let result = async_error_propagation_contains_await(
+        "async function unbuffered() { await syncChannel.put(value); }",
+    );
+    assert!(result, "Should detect await in unbuffered channel");
+}
+
+#[test]
+fn test_async_channel_close() {
+    let result = async_error_propagation_contains_await(
+        "async function close() { await channel.close(); }",
+    );
+    assert!(result, "Should detect await in channel close");
+}
+
+#[test]
+fn test_async_channel_select() {
+    let result = async_error_propagation_contains_await(
+        "async function selectChannel() { return await select([ch1, ch2, ch3]); }",
+    );
+    assert!(result, "Should detect await in channel select");
+}
+
+#[test]
+fn test_async_channel_broadcast() {
+    let result = async_error_propagation_contains_await(
+        "async function broadcast() { await broadcaster.send(event); }",
+    );
+    assert!(result, "Should detect await in broadcast channel");
+}
+
+#[test]
+fn test_async_channel_multicast() {
+    let result = async_error_propagation_contains_await(
+        "async function multicast() { return await multicastChannel.subscribe(); }",
+    );
+    assert!(result, "Should detect await in multicast channel");
+}
+
+#[test]
+fn test_async_channel_pipe() {
+    let result = async_error_propagation_contains_await(
+        "async function pipe() { await input.pipe(output); }",
+    );
+    assert!(result, "Should detect await in channel pipe");
+}
+
+#[test]
+fn test_async_channel_timeout() {
+    let result = async_error_propagation_contains_await(
+        "async function receiveTimeout() { return await channel.receiveWithTimeout(5000); }",
+    );
+    assert!(result, "Should detect await in channel receive with timeout");
+}
+
+#[test]
+fn test_async_channel_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function syncChannel() { return channel.isEmpty(); }",
+    );
+    assert!(!result, "Should not detect await when channel access is sync");
+}
+
+#[test]
+fn test_async_channel_ignores_nested_async() {
+    let result = async_error_propagation_contains_await(
+        "async function outer() { const receiver = async () => await channel.receive(); }",
+    );
+    assert!(!result, "Should not detect await inside nested async in channel function");
+}
+
+// ============================================================================
+// ASYNC SEMAPHORE PATTERN TESTS
+// Tests for semaphore patterns: acquire, release, concurrent limit, wait queue
+// ============================================================================
+
+#[test]
+fn test_async_semaphore_acquire() {
+    let result = async_error_propagation_contains_await(
+        "async function acquire() { await semaphore.acquire(); }",
+    );
+    assert!(result, "Should detect await in semaphore acquire");
+}
+
+#[test]
+fn test_async_semaphore_release() {
+    let result = async_error_propagation_contains_await(
+        "async function release() { await semaphore.release(); }",
+    );
+    assert!(result, "Should detect await in semaphore release");
+}
+
+#[test]
+fn test_async_semaphore_concurrent_limit() {
+    let result = async_error_propagation_contains_await(
+        "async function limitedConcurrency() { return await limiter.run(task); }",
+    );
+    assert!(result, "Should detect await in concurrent limit");
+}
+
+#[test]
+fn test_async_semaphore_wait_queue() {
+    let result = async_error_propagation_contains_await(
+        "async function waitInQueue() { return await semaphore.waitForPermit(); }",
+    );
+    assert!(result, "Should detect await in wait queue");
+}
+
+#[test]
+fn test_async_semaphore_try_acquire() {
+    let result = async_error_propagation_contains_await(
+        "async function tryAcquire() { return await semaphore.tryAcquire(timeout); }",
+    );
+    assert!(result, "Should detect await in try acquire");
+}
+
+#[test]
+fn test_async_semaphore_with_timeout() {
+    let result = async_error_propagation_contains_await(
+        "async function acquireTimeout() { return await semaphore.acquireWithTimeout(5000); }",
+    );
+    assert!(result, "Should detect await in acquire with timeout");
+}
+
+#[test]
+fn test_async_semaphore_permits() {
+    let result = async_error_propagation_contains_await(
+        "async function multiPermit() { await semaphore.acquire(3); }",
+    );
+    assert!(result, "Should detect await in multiple permits acquire");
+}
+
+#[test]
+fn test_async_semaphore_drain() {
+    let result = async_error_propagation_contains_await(
+        "async function drain() { await semaphore.drainPermits(); }",
+    );
+    assert!(result, "Should detect await in drain permits");
+}
+
+#[test]
+fn test_async_semaphore_available() {
+    let result = async_error_propagation_contains_await(
+        "async function checkAvailable() { return await semaphore.availablePermits(); }",
+    );
+    assert!(result, "Should detect await in check available permits");
+}
+
+#[test]
+fn test_async_semaphore_guard() {
+    let result = async_error_propagation_contains_await(
+        "async function withGuard() { return await semaphore.withPermit(operation); }",
+    );
+    assert!(result, "Should detect await in semaphore guard pattern");
+}
+
+#[test]
+fn test_async_semaphore_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function syncSemaphore() { return semaphore.getPermitCount(); }",
+    );
+    assert!(!result, "Should not detect await when semaphore access is sync");
+}
+
+#[test]
+fn test_async_semaphore_ignores_nested_async() {
+    let result = async_error_propagation_contains_await(
+        "async function outer() { const worker = async () => await semaphore.acquire(); }",
+    );
+    assert!(!result, "Should not detect await inside nested async in semaphore function");
+}
+
+// ============================================================================
+// ASYNC MUTEX PATTERN TESTS
+// Tests for mutex patterns: lock, unlock, try-lock, deadlock prevention
+// ============================================================================
+
+#[test]
+fn test_async_mutex_lock() {
+    let result = async_error_propagation_contains_await(
+        "async function lock() { await mutex.lock(); }",
+    );
+    assert!(result, "Should detect await in mutex lock");
+}
+
+#[test]
+fn test_async_mutex_unlock() {
+    let result = async_error_propagation_contains_await(
+        "async function unlock() { await mutex.unlock(); }",
+    );
+    assert!(result, "Should detect await in mutex unlock");
+}
+
+#[test]
+fn test_async_mutex_try_lock() {
+    let result = async_error_propagation_contains_await(
+        "async function tryLock() { return await mutex.tryLock(); }",
+    );
+    assert!(result, "Should detect await in mutex try lock");
+}
+
+#[test]
+fn test_async_mutex_deadlock_prevention() {
+    let result = async_error_propagation_contains_await(
+        "async function orderedLock() { await lockManager.acquireInOrder([mutex1, mutex2]); }",
+    );
+    assert!(result, "Should detect await in deadlock prevention");
+}
+
+#[test]
+fn test_async_mutex_with_timeout() {
+    let result = async_error_propagation_contains_await(
+        "async function lockTimeout() { return await mutex.lockWithTimeout(5000); }",
+    );
+    assert!(result, "Should detect await in mutex lock with timeout");
+}
+
+#[test]
+fn test_async_mutex_guard() {
+    let result = async_error_propagation_contains_await(
+        "async function withLock() { return await mutex.withLock(criticalSection); }",
+    );
+    assert!(result, "Should detect await in mutex guard pattern");
+}
+
+#[test]
+fn test_async_mutex_reentrant() {
+    let result = async_error_propagation_contains_await(
+        "async function reentrant() { await reentrantLock.acquire(); }",
+    );
+    assert!(result, "Should detect await in reentrant lock");
+}
+
+#[test]
+fn test_async_mutex_fair() {
+    let result = async_error_propagation_contains_await(
+        "async function fairLock() { await fairMutex.lock(); }",
+    );
+    assert!(result, "Should detect await in fair lock");
+}
+
+#[test]
+fn test_async_mutex_read_write() {
+    let result = async_error_propagation_contains_await(
+        "async function readLock() { await rwLock.readLock(); }",
+    );
+    assert!(result, "Should detect await in read-write lock");
+}
+
+#[test]
+fn test_async_mutex_upgrade() {
+    let result = async_error_propagation_contains_await(
+        "async function upgradeLock() { await rwLock.upgradeToWrite(); }",
+    );
+    assert!(result, "Should detect await in lock upgrade");
+}
+
+#[test]
+fn test_async_mutex_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function syncMutex() { return mutex.isLocked(); }",
+    );
+    assert!(!result, "Should not detect await when mutex access is sync");
+}
+
+#[test]
+fn test_async_mutex_ignores_nested_async() {
+    let result = async_error_propagation_contains_await(
+        "async function outer() { const locker = async () => await mutex.lock(); }",
+    );
+    assert!(!result, "Should not detect await inside nested async in mutex function");
+}
