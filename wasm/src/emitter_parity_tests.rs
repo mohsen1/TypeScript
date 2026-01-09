@@ -16501,3 +16501,275 @@ function process(user: User): Product {
         output
     );
 }
+
+/// Parity test for ES5 class extends clause.
+/// Class extending another class should use __extends helper.
+#[test]
+fn test_parity_es5_class_extends_clause() {
+    let source = r#"class Animal {
+    name: string;
+    constructor(name: string) {
+        this.name = name;
+    }
+    speak(): void {
+        console.log(this.name);
+    }
+}
+
+class Dog extends Animal {
+    breed: string;
+    constructor(name: string, breed: string) {
+        super(name);
+        this.breed = breed;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Both classes should be present
+    assert!(
+        output.contains("Animal") && output.contains("Dog"),
+        "Output should contain both classes: {}",
+        output
+    );
+    // Should have __extends helper or prototype chain setup
+    assert!(
+        output.contains("__extends") || output.contains(".prototype"),
+        "ES5 output should have inheritance mechanism: {}",
+        output
+    );
+    // No ES6 class syntax
+    assert!(
+        !output.contains("class Dog extends"),
+        "ES5 output should not contain ES6 class extends: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": void"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 super calls in constructor and methods.
+/// Super calls should be transformed to parent prototype calls.
+#[test]
+fn test_parity_es5_class_super_calls() {
+    let source = r#"class Base {
+    value: number;
+    constructor(value: number) {
+        this.value = value;
+    }
+    getValue(): number {
+        return this.value;
+    }
+}
+
+class Derived extends Base {
+    multiplier: number;
+    constructor(value: number, multiplier: number) {
+        super(value);
+        this.multiplier = multiplier;
+    }
+    getValue(): number {
+        return super.getValue() * this.multiplier;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Both classes should be present
+    assert!(
+        output.contains("Base") && output.contains("Derived"),
+        "Output should contain both classes: {}",
+        output
+    );
+    // No ES6 super keyword as constructor call
+    assert!(
+        !output.contains("super(value)"),
+        "ES5 output should not contain ES6 super(): {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 method overrides.
+/// Overridden methods should be on prototype chain.
+#[test]
+fn test_parity_es5_class_method_overrides() {
+    let source = r#"class Shape {
+    getArea(): number {
+        return 0;
+    }
+    getPerimeter(): number {
+        return 0;
+    }
+}
+
+class Rectangle extends Shape {
+    width: number;
+    height: number;
+    constructor(width: number, height: number) {
+        super();
+        this.width = width;
+        this.height = height;
+    }
+    override getArea(): number {
+        return this.width * this.height;
+    }
+    override getPerimeter(): number {
+        return 2 * (this.width + this.height);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Both classes should be present
+    assert!(
+        output.contains("Shape") && output.contains("Rectangle"),
+        "Output should contain both classes: {}",
+        output
+    );
+    // Methods should be defined
+    assert!(
+        output.contains("getArea") && output.contains("getPerimeter"),
+        "Output should contain methods: {}",
+        output
+    );
+    // No override keyword
+    assert!(
+        !output.contains("override"),
+        "ES5 output should not contain override keyword: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 abstract class with methods.
+/// Abstract classes with abstract and concrete methods should be lowered properly.
+#[test]
+fn test_parity_es5_abstract_class_methods() {
+    let source = r#"abstract class Vehicle {
+    abstract start(): void;
+    abstract stop(): void;
+
+    honk(): void {
+        console.log("Beep!");
+    }
+}
+
+class Car extends Vehicle {
+    start(): void {
+        console.log("Car starting");
+    }
+    stop(): void {
+        console.log("Car stopping");
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Both classes should be present
+    assert!(
+        output.contains("Vehicle") && output.contains("Car"),
+        "Output should contain both classes: {}",
+        output
+    );
+    // No abstract keyword
+    assert!(
+        !output.contains("abstract"),
+        "ES5 output should not contain abstract keyword: {}",
+        output
+    );
+    // Methods should be defined
+    assert!(
+        output.contains("start") && output.contains("stop") && output.contains("honk"),
+        "Output should contain methods: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": void"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}

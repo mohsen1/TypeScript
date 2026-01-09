@@ -7,12 +7,13 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] Add ES5 class inheritance patterns parity tests: extends clause, super calls, method overrides, abstract classes. Tests: `./wasm/test.sh emitter_parity`
+- [ ] Add ES5 decorator patterns parity tests: class decorators, method decorators, parameter decorators. Tests: `./wasm/test.sh emitter_parity`
 
 ## Task Queue
-- [ ] Add ES5 decorator patterns parity tests: class decorators, method decorators, parameter decorators
+(empty)
 
 ## Completed
+- [x] Added ES5 class inheritance patterns parity tests (extends-clause, super-calls, method-overrides, abstract-class) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (296 tests).
 - [x] Added ES5 import/export patterns parity tests (reexport, barrel-file, type-only-imports) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (292 tests).
 - [x] Added ES5 enum patterns parity tests (const-usage, reverse-mapping, string-values, computed-complex) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (289 tests).
 - [x] Added ES5 namespace patterns parity tests (merging, exports, deeply-nested) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (285 tests).
