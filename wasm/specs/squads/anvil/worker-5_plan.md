@@ -7,26 +7,25 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-Add async ES5 integration tests for derived class edge cases: super() with async field initializers
+Add async ES5 tests for computed super property access patterns
 
-Per GOALS.md Objective 1: "Match tsc for super() in derived classes with field initializers, nested arrow/async this capture"
+Per GOALS.md Objective 1: "Match tsc for computed super[...] cases"
 
 Steps:
-1. Add 12 async/class integration edge case tests to `wasm/src/transforms/async_es5_tests.rs`:
-   - Derived class with async field initializer calling super()
-   - Async arrow in derived constructor before super()
-   - Async arrow in derived constructor after super()
-   - Async method calling super.method()
-   - Async static method with this capture
-   - Async field with nested arrow this binding
-   - Derived async constructor with parameter properties
-   - Async generator in derived class
-   - Multiple async fields with super dependency
-   - Computed async field with super access
-   - body_contains_await tests for derived patterns
-   - Combined derived async patterns
+1. Add 12 async computed super tests to `wasm/src/transforms/async_es5_tests.rs`:
+   - async method with super[key] access
+   - async method with super[computed()] call
+   - async arrow with super property
+   - async static with super access
+   - async generator with super[key]
+   - super[key] in try/catch async
+   - super[Symbol.iterator] async pattern
+   - super["method"]() async call
+   - body_contains_await tests for super patterns
+   - ignores nested async patterns
+   - Combined computed super patterns
 2. Run `./wasm/test.sh async_es5_tests` to verify all tests pass
-3. Commit with message: `[wasm] async_es5: add derived class edge case integration tests`
+3. Commit with message: `[wasm] async_es5: add computed super property access tests`
 4. Push to `origin/worker/anvil-5`
 5. Update this plan file and push
 
@@ -35,6 +34,7 @@ Steps:
 
 
 ## Completed
+- [x] Added 12 async derived class edge case tests (field_initializer, arrow_after_super, super_method, static_this, nested_arrow_this, param_property, generator, multiple_fields, computed_field, super_property, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (976 tests PASS).
 - [x] Added 12 async transaction pattern tests (begin, commit, rollback, savepoint, nested, timeout, try_catch, conditional, isolation, execute, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (964 tests PASS).
 - [x] Added 12 async resource pool pattern tests (acquire, release, drain, resize, create, destroy, validate, evict, warmup, health_check, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (952 tests PASS).
 - [x] Added 12 async pub/sub pattern tests (subscribe, publish, unsubscribe, filter, broadcast, receive, acknowledge, replay, partition, fanout, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (940 tests PASS).
