@@ -28813,217 +28813,63 @@ class PrimitiveHandler {
     );
 }
 
-/// Test ES5 class with object satisfies expressions
+/// Test: Partial mapped type
+/// Verifies that classes using Partial<T> mapped type transform correctly to ES5
 #[test]
-fn test_class_es5_satisfies_object_patterns() {
+fn test_class_es5_partial_mapped_type() {
     let source = r#"
-// Interface for type checking
-interface Config {
-    host: string;
-    port: number;
-    debug?: boolean;
+interface User {
+    name: string;
+    email: string;
+    age: number;
 }
 
-interface Theme {
-    primary: string;
-    secondary: string;
-    background: string;
+class UserUpdater {
+    private user: User;
+
+    constructor(user: User) {
+        this.user = user;
+    }
+
+    update(changes: Partial<User>): User {
+        if (changes.name !== undefined) {
+            this.user.name = changes.name;
+        }
+        if (changes.email !== undefined) {
+            this.user.email = changes.email;
+        }
+        if (changes.age !== undefined) {
+            this.user.age = changes.age;
+        }
+        return this.user;
+    }
+
+    patch(field: keyof User, value: string | number): void {
+        this.user[field] = value as any;
+    }
+
+    getUser(): User {
+        return this.user;
+    }
 }
 
-// Class using object satisfies
-class ConfigManager {
-    private config: Config;
+class PartialBuilder<T> {
+    private data: Partial<T>;
 
     constructor() {
-        this.config = {
-            host: "localhost",
-            port: 8080,
-            debug: true
-        } satisfies Config;
+        this.data = {};
     }
 
-    getConfig(): Config {
-        return this.config;
+    set<K extends keyof T>(key: K, value: T[K]): this {
+        this.data[key] = value;
+        return this;
     }
 
-    updateConfig(partial: Partial<Config>): void {
-        this.config = {
-            ...this.config,
-            ...partial
-        } satisfies Config;
-    }
-}
-
-// Theme manager with satisfies
-class ThemeManager {
-    private themes: Record<string, Theme> = {
-        light: {
-            primary: "blue",
-            secondary: "gray",
-            background: "white"
-        } satisfies Theme,
-        dark: {
-            primary: "darkblue",
-            secondary: "lightgray",
-            background: "black"
-        } satisfies Theme
-    };
-
-    getTheme(name: string): Theme | undefined {
-        return this.themes[name];
-    }
-}
-
-// Settings with complex satisfies
-interface Settings {
-    readonly name: string;
-    version: number;
-    features: string[];
-}
-
-class SettingsManager {
-    private settings: Settings;
-
-    constructor() {
-        this.settings = {
-            name: "MyApp",
-            version: 1,
-            features: ["auth", "cache", "logging"]
-        } satisfies Settings;
-    }
-
-    getSettings(): Settings {
-        return this.settings;
-    }
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Classes should be converted
-    assert!(
-        output.contains("ConfigManager") && output.contains("ThemeManager") && output.contains("SettingsManager"),
-        "Expected satisfies classes: {}",
-        output
-    );
-
-    // satisfies keyword should be stripped (type-only)
-    assert!(
-        !output.contains("satisfies Config") && !output.contains("satisfies Theme"),
-        "Expected satisfies to be stripped: {}",
-        output
-    );
-
-    // Methods should be preserved
-    assert!(
-        output.contains("getConfig") && output.contains("getTheme") && output.contains("getSettings"),
-        "Expected methods: {}",
-        output
-    );
-}
-
-/// Test ES5 class with array satisfies expressions
-#[test]
-fn test_class_es5_satisfies_array_patterns() {
-    let source = r#"
-// Types for arrays
-type StringArray = string[];
-type NumberTuple = [number, number, number];
-type MixedTuple = [string, number, boolean];
-
-// Class with array satisfies
-class DataProcessor {
-    private items: string[];
-    private coordinates: [number, number, number];
-
-    constructor() {
-        this.items = ["a", "b", "c"] satisfies StringArray;
-        this.coordinates = [1, 2, 3] satisfies NumberTuple;
-    }
-
-    getItems(): string[] {
-        return this.items;
-    }
-
-    addItem(item: string): void {
-        this.items = [...this.items, item] satisfies StringArray;
-    }
-}
-
-// Tuple manager
-class TupleManager {
-    private data: MixedTuple;
-
-    constructor() {
-        this.data = ["hello", 42, true] satisfies MixedTuple;
-    }
-
-    getData(): MixedTuple {
+    getData(): Partial<T> {
         return this.data;
     }
-
-    updateFirst(value: string): void {
-        this.data = [value, this.data[1], this.data[2]] satisfies MixedTuple;
-    }
-}
-
-// Array of objects with satisfies
-interface Item {
-    id: number;
-    name: string;
-}
-
-class ItemCollection {
-    private items: Item[];
-
-    constructor() {
-        this.items = [
-            { id: 1, name: "First" },
-            { id: 2, name: "Second" },
-            { id: 3, name: "Third" }
-        ] satisfies Item[];
-    }
-
-    getItems(): Item[] {
-        return this.items;
-    }
-
-    addItem(item: Item): void {
-        this.items = [...this.items, item] satisfies Item[];
-    }
-}
-
-// Readonly arrays with satisfies
-class ReadonlyArrayManager {
-    private readonly values: readonly number[];
-
-    constructor() {
-        this.values = [1, 2, 3, 4, 5] satisfies readonly number[];
-    }
-
-    getValues(): readonly number[] {
-        return this.values;
-    }
-
-    sum(): number {
-        return this.values.reduce((a, b) => a + b, 0);
-    }
 }
 "#;
-
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -29039,170 +28885,283 @@ class ReadonlyArrayManager {
 
     let output = printer.get_output().to_string();
 
-    // Classes should be converted
     assert!(
-        output.contains("DataProcessor") && output.contains("TupleManager") && output.contains("ItemCollection"),
-        "Expected array satisfies classes: {}",
+        output.contains("function UserUpdater"),
+        "Expected UserUpdater function: {}",
         output
     );
-
-    // satisfies keyword should be stripped
     assert!(
-        !output.contains("satisfies StringArray") && !output.contains("satisfies NumberTuple"),
-        "Expected satisfies to be stripped: {}",
+        output.contains("UserUpdater.prototype.update") && output.contains("UserUpdater.prototype.patch"),
+        "Expected update and patch methods: {}",
         output
     );
-
-    // ReadonlyArrayManager should be present
     assert!(
-        output.contains("ReadonlyArrayManager"),
-        "Expected ReadonlyArrayManager: {}",
+        output.contains("UserUpdater.prototype.getUser"),
+        "Expected getUser method: {}",
         output
     );
-
-    // Methods should be preserved
     assert!(
-        output.contains("getItems") && output.contains("getData"),
-        "Expected methods: {}",
+        output.contains("function PartialBuilder"),
+        "Expected PartialBuilder function: {}",
+        output
+    );
+    assert!(
+        output.contains("PartialBuilder.prototype.set") && output.contains("PartialBuilder.prototype.getData"),
+        "Expected set and getData methods: {}",
         output
     );
 }
 
-/// Test ES5 class with nested satisfies expressions
+/// Test: Required mapped type
+/// Verifies that classes using Required<T> mapped type transform correctly to ES5
 #[test]
-fn test_class_es5_satisfies_nested_patterns() {
+fn test_class_es5_required_mapped_type() {
     let source = r#"
-// Nested types
-interface Address {
-    street: string;
-    city: string;
-    zipCode: string;
+interface Config {
+    host?: string;
+    port?: number;
+    timeout?: number;
 }
 
+class ConfigValidator {
+    validate(config: Config): Required<Config> {
+        var result = {
+            host: config.host || "localhost",
+            port: config.port || 8080,
+            timeout: config.timeout || 30000
+        };
+        return result;
+    }
+
+    isComplete(config: Config): boolean {
+        return config.host !== undefined && config.port !== undefined && config.timeout !== undefined;
+    }
+
+    fillDefaults(config: Config): Required<Config> {
+        return {
+            host: config.host !== undefined ? config.host : "localhost",
+            port: config.port !== undefined ? config.port : 8080,
+            timeout: config.timeout !== undefined ? config.timeout : 30000
+        };
+    }
+}
+
+class RequiredWrapper<T> {
+    private data: Required<T>;
+
+    constructor(data: Required<T>) {
+        this.data = data;
+    }
+
+    get<K extends keyof T>(key: K): T[K] {
+        return this.data[key];
+    }
+
+    getData(): Required<T> {
+        return this.data;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function ConfigValidator"),
+        "Expected ConfigValidator function: {}",
+        output
+    );
+    assert!(
+        output.contains("ConfigValidator.prototype.validate") && output.contains("ConfigValidator.prototype.isComplete"),
+        "Expected validate and isComplete methods: {}",
+        output
+    );
+    assert!(
+        output.contains("ConfigValidator.prototype.fillDefaults"),
+        "Expected fillDefaults method: {}",
+        output
+    );
+    assert!(
+        output.contains("function RequiredWrapper"),
+        "Expected RequiredWrapper function: {}",
+        output
+    );
+    assert!(
+        output.contains("RequiredWrapper.prototype.get") && output.contains("RequiredWrapper.prototype.getData"),
+        "Expected get and getData methods: {}",
+        output
+    );
+}
+
+/// Test: Readonly mapped type
+/// Verifies that classes using Readonly<T> mapped type transform correctly to ES5
+#[test]
+fn test_class_es5_readonly_mapped_type() {
+    let source = r#"
+interface State {
+    count: number;
+    items: string[];
+    active: boolean;
+}
+
+class StateManager {
+    private state: Readonly<State>;
+
+    constructor(initial: State) {
+        this.state = initial;
+    }
+
+    getState(): Readonly<State> {
+        return this.state;
+    }
+
+    getCount(): number {
+        return this.state.count;
+    }
+
+    createSnapshot(): Readonly<State> {
+        return {
+            count: this.state.count,
+            items: this.state.items.slice(),
+            active: this.state.active
+        };
+    }
+}
+
+class ImmutableWrapper<T> {
+    private data: Readonly<T>;
+
+    constructor(data: T) {
+        this.data = data;
+    }
+
+    get<K extends keyof T>(key: K): T[K] {
+        return this.data[key];
+    }
+
+    clone(): Readonly<T> {
+        return this.data;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function StateManager"),
+        "Expected StateManager function: {}",
+        output
+    );
+    assert!(
+        output.contains("StateManager.prototype.getState") && output.contains("StateManager.prototype.getCount"),
+        "Expected getState and getCount methods: {}",
+        output
+    );
+    assert!(
+        output.contains("StateManager.prototype.createSnapshot"),
+        "Expected createSnapshot method: {}",
+        output
+    );
+    assert!(
+        output.contains("function ImmutableWrapper"),
+        "Expected ImmutableWrapper function: {}",
+        output
+    );
+    assert!(
+        output.contains("ImmutableWrapper.prototype.get") && output.contains("ImmutableWrapper.prototype.clone"),
+        "Expected get and clone methods: {}",
+        output
+    );
+}
+
+/// Test: Pick mapped type
+/// Verifies that classes using Pick<T, K> mapped type transform correctly to ES5
+#[test]
+fn test_class_es5_pick_mapped_type() {
+    let source = r#"
 interface Person {
-    name: string;
-    age: number;
-    address: Address;
-}
-
-interface Company {
-    name: string;
-    employees: Person[];
-    headquarters: Address;
-}
-
-// Class with deeply nested satisfies
-class CompanyRegistry {
-    private companies: Company[];
-
-    constructor() {
-        this.companies = [
-            {
-                name: "Tech Corp",
-                employees: [
-                    {
-                        name: "John Doe",
-                        age: 30,
-                        address: {
-                            street: "123 Main St",
-                            city: "Tech City",
-                            zipCode: "12345"
-                        } satisfies Address
-                    } satisfies Person
-                ],
-                headquarters: {
-                    street: "1 Corporate Way",
-                    city: "Business Town",
-                    zipCode: "67890"
-                } satisfies Address
-            } satisfies Company
-        ] satisfies Company[];
-    }
-
-    getCompanies(): Company[] {
-        return this.companies;
-    }
-}
-
-// Nested config with satisfies
-interface DatabaseConfig {
-    host: string;
-    port: number;
-}
-
-interface CacheConfig {
-    enabled: boolean;
-    ttl: number;
-}
-
-interface AppConfig {
-    database: DatabaseConfig;
-    cache: CacheConfig;
-    name: string;
-}
-
-class AppConfigManager {
-    private config: AppConfig;
-
-    constructor() {
-        this.config = {
-            name: "MyApp",
-            database: {
-                host: "localhost",
-                port: 5432
-            } satisfies DatabaseConfig,
-            cache: {
-                enabled: true,
-                ttl: 3600
-            } satisfies CacheConfig
-        } satisfies AppConfig;
-    }
-
-    getDatabase(): DatabaseConfig {
-        return this.config.database;
-    }
-
-    getCache(): CacheConfig {
-        return this.config.cache;
-    }
-}
-
-// Triple nested satisfies
-interface Inner {
-    value: number;
-}
-
-interface Middle {
-    inner: Inner;
-    name: string;
-}
-
-interface Outer {
-    middle: Middle;
     id: number;
+    name: string;
+    email: string;
+    phone: string;
+    address: string;
 }
 
-class NestedManager {
-    private data: Outer;
+type ContactInfo = Pick<Person, "email" | "phone">;
+type PersonSummary = Pick<Person, "id" | "name">;
+
+class PersonService {
+    private people: Person[];
 
     constructor() {
-        this.data = {
-            id: 1,
-            middle: {
-                name: "middle",
-                inner: {
-                    value: 42
-                } satisfies Inner
-            } satisfies Middle
-        } satisfies Outer;
+        this.people = [];
     }
 
-    getValue(): number {
-        return this.data.middle.inner.value;
+    add(person: Person): void {
+        this.people.push(person);
+    }
+
+    getContactInfo(id: number): ContactInfo | null {
+        var person = this.findById(id);
+        if (person === null) return null;
+        return { email: person.email, phone: person.phone };
+    }
+
+    getSummary(id: number): PersonSummary | null {
+        var person = this.findById(id);
+        if (person === null) return null;
+        return { id: person.id, name: person.name };
+    }
+
+    findById(id: number): Person | null {
+        for (var i = 0; i < this.people.length; i++) {
+            if (this.people[i].id === id) {
+                return this.people[i];
+            }
+        }
+        return null;
+    }
+}
+
+class PickHelper<T, K extends keyof T> {
+    private source: T;
+
+    constructor(source: T) {
+        this.source = source;
+    }
+
+    pick(key: K): T[K] {
+        return this.source[key];
+    }
+
+    getSource(): T {
+        return this.source;
     }
 }
 "#;
-
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -29218,144 +29177,99 @@ class NestedManager {
 
     let output = printer.get_output().to_string();
 
-    // Classes should be converted
     assert!(
-        output.contains("CompanyRegistry") && output.contains("AppConfigManager") && output.contains("NestedManager"),
-        "Expected nested satisfies classes: {}",
+        output.contains("function PersonService"),
+        "Expected PersonService function: {}",
         output
     );
-
-    // All satisfies should be stripped
     assert!(
-        !output.contains("satisfies Address") && !output.contains("satisfies Person") && !output.contains("satisfies Company"),
-        "Expected all satisfies to be stripped: {}",
+        output.contains("PersonService.prototype.add") && output.contains("PersonService.prototype.getContactInfo"),
+        "Expected add and getContactInfo methods: {}",
         output
     );
-
-    // Methods should be preserved
     assert!(
-        output.contains("getCompanies") && output.contains("getDatabase") && output.contains("getValue"),
-        "Expected methods: {}",
+        output.contains("PersonService.prototype.getSummary") && output.contains("PersonService.prototype.findById"),
+        "Expected getSummary and findById methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function PickHelper"),
+        "Expected PickHelper function: {}",
+        output
+    );
+    assert!(
+        output.contains("PickHelper.prototype.pick") && output.contains("PickHelper.prototype.getSource"),
+        "Expected pick and getSource methods: {}",
         output
     );
 }
 
-/// Test ES5 class with generic satisfies expressions
+/// Test: Omit mapped type
+/// Verifies that classes using Omit<T, K> mapped type transform correctly to ES5
 #[test]
-fn test_class_es5_satisfies_generic_patterns() {
+fn test_class_es5_omit_mapped_type() {
     let source = r#"
-// Generic types
-interface Container<T> {
-    value: T;
-    timestamp: number;
+interface Entity {
+    id: number;
+    createdAt: Date;
+    updatedAt: Date;
+    name: string;
+    data: object;
 }
 
-interface Wrapper<T, U> {
-    first: T;
-    second: U;
-}
+type CreateEntity = Omit<Entity, "id" | "createdAt" | "updatedAt">;
+type PublicEntity = Omit<Entity, "data">;
 
-type KeyValuePair<K, V> = { key: K; value: V };
-
-// Class with generic satisfies
-class GenericContainer {
-    private stringContainer: Container<string>;
-    private numberContainer: Container<number>;
+class EntityFactory {
+    private nextId: number;
 
     constructor() {
-        this.stringContainer = {
-            value: "hello",
-            timestamp: Date.now()
-        } satisfies Container<string>;
-
-        this.numberContainer = {
-            value: 42,
-            timestamp: Date.now()
-        } satisfies Container<number>;
+        this.nextId = 1;
     }
 
-    getString(): string {
-        return this.stringContainer.value;
-    }
-
-    getNumber(): number {
-        return this.numberContainer.value;
-    }
-}
-
-// Multi-generic satisfies
-class MultiGenericManager {
-    private wrapper: Wrapper<string, number>;
-    private pair: KeyValuePair<string, boolean>;
-
-    constructor() {
-        this.wrapper = {
-            first: "text",
-            second: 100
-        } satisfies Wrapper<string, number>;
-
-        this.pair = {
-            key: "enabled",
-            value: true
-        } satisfies KeyValuePair<string, boolean>;
-    }
-
-    getWrapper(): Wrapper<string, number> {
-        return this.wrapper;
-    }
-
-    getPair(): KeyValuePair<string, boolean> {
-        return this.pair;
-    }
-}
-
-// Generic array satisfies
-class GenericArrayManager<T> {
-    private items: Container<T>[];
-
-    constructor(initial: T[]) {
-        this.items = initial.map((value, index) => ({
-            value,
-            timestamp: Date.now() + index
-        } satisfies Container<T>));
-    }
-
-    getItems(): Container<T>[] {
-        return this.items;
-    }
-
-    addItem(value: T): void {
-        this.items.push({
-            value,
-            timestamp: Date.now()
-        } satisfies Container<T>);
-    }
-}
-
-// Record with generic satisfies
-class RecordManager {
-    private records: Record<string, Container<number>>;
-
-    constructor() {
-        this.records = {
-            count: { value: 0, timestamp: Date.now() } satisfies Container<number>,
-            total: { value: 100, timestamp: Date.now() } satisfies Container<number>
+    create(input: CreateEntity): Entity {
+        var now = new Date();
+        return {
+            id: this.nextId++,
+            createdAt: now,
+            updatedAt: now,
+            name: input.name,
+            data: input.data
         };
     }
 
-    getRecord(key: string): Container<number> | undefined {
-        return this.records[key];
+    toPublic(entity: Entity): PublicEntity {
+        return {
+            id: entity.id,
+            createdAt: entity.createdAt,
+            updatedAt: entity.updatedAt,
+            name: entity.name
+        };
     }
 
-    setRecord(key: string, value: number): void {
-        this.records[key] = {
-            value,
-            timestamp: Date.now()
-        } satisfies Container<number>;
+    getNextId(): number {
+        return this.nextId;
+    }
+}
+
+class OmitHelper<T, K extends keyof T> {
+    private source: T;
+    private excluded: K[];
+
+    constructor(source: T, excluded: K[]) {
+        this.source = source;
+        this.excluded = excluded;
+    }
+
+    isExcluded(key: K): boolean {
+        return this.excluded.indexOf(key) >= 0;
+    }
+
+    getSource(): T {
+        return this.source;
     }
 }
 "#;
-
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -29371,31 +29285,133 @@ class RecordManager {
 
     let output = printer.get_output().to_string();
 
-    // Classes should be converted
     assert!(
-        output.contains("GenericContainer") && output.contains("MultiGenericManager") && output.contains("GenericArrayManager"),
-        "Expected generic satisfies classes: {}",
+        output.contains("function EntityFactory"),
+        "Expected EntityFactory function: {}",
         output
     );
-
-    // All generic satisfies should be stripped
     assert!(
-        !output.contains("satisfies Container") && !output.contains("satisfies Wrapper") && !output.contains("satisfies KeyValuePair"),
-        "Expected all generic satisfies to be stripped: {}",
+        output.contains("EntityFactory.prototype.create") && output.contains("EntityFactory.prototype.toPublic"),
+        "Expected create and toPublic methods: {}",
         output
     );
-
-    // RecordManager should be present
     assert!(
-        output.contains("RecordManager"),
-        "Expected RecordManager: {}",
+        output.contains("EntityFactory.prototype.getNextId"),
+        "Expected getNextId method: {}",
         output
     );
-
-    // Methods should be preserved
     assert!(
-        output.contains("getString") && output.contains("getNumber") && output.contains("getWrapper"),
-        "Expected methods: {}",
+        output.contains("function OmitHelper"),
+        "Expected OmitHelper function: {}",
+        output
+    );
+    assert!(
+        output.contains("OmitHelper.prototype.isExcluded") && output.contains("OmitHelper.prototype.getSource"),
+        "Expected isExcluded and getSource methods: {}",
+        output
+    );
+}
+
+/// Test: Record mapped type
+/// Verifies that classes using Record<K, V> mapped type transform correctly to ES5
+#[test]
+fn test_class_es5_record_mapped_type() {
+    let source = r#"
+type StatusCode = "ok" | "error" | "pending";
+type StatusInfo = { message: string; timestamp: number };
+
+class StatusRegistry {
+    private statuses: Record<StatusCode, StatusInfo>;
+
+    constructor() {
+        var now = Date.now();
+        this.statuses = {
+            ok: { message: "Success", timestamp: now },
+            error: { message: "Failed", timestamp: now },
+            pending: { message: "In progress", timestamp: now }
+        };
+    }
+
+    getStatus(code: StatusCode): StatusInfo {
+        return this.statuses[code];
+    }
+
+    updateStatus(code: StatusCode, message: string): void {
+        this.statuses[code] = { message: message, timestamp: Date.now() };
+    }
+
+    getAllStatuses(): Record<StatusCode, StatusInfo> {
+        return this.statuses;
+    }
+}
+
+class RecordStore<K extends string, V> {
+    private data: Record<K, V>;
+
+    constructor(initial: Record<K, V>) {
+        this.data = initial;
+    }
+
+    get(key: K): V {
+        return this.data[key];
+    }
+
+    set(key: K, value: V): void {
+        this.data[key] = value;
+    }
+
+    has(key: K): boolean {
+        return key in this.data;
+    }
+
+    getData(): Record<K, V> {
+        return this.data;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function StatusRegistry"),
+        "Expected StatusRegistry function: {}",
+        output
+    );
+    assert!(
+        output.contains("StatusRegistry.prototype.getStatus") && output.contains("StatusRegistry.prototype.updateStatus"),
+        "Expected getStatus and updateStatus methods: {}",
+        output
+    );
+    assert!(
+        output.contains("StatusRegistry.prototype.getAllStatuses"),
+        "Expected getAllStatuses method: {}",
+        output
+    );
+    assert!(
+        output.contains("function RecordStore"),
+        "Expected RecordStore function: {}",
+        output
+    );
+    assert!(
+        output.contains("RecordStore.prototype.get") && output.contains("RecordStore.prototype.set"),
+        "Expected get and set methods: {}",
+        output
+    );
+    assert!(
+        output.contains("RecordStore.prototype.has") && output.contains("RecordStore.prototype.getData"),
+        "Expected has and getData methods: {}",
         output
     );
 }
