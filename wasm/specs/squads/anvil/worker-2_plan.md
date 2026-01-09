@@ -7,10 +7,25 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-Awaiting new assignment from EM-Anvil.
+Add ES5 const assertion parity tests
+
+Per GOALS.md Objective 3: End-to-End Conformance Validation
+
+Steps:
+1. Add 6 const assertion parity tests to `wasm/src/emitter_parity_tests.rs`:
+   - Object literal as const
+   - Array literal as const
+   - Nested as const
+   - As const with type assertion
+   - As const in function return
+   - Combined const assertion patterns
+2. Run `./wasm/test.sh emitter_parity` to verify all tests pass
+3. Commit with message: `[wasm] emitter: add const assertion parity tests`
+4. Push to `origin/worker/anvil-2`
+5. Update this plan file and push
 
 ## Task Queue
-(empty)
+(empty - will receive new tasks from EM after completing current assignment)
 
 ## Completed
 - [x] Added ES5 satisfies expression parity tests (object-literal, array-literal, function-expr, as-const, class-context, combined) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (443 tests).

@@ -7,7 +7,22 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-(none - awaiting assignment from EM)
+Add ES5 class tests for module pattern variations
+
+Per GOALS.md Objective 1: ES5 downleveling correctness
+
+Steps:
+1. Add 6 ES5 class tests for module pattern variations to `wasm/src/transforms/class_es5_tests.rs`:
+   - Revealing module pattern
+   - Namespace pattern
+   - Import/export class patterns
+   - Barrel export pattern
+   - Re-export patterns
+   - Combined module patterns
+2. Run `./wasm/test.sh class_es5_tests` to verify all tests pass
+3. Commit with message: `[wasm] transforms: add module pattern ES5 class tests`
+4. Push to `origin/worker/anvil-4`
+5. Update this plan file and push
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)

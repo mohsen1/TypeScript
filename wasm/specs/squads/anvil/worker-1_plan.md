@@ -6,10 +6,25 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-(awaiting assignment)
+Add ES5 class tests for dependency injection patterns
+
+Per GOALS.md Objective 1: ES5 downleveling correctness
+
+Steps:
+1. Add 6 ES5 class tests for dependency injection patterns to `wasm/src/transforms/class_es5_tests.rs`:
+   - Basic constructor injection
+   - Property injection
+   - Factory pattern injection
+   - Singleton pattern
+   - Scoped injection
+   - Combined DI patterns
+2. Run `./wasm/test.sh class_es5_tests` to verify all tests pass
+3. Commit with message: `[wasm] transforms: add dependency injection ES5 class tests`
+4. Push to `origin/worker/anvil-1`
+5. Update this plan file and push
 
 ## Task Queue
-(empty)
+(empty - will receive new tasks from EM after completing current assignment)
 
 ## Completed
 - [x] Added ES5 tests for observable/event emitter patterns (6 tests): basic event emitter, subscribe/unsubscribe, event delegation, typed event emitter, async event handling, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 536 pass).
