@@ -8824,9 +8824,16 @@ impl<'a> ThinCheckerState<'a> {
             // Check for variable redeclaration in the current scope (TS2403).
             // Note: This applies specifically to 'var' merging where types must match.
             // let/const duplicates are caught earlier by the binder (TS2451).
+            // TypeScript requires types to be "the same" - meaning bi-directionally assignable,
+            // not just identical TypeIds. For example, `typeof E1` and its structural form
+            // should be considered "the same type" even if they have different TypeIds.
             if let Some(prev_type) = self.ctx.var_decl_types.get(&sym_id).copied() {
                 if let Some(ref name) = var_name {
-                    if !self.are_types_identical(final_type, prev_type) {
+                    // Types are "the same" if they are identical OR bi-directionally assignable
+                    let types_are_same = self.are_types_identical(final_type, prev_type)
+                        || (self.is_assignable_to(final_type, prev_type)
+                            && self.is_assignable_to(prev_type, final_type));
+                    if !types_are_same {
                         self.error_subsequent_variable_declaration(name, prev_type, final_type, decl_idx);
                     }
                 }
