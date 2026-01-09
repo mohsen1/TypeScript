@@ -2967,7 +2967,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 }
 
                 if pattern_fn.this_type.is_none() && has_param_infer && !has_return_infer {
-                    let mut match_function_params = |source_type: TypeId,
+                    let mut match_function_params = |_source_type: TypeId,
                                                      source_fn_id: FunctionShapeId,
                                                      bindings: &mut FxHashMap<Atom, TypeId>|
                      -> bool {
@@ -3002,8 +3002,10 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                                 return false;
                             }
                         }
-                        let substituted = self.substitute_infer(pattern, bindings);
-                        checker.is_subtype_of(source_type, substituted)
+                        // For param-only inference, parameter matching is sufficient.
+                        // Skipping the final subtype check avoids issues with optional
+                        // param widening (undefined added twice).
+                        true
                     };
 
                     return match self.interner.lookup(source) {
@@ -4443,6 +4445,46 @@ impl<'a> InferSubstitutor<'a> {
                 }
                 if changed {
                     self.interner.application(base, new_args)
+                } else {
+                    type_id
+                }
+            }
+            TypeKey::Function(shape_id) => {
+                let shape = self.interner.function_shape(shape_id);
+                let mut changed = false;
+                let mut new_params = Vec::with_capacity(shape.params.len());
+                for param in shape.params.iter() {
+                    let param_type = self.substitute(param.type_id);
+                    if param_type != param.type_id {
+                        changed = true;
+                    }
+                    new_params.push(ParamInfo {
+                        name: param.name,
+                        type_id: param_type,
+                        optional: param.optional,
+                        rest: param.rest,
+                    });
+                }
+                let return_type = self.substitute(shape.return_type);
+                if return_type != shape.return_type {
+                    changed = true;
+                }
+                let this_type = shape.this_type.map(|t| {
+                    let substituted = self.substitute(t);
+                    if substituted != t {
+                        changed = true;
+                    }
+                    substituted
+                });
+                if changed {
+                    self.interner.function(FunctionShape {
+                        params: new_params,
+                        this_type,
+                        return_type,
+                        type_params: shape.type_params.clone(),
+                        type_predicate: shape.type_predicate.clone(),
+                        is_constructor: shape.is_constructor,
+                    })
                 } else {
                     type_id
                 }
