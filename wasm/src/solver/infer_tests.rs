@@ -7639,3 +7639,448 @@ fn test_tuple_spread_with_rest() {
     assert_eq!(results[0].1, fixed_tuple);
     assert_eq!(results[1].1, TypeId::NUMBER);
 }
+
+// ============================================================================
+// Type Guard Narrowing Pattern Tests
+// ============================================================================
+// Tests for type narrowing via type guards (typeof, instanceof, custom)
+
+#[test]
+fn test_type_guard_typeof_string() {
+    // Test: typeof x === "string" narrows union to string
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Original type is string | number
+    let string_or_number = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    ctx.add_upper_bound(var_t, string_or_number);
+
+    // After typeof === "string", narrow to string
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_type_guard_typeof_number() {
+    // Test: typeof x === "number" narrows union to number
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Original type is string | number | boolean
+    let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::BOOLEAN]);
+    ctx.add_upper_bound(var_t, union);
+
+    // After typeof === "number", narrow to number
+    ctx.add_lower_bound(var_t, TypeId::NUMBER);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_type_guard_typeof_object() {
+    // Test: typeof x === "object" narrows to object types
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Upper bound is object | null | string
+    let obj_or_null_or_string = interner.union(vec![TypeId::OBJECT, TypeId::NULL, TypeId::STRING]);
+    ctx.add_upper_bound(var_t, obj_or_null_or_string);
+
+    // typeof === "object" includes object and null
+    let obj_or_null = interner.union(vec![TypeId::OBJECT, TypeId::NULL]);
+    ctx.add_lower_bound(var_t, obj_or_null);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, obj_or_null);
+}
+
+#[test]
+fn test_type_guard_instanceof() {
+    // Test: x instanceof Error narrows to Error type
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Upper bound is Error | string (simulated with object)
+    let error_or_string = interner.union(vec![TypeId::OBJECT, TypeId::STRING]);
+    ctx.add_upper_bound(var_t, error_or_string);
+
+    // After instanceof Error, narrow to object (Error)
+    ctx.add_lower_bound(var_t, TypeId::OBJECT);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::OBJECT);
+}
+
+#[test]
+fn test_type_guard_custom_predicate() {
+    // Test: isString(x): x is string - custom type predicate
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Upper bound is unknown
+    ctx.add_upper_bound(var_t, TypeId::UNKNOWN);
+
+    // After custom guard, narrow to string
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::STRING);
+}
+
+// ============================================================================
+// Discriminated Union Narrowing Tests
+// ============================================================================
+// Tests for narrowing unions via discriminant properties
+
+#[test]
+fn test_discriminated_union_basic() {
+    // Test: { kind: "a" } | { kind: "b" } narrowed by kind
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Create discriminated union members
+    let kind_prop = interner.intern_string("kind");
+    let lit_a = interner.literal_string("a");
+
+    let type_a = interner.object(vec![PropertyInfo {
+        name: kind_prop,
+        type_id: lit_a,
+        write_type: lit_a,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // After checking kind === "a", narrow to type_a
+    ctx.add_lower_bound(var_t, type_a);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, type_a);
+}
+
+#[test]
+fn test_discriminated_union_switch() {
+    // Test: switch(x.kind) narrowing
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // After switch case "circle"
+    let kind_prop = interner.intern_string("kind");
+    let radius_prop = interner.intern_string("radius");
+    let lit_circle = interner.literal_string("circle");
+
+    let circle_type = interner.object(vec![
+        PropertyInfo {
+            name: kind_prop,
+            type_id: lit_circle,
+            write_type: lit_circle,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: radius_prop,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    ctx.add_lower_bound(var_t, circle_type);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, circle_type);
+}
+
+#[test]
+fn test_discriminated_union_type_property() {
+    // Test: { type: "request" } | { type: "response" } narrowing
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let type_prop = interner.intern_string("type");
+    let lit_request = interner.literal_string("request");
+    let body_prop = interner.intern_string("body");
+
+    let request_type = interner.object(vec![
+        PropertyInfo {
+            name: type_prop,
+            type_id: lit_request,
+            write_type: lit_request,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: body_prop,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    ctx.add_lower_bound(var_t, request_type);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, request_type);
+}
+
+#[test]
+fn test_discriminated_union_boolean_discriminant() {
+    // Test: { success: true, data: T } | { success: false, error: E }
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let success_prop = interner.intern_string("success");
+    let data_prop = interner.intern_string("data");
+
+    // Use BOOLEAN for success field (representing literal true)
+    let success_type = interner.object(vec![
+        PropertyInfo {
+            name: success_prop,
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: data_prop,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    ctx.add_lower_bound(var_t, success_type);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, success_type);
+}
+
+#[test]
+fn test_discriminated_union_numeric_discriminant() {
+    // Test: { code: 200, body: string } | { code: 404, message: string }
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let code_prop = interner.intern_string("code");
+    let body_prop = interner.intern_string("body");
+    let lit_200 = interner.literal_number(200.0);
+
+    let ok_response = interner.object(vec![
+        PropertyInfo {
+            name: code_prop,
+            type_id: lit_200,
+            write_type: lit_200,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: body_prop,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    ctx.add_lower_bound(var_t, ok_response);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, ok_response);
+}
+
+// ============================================================================
+// In Operator Narrowing Tests
+// ============================================================================
+// Tests for narrowing via the 'in' operator
+
+#[test]
+fn test_in_operator_basic() {
+    // Test: "prop" in x narrows to types with prop
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // After "name" in x, narrow to object with name
+    let name_prop = interner.intern_string("name");
+    let with_name = interner.object(vec![PropertyInfo {
+        name: name_prop,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    ctx.add_lower_bound(var_t, with_name);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, with_name);
+}
+
+#[test]
+fn test_in_operator_union_narrowing() {
+    // Test: "fly" in animal narrows Animal to Bird
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Bird has fly method
+    let fly_prop = interner.intern_string("fly");
+    let fly_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let bird_type = interner.object(vec![PropertyInfo {
+        name: fly_prop,
+        type_id: fly_fn,
+        write_type: fly_fn,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    ctx.add_lower_bound(var_t, bird_type);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, bird_type);
+}
+
+#[test]
+fn test_in_operator_optional_property() {
+    // Test: "optional" in x where optional may not exist
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Object with optional property (in check confirms it exists)
+    let opt_prop = interner.intern_string("optional");
+    let with_optional = interner.object(vec![PropertyInfo {
+        name: opt_prop,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    ctx.add_lower_bound(var_t, with_optional);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, with_optional);
+}
+
+#[test]
+fn test_in_operator_method_check() {
+    // Test: "forEach" in x narrows to array-like
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Array-like with forEach method
+    let foreach_prop = interner.intern_string("forEach");
+    let foreach_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let array_like = interner.object(vec![PropertyInfo {
+        name: foreach_prop,
+        type_id: foreach_fn,
+        write_type: foreach_fn,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    ctx.add_lower_bound(var_t, array_like);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, array_like);
+}
+
+#[test]
+fn test_in_operator_negation() {
+    // Test: !("prop" in x) narrows to types without prop
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // After !("special" in x), narrow to object without special
+    let other_prop = interner.intern_string("basic");
+    let without_special = interner.object(vec![PropertyInfo {
+        name: other_prop,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    ctx.add_lower_bound(var_t, without_special);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, without_special);
+}
