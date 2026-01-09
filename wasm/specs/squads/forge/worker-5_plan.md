@@ -41,16 +41,30 @@ Priority: 5
 - [ ] Fix cross-file type alias resolution in `test_check_redux_lodash_style_generics` (currently 4 errors, down from 6).
 
 ### Cross-File Type Alias Resolution Issue
-**Status:** Partial progress (6 errors → 4 errors)
+**Status:** Rebased on origin/squad/forge (commit 9c00240b51)
 
-**Root Cause Analysis:**
-When checking files in parallel, each `ThinCheckerState` only has access to its own file's `NodeArena`. Type alias symbols from other files (e.g., `Reducer`, `StateFromReducers` from types.ts) have their declarations stored as `NodeIndex` values that point to nodes in the source file's arena. Accessing these nodes from a different file's arena returns garbage data.
+**Resolution:**
+Rebased changes onto origin/squad/forge which already had fixes for:
+- `symbol_arenas` map to track which arena each symbol came from
+- `decl_file_idx: u32` field on Symbol struct
+- Updated `merge_bind_results` to properly copy all symbol fields and track arenas
 
-**Changes Made:**
-1. **Symbol merge fix** (parallel.rs): Modified `merge_bind_results` to copy all symbol fields (declarations, value_declaration, exports, members) instead of just flags and name.
-2. **File tracking** (binder.rs): Added `source_file_idx: Option<usize>` to `Symbol` struct to track which file each symbol originated from.
-3. **Application expansion** (subtype.rs): Added `try_expand_application` method and handlers for `(TypeKey::Application, _)` cases to structurally expand type aliases before subtype checking.
-4. **Symbol pre-resolution** (thin_checker.rs): Added `ensure_application_symbols_resolved` to walk types and resolve Application type symbols before assignability checks.
+**Merge Conflicts Resolved:**
+- binder.rs: Used HEAD's `decl_file_idx: u32` instead of my `source_file_idx: Option<usize>`
+- parallel.rs: Used HEAD's version with `symbol_arenas` map
+- thin_checker.rs: Combined HEAD's type argument resolution with my `type_param_bindings` support
+- subtype.rs: Removed duplicate `try_expand_application` function, fixed calls to use `TypeApplicationId` pattern
+
+**Test Status:**
+- 40 pre-existing failures on origin/squad/forge (same on my branch)
+- No new regressions introduced by my changes
+
+**Key Changes (from HEAD/origin/squad/forge):**
+1. **Symbol merge fix** (parallel.rs): Modified `merge_bind_results` to copy all symbol fields and track arenas via `symbol_arenas` map.
+2. **File tracking** (binder.rs): Added `decl_file_idx: u32` to `Symbol` struct to track which file each symbol originated from.
+3. **Application expansion** (subtype.rs): `try_expand_application` method handles `TypeKey::Application` cases to structurally expand type aliases before subtype checking.
+4. **Symbol pre-resolution** (thin_checker.rs): Type argument resolution ensures symbols are in type_env for Application expansion.
+5. **Type param bindings** (lower.rs): `with_type_param_bindings` and `seed_type_params` methods for proper type parameter scope handling.
 
 **Remaining Issue:**
 Cross-file type aliases still resolve to `any` because `ThinCheckerState` only has access to the current file's arena. When `get_type_alias()` is called with a `NodeIndex` from a different file, it can't retrieve the type alias declaration node.
