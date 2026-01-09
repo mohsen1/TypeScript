@@ -47709,3 +47709,677 @@ app.initialize();
         output
     );
 }
+
+// =============================================================================
+// Dependency Injection Pattern Tests
+// =============================================================================
+
+#[test]
+fn test_class_es5_di_basic_constructor_injection() {
+    // Test basic constructor injection pattern
+    let source = r#"
+interface Logger {
+    log(message: string): void;
+}
+
+class ConsoleLogger implements Logger {
+    log(message: string): void {
+        console.log(message);
+    }
+}
+
+class UserService {
+    private logger: Logger;
+
+    constructor(logger: Logger) {
+        this.logger = logger;
+    }
+
+    createUser(name: string): void {
+        this.logger.log(`Creating user: ${name}`);
+    }
+}
+
+const logger = new ConsoleLogger();
+const userService = new UserService(logger);
+userService.createUser("Alice");
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function ConsoleLogger"),
+        "Expected ConsoleLogger function: {}",
+        output
+    );
+    assert!(
+        output.contains("function UserService"),
+        "Expected UserService function: {}",
+        output
+    );
+    assert!(
+        output.contains("this.logger = logger"),
+        "Expected logger assignment in constructor: {}",
+        output
+    );
+    assert!(
+        output.contains("UserService.prototype.createUser"),
+        "Expected createUser method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_di_property_injection() {
+    // Test property injection pattern
+    let source = r#"
+interface Database {
+    query(sql: string): any[];
+}
+
+class MySQLDatabase implements Database {
+    query(sql: string): any[] {
+        return [];
+    }
+}
+
+class Repository {
+    public database!: Database;
+
+    findAll(): any[] {
+        return this.database.query("SELECT * FROM items");
+    }
+
+    findById(id: number): any {
+        return this.database.query(`SELECT * FROM items WHERE id = ${id}`)[0];
+    }
+}
+
+const repo = new Repository();
+repo.database = new MySQLDatabase();
+repo.findAll();
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function MySQLDatabase"),
+        "Expected MySQLDatabase function: {}",
+        output
+    );
+    assert!(
+        output.contains("function Repository"),
+        "Expected Repository function: {}",
+        output
+    );
+    assert!(
+        output.contains("Repository.prototype.findAll"),
+        "Expected findAll method: {}",
+        output
+    );
+    assert!(
+        output.contains("Repository.prototype.findById"),
+        "Expected findById method: {}",
+        output
+    );
+    assert!(
+        output.contains("repo.database ="),
+        "Expected property injection: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_di_factory_pattern() {
+    // Test factory pattern for dependency injection
+    let source = r#"
+interface HttpClient {
+    get(url: string): Promise<any>;
+    post(url: string, data: any): Promise<any>;
+}
+
+class FetchClient implements HttpClient {
+    async get(url: string): Promise<any> {
+        const response = await fetch(url);
+        return response.json();
+    }
+
+    async post(url: string, data: any): Promise<any> {
+        const response = await fetch(url, {
+            method: "POST",
+            body: JSON.stringify(data)
+        });
+        return response.json();
+    }
+}
+
+class HttpClientFactory {
+    private static instance: HttpClient | null = null;
+
+    static create(): HttpClient {
+        if (!HttpClientFactory.instance) {
+            HttpClientFactory.instance = new FetchClient();
+        }
+        return HttpClientFactory.instance;
+    }
+
+    static reset(): void {
+        HttpClientFactory.instance = null;
+    }
+}
+
+class ApiService {
+    private client: HttpClient;
+
+    constructor() {
+        this.client = HttpClientFactory.create();
+    }
+
+    fetchData(endpoint: string): Promise<any> {
+        return this.client.get(endpoint);
+    }
+}
+
+const apiService = new ApiService();
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function FetchClient"),
+        "Expected FetchClient function: {}",
+        output
+    );
+    assert!(
+        output.contains("function HttpClientFactory"),
+        "Expected HttpClientFactory function: {}",
+        output
+    );
+    assert!(
+        output.contains("HttpClientFactory.create"),
+        "Expected static create method: {}",
+        output
+    );
+    assert!(
+        output.contains("HttpClientFactory.reset"),
+        "Expected static reset method: {}",
+        output
+    );
+    assert!(
+        output.contains("function ApiService"),
+        "Expected ApiService function: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_di_singleton_pattern() {
+    // Test singleton pattern for dependency injection
+    let source = r#"
+class ConfigService {
+    private static instance: ConfigService;
+    private config: Map<string, any> = new Map();
+
+    private constructor() {}
+
+    static getInstance(): ConfigService {
+        if (!ConfigService.instance) {
+            ConfigService.instance = new ConfigService();
+        }
+        return ConfigService.instance;
+    }
+
+    set(key: string, value: any): void {
+        this.config.set(key, value);
+    }
+
+    get<T>(key: string): T | undefined {
+        return this.config.get(key);
+    }
+
+    has(key: string): boolean {
+        return this.config.has(key);
+    }
+}
+
+class AppComponent {
+    private config: ConfigService;
+
+    constructor() {
+        this.config = ConfigService.getInstance();
+    }
+
+    initialize(): void {
+        const apiUrl = this.config.get<string>("apiUrl");
+        console.log(`Connecting to: ${apiUrl}`);
+    }
+}
+
+const app = new AppComponent();
+app.initialize();
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function ConfigService"),
+        "Expected ConfigService function: {}",
+        output
+    );
+    assert!(
+        output.contains("ConfigService.getInstance"),
+        "Expected static getInstance method: {}",
+        output
+    );
+    assert!(
+        output.contains("ConfigService.prototype.set"),
+        "Expected set method: {}",
+        output
+    );
+    assert!(
+        output.contains("ConfigService.prototype.get"),
+        "Expected get method: {}",
+        output
+    );
+    assert!(
+        output.contains("function AppComponent"),
+        "Expected AppComponent function: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_di_scoped_injection() {
+    // Test scoped injection pattern with container
+    let source = r#"
+type ServiceFactory<T> = () => T;
+
+class Container {
+    private services: Map<string, ServiceFactory<any>> = new Map();
+    private singletons: Map<string, any> = new Map();
+
+    register<T>(key: string, factory: ServiceFactory<T>): void {
+        this.services.set(key, factory);
+    }
+
+    registerSingleton<T>(key: string, factory: ServiceFactory<T>): void {
+        this.services.set(key, () => {
+            if (!this.singletons.has(key)) {
+                this.singletons.set(key, factory());
+            }
+            return this.singletons.get(key);
+        });
+    }
+
+    resolve<T>(key: string): T {
+        const factory = this.services.get(key);
+        if (!factory) {
+            throw new Error(`Service not found: ${key}`);
+        }
+        return factory();
+    }
+}
+
+class EmailService {
+    send(to: string, message: string): void {
+        console.log(`Email to ${to}: ${message}`);
+    }
+}
+
+class NotificationService {
+    private emailService: EmailService;
+
+    constructor(emailService: EmailService) {
+        this.emailService = emailService;
+    }
+
+    notify(user: string, message: string): void {
+        this.emailService.send(user, message);
+    }
+}
+
+const container = new Container();
+container.registerSingleton("email", () => new EmailService());
+container.register("notification", () => new NotificationService(container.resolve("email")));
+
+const notificationService = container.resolve<NotificationService>("notification");
+notificationService.notify("user@example.com", "Hello!");
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function Container"),
+        "Expected Container function: {}",
+        output
+    );
+    assert!(
+        output.contains("Container.prototype.register"),
+        "Expected register method: {}",
+        output
+    );
+    assert!(
+        output.contains("Container.prototype.registerSingleton"),
+        "Expected registerSingleton method: {}",
+        output
+    );
+    assert!(
+        output.contains("Container.prototype.resolve"),
+        "Expected resolve method: {}",
+        output
+    );
+    assert!(
+        output.contains("function EmailService"),
+        "Expected EmailService function: {}",
+        output
+    );
+    assert!(
+        output.contains("function NotificationService"),
+        "Expected NotificationService function: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_di_combined_patterns() {
+    // Test combined dependency injection patterns
+    let source = r#"
+// Interfaces
+interface ILogger {
+    debug(msg: string): void;
+    info(msg: string): void;
+    error(msg: string): void;
+}
+
+interface ICache<T> {
+    get(key: string): T | undefined;
+    set(key: string, value: T, ttl?: number): void;
+    delete(key: string): void;
+}
+
+interface IRepository<T> {
+    findById(id: string): Promise<T | null>;
+    save(entity: T): Promise<void>;
+    delete(id: string): Promise<void>;
+}
+
+// Implementations
+class ConsoleLogger implements ILogger {
+    private prefix: string;
+
+    constructor(prefix: string = "") {
+        this.prefix = prefix;
+    }
+
+    debug(msg: string): void {
+        console.debug(`${this.prefix}[DEBUG] ${msg}`);
+    }
+
+    info(msg: string): void {
+        console.info(`${this.prefix}[INFO] ${msg}`);
+    }
+
+    error(msg: string): void {
+        console.error(`${this.prefix}[ERROR] ${msg}`);
+    }
+}
+
+class MemoryCache<T> implements ICache<T> {
+    private cache: Map<string, { value: T; expires: number }> = new Map();
+
+    get(key: string): T | undefined {
+        const entry = this.cache.get(key);
+        if (!entry) return undefined;
+        if (entry.expires < Date.now()) {
+            this.cache.delete(key);
+            return undefined;
+        }
+        return entry.value;
+    }
+
+    set(key: string, value: T, ttl: number = 60000): void {
+        this.cache.set(key, { value, expires: Date.now() + ttl });
+    }
+
+    delete(key: string): void {
+        this.cache.delete(key);
+    }
+}
+
+// Base repository with DI
+class BaseRepository<T extends { id: string }> implements IRepository<T> {
+    protected logger: ILogger;
+    protected cache: ICache<T>;
+
+    constructor(logger: ILogger, cache: ICache<T>) {
+        this.logger = logger;
+        this.cache = cache;
+    }
+
+    async findById(id: string): Promise<T | null> {
+        this.logger.debug(`Finding entity by id: ${id}`);
+        const cached = this.cache.get(id);
+        if (cached) {
+            this.logger.debug(`Cache hit for id: ${id}`);
+            return cached;
+        }
+        return null;
+    }
+
+    async save(entity: T): Promise<void> {
+        this.logger.info(`Saving entity: ${entity.id}`);
+        this.cache.set(entity.id, entity);
+    }
+
+    async delete(id: string): Promise<void> {
+        this.logger.info(`Deleting entity: ${id}`);
+        this.cache.delete(id);
+    }
+}
+
+// DI Container
+class DIContainer {
+    private static instance: DIContainer;
+    private factories: Map<string, () => any> = new Map();
+    private instances: Map<string, any> = new Map();
+
+    private constructor() {}
+
+    static getInstance(): DIContainer {
+        if (!DIContainer.instance) {
+            DIContainer.instance = new DIContainer();
+        }
+        return DIContainer.instance;
+    }
+
+    bind<T>(key: string, factory: () => T, singleton: boolean = false): void {
+        if (singleton) {
+            this.factories.set(key, () => {
+                if (!this.instances.has(key)) {
+                    this.instances.set(key, factory());
+                }
+                return this.instances.get(key);
+            });
+        } else {
+            this.factories.set(key, factory);
+        }
+    }
+
+    get<T>(key: string): T {
+        const factory = this.factories.get(key);
+        if (!factory) throw new Error(`No binding found for: ${key}`);
+        return factory();
+    }
+}
+
+// Setup container
+const container = DIContainer.getInstance();
+container.bind<ILogger>("logger", () => new ConsoleLogger("[App] "), true);
+container.bind<ICache<any>>("cache", () => new MemoryCache<any>(), true);
+
+// User entity and repository
+interface User {
+    id: string;
+    name: string;
+    email: string;
+}
+
+class UserRepository extends BaseRepository<User> {
+    constructor() {
+        super(
+            DIContainer.getInstance().get<ILogger>("logger"),
+            DIContainer.getInstance().get<ICache<User>>("cache")
+        );
+    }
+
+    async findByEmail(email: string): Promise<User | null> {
+        this.logger.debug(`Finding user by email: ${email}`);
+        return null;
+    }
+}
+
+// Usage
+const userRepo = new UserRepository();
+userRepo.save({ id: "1", name: "Alice", email: "alice@example.com" });
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Check implementations
+    assert!(
+        output.contains("function ConsoleLogger"),
+        "Expected ConsoleLogger function: {}",
+        output
+    );
+    assert!(
+        output.contains("function MemoryCache"),
+        "Expected MemoryCache function: {}",
+        output
+    );
+    assert!(
+        output.contains("function BaseRepository"),
+        "Expected BaseRepository function: {}",
+        output
+    );
+    assert!(
+        output.contains("function DIContainer"),
+        "Expected DIContainer function: {}",
+        output
+    );
+    assert!(
+        output.contains("function UserRepository"),
+        "Expected UserRepository function: {}",
+        output
+    );
+
+    // Check methods
+    assert!(
+        output.contains("ConsoleLogger.prototype.debug") &&
+        output.contains("ConsoleLogger.prototype.info") &&
+        output.contains("ConsoleLogger.prototype.error"),
+        "Expected logger methods: {}",
+        output
+    );
+    assert!(
+        output.contains("MemoryCache.prototype.get") &&
+        output.contains("MemoryCache.prototype.set") &&
+        output.contains("MemoryCache.prototype.delete"),
+        "Expected cache methods: {}",
+        output
+    );
+    assert!(
+        output.contains("BaseRepository.prototype.findById") &&
+        output.contains("BaseRepository.prototype.save") &&
+        output.contains("BaseRepository.prototype.delete"),
+        "Expected repository methods: {}",
+        output
+    );
+    assert!(
+        output.contains("DIContainer.getInstance") &&
+        output.contains("DIContainer.prototype.bind") &&
+        output.contains("DIContainer.prototype.get"),
+        "Expected container methods: {}",
+        output
+    );
+
+    // Interfaces should be stripped
+    assert!(
+        !output.contains("interface ILogger") &&
+        !output.contains("interface ICache") &&
+        !output.contains("interface IRepository"),
+        "Expected interfaces to be stripped: {}",
+        output
+    );
+}

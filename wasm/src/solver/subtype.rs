@@ -743,24 +743,6 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 SubtypeResult::True
             }
 
-            // Application to non-Application: try to evaluate the Application
-            (TypeKey::Application(app_id), _) => {
-                if let Some(expanded) = self.try_expand_application(*app_id) {
-                    self.check_subtype(expanded, target)
-                } else {
-                    SubtypeResult::False
-                }
-            }
-
-            // Non-Application to Application: try to evaluate the Application
-            (_, TypeKey::Application(app_id)) => {
-                if let Some(expanded) = self.try_expand_application(*app_id) {
-                    self.check_subtype(source, expanded)
-                } else {
-                    SubtypeResult::False
-                }
-            }
-
             // Default: not a subtype
             _ => SubtypeResult::False,
         }

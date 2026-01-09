@@ -191,7 +191,7 @@ Steps:
 - [x] Added async computed object literal source-map coverage in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
 
 ## Ready for Merge
-Yes
+Yes - Working on spread argument expansion for overload resolution
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize emitter fidelity (ES5 downleveling/source maps) before new features.
@@ -202,3 +202,5 @@ Yes
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/anvil-5`
 - **NEVER edit**: `DIRECTOR_AGENT.md`, `SQUAD_LEAD_AGENT.md`, `MANAGER_AGENT.md`, `AGENTS.md`, `start_*.sh`
+- Implemented spread argument expansion in `wasm/src/thin_checker.rs` for tuple types in function calls.
+- Fixed duplicate match arms in `wasm/src/solver/subtype.rs`.

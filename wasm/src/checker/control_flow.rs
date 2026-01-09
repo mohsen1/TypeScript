@@ -89,6 +89,17 @@ impl<'a> FlowAnalyzer<'a> {
         self.check_flow(reference, initial_type, flow_node, &mut Vec::new())
     }
 
+    /// Check if a reference is definitely assigned at a specific flow node.
+    pub fn is_definitely_assigned(&self, reference: NodeIndex, flow_node: FlowNodeId) -> bool {
+        if flow_node.is_none() {
+            return true;
+        }
+
+        let mut visited = Vec::new();
+        let mut cache = FxHashMap::default();
+        self.check_definite_assignment(reference, flow_node, &mut visited, &mut cache)
+    }
+
     /// Recursive flow graph traversal with cycle detection.
     fn check_flow(
         &self,
@@ -143,6 +154,78 @@ impl<'a> FlowAnalyzer<'a> {
         } else {
             type_id
         }
+    }
+
+    /// Recursive flow graph traversal for definite assignment checks.
+    fn check_definite_assignment(
+        &self,
+        reference: NodeIndex,
+        flow_id: FlowNodeId,
+        visited: &mut Vec<FlowNodeId>,
+        cache: &mut FxHashMap<FlowNodeId, bool>,
+    ) -> bool {
+        if let Some(&cached) = cache.get(&flow_id) {
+            return cached;
+        }
+
+        if visited.contains(&flow_id) {
+            return false;
+        }
+        visited.push(flow_id);
+
+        let result = if let Some(flow) = self.binder.flow_nodes.get(flow_id) {
+            if flow.has_any_flags(flow_flags::UNREACHABLE) {
+                false
+            } else if flow.has_any_flags(flow_flags::ASSIGNMENT) {
+                if self.assignment_targets_reference(flow.node, reference) {
+                    true
+                } else if let Some(&ant) = flow.antecedent.first() {
+                    self.check_definite_assignment(reference, ant, visited, cache)
+                } else {
+                    false
+                }
+            } else if flow.has_any_flags(flow_flags::BRANCH_LABEL) {
+                if flow.antecedent.is_empty() {
+                    false
+                } else {
+                    flow.antecedent.iter().all(|&ant| {
+                        self.check_definite_assignment(reference, ant, visited, cache)
+                    })
+                }
+            } else if flow.has_any_flags(flow_flags::LOOP_LABEL) {
+                if let Some(&ant) = flow.antecedent.first() {
+                    self.check_definite_assignment(reference, ant, visited, cache)
+                } else {
+                    false
+                }
+            } else if flow.has_any_flags(flow_flags::CONDITION) {
+                if let Some(&ant) = flow.antecedent.first() {
+                    self.check_definite_assignment(reference, ant, visited, cache)
+                } else {
+                    false
+                }
+            } else if flow.has_any_flags(flow_flags::SWITCH_CLAUSE) {
+                if flow.antecedent.is_empty() {
+                    false
+                } else {
+                    flow.antecedent.iter().all(|&ant| {
+                        self.check_definite_assignment(reference, ant, visited, cache)
+                    })
+                }
+            } else if flow.has_any_flags(flow_flags::START) {
+                false
+            } else if let Some(&ant) = flow.antecedent.first() {
+                self.check_definite_assignment(reference, ant, visited, cache)
+            } else {
+                false
+            }
+        } else {
+            true
+        };
+
+        visited.pop();
+        cache.insert(flow_id, result);
+        result
     }
 
     /// Handle branch label (merge point) - union of types from all branches.
@@ -286,28 +369,7 @@ impl<'a> FlowAnalyzer<'a> {
         flow: &FlowNode,
         visited: &mut Vec<FlowNodeId>,
     ) -> TypeId {
-        let Some(node) = self.arena.get(flow.node) else {
-            return type_id;
-        };
-
-        let affects_reference = if node.kind == syntax_kind_ext::BINARY_EXPRESSION {
-            self.arena
-                .get_binary_expr(node)
-                .map(|bin| self.is_assignment_operator(bin.operator_token)
-                    && self.assignment_affects_reference(bin.left, reference))
-                .unwrap_or(false)
-        } else if node.kind == syntax_kind_ext::PREFIX_UNARY_EXPRESSION
-            || node.kind == syntax_kind_ext::POSTFIX_UNARY_EXPRESSION
-        {
-            self.arena
-                .get_unary_expr(node)
-                .map(|unary| (unary.operator == SyntaxKind::PlusPlusToken as u16
-                    || unary.operator == SyntaxKind::MinusMinusToken as u16)
-                    && self.assignment_affects_reference(unary.operand, reference))
-                .unwrap_or(false)
-        } else {
-            false
-        };
+        let affects_reference = self.assignment_affects_reference_node(flow.node, reference);
 
         if affects_reference {
             return type_id;
@@ -318,6 +380,124 @@ impl<'a> FlowAnalyzer<'a> {
         } else {
             type_id
         }
+    }
+
+    fn assignment_affects_reference_node(
+        &self,
+        assignment_node: NodeIndex,
+        target: NodeIndex,
+    ) -> bool {
+        let Some(node) = self.arena.get(assignment_node) else {
+            return false;
+        };
+
+        if node.kind == syntax_kind_ext::BINARY_EXPRESSION {
+            return self.arena
+                .get_binary_expr(node)
+                .map(|bin| self.is_assignment_operator(bin.operator_token)
+                    && self.assignment_affects_reference(bin.left, target))
+                .unwrap_or(false);
+        }
+
+        if node.kind == syntax_kind_ext::PREFIX_UNARY_EXPRESSION
+            || node.kind == syntax_kind_ext::POSTFIX_UNARY_EXPRESSION
+        {
+            return self.arena
+                .get_unary_expr(node)
+                .map(|unary| (unary.operator == SyntaxKind::PlusPlusToken as u16
+                    || unary.operator == SyntaxKind::MinusMinusToken as u16)
+                    && self.assignment_affects_reference(unary.operand, target))
+                .unwrap_or(false);
+        }
+
+        if node.kind == syntax_kind_ext::VARIABLE_DECLARATION {
+            return self.arena
+                .get_variable_declaration(node)
+                .map(|decl| self.assignment_affects_reference(decl.name, target))
+                .unwrap_or(false);
+        }
+
+        if node.kind == syntax_kind_ext::VARIABLE_DECLARATION_LIST {
+            if let Some(list) = self.arena.get_variable(node) {
+                for &decl_idx in &list.declarations.nodes {
+                    let Some(decl_node) = self.arena.get(decl_idx) else {
+                        continue;
+                    };
+                    if decl_node.kind != syntax_kind_ext::VARIABLE_DECLARATION {
+                        continue;
+                    }
+                    if let Some(decl) = self.arena.get_variable_declaration(decl_node) {
+                        if self.assignment_affects_reference(decl.name, target) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        self.assignment_affects_reference(assignment_node, target)
+    }
+
+    pub fn assignment_targets_reference(&self, assignment_node: NodeIndex, target: NodeIndex) -> bool {
+        self.assignment_targets_reference_node(assignment_node, target)
+    }
+
+    fn assignment_targets_reference_node(
+        &self,
+        assignment_node: NodeIndex,
+        target: NodeIndex,
+    ) -> bool {
+        let Some(node) = self.arena.get(assignment_node) else {
+            return false;
+        };
+
+        if node.kind == syntax_kind_ext::BINARY_EXPRESSION {
+            return self.arena
+                .get_binary_expr(node)
+                .map(|bin| self.is_assignment_operator(bin.operator_token)
+                    && self.assignment_targets_reference_internal(bin.left, target))
+                .unwrap_or(false);
+        }
+
+        if node.kind == syntax_kind_ext::PREFIX_UNARY_EXPRESSION
+            || node.kind == syntax_kind_ext::POSTFIX_UNARY_EXPRESSION
+        {
+            return self.arena
+                .get_unary_expr(node)
+                .map(|unary| (unary.operator == SyntaxKind::PlusPlusToken as u16
+                    || unary.operator == SyntaxKind::MinusMinusToken as u16)
+                    && self.assignment_targets_reference_internal(unary.operand, target))
+                .unwrap_or(false);
+        }
+
+        if node.kind == syntax_kind_ext::VARIABLE_DECLARATION {
+            return self.arena
+                .get_variable_declaration(node)
+                .map(|decl| self.assignment_targets_reference_internal(decl.name, target))
+                .unwrap_or(false);
+        }
+
+        if node.kind == syntax_kind_ext::VARIABLE_DECLARATION_LIST {
+            if let Some(list) = self.arena.get_variable(node) {
+                for &decl_idx in &list.declarations.nodes {
+                    let Some(decl_node) = self.arena.get(decl_idx) else {
+                        continue;
+                    };
+                    if decl_node.kind != syntax_kind_ext::VARIABLE_DECLARATION {
+                        continue;
+                    }
+                    if let Some(decl) = self.arena.get_variable_declaration(decl_node) {
+                        if self.assignment_targets_reference_internal(decl.name, target) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        self.assignment_targets_reference_internal(assignment_node, target)
     }
 
     fn handle_array_mutation(
@@ -710,6 +890,107 @@ impl<'a> FlowAnalyzer<'a> {
         if node.kind == syntax_kind_ext::BINDING_ELEMENT {
             if let Some(binding) = self.arena.get_binding_element(node) {
                 if self.assignment_affects_reference(binding.name, target) {
+                    return true;
+                }
+            }
+        }
+
+        false
+    }
+
+    fn assignment_targets_reference_internal(&self, left: NodeIndex, target: NodeIndex) -> bool {
+        let left = self.skip_parenthesized(left);
+        let target = self.skip_parenthesized(target);
+        if self.is_matching_reference(left, target) {
+            return true;
+        }
+
+        let Some(node) = self.arena.get(left) else {
+            return false;
+        };
+
+        if node.kind == syntax_kind_ext::NON_NULL_EXPRESSION {
+            if let Some(unary) = self.arena.get_unary_expr_ex(node) {
+                return self.assignment_targets_reference_internal(unary.expression, target);
+            }
+        }
+
+        if node.kind == syntax_kind_ext::TYPE_ASSERTION
+            || node.kind == syntax_kind_ext::AS_EXPRESSION
+            || node.kind == syntax_kind_ext::SATISFIES_EXPRESSION
+        {
+            if let Some(assertion) = self.arena.get_type_assertion(node) {
+                return self.assignment_targets_reference_internal(assertion.expression, target);
+            }
+        }
+
+        if node.kind == syntax_kind_ext::BINARY_EXPRESSION {
+            if let Some(bin) = self.arena.get_binary_expr(node) {
+                if self.is_assignment_operator(bin.operator_token) {
+                    return self.assignment_targets_reference_internal(bin.left, target);
+                }
+            }
+        }
+
+        if node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION
+            || node.kind == syntax_kind_ext::ARRAY_LITERAL_EXPRESSION
+        {
+            if let Some(lit) = self.arena.get_literal_expr(node) {
+                for &elem in &lit.elements.nodes {
+                    if elem.is_none() {
+                        continue;
+                    }
+                    if self.assignment_targets_reference_internal(elem, target) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        if node.kind == syntax_kind_ext::PROPERTY_ASSIGNMENT {
+            if let Some(prop) = self.arena.get_property_assignment(node) {
+                if self.assignment_targets_reference_internal(prop.initializer, target) {
+                    return true;
+                }
+            }
+        }
+
+        if node.kind == syntax_kind_ext::SHORTHAND_PROPERTY_ASSIGNMENT {
+            if let Some(prop) = self.arena.get_shorthand_property(node) {
+                if self.assignment_targets_reference_internal(prop.name, target) {
+                    return true;
+                }
+            }
+        }
+
+        if node.kind == syntax_kind_ext::SPREAD_ELEMENT
+            || node.kind == syntax_kind_ext::SPREAD_ASSIGNMENT
+        {
+            if let Some(spread) = self.arena.get_spread(node) {
+                if self.assignment_targets_reference_internal(spread.expression, target) {
+                    return true;
+                }
+            }
+        }
+
+        if node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN
+            || node.kind == syntax_kind_ext::ARRAY_BINDING_PATTERN
+        {
+            if let Some(pattern) = self.arena.get_binding_pattern(node) {
+                for &elem in &pattern.elements.nodes {
+                    if elem.is_none() {
+                        continue;
+                    }
+                    if self.assignment_targets_reference_internal(elem, target) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        if node.kind == syntax_kind_ext::BINDING_ELEMENT {
+            if let Some(binding) = self.arena.get_binding_element(node) {
+                if self.assignment_targets_reference_internal(binding.name, target) {
                     return true;
                 }
             }
