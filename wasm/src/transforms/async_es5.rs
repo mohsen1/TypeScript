@@ -429,6 +429,13 @@ impl<'a> AsyncES5Emitter<'a> {
             }
         }
 
+        // Check labeled statements
+        if node.kind == syntax_kind_ext::LABELED_STATEMENT {
+            if let Some(labeled_data) = self.arena.get_labeled_statement(node) {
+                return self.contains_await_recursive(labeled_data.statement);
+            }
+        }
+
         false
     }
 

@@ -9226,3 +9226,151 @@ fn test_async_short_circuit_chained() {
         output
     );
 }
+
+// ============================================================================
+// ASYNC LABELED STATEMENT PATTERN TESTS
+// ============================================================================
+
+fn parse_and_emit_async_labeled_statement(source: &str) -> String {
+    use crate::parser::syntax_kind_ext;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &stmt_idx in &source_file.statements.nodes {
+                if let Some(stmt_node) = parser.arena.get(stmt_idx) {
+                    if stmt_node.kind == syntax_kind_ext::FUNCTION_DECLARATION {
+                        if let Some(func_data) = parser.arena.get_function(stmt_node) {
+                            let emitter = AsyncES5Emitter::new(&parser.arena);
+                            let has_await = emitter.body_contains_await(func_data.body);
+                            let mut emitter = AsyncES5Emitter::new(&parser.arena);
+                            if has_await {
+                                return emitter.emit_generator_body_with_await(func_data.body);
+                            } else {
+                                return emitter.emit_simple_generator_body(func_data.body);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    String::new()
+}
+
+fn async_labeled_statement_contains_await(source: &str) -> bool {
+    use crate::parser::syntax_kind_ext;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &stmt_idx in &source_file.statements.nodes {
+                if let Some(stmt_node) = parser.arena.get(stmt_idx) {
+                    if stmt_node.kind == syntax_kind_ext::FUNCTION_DECLARATION {
+                        if let Some(func_data) = parser.arena.get_function(stmt_node) {
+                            let emitter = AsyncES5Emitter::new(&parser.arena);
+                            return emitter.body_contains_await(func_data.body);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+#[test]
+fn test_async_labeled_break_basic() {
+    let result = async_labeled_statement_contains_await(
+        "async function foo() { outer: for (let i = 0; i < 10; i++) { await process(i); if (i > 5) break outer; } }",
+    );
+    assert!(result, "Should detect await in labeled for loop with break");
+}
+
+#[test]
+fn test_async_labeled_continue_basic() {
+    let result = async_labeled_statement_contains_await(
+        "async function foo() { outer: for (let i = 0; i < 10; i++) { for (let j = 0; j < 10; j++) { if (await shouldSkip(i, j)) continue outer; } } }",
+    );
+    assert!(result, "Should detect await in labeled for loop with continue");
+}
+
+#[test]
+fn test_async_labeled_statement_no_await() {
+    let result = async_labeled_statement_contains_await(
+        "async function foo() { outer: for (let i = 0; i < 10; i++) { if (i > 5) break outer; } }",
+    );
+    assert!(!result, "Should not detect await when labeled statement has no await");
+}
+
+#[test]
+fn test_async_labeled_statement_body_contains_await() {
+    let result = async_labeled_statement_contains_await(
+        "async function foo() { myLabel: { await process(); } }",
+    );
+    assert!(result, "Should detect await in labeled block");
+}
+
+#[test]
+fn test_async_labeled_statement_body_no_await() {
+    let result = async_labeled_statement_contains_await(
+        "async function foo() { myLabel: { console.log('in label'); } }",
+    );
+    assert!(!result, "Should not detect await when labeled block has no await");
+}
+
+#[test]
+fn test_async_labeled_statement_ignores_nested_async() {
+    let result = async_labeled_statement_contains_await(
+        "async function foo() { myLabel: { const inner = async () => { await x; }; } }",
+    );
+    assert!(!result, "Should not detect await inside nested async in labeled statement");
+}
+
+#[test]
+fn test_async_labeled_nested_labels() {
+    let result = async_labeled_statement_contains_await(
+        "async function foo() { outer: for (let i = 0; i < 5; i++) { inner: for (let j = 0; j < 5; j++) { if (await check(i, j)) break outer; if (await skip(j)) continue inner; } } }",
+    );
+    assert!(result, "Should detect await in nested labeled loops");
+}
+
+#[test]
+fn test_async_labeled_while_loop() {
+    let result = async_labeled_statement_contains_await(
+        "async function foo() { loop: while (true) { if (await isDone()) break loop; await step(); } }",
+    );
+    assert!(result, "Should detect await in labeled while loop");
+}
+
+#[test]
+fn test_async_labeled_block() {
+    let result = async_labeled_statement_contains_await(
+        "async function foo() { block: { const result = await fetch(); if (!result) break block; await process(result); } }",
+    );
+    assert!(result, "Should detect await in labeled block");
+}
+
+#[test]
+fn test_async_labeled_with_try_catch() {
+    let result = async_labeled_statement_contains_await(
+        "async function foo() { outer: for (let i = 0; i < 10; i++) { try { if (await shouldBreak(i)) break outer; } catch (e) { continue outer; } } }",
+    );
+    assert!(result, "Should detect await in labeled statement with try/catch");
+}
+
+#[test]
+fn test_async_labeled_switch_break() {
+    let result = async_labeled_statement_contains_await(
+        "async function foo(x: number) { outer: switch (x) { case 1: await doOne(); break outer; case 2: await doTwo(); break outer; } }",
+    );
+    assert!(result, "Should detect await in labeled switch");
+}
+
+#[test]
+fn test_async_labeled_do_while() {
+    let result = async_labeled_statement_contains_await(
+        "async function foo() { loop: do { if (await checkExit()) break loop; await process(); } while (await hasMore()); }",
+    );
+    assert!(result, "Should detect await in labeled do-while");
+}
