@@ -17566,6 +17566,376 @@ fn test_index_access_nested_object() {
     assert_eq!(final_result, TypeId::STRING);
 }
 
+// =============================================================================
+// INDEXED ACCESS TYPE TESTS
+// =============================================================================
+
+/// Test basic indexed access with literal key.
+///
+/// { a: string, b: number }["a"] should be string.
+#[test]
+fn test_indexed_access_basic_literal_key() {
+    let interner = TypeInterner::new();
+
+    let obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let key_a = interner.literal_string("a");
+    let result = evaluate_index_access(&interner, obj, key_a);
+    assert_eq!(result, TypeId::STRING);
+
+    let key_b = interner.literal_string("b");
+    let result_b = evaluate_index_access(&interner, obj, key_b);
+    assert_eq!(result_b, TypeId::NUMBER);
+}
+
+/// Test indexed access with union key produces union type.
+///
+/// { a: string, b: number, c: boolean }["a" | "b"] should be string | number.
+#[test]
+fn test_indexed_access_union_key_produces_union() {
+    let interner = TypeInterner::new();
+
+    let obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("c"),
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let key_a = interner.literal_string("a");
+    let key_b = interner.literal_string("b");
+    let key_union = interner.union(vec![key_a, key_b]);
+
+    let result = evaluate_index_access(&interner, obj, key_union);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert_eq!(result, expected);
+}
+
+/// Test indexed access with triple union key.
+///
+/// { a: string, b: number, c: boolean }["a" | "b" | "c"] should be string | number | boolean.
+#[test]
+fn test_indexed_access_triple_union_key() {
+    let interner = TypeInterner::new();
+
+    let obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("c"),
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let key_a = interner.literal_string("a");
+    let key_b = interner.literal_string("b");
+    let key_c = interner.literal_string("c");
+    let key_union = interner.union(vec![key_a, key_b, key_c]);
+
+    let result = evaluate_index_access(&interner, obj, key_union);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::BOOLEAN]);
+    assert_eq!(result, expected);
+}
+
+/// Test recursive indexed access for nested objects.
+///
+/// { outer: { middle: { inner: string } } }["outer"]["middle"]["inner"] should be string.
+#[test]
+fn test_indexed_access_recursive_three_levels() {
+    let interner = TypeInterner::new();
+
+    // Build innermost object: { inner: string }
+    let inner_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("inner"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Build middle object: { middle: { inner: string } }
+    let middle_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("middle"),
+        type_id: inner_obj,
+        write_type: inner_obj,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Build outer object: { outer: { middle: { inner: string } } }
+    let outer_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("outer"),
+        type_id: middle_obj,
+        write_type: middle_obj,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Access T["outer"]
+    let outer_key = interner.literal_string("outer");
+    let first_result = evaluate_index_access(&interner, outer_obj, outer_key);
+    assert_eq!(first_result, middle_obj);
+
+    // Access T["outer"]["middle"]
+    let middle_key = interner.literal_string("middle");
+    let second_result = evaluate_index_access(&interner, first_result, middle_key);
+    assert_eq!(second_result, inner_obj);
+
+    // Access T["outer"]["middle"]["inner"]
+    let inner_key = interner.literal_string("inner");
+    let final_result = evaluate_index_access(&interner, second_result, inner_key);
+    assert_eq!(final_result, TypeId::STRING);
+}
+
+/// Test indexed access on optional property includes undefined.
+///
+/// { a?: string }["a"] should be string | undefined.
+#[test]
+fn test_indexed_access_optional_property() {
+    let interner = TypeInterner::new();
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: true,  // optional property
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let key_a = interner.literal_string("a");
+    let result = evaluate_index_access(&interner, obj, key_a);
+
+    // Optional property access should include undefined
+    let expected = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+    assert_eq!(result, expected);
+}
+
+/// Test indexed access with mix of required and optional properties.
+///
+/// { a: string, b?: number }["a" | "b"] should be string | number | undefined.
+#[test]
+fn test_indexed_access_mixed_optional_required() {
+    let interner = TypeInterner::new();
+
+    let obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,  // required
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: true,  // optional
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let key_a = interner.literal_string("a");
+    let key_b = interner.literal_string("b");
+    let key_union = interner.union(vec![key_a, key_b]);
+
+    let result = evaluate_index_access(&interner, obj, key_union);
+
+    // Union access includes all types + undefined from optional
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::UNDEFINED]);
+    assert_eq!(result, expected);
+}
+
+/// Test indexed access on array type with number key.
+///
+/// string[][number] should be string.
+#[test]
+fn test_indexed_access_array_number_key() {
+    let interner = TypeInterner::new();
+
+    let string_array = interner.array(TypeId::STRING);
+
+    let result = evaluate_index_access(&interner, string_array, TypeId::NUMBER);
+    assert_eq!(result, TypeId::STRING);
+}
+
+/// Test indexed access on tuple with literal index.
+///
+/// [string, number, boolean][1] should be number.
+#[test]
+fn test_indexed_access_tuple_literal_index() {
+    let interner = TypeInterner::new();
+
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+    ]);
+
+    let key_0 = interner.literal_number(0.0);
+    let result_0 = evaluate_index_access(&interner, tuple, key_0);
+    assert_eq!(result_0, TypeId::STRING);
+
+    let key_1 = interner.literal_number(1.0);
+    let result_1 = evaluate_index_access(&interner, tuple, key_1);
+    assert_eq!(result_1, TypeId::NUMBER);
+
+    let key_2 = interner.literal_number(2.0);
+    let result_2 = evaluate_index_access(&interner, tuple, key_2);
+    assert_eq!(result_2, TypeId::BOOLEAN);
+}
+
+/// Test indexed access with union of objects.
+///
+/// ({ a: string } | { a: number })["a"] should be string | number.
+#[test]
+fn test_indexed_access_union_object() {
+    let interner = TypeInterner::new();
+
+    let obj1 = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj2 = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let union_obj = interner.union(vec![obj1, obj2]);
+
+    let key_a = interner.literal_string("a");
+    let result = evaluate_index_access(&interner, union_obj, key_a);
+
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert_eq!(result, expected);
+}
+
+/// Test indexed access with all optional properties.
+///
+/// { a?: string, b?: number }["a" | "b"] should be string | number | undefined.
+#[test]
+fn test_indexed_access_all_optional_properties() {
+    let interner = TypeInterner::new();
+
+    let obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: true,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: true,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let key_a = interner.literal_string("a");
+    let key_b = interner.literal_string("b");
+    let key_union = interner.union(vec![key_a, key_b]);
+
+    let result = evaluate_index_access(&interner, obj, key_union);
+
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::UNDEFINED]);
+    assert_eq!(result, expected);
+}
+
+/// Test indexed access preserves readonly property type.
+///
+/// { readonly a: string }["a"] should still be string.
+#[test]
+fn test_indexed_access_readonly_property() {
+    let interner = TypeInterner::new();
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: true,  // readonly
+        is_method: false,
+    }]);
+
+    let key_a = interner.literal_string("a");
+    let result = evaluate_index_access(&interner, obj, key_a);
+    assert_eq!(result, TypeId::STRING);
+}
+
 
 // ============================================================================
 // Generator Function Type Tests
