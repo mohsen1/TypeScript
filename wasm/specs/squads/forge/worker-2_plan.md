@@ -11,12 +11,22 @@ Priority: 2
 - [x] Distributive conditional type stress tests (per GOALS.md objective #2)
 - [x] Context-sensitive typing tests (generic function call inference, contextual parameter types)
 - [x] Function return type inference tests for conditional types
+- [x] Variadic tuple type tests
 
 ## Task Queue
 - [ ] Implement TypeResolver for TypeEvaluator to resolve Refs inside Mapped/Conditional types
 - [ ] This would enable full evaluation of complex patterns like `{ [K in keyof R]: ExtractAction<R[K]> }[keyof R]`
 
 ## Completed
+- [x] Added 28 variadic tuple type tests including:
+  - Basic rest element at end/start/middle positions
+  - Inference from spread calls and contexts
+  - Concat, Push, Unshift type operations
+  - First/Last/Tail/Init extraction patterns
+  - Function apply and curry patterns
+  - Zip, flatten, partial application patterns
+  - Labeled elements, optional before rest
+  - Union elements in variadic tuples
 - [x] Added 24 function return type inference tests for conditional types including:
   - Basic conditional return type evaluation (true/false branches)
   - Distributive conditional types with unions
@@ -96,6 +106,7 @@ Worker 2 branch now contains:
 - 18 distributive conditional type stress tests
 - 24 context-sensitive typing tests (generic inference, contextual typing)
 - 24 function return type inference tests for conditional types
+- 28 variadic tuple type tests
 - No modifications to evaluate.rs or other core files
 - Pure test additions that can be safely merged
 
