@@ -7,10 +7,10 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-None - awaiting assignment from EM-Anvil.
+- [ ] Add ES5 class tests for utility type patterns: Partial, Required, Pick, Omit, Record, Readonly, ReturnType, Parameters usage in classes. Tests: `./wasm/test.sh class_es5_tests`
 
 ## Task Queue
-- [ ] Add ES5 class tests for utility type patterns: Partial, Required, Pick, Omit, Record usage in classes
+- [ ] Add ES5 class tests for branded type patterns: nominal types, opaque types, type branding
 
 ## Completed
 - [x] Add ES5 class tests for generic constraint patterns. Tests: `./wasm/test.sh class_es5_tests`
