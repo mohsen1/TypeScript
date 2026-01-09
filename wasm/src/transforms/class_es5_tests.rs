@@ -22199,3 +22199,588 @@ class DataProcessor {
         output
     );
 }
+
+// ============================================================================
+// module pattern variation tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_commonjs_class_exports() {
+    // Test CommonJS module pattern with class exports
+    let source = r#"
+class DatabaseConnection {
+    private host: string;
+    private port: number;
+
+    constructor(host: string, port: number = 5432) {
+        this.host = host;
+        this.port = port;
+    }
+
+    connect(): Promise<void> {
+        return Promise.resolve();
+    }
+
+    disconnect(): void {
+        console.log("Disconnected");
+    }
+}
+
+class QueryBuilder {
+    private query: string = "";
+
+    select(...columns: string[]): this {
+        this.query = `SELECT ${columns.join(", ")}`;
+        return this;
+    }
+
+    from(table: string): this {
+        this.query += ` FROM ${table}`;
+        return this;
+    }
+
+    build(): string {
+        return this.query;
+    }
+}
+
+// CommonJS exports
+module.exports = { DatabaseConnection, QueryBuilder };
+module.exports.DatabaseConnection = DatabaseConnection;
+module.exports.QueryBuilder = QueryBuilder;
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function DatabaseConnection"),
+        "Expected DatabaseConnection function: {}",
+        output
+    );
+    assert!(
+        output.contains("DatabaseConnection.prototype.connect") && output.contains("DatabaseConnection.prototype.disconnect"),
+        "Expected DatabaseConnection methods on prototype: {}",
+        output
+    );
+    assert!(
+        output.contains("function QueryBuilder"),
+        "Expected QueryBuilder function: {}",
+        output
+    );
+    assert!(
+        output.contains("QueryBuilder.prototype.select") && output.contains("QueryBuilder.prototype.from"),
+        "Expected QueryBuilder methods on prototype: {}",
+        output
+    );
+    assert!(
+        output.contains("module.exports"),
+        "Expected module.exports: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_esm_default_class() {
+    // Test ESM default export with class
+    let source = r#"
+export default class Application {
+    private name: string;
+    private version: string;
+
+    constructor(name: string, version: string = "1.0.0") {
+        this.name = name;
+        this.version = version;
+    }
+
+    getName(): string {
+        return this.name;
+    }
+
+    getVersion(): string {
+        return this.version;
+    }
+
+    static create(name: string): Application {
+        return new Application(name);
+    }
+}
+
+export class Plugin {
+    constructor(public id: string, public enabled: boolean = true) {}
+
+    enable(): void {
+        this.enabled = true;
+    }
+
+    disable(): void {
+        this.enabled = false;
+    }
+}
+
+export class Config {
+    private settings: Map<string, any> = new Map();
+
+    set(key: string, value: any): void {
+        this.settings.set(key, value);
+    }
+
+    get(key: string): any {
+        return this.settings.get(key);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function Application"),
+        "Expected Application function: {}",
+        output
+    );
+    assert!(
+        output.contains("Application.prototype.getName") && output.contains("Application.prototype.getVersion"),
+        "Expected Application methods on prototype: {}",
+        output
+    );
+    assert!(
+        output.contains("Application.create"),
+        "Expected Application static method: {}",
+        output
+    );
+    assert!(
+        output.contains("function Plugin") && output.contains("function Config"),
+        "Expected Plugin and Config functions: {}",
+        output
+    );
+    assert!(
+        output.contains("export") || output.contains("exports"),
+        "Expected export statements: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_esm_named_exports() {
+    // Test ESM named exports with classes
+    let source = r#"
+export class Logger {
+    private prefix: string;
+
+    constructor(prefix: string = "") {
+        this.prefix = prefix;
+    }
+
+    log(message: string): void {
+        console.log(`${this.prefix}${message}`);
+    }
+
+    error(message: string): void {
+        console.error(`${this.prefix}ERROR: ${message}`);
+    }
+
+    warn(message: string): void {
+        console.warn(`${this.prefix}WARN: ${message}`);
+    }
+}
+
+export class Formatter {
+    static formatDate(date: Date): string {
+        return date.toISOString();
+    }
+
+    static formatCurrency(amount: number, currency: string = "USD"): string {
+        return `${currency} ${amount.toFixed(2)}`;
+    }
+
+    static formatPercentage(value: number): string {
+        return `${(value * 100).toFixed(1)}%`;
+    }
+}
+
+export class Validator {
+    static isEmail(value: string): boolean {
+        return value.includes("@") && value.includes(".");
+    }
+
+    static isUrl(value: string): boolean {
+        return value.startsWith("http://") || value.startsWith("https://");
+    }
+
+    static isPhone(value: string): boolean {
+        return /^\d{10,}$/.test(value.replace(/\D/g, ""));
+    }
+}
+
+export { Logger as DefaultLogger };
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function Logger"),
+        "Expected Logger function: {}",
+        output
+    );
+    assert!(
+        output.contains("Logger.prototype.log") && output.contains("Logger.prototype.error"),
+        "Expected Logger methods on prototype: {}",
+        output
+    );
+    assert!(
+        output.contains("function Formatter") || output.contains("Formatter.formatDate"),
+        "Expected Formatter with static methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function Validator") || output.contains("Validator.isEmail"),
+        "Expected Validator with static methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_re_export_patterns() {
+    // Test re-export patterns with classes
+    let source = r#"
+// Original classes
+class BaseEntity {
+    constructor(public id: string) {}
+
+    getId(): string {
+        return this.id;
+    }
+}
+
+class User extends BaseEntity {
+    constructor(id: string, public name: string, public email: string) {
+        super(id);
+    }
+
+    getDisplayName(): string {
+        return this.name;
+    }
+}
+
+class Product extends BaseEntity {
+    constructor(id: string, public sku: string, public price: number) {
+        super(id);
+    }
+
+    getFormattedPrice(): string {
+        return `$${this.price.toFixed(2)}`;
+    }
+}
+
+class Order extends BaseEntity {
+    private items: Product[] = [];
+
+    constructor(id: string, public userId: string) {
+        super(id);
+    }
+
+    addItem(product: Product): void {
+        this.items.push(product);
+    }
+
+    getTotal(): number {
+        return this.items.reduce((sum, p) => sum + p.price, 0);
+    }
+}
+
+// Re-export patterns
+export { BaseEntity, User, Product, Order };
+export { User as Customer };
+export { Product as Item };
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function BaseEntity"),
+        "Expected BaseEntity function: {}",
+        output
+    );
+    assert!(
+        output.contains("function User") && output.contains("__extends(User, _super)"),
+        "Expected User extending BaseEntity: {}",
+        output
+    );
+    assert!(
+        output.contains("function Product") && output.contains("__extends(Product, _super)"),
+        "Expected Product extending BaseEntity: {}",
+        output
+    );
+    assert!(
+        output.contains("function Order") && output.contains("__extends(Order, _super)"),
+        "Expected Order extending BaseEntity: {}",
+        output
+    );
+    assert!(
+        output.contains("export") || output.contains("exports"),
+        "Expected export statements: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_barrel_export_pattern() {
+    // Test barrel export pattern (index file pattern)
+    let source = r#"
+// Service classes
+class AuthService {
+    private token: string | null = null;
+
+    login(username: string, password: string): Promise<boolean> {
+        return Promise.resolve(true);
+    }
+
+    logout(): void {
+        this.token = null;
+    }
+
+    isAuthenticated(): boolean {
+        return this.token !== null;
+    }
+}
+
+class ApiService {
+    private baseUrl: string;
+
+    constructor(baseUrl: string) {
+        this.baseUrl = baseUrl;
+    }
+
+    get<T>(endpoint: string): Promise<T> {
+        return fetch(`${this.baseUrl}${endpoint}`).then(r => r.json());
+    }
+
+    post<T>(endpoint: string, data: any): Promise<T> {
+        return fetch(`${this.baseUrl}${endpoint}`, {
+            method: "POST",
+            body: JSON.stringify(data)
+        }).then(r => r.json());
+    }
+}
+
+class StorageService {
+    get(key: string): string | null {
+        return localStorage.getItem(key);
+    }
+
+    set(key: string, value: string): void {
+        localStorage.setItem(key, value);
+    }
+
+    remove(key: string): void {
+        localStorage.removeItem(key);
+    }
+}
+
+// Barrel exports
+export { AuthService, ApiService, StorageService };
+export type { AuthService as IAuthService };
+
+// Default export
+const services = {
+    auth: new AuthService(),
+    storage: new StorageService()
+};
+
+export default services;
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function AuthService"),
+        "Expected AuthService function: {}",
+        output
+    );
+    assert!(
+        output.contains("AuthService.prototype.login") && output.contains("AuthService.prototype.logout"),
+        "Expected AuthService methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function ApiService"),
+        "Expected ApiService function: {}",
+        output
+    );
+    assert!(
+        output.contains("function StorageService"),
+        "Expected StorageService function: {}",
+        output
+    );
+    assert!(
+        output.contains("services") || output.contains("default"),
+        "Expected services object or default export: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_mixed_module_patterns() {
+    // Test mixed module patterns combining CommonJS and ESM
+    let source = r#"
+// Classes with various export patterns
+export class EventEmitter {
+    private listeners: Map<string, Function[]> = new Map();
+
+    on(event: string, callback: Function): void {
+        if (!this.listeners.has(event)) {
+            this.listeners.set(event, []);
+        }
+        this.listeners.get(event)!.push(callback);
+    }
+
+    emit(event: string, ...args: any[]): void {
+        const callbacks = this.listeners.get(event);
+        if (callbacks) {
+            callbacks.forEach(cb => cb(...args));
+        }
+    }
+
+    off(event: string, callback: Function): void {
+        const callbacks = this.listeners.get(event);
+        if (callbacks) {
+            const index = callbacks.indexOf(callback);
+            if (index > -1) {
+                callbacks.splice(index, 1);
+            }
+        }
+    }
+}
+
+class InternalProcessor {
+    process(data: any): any {
+        return data;
+    }
+}
+
+export class DataPipeline extends EventEmitter {
+    private processor = new InternalProcessor();
+    private stages: Function[] = [];
+
+    addStage(stage: Function): this {
+        this.stages.push(stage);
+        return this;
+    }
+
+    async run(input: any): Promise<any> {
+        let result = input;
+        for (const stage of this.stages) {
+            result = await stage(result);
+            this.emit("stage-complete", result);
+        }
+        return this.processor.process(result);
+    }
+}
+
+// Mixed exports
+export { EventEmitter as Emitter };
+export default DataPipeline;
+
+// Type-only export (should be erased)
+export type PipelineStage = (input: any) => any | Promise<any>;
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function EventEmitter"),
+        "Expected EventEmitter function: {}",
+        output
+    );
+    assert!(
+        output.contains("EventEmitter.prototype.on") && output.contains("EventEmitter.prototype.emit"),
+        "Expected EventEmitter methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function InternalProcessor"),
+        "Expected InternalProcessor function: {}",
+        output
+    );
+    assert!(
+        output.contains("function DataPipeline") && output.contains("__extends(DataPipeline, _super)"),
+        "Expected DataPipeline extending EventEmitter: {}",
+        output
+    );
+    assert!(
+        output.contains("DataPipeline.prototype.addStage") && output.contains("DataPipeline.prototype.run"),
+        "Expected DataPipeline methods: {}",
+        output
+    );
+}
