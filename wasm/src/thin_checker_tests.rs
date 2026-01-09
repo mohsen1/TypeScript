@@ -13711,3 +13711,103 @@ class Derived extends Base {
         checker.ctx.diagnostics
     );
 }
+
+#[test]
+fn test_no_implicit_returns_ts7030_function() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// @noImplicitReturns: true
+function maybeReturn(x: boolean) {
+    if (x) {
+        return 42;
+    }
+    // Missing return when x is false - should trigger TS7030
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts7030_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 7030)
+        .collect();
+
+    assert_eq!(ts7030_errors.len(), 1, "Expected one TS7030 error, got: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>());
+}
+
+#[test]
+fn test_no_implicit_returns_disabled() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// @noImplicitReturns: false
+function maybeReturn(x: boolean) {
+    if (x) {
+        return 42;
+    }
+    // Should not trigger TS7030 since noImplicitReturns is false
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts7030_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 7030)
+        .collect();
+
+    assert!(ts7030_errors.is_empty(), "Expected no TS7030 errors, got: {:?}", ts7030_errors);
+}
+
+#[test]
+fn test_no_implicit_returns_ts7030_method() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// @noImplicitReturns: true
+class Example {
+    maybeReturn(x: boolean) {
+        if (x) {
+            return "hello";
+        }
+        // Missing return when x is false - should trigger TS7030
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts7030_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 7030)
+        .collect();
+
+    assert_eq!(ts7030_errors.len(), 1, "Expected one TS7030 error for method, got: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>());
+}
