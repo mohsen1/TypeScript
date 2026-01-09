@@ -13151,3 +13151,334 @@ class CustomPattern {
         output
     );
 }
+
+// ============================================================================
+// Symbol.replace Tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_symbol_replace_basic() {
+    // Basic Symbol.replace implementation for custom replacer
+    let source = r#"
+class SimpleReplacer {
+    private searchValue: string;
+    private replaceValue: string;
+
+    constructor(search: string, replace: string) {
+        this.searchValue = search;
+        this.replaceValue = replace;
+    }
+
+    [Symbol.replace](str: string): string {
+        return str.split(this.searchValue).join(this.replaceValue);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function SimpleReplacer"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Symbol.replace should be referenced
+    assert!(
+        output.contains("replace") || output.contains("Symbol"),
+        "Expected Symbol.replace reference: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_replace_with_function() {
+    // Symbol.replace with replacer function parameter
+    let source = r#"
+class FunctionReplacer {
+    private pattern: string;
+
+    constructor(pattern: string) {
+        this.pattern = pattern;
+    }
+
+    [Symbol.replace](str: string, replacer: (match: string, offset: number, original: string) => string): string {
+        let result = str;
+        let idx = 0;
+        while ((idx = result.indexOf(this.pattern, idx)) !== -1) {
+            const replacement = replacer(this.pattern, idx, str);
+            result = result.substring(0, idx) + replacement + result.substring(idx + this.pattern.length);
+            idx += replacement.length;
+        }
+        return result;
+    }
+
+    get source(): string {
+        return this.pattern;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function FunctionReplacer"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Source getter should be present
+    assert!(
+        output.contains("source") || output.contains("defineProperty"),
+        "Expected source getter: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_replace_global() {
+    // Symbol.replace with global flag behavior
+    let source = r#"
+class GlobalReplacer {
+    private pattern: string;
+    readonly global: boolean = true;
+    readonly flags: string = "g";
+
+    constructor(pattern: string) {
+        this.pattern = pattern;
+    }
+
+    [Symbol.replace](str: string, replacement: string): string {
+        return str.split(this.pattern).join(replacement);
+    }
+
+    get lastIndex(): number {
+        return 0;
+    }
+
+    set lastIndex(value: number) {
+        // Reset behavior
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function GlobalReplacer"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Global and flags properties should be present
+    assert!(
+        output.contains("global") && output.contains("flags"),
+        "Expected global and flags properties: {}",
+        output
+    );
+
+    // lastIndex accessor should be present
+    assert!(
+        output.contains("lastIndex"),
+        "Expected lastIndex accessor: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_replace_with_inheritance() {
+    // Symbol.replace with class inheritance
+    let source = r#"
+abstract class BaseReplacer {
+    abstract readonly pattern: string;
+
+    abstract [Symbol.replace](str: string, replacement: string): string;
+
+    replaceAll(str: string, replacement: string): string {
+        let result = str;
+        let prev = "";
+        while (result !== prev) {
+            prev = result;
+            result = this[Symbol.replace](result, replacement);
+        }
+        return result;
+    }
+}
+
+class CasePreservingReplacer extends BaseReplacer {
+    readonly pattern: string;
+
+    constructor(pattern: string) {
+        super();
+        this.pattern = pattern;
+    }
+
+    [Symbol.replace](str: string, replacement: string): string {
+        const idx = str.toLowerCase().indexOf(this.pattern.toLowerCase());
+        if (idx === -1) return str;
+        const original = str.substring(idx, idx + this.pattern.length);
+        const preserved = this.preserveCase(original, replacement);
+        return str.substring(0, idx) + preserved + str.substring(idx + this.pattern.length);
+    }
+
+    private preserveCase(original: string, replacement: string): string {
+        if (original === original.toUpperCase()) {
+            return replacement.toUpperCase();
+        }
+        if (original[0] === original[0].toUpperCase()) {
+            return replacement[0].toUpperCase() + replacement.slice(1);
+        }
+        return replacement;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Both classes should be converted
+    assert!(
+        output.contains("function BaseReplacer"),
+        "Expected BaseReplacer function: {}",
+        output
+    );
+    assert!(
+        output.contains("function CasePreservingReplacer"),
+        "Expected CasePreservingReplacer function: {}",
+        output
+    );
+
+    // Inheritance should be set up
+    assert!(
+        output.contains("__extends") || output.contains("extends"),
+        "Expected inheritance: {}",
+        output
+    );
+
+    // replaceAll method should be present
+    assert!(
+        output.contains("replaceAll"),
+        "Expected replaceAll method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_replace_template() {
+    // Symbol.replace with template string support
+    let source = r#"
+class TemplateReplacer {
+    private pattern: string;
+    private captureGroups: Map<string, string> = new Map();
+
+    constructor(pattern: string) {
+        this.pattern = pattern;
+    }
+
+    [Symbol.replace](str: string, template: string): string {
+        const idx = str.indexOf(this.pattern);
+        if (idx === -1) return str;
+
+        let result = template;
+        result = result.replace("$&", this.pattern);
+        result = result.replace("$\`", str.substring(0, idx));
+        result = result.replace("$'", str.substring(idx + this.pattern.length));
+
+        return str.substring(0, idx) + result + str.substring(idx + this.pattern.length);
+    }
+
+    addCapture(name: string, value: string): void {
+        this.captureGroups.set(name, value);
+    }
+
+    getCapture(name: string): string | undefined {
+        return this.captureGroups.get(name);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function TemplateReplacer"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Helper methods should be present
+    assert!(
+        output.contains("addCapture") && output.contains("getCapture"),
+        "Expected capture methods: {}",
+        output
+    );
+
+    // Map usage should be preserved
+    assert!(
+        output.contains("Map"),
+        "Expected Map usage: {}",
+        output
+    );
+}
