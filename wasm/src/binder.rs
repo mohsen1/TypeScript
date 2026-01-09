@@ -1114,6 +1114,13 @@ impl BinderState {
             return true;
         }
 
+        // Enum can merge with enum (members are combined)
+        if (existing_flags & symbol_flags::ENUM) != 0
+            && (new_flags & symbol_flags::ENUM) != 0
+        {
+            return true;
+        }
+
         false
     }
 
