@@ -33071,3 +33071,568 @@ class Color {
         output
     );
 }
+
+// ============================================================================
+// FUNCTION OVERLOAD PATTERN TESTS
+// ============================================================================
+
+/// Test function overload patterns: basic method overloads
+#[test]
+fn test_class_es5_overload_basic_methods() {
+    let source = r#"
+class StringFormatter {
+    format(value: string): string;
+    format(value: number): string;
+    format(value: boolean): string;
+    format(value: string | number | boolean): string {
+        if (typeof value === "string") {
+            return value.toUpperCase();
+        } else if (typeof value === "number") {
+            return value.toFixed(2);
+        } else {
+            return value ? "true" : "false";
+        }
+    }
+}
+
+class DataProcessor {
+    process(data: string): string[];
+    process(data: number): number[];
+    process(data: string | number): string[] | number[] {
+        if (typeof data === "string") {
+            return data.split(",");
+        } else {
+            return [data, data * 2, data * 3];
+        }
+    }
+
+    transform(input: string, uppercase: true): string;
+    transform(input: string, uppercase: false): string;
+    transform(input: string, uppercase: boolean): string {
+        return uppercase ? input.toUpperCase() : input.toLowerCase();
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted to ES5
+    assert!(
+        output.contains("function StringFormatter") && output.contains("function DataProcessor"),
+        "Expected ES5 class constructors: {}",
+        output
+    );
+
+    // Methods should be on prototype (only implementation, not overload signatures)
+    assert!(
+        output.contains("StringFormatter.prototype.format") &&
+        output.contains("DataProcessor.prototype.process"),
+        "Expected methods on prototype: {}",
+        output
+    );
+
+    // typeof checks should be preserved
+    assert!(
+        output.contains("typeof"),
+        "Expected typeof checks: {}",
+        output
+    );
+}
+
+/// Test function overload patterns: constructor overloads
+#[test]
+fn test_class_es5_overload_constructors() {
+    let source = r#"
+class Point {
+    x: number;
+    y: number;
+
+    constructor();
+    constructor(x: number, y: number);
+    constructor(point: { x: number; y: number });
+    constructor(xOrPoint?: number | { x: number; y: number }, y?: number) {
+        if (xOrPoint === undefined) {
+            this.x = 0;
+            this.y = 0;
+        } else if (typeof xOrPoint === "number") {
+            this.x = xOrPoint;
+            this.y = y ?? 0;
+        } else {
+            this.x = xOrPoint.x;
+            this.y = xOrPoint.y;
+        }
+    }
+
+    toString(): string {
+        return "(" + this.x + ", " + this.y + ")";
+    }
+}
+
+class Rectangle {
+    width: number;
+    height: number;
+
+    constructor(size: number);
+    constructor(width: number, height: number);
+    constructor(widthOrSize: number, height?: number) {
+        if (height === undefined) {
+            this.width = widthOrSize;
+            this.height = widthOrSize;
+        } else {
+            this.width = widthOrSize;
+            this.height = height;
+        }
+    }
+
+    area(): number {
+        return this.width * this.height;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("function Point") && output.contains("function Rectangle"),
+        "Expected ES5 class constructors: {}",
+        output
+    );
+
+    // Constructor should handle overloads
+    assert!(
+        output.contains("this.x") && output.contains("this.y"),
+        "Expected property assignments: {}",
+        output
+    );
+
+    // Methods preserved
+    assert!(
+        output.contains("toString") && output.contains("area"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+/// Test function overload patterns: generic method overloads
+#[test]
+fn test_class_es5_overload_generic_methods() {
+    let source = r#"
+class ArrayHelper {
+    first<T>(arr: T[]): T | undefined;
+    first<T>(arr: T[], defaultValue: T): T;
+    first<T>(arr: T[], defaultValue?: T): T | undefined {
+        return arr.length > 0 ? arr[0] : defaultValue;
+    }
+
+    find<T>(arr: T[], predicate: (item: T) => boolean): T | undefined;
+    find<T>(arr: T[], predicate: (item: T) => boolean, defaultValue: T): T;
+    find<T>(arr: T[], predicate: (item: T) => boolean, defaultValue?: T): T | undefined {
+        for (const item of arr) {
+            if (predicate(item)) {
+                return item;
+            }
+        }
+        return defaultValue;
+    }
+}
+
+class MapHelper {
+    get<K, V>(map: Map<K, V>, key: K): V | undefined;
+    get<K, V>(map: Map<K, V>, key: K, defaultValue: V): V;
+    get<K, V>(map: Map<K, V>, key: K, defaultValue?: V): V | undefined {
+        return map.has(key) ? map.get(key) : defaultValue;
+    }
+
+    set<K, V>(map: Map<K, V>, key: K, value: V): Map<K, V>;
+    set<K, V>(map: Map<K, V>, entries: [K, V][]): Map<K, V>;
+    set<K, V>(map: Map<K, V>, keyOrEntries: K | [K, V][], value?: V): Map<K, V> {
+        if (Array.isArray(keyOrEntries)) {
+            for (const [k, v] of keyOrEntries) {
+                map.set(k, v);
+            }
+        } else {
+            map.set(keyOrEntries, value!);
+        }
+        return map;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("function ArrayHelper") && output.contains("function MapHelper"),
+        "Expected ES5 class constructors: {}",
+        output
+    );
+
+    // Methods should be on prototype
+    assert!(
+        output.contains("ArrayHelper.prototype.first") &&
+        output.contains("MapHelper.prototype.get"),
+        "Expected methods on prototype: {}",
+        output
+    );
+
+    // Array.isArray should be preserved
+    assert!(
+        output.contains("Array.isArray"),
+        "Expected Array.isArray check: {}",
+        output
+    );
+}
+
+/// Test function overload patterns: static method overloads
+#[test]
+fn test_class_es5_overload_static_methods() {
+    let source = r#"
+class MathUtils {
+    static add(a: number, b: number): number;
+    static add(a: string, b: string): string;
+    static add(a: number | string, b: number | string): number | string {
+        if (typeof a === "number" && typeof b === "number") {
+            return a + b;
+        }
+        return String(a) + String(b);
+    }
+
+    static parse(value: string): number;
+    static parse(value: string, radix: number): number;
+    static parse(value: string, radix: number = 10): number {
+        return parseInt(value, radix);
+    }
+
+    static max(...values: number[]): number;
+    static max(arr: number[]): number;
+    static max(...valuesOrArr: number[] | [number[]]): number {
+        const arr = Array.isArray(valuesOrArr[0]) ? valuesOrArr[0] : valuesOrArr as number[];
+        return Math.max(...arr);
+    }
+}
+
+class StringUtils {
+    static concat(a: string, b: string): string;
+    static concat(...strings: string[]): string;
+    static concat(...strings: string[]): string {
+        return strings.join("");
+    }
+
+    static split(str: string): string[];
+    static split(str: string, separator: string): string[];
+    static split(str: string, separator: string, limit: number): string[];
+    static split(str: string, separator: string = ",", limit?: number): string[] {
+        return limit !== undefined ? str.split(separator, limit) : str.split(separator);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("function MathUtils") && output.contains("function StringUtils"),
+        "Expected ES5 class constructors: {}",
+        output
+    );
+
+    // Static methods should be on constructor
+    assert!(
+        output.contains("MathUtils.add") && output.contains("StringUtils.concat"),
+        "Expected static methods: {}",
+        output
+    );
+
+    // Math.max should be preserved
+    assert!(
+        output.contains("Math.max"),
+        "Expected Math.max: {}",
+        output
+    );
+}
+
+/// Test function overload patterns: overloads with different return types
+#[test]
+fn test_class_es5_overload_return_types() {
+    let source = r#"
+class ResponseParser {
+    parse(response: string, format: "json"): object;
+    parse(response: string, format: "text"): string;
+    parse(response: string, format: "binary"): ArrayBuffer;
+    parse(response: string, format: "json" | "text" | "binary"): object | string | ArrayBuffer {
+        switch (format) {
+            case "json":
+                return JSON.parse(response);
+            case "text":
+                return response;
+            case "binary":
+                return new ArrayBuffer(response.length);
+        }
+    }
+}
+
+class DataConverter {
+    convert(value: string, to: "number"): number;
+    convert(value: string, to: "boolean"): boolean;
+    convert(value: string, to: "array"): string[];
+    convert(value: string, to: "number" | "boolean" | "array"): number | boolean | string[] {
+        switch (to) {
+            case "number":
+                return parseFloat(value);
+            case "boolean":
+                return value === "true";
+            case "array":
+                return value.split(",");
+        }
+    }
+
+    serialize(data: object): string;
+    serialize(data: object, pretty: true): string;
+    serialize(data: object, pretty: boolean = false): string {
+        return pretty ? JSON.stringify(data, null, 2) : JSON.stringify(data);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("function ResponseParser") && output.contains("function DataConverter"),
+        "Expected ES5 class constructors: {}",
+        output
+    );
+
+    // Methods preserved
+    assert!(
+        output.contains("parse") && output.contains("convert") && output.contains("serialize"),
+        "Expected methods: {}",
+        output
+    );
+
+    // JSON operations preserved
+    assert!(
+        output.contains("JSON.parse") && output.contains("JSON.stringify"),
+        "Expected JSON operations: {}",
+        output
+    );
+}
+
+/// Test function overload patterns: combined overload patterns
+#[test]
+fn test_class_es5_overload_combined_patterns() {
+    let source = r#"
+class EventEmitter {
+    private listeners: Map<string, Function[]> = new Map();
+
+    on(event: string, callback: Function): void;
+    on(events: string[], callback: Function): void;
+    on(eventOrEvents: string | string[], callback: Function): void {
+        const events = Array.isArray(eventOrEvents) ? eventOrEvents : [eventOrEvents];
+        for (const event of events) {
+            if (!this.listeners.has(event)) {
+                this.listeners.set(event, []);
+            }
+            this.listeners.get(event)!.push(callback);
+        }
+    }
+
+    emit(event: string): void;
+    emit(event: string, data: unknown): void;
+    emit(event: string, data?: unknown): void {
+        const callbacks = this.listeners.get(event) || [];
+        for (const callback of callbacks) {
+            callback(data);
+        }
+    }
+
+    off(event: string): void;
+    off(event: string, callback: Function): void;
+    off(event: string, callback?: Function): void {
+        if (!callback) {
+            this.listeners.delete(event);
+        } else {
+            const callbacks = this.listeners.get(event);
+            if (callbacks) {
+                const index = callbacks.indexOf(callback);
+                if (index !== -1) {
+                    callbacks.splice(index, 1);
+                }
+            }
+        }
+    }
+}
+
+class HttpClient {
+    get(url: string): Promise<Response>;
+    get<T>(url: string, options: { parse: true }): Promise<T>;
+    get<T>(url: string, options?: { parse?: boolean }): Promise<Response | T> {
+        return fetch(url).then(res => {
+            if (options?.parse) {
+                return res.json();
+            }
+            return res;
+        });
+    }
+
+    post(url: string, body: object): Promise<Response>;
+    post<T>(url: string, body: object, options: { parse: true }): Promise<T>;
+    post<T>(url: string, body: object, options?: { parse?: boolean }): Promise<Response | T> {
+        return fetch(url, {
+            method: "POST",
+            body: JSON.stringify(body),
+            headers: { "Content-Type": "application/json" }
+        }).then(res => {
+            if (options?.parse) {
+                return res.json();
+            }
+            return res;
+        });
+    }
+}
+
+class QueryBuilder {
+    where(column: string, value: unknown): this;
+    where(column: string, operator: string, value: unknown): this;
+    where(conditions: Record<string, unknown>): this;
+    where(
+        columnOrConditions: string | Record<string, unknown>,
+        operatorOrValue?: string | unknown,
+        value?: unknown
+    ): this {
+        if (typeof columnOrConditions === "object") {
+            for (const [col, val] of Object.entries(columnOrConditions)) {
+                this.addCondition(col, "=", val);
+            }
+        } else if (value !== undefined) {
+            this.addCondition(columnOrConditions, operatorOrValue as string, value);
+        } else {
+            this.addCondition(columnOrConditions, "=", operatorOrValue);
+        }
+        return this;
+    }
+
+    private addCondition(column: string, operator: string, value: unknown): void {
+        console.log(column, operator, value);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // All classes should be converted
+    assert!(
+        output.contains("function EventEmitter") &&
+        output.contains("function HttpClient") &&
+        output.contains("function QueryBuilder"),
+        "Expected ES5 class constructors: {}",
+        output
+    );
+
+    // EventEmitter methods
+    assert!(
+        output.contains("on") && output.contains("emit") && output.contains("off"),
+        "Expected EventEmitter methods: {}",
+        output
+    );
+
+    // HttpClient methods
+    assert!(
+        output.contains("get") && output.contains("post"),
+        "Expected HttpClient methods: {}",
+        output
+    );
+
+    // QueryBuilder methods
+    assert!(
+        output.contains("where") && output.contains("addCondition"),
+        "Expected QueryBuilder methods: {}",
+        output
+    );
+
+    // Array.isArray preserved
+    assert!(
+        output.contains("Array.isArray"),
+        "Expected Array.isArray: {}",
+        output
+    );
+}
