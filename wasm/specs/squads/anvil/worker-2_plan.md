@@ -13,6 +13,7 @@ Priority: 2
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 for-of loop parity tests (async, try-catch, labeled, arrow) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (208 tests).
 - [x] Added ES5 for-of loop parity tests (iterables, control-flow, generator, class-method) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (204 tests).
 - [x] Added ES5 destructuring assignment parity tests (computed, return, rename, loop) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (200 tests).
 - [x] Added ES5 spread parameter parity tests (method-call, typed-array, constructor, nested) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (196 tests).
