@@ -7,7 +7,28 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-None - awaiting new task
+Add async ES5 tests for private field access in async methods
+
+Per GOALS.md Objective 1: ES5 downleveling correctness
+
+Steps:
+1. Add 12 async private field tests to `wasm/src/transforms/async_es5_tests.rs`:
+   - async method reading #privateField
+   - async method writing #privateField
+   - async method with #privateMethod call
+   - async static with #staticPrivate
+   - async arrow with private field capture
+   - async with private accessor
+   - private field in try/catch async
+   - multiple private fields in async
+   - private field increment in async
+   - body_contains_await tests for private patterns
+   - ignores nested async patterns
+   - Combined private field async patterns
+2. Run `./wasm/test.sh async_es5_tests` to verify all tests pass
+3. Commit with message: `[wasm] async_es5: add private field access tests`
+4. Push to `origin/worker/anvil-5`
+5. Update this plan file and push
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
