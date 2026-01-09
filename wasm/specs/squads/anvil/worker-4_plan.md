@@ -7,10 +7,10 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-None - ready for next task.
+- [ ] Add ES5 class tests for constructor signature patterns: overloads, optional params. Tests: `./wasm/test.sh class_es5_tests`
 
 ## Task Queue
-- [ ] Add ES5 class tests for constructor signature patterns: overloads, optional params
+- [ ] Add ES5 class tests for generic constraint patterns: extends, keyof, conditional
 
 ## Completed
 - [x] Add ES5 class tests for interface implementation patterns. Tests: `./wasm/test.sh class_es5_tests`
