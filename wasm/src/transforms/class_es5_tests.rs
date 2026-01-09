@@ -43078,3 +43078,723 @@ class SecureResource extends Lockable(DisposableMixin(Resource)) {
         output
     );
 }
+
+// =============================================================================
+// NEW.TARGET META-PROPERTY PATTERN TESTS
+// =============================================================================
+
+/// Test ES5 class with basic new.target in constructor
+#[test]
+fn test_class_es5_basic_new_target_constructor() {
+    let source = r#"
+class Shape {
+    name: string;
+
+    constructor() {
+        if (new.target === Shape) {
+            throw new Error("Shape is abstract");
+        }
+        this.name = new.target.name;
+    }
+
+    getName(): string {
+        return this.name;
+    }
+}
+
+class Circle extends Shape {
+    radius: number;
+
+    constructor(radius: number) {
+        super();
+        this.radius = radius;
+    }
+
+    getArea(): number {
+        return Math.PI * this.radius * this.radius;
+    }
+}
+
+class Rectangle extends Shape {
+    width: number;
+    height: number;
+
+    constructor(width: number, height: number) {
+        super();
+        this.width = width;
+        this.height = height;
+    }
+
+    getArea(): number {
+        return this.width * this.height;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Shape") && output.contains("Circle") && output.contains("Rectangle"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("getName") && output.contains("getArea"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+/// Test ES5 class with new.target in derived class
+#[test]
+fn test_class_es5_new_target_derived_class() {
+    let source = r#"
+class BaseComponent {
+    componentName: string;
+    isBase: boolean;
+
+    constructor() {
+        this.componentName = new.target.name;
+        this.isBase = new.target === BaseComponent;
+    }
+
+    getInfo(): string {
+        return this.componentName + (this.isBase ? " (base)" : " (derived)");
+    }
+}
+
+class Button extends BaseComponent {
+    label: string;
+
+    constructor(label: string) {
+        super();
+        this.label = label;
+    }
+
+    render(): string {
+        return "<button>" + this.label + "</button>";
+    }
+}
+
+class IconButton extends Button {
+    icon: string;
+
+    constructor(label: string, icon: string) {
+        super(label);
+        this.icon = icon;
+    }
+
+    render(): string {
+        return "<button>" + this.icon + " " + this.label + "</button>";
+    }
+}
+
+class Input extends BaseComponent {
+    type: string;
+    value: string;
+
+    constructor(type: string) {
+        super();
+        this.type = type;
+        this.value = "";
+    }
+
+    render(): string {
+        return "<input type=\"" + this.type + "\" />";
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("BaseComponent") && output.contains("Button") && output.contains("IconButton") && output.contains("Input"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("getInfo") && output.contains("render"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+/// Test ES5 class with new.target with abstract pattern
+#[test]
+fn test_class_es5_new_target_abstract_service_pattern() {
+    let source = r#"
+class AbstractService {
+    serviceName: string;
+    private initialized: boolean = false;
+
+    constructor() {
+        if (new.target === AbstractService) {
+            throw new TypeError("Cannot instantiate abstract class AbstractService");
+        }
+        this.serviceName = new.target.name;
+    }
+
+    protected init(): void {
+        if (this.initialized) {
+            throw new Error("Already initialized");
+        }
+        this.initialized = true;
+    }
+
+    isInitialized(): boolean {
+        return this.initialized;
+    }
+
+    abstract process(data: any): any;
+}
+
+class DataService extends AbstractService {
+    private data: any[] = [];
+
+    constructor() {
+        super();
+        this.init();
+    }
+
+    process(data: any): any {
+        this.data.push(data);
+        return data;
+    }
+
+    getAll(): any[] {
+        return [...this.data];
+    }
+}
+
+class CacheService extends AbstractService {
+    private cache: Map<string, any> = new Map();
+
+    constructor() {
+        super();
+        this.init();
+    }
+
+    process(data: any): any {
+        const key = JSON.stringify(data);
+        if (!this.cache.has(key)) {
+            this.cache.set(key, data);
+        }
+        return this.cache.get(key);
+    }
+
+    clear(): void {
+        this.cache.clear();
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("AbstractService") && output.contains("DataService") && output.contains("CacheService"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("process") && output.contains("isInitialized"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Abstract keyword should be stripped
+    assert!(
+        !output.contains("abstract process"),
+        "Expected abstract keyword to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with new.target in factory function
+#[test]
+fn test_class_es5_new_target_factory_function() {
+    let source = r#"
+class Entity {
+    id: string;
+    createdBy: string;
+
+    constructor(id: string) {
+        this.id = id;
+        this.createdBy = new.target ? new.target.name : "factory";
+    }
+
+    static create(id: string): Entity {
+        return new Entity(id);
+    }
+
+    getCreator(): string {
+        return this.createdBy;
+    }
+}
+
+class User extends Entity {
+    name: string;
+
+    constructor(id: string, name: string) {
+        super(id);
+        this.name = name;
+    }
+
+    static createUser(id: string, name: string): User {
+        return new User(id, name);
+    }
+}
+
+class Product extends Entity {
+    title: string;
+    price: number;
+
+    constructor(id: string, title: string, price: number) {
+        super(id);
+        this.title = title;
+        this.price = price;
+    }
+
+    static createProduct(id: string, title: string, price: number): Product {
+        return new Product(id, title, price);
+    }
+
+    getInfo(): string {
+        return this.title + " - $" + this.price;
+    }
+}
+
+function createEntity(id: string): Entity {
+    return new Entity(id);
+}
+
+function createTypedEntity<T extends Entity>(
+    Ctor: new (id: string) => T,
+    id: string
+): T {
+    return new Ctor(id);
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Entity") && output.contains("User") && output.contains("Product"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Factory functions should exist
+    assert!(
+        output.contains("createEntity") && output.contains("createTypedEntity"),
+        "Expected factory functions: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("getCreator") && output.contains("getInfo"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+/// Test ES5 class with new.target with instanceof check
+#[test]
+fn test_class_es5_new_target_instanceof_check() {
+    let source = r#"
+class Singleton {
+    private static instance: Singleton | null = null;
+    name: string;
+
+    constructor() {
+        if (new.target === Singleton) {
+            if (Singleton.instance) {
+                return Singleton.instance;
+            }
+            Singleton.instance = this;
+        }
+        this.name = new.target.name;
+    }
+
+    static getInstance(): Singleton {
+        if (!Singleton.instance) {
+            new Singleton();
+        }
+        return Singleton.instance!;
+    }
+
+    getName(): string {
+        return this.name;
+    }
+}
+
+class ExtendedSingleton extends Singleton {
+    value: number;
+
+    constructor(value: number) {
+        super();
+        this.value = value;
+    }
+
+    getValue(): number {
+        return this.value;
+    }
+}
+
+class TypeChecker {
+    targetName: string;
+    isDirectInstantiation: boolean;
+
+    constructor() {
+        this.targetName = new.target.name;
+        this.isDirectInstantiation = new.target === TypeChecker;
+    }
+
+    checkType(): string {
+        if (this.isDirectInstantiation) {
+            return "Direct TypeChecker instance";
+        }
+        return "Instance of " + this.targetName;
+    }
+}
+
+class DerivedChecker extends TypeChecker {
+    category: string;
+
+    constructor(category: string) {
+        super();
+        this.category = category;
+    }
+
+    getCategory(): string {
+        return this.category;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Singleton") && output.contains("ExtendedSingleton") && output.contains("TypeChecker") && output.contains("DerivedChecker"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("getInstance") && output.contains("getName") && output.contains("checkType"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+/// Test ES5 class with combined new.target patterns
+#[test]
+fn test_class_es5_combined_new_target_patterns() {
+    let source = r#"
+class AbstractFactory<T> {
+    factoryName: string;
+    productType: string;
+
+    constructor() {
+        if (new.target === AbstractFactory) {
+            throw new Error("AbstractFactory cannot be instantiated directly");
+        }
+        this.factoryName = new.target.name;
+        this.productType = "";
+    }
+
+    abstract create(...args: any[]): T;
+
+    getFactoryInfo(): string {
+        return this.factoryName + " produces " + this.productType;
+    }
+}
+
+interface Vehicle {
+    brand: string;
+    model: string;
+    start(): void;
+}
+
+class Car implements Vehicle {
+    brand: string;
+    model: string;
+
+    constructor(brand: string, model: string) {
+        this.brand = brand;
+        this.model = model;
+    }
+
+    start(): void {
+        console.log("Starting car: " + this.brand + " " + this.model);
+    }
+}
+
+class CarFactory extends AbstractFactory<Car> {
+    constructor() {
+        super();
+        this.productType = "Car";
+    }
+
+    create(brand: string, model: string): Car {
+        return new Car(brand, model);
+    }
+}
+
+class Motorcycle implements Vehicle {
+    brand: string;
+    model: string;
+    cc: number;
+
+    constructor(brand: string, model: string, cc: number) {
+        this.brand = brand;
+        this.model = model;
+        this.cc = cc;
+    }
+
+    start(): void {
+        console.log("Starting motorcycle: " + this.brand + " " + this.model);
+    }
+}
+
+class MotorcycleFactory extends AbstractFactory<Motorcycle> {
+    constructor() {
+        super();
+        this.productType = "Motorcycle";
+    }
+
+    create(brand: string, model: string, cc: number): Motorcycle {
+        return new Motorcycle(brand, model, cc);
+    }
+}
+
+class ServiceRegistry {
+    private static services: Map<string, any> = new Map();
+    serviceName: string;
+    registeredAt: number;
+
+    constructor() {
+        this.serviceName = new.target.name;
+        this.registeredAt = Date.now();
+
+        const existing = ServiceRegistry.services.get(this.serviceName);
+        if (existing && new.target === existing.constructor) {
+            return existing;
+        }
+
+        ServiceRegistry.services.set(this.serviceName, this);
+    }
+
+    static getService<T extends ServiceRegistry>(name: string): T | undefined {
+        return ServiceRegistry.services.get(name) as T | undefined;
+    }
+
+    static clearAll(): void {
+        ServiceRegistry.services.clear();
+    }
+
+    getRegistrationTime(): number {
+        return this.registeredAt;
+    }
+}
+
+class AuthService extends ServiceRegistry {
+    private token: string | null = null;
+
+    login(username: string, password: string): boolean {
+        this.token = "token_" + username;
+        return true;
+    }
+
+    logout(): void {
+        this.token = null;
+    }
+
+    isAuthenticated(): boolean {
+        return this.token !== null;
+    }
+}
+
+class DataService extends ServiceRegistry {
+    private data: any[] = [];
+
+    add(item: any): void {
+        this.data.push(item);
+    }
+
+    getAll(): any[] {
+        return [...this.data];
+    }
+
+    clear(): void {
+        this.data = [];
+    }
+}
+
+class Logger {
+    level: string;
+    prefix: string;
+    createdViaNew: boolean;
+
+    constructor(level: string = "info") {
+        this.level = level;
+        this.prefix = new.target ? "[" + new.target.name + "]" : "[Logger]";
+        this.createdViaNew = !!new.target;
+    }
+
+    log(message: string): void {
+        console.log(this.prefix + " [" + this.level + "] " + message);
+    }
+
+    static create(level: string): Logger {
+        return new Logger(level);
+    }
+}
+
+class DebugLogger extends Logger {
+    debugInfo: boolean = true;
+
+    constructor() {
+        super("debug");
+    }
+
+    debug(message: string): void {
+        if (this.debugInfo) {
+            this.log("[DEBUG] " + message);
+        }
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("AbstractFactory") && output.contains("CarFactory") && output.contains("MotorcycleFactory"),
+        "Expected factory classes: {}",
+        output
+    );
+
+    assert!(
+        output.contains("ServiceRegistry") && output.contains("AuthService") && output.contains("DataService"),
+        "Expected service classes: {}",
+        output
+    );
+
+    assert!(
+        output.contains("Logger") && output.contains("DebugLogger"),
+        "Expected logger classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("create") && output.contains("getFactoryInfo") && output.contains("getService"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Interface should be stripped
+    assert!(
+        !output.contains("interface Vehicle"),
+        "Expected interface to be stripped: {}",
+        output
+    );
+
+    // Generic parameter should be stripped
+    assert!(
+        !output.contains("AbstractFactory<T>"),
+        "Expected generic parameter to be stripped: {}",
+        output
+    );
+}
