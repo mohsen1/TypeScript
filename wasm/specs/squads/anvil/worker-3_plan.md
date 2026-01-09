@@ -7,12 +7,13 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] Add ES5 source map tests for JSX transform patterns: JSX elements, fragments, spread attributes. Tests: `./wasm/test.sh source_map`
+- [ ] Add ES5 source map tests for class accessor patterns: getter/setter transforms, static accessors, computed accessor names, accessor decorators. Tests: `./wasm/test.sh source_map`
 
 ## Task Queue
-(empty)
+- [ ] Add ES5 source map tests for for-of/for-in loop transforms: iterator patterns, destructuring in loops
 
 ## Completed
+- [x] Added JSX transform ES5 source map tests (basic element, fragment, spread attributes, self-closing, nested elements, expressions, component props, event handlers, conditional rendering, comprehensive); 687 tests pass.
 - [x] Added module bundling ES5 source map tests (CommonJS require, dynamic import, re-exports, barrel exports, circular imports, conditional imports, namespace imports, comprehensive); 677 tests pass.
 - [x] Added decorator metadata ES5 source map tests (reflect-metadata, parameter decorators, property descriptors, method descriptors, accessor descriptors, class constructor metadata, design type metadata, comprehensive); 669 tests pass.
 - [x] Added Symbol-keyed member ES5 source map tests (Symbol.iterator, Symbol.asyncIterator, computed Symbol methods, Symbol.toStringTag, Symbol.hasInstance, Symbol.species, Symbol.toPrimitive, Symbol.isConcatSpreadable, comprehensive); 661 tests pass.

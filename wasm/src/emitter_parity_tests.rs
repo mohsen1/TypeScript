@@ -12301,6 +12301,242 @@ class ConditionalComputed {
     );
 }
 
+/// Parity test for ES5 computed property with method call as key.
+/// Computed property using method call result as key.
+#[test]
+fn test_parity_es5_computed_property_method_call() {
+    let source = r#"
+interface KeyProvider { getKey(): string }
+class PropertyMapper {
+    private prefix: string;
+
+    constructor(prefix: string) {
+        this.prefix = prefix;
+    }
+
+    getPropertyName(suffix: string): string {
+        return this.prefix + "_" + suffix;
+    }
+
+    createObject(): { [key: string]: number } {
+        return {
+            [this.getPropertyName("first")]: 1,
+            [this.getPropertyName("second")]: 2,
+            [this.prefix.toUpperCase()]: 3
+        };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the class
+    assert!(
+        output.contains("PropertyMapper"),
+        "Output should contain PropertyMapper class: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface"),
+        "ES5 output should erase interface: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": number") && !output.contains(": { [key: string]"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+    // private keyword should be erased
+    assert!(
+        !output.contains("private"),
+        "ES5 output should erase private keyword: {}",
+        output
+    );
+    // Method calls should be preserved
+    assert!(
+        output.contains("getPropertyName") && output.contains("toUpperCase"),
+        "ES5 output should preserve method calls: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 computed property with function call as key.
+/// Computed property using external function call as key.
+#[test]
+fn test_parity_es5_computed_property_function_call() {
+    let source = r#"
+function generateKey(namespace: string, name: string): string {
+    return namespace + ":" + name;
+}
+
+function getSymbol(): symbol {
+    return Symbol("dynamic");
+}
+
+interface Config {
+    [key: string]: string | number;
+}
+
+const config: Config = {
+    [generateKey("app", "version")]: "1.0.0",
+    [generateKey("app", "name")]: "MyApp",
+    [String(Date.now())]: "timestamp",
+    ["static_" + "key"]: "concatenated"
+};
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the config variable
+    assert!(
+        output.contains("config"),
+        "Output should contain config variable: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface"),
+        "ES5 output should erase interface: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": symbol") && !output.contains(": Config"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+    // Function calls should be preserved
+    assert!(
+        output.contains("generateKey") && output.contains("Date.now"),
+        "ES5 output should preserve function calls: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 computed property with complex typed expressions.
+/// Computed property with generic types and complex expressions.
+#[test]
+fn test_parity_es5_computed_property_typed() {
+    let source = r#"
+type PropertyKey = string | number | symbol;
+interface TypedObject<K extends PropertyKey, V> {
+    [key: string]: V;
+}
+
+class TypedPropertyBuilder<T> {
+    private readonly keyPrefix: string;
+    private counter: number = 0;
+
+    constructor(prefix: string) {
+        this.keyPrefix = prefix;
+    }
+
+    nextKey(): string {
+        return this.keyPrefix + "_" + (this.counter++);
+    }
+
+    build(value: T): TypedObject<string, T> {
+        return {
+            [this.nextKey()]: value,
+            [this.keyPrefix + "_static"]: value
+        };
+    }
+}
+
+const builder = new TypedPropertyBuilder<number>("prop");
+const result = builder.build(42);
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the class
+    assert!(
+        output.contains("TypedPropertyBuilder"),
+        "Output should contain TypedPropertyBuilder class: {}",
+        output
+    );
+    // Type alias should be erased
+    assert!(
+        !output.contains("type PropertyKey"),
+        "ES5 output should erase type alias: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface"),
+        "ES5 output should erase interface: {}",
+        output
+    );
+    // Generic type parameters should be erased
+    assert!(
+        !output.contains("<T>") && !output.contains("<K extends") && !output.contains("<string, T>"),
+        "ES5 output should erase generic type parameters: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": number") && !output.contains(": T"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+    // readonly and private keywords should be erased
+    assert!(
+        !output.contains("readonly") && !output.contains("private"),
+        "ES5 output should erase modifiers: {}",
+        output
+    );
+}
+
 // ============================================================================
 // ES5 REST PARAMETER PARITY TESTS (ADDITIONAL)
 // ============================================================================
