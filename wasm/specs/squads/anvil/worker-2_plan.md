@@ -7,12 +7,13 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] Add ES5 async generator parity tests in `wasm/src/emitter_parity_tests.rs`. Run `./wasm/test.sh emitter_parity`.
+- [ ] (empty)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 async generator parity tests (try-catch, static, multi-yield, yield-star) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (136 tests).
 - [x] Added ES5 parameter decorator parity tests (multiple, method, factory, multi-params) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (132 tests).
 - [x] Added ES5 accessor decorator parity tests (getter, setter, multiple, static) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (128 tests).
 - [x] Added ES5 property decorator parity tests (multiple, factory, static, initializer) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (124 tests).
