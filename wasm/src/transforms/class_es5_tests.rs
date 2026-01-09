@@ -33429,131 +33429,84 @@ class ArrayProcessor<T extends any[]> {
 }
 
 // ============================================================================
-// MODULE AUGMENTATION PATTERN TESTS
+// TYPE ALIAS PATTERN TESTS
 // ============================================================================
 
-/// Test module augmentation patterns: basic declare module
+/// Test ES5 class downleveling with union type alias patterns
 #[test]
-fn test_class_es5_module_augmentation_basic() {
+fn test_class_es5_type_alias_union() {
     let source = r#"
-declare module "external-lib" {
-    export interface ExternalConfig {
-        timeout: number;
-        retries: number;
+type StringOrNumber = string | number;
+type Primitive = string | number | boolean | null | undefined;
+type Result<T> = T | Error;
+type AsyncResult<T> = T | Promise<T>;
+
+class ValueHolder<T extends StringOrNumber> {
+    private value: T;
+
+    constructor(value: T) {
+        this.value = value;
     }
 
-    export function configure(config: ExternalConfig): void;
-}
-
-class ConfigManager {
-    private config: { timeout: number; retries: number };
-
-    constructor() {
-        this.config = { timeout: 5000, retries: 3 };
+    getValue(): T {
+        return this.value;
     }
 
-    getTimeout(): number {
-        return this.config.timeout;
+    isString(): boolean {
+        return typeof this.value === "string";
     }
 
-    setRetries(retries: number): void {
-        this.config.retries = retries;
-    }
-}
-
-class ServiceWrapper {
-    private manager: ConfigManager;
-
-    constructor() {
-        this.manager = new ConfigManager();
+    isNumber(): boolean {
+        return typeof this.value === "number";
     }
 
-    configure(timeout: number, retries: number): void {
-        this.manager.setRetries(retries);
-    }
-
-    getConfig(): { timeout: number; retries: number } {
-        return { timeout: this.manager.getTimeout(), retries: 3 };
-    }
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Classes should be converted to ES5
-    assert!(
-        output.contains("function ConfigManager") && output.contains("function ServiceWrapper"),
-        "Expected ES5 class constructors: {}",
-        output
-    );
-
-    // Methods should be on prototype
-    assert!(
-        output.contains("ConfigManager.prototype.getTimeout") &&
-        output.contains("ServiceWrapper.prototype.configure"),
-        "Expected methods on prototype: {}",
-        output
-    );
-}
-
-/// Test module augmentation patterns: interface augmentation
-#[test]
-fn test_class_es5_module_augmentation_interface() {
-    let source = r#"
-interface Window {
-    customProperty: string;
-}
-
-interface Array<T> {
-    customMethod(): T[];
-}
-
-declare global {
-    interface String {
-        toTitleCase(): string;
+    toString(): string {
+        return String(this.value);
     }
 }
 
-class WindowHelper {
-    setCustomProperty(value: string): void {
-        (window as any).customProperty = value;
+class ResultHandler<T> {
+    private result: Result<T>;
+
+    constructor(result: Result<T>) {
+        this.result = result;
     }
 
-    getCustomProperty(): string {
-        return (window as any).customProperty || "";
+    isError(): boolean {
+        return this.result instanceof Error;
+    }
+
+    getValue(): T | null {
+        if (this.result instanceof Error) {
+            return null;
+        }
+        return this.result;
+    }
+
+    getError(): Error | null {
+        if (this.result instanceof Error) {
+            return this.result;
+        }
+        return null;
+    }
+
+    map<U>(fn: (value: T) => U): ResultHandler<U> {
+        if (this.result instanceof Error) {
+            return new ResultHandler<U>(this.result);
+        }
+        return new ResultHandler<U>(fn(this.result));
     }
 }
 
-class ArrayUtils {
-    processArray<T>(arr: T[]): T[] {
-        return arr.slice();
+class PrimitiveParser {
+    parse(value: Primitive): string {
+        if (value === null) return "null";
+        if (value === undefined) return "undefined";
+        return String(value);
     }
 
-    mapArray<T, U>(arr: T[], fn: (item: T) => U): U[] {
-        return arr.map(fn);
-    }
-}
-
-class StringProcessor {
-    process(input: string): string {
-        return input.trim();
-    }
-
-    split(input: string, separator: string): string[] {
-        return input.split(separator);
+    parseAll(values: Primitive[]): string[] {
+        return values.map(v => this.parse(v));
     }
 }
 "#;
@@ -33575,288 +33528,108 @@ class StringProcessor {
 
     // Classes should be converted
     assert!(
-        output.contains("function WindowHelper") &&
-        output.contains("function ArrayUtils") &&
-        output.contains("function StringProcessor"),
-        "Expected ES5 class constructors: {}",
+        output.contains("ValueHolder") && output.contains("ResultHandler") && output.contains("PrimitiveParser"),
+        "Expected union type alias classes: {}",
         output
     );
 
-    // Methods preserved
+    // ValueHolder methods
     assert!(
-        output.contains("setCustomProperty") && output.contains("processArray"),
-        "Expected helper methods: {}",
+        output.contains("getValue") && output.contains("isString") && output.contains("isNumber"),
+        "Expected ValueHolder methods: {}",
+        output
+    );
+
+    // ResultHandler methods
+    assert!(
+        output.contains("isError") && output.contains("getError"),
+        "Expected ResultHandler methods: {}",
+        output
+    );
+
+    // PrimitiveParser methods
+    assert!(
+        output.contains("parse") && output.contains("parseAll"),
+        "Expected PrimitiveParser methods: {}",
         output
     );
 }
 
-/// Test module augmentation patterns: global augmentation
+/// Test ES5 class downleveling with intersection type alias patterns
 #[test]
-fn test_class_es5_module_augmentation_global() {
+fn test_class_es5_type_alias_intersection() {
     let source = r#"
-declare global {
-    interface Window {
-        appVersion: string;
-        debugMode: boolean;
-    }
+type Named = { name: string };
+type Aged = { age: number };
+type Identified = { id: string };
 
-    var globalConfig: {
-        apiUrl: string;
-        timeout: number;
-    };
-}
+type Person = Named & Aged;
+type IdentifiedPerson = Person & Identified;
+type Timestamped = { createdAt: Date; updatedAt: Date };
+type Entity = Identified & Timestamped;
 
-class AppInitializer {
-    private version: string;
+class PersonBuilder {
+    private data: Partial<IdentifiedPerson> = {};
 
-    constructor(version: string) {
-        this.version = version;
-    }
-
-    initialize(): void {
-        if (typeof window !== "undefined") {
-            (window as any).appVersion = this.version;
-        }
-    }
-
-    setDebugMode(enabled: boolean): void {
-        if (typeof window !== "undefined") {
-            (window as any).debugMode = enabled;
-        }
-    }
-}
-
-class GlobalConfigManager {
-    private apiUrl: string;
-    private timeout: number;
-
-    constructor(apiUrl: string, timeout: number) {
-        this.apiUrl = apiUrl;
-        this.timeout = timeout;
-    }
-
-    applyGlobal(): void {
-        (globalThis as any).globalConfig = {
-            apiUrl: this.apiUrl,
-            timeout: this.timeout
-        };
-    }
-
-    getConfig(): { apiUrl: string; timeout: number } {
-        return { apiUrl: this.apiUrl, timeout: this.timeout };
-    }
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Classes should be converted
-    assert!(
-        output.contains("function AppInitializer") && output.contains("function GlobalConfigManager"),
-        "Expected ES5 class constructors: {}",
-        output
-    );
-
-    // Methods preserved
-    assert!(
-        output.contains("initialize") && output.contains("setDebugMode") && output.contains("applyGlobal"),
-        "Expected initialization methods: {}",
-        output
-    );
-
-    // typeof check preserved
-    assert!(
-        output.contains("typeof"),
-        "Expected typeof check: {}",
-        output
-    );
-}
-
-/// Test module augmentation patterns: namespace augmentation
-#[test]
-fn test_class_es5_module_augmentation_namespace() {
-    let source = r#"
-namespace MyApp {
-    export interface User {
-        id: number;
-        name: string;
-    }
-
-    export class UserService {
-        private users: User[] = [];
-
-        addUser(user: User): void {
-            this.users.push(user);
-        }
-
-        getUser(id: number): User | undefined {
-            return this.users.find(u => u.id === id);
-        }
-    }
-}
-
-namespace MyApp {
-    export interface Admin extends User {
-        permissions: string[];
-    }
-
-    export class AdminService extends UserService {
-        private admins: Admin[] = [];
-
-        addAdmin(admin: Admin): void {
-            this.addUser(admin);
-            this.admins.push(admin);
-        }
-
-        getAdmin(id: number): Admin | undefined {
-            return this.admins.find(a => a.id === id);
-        }
-    }
-}
-
-class AppController {
-    private userService: MyApp.UserService;
-    private adminService: MyApp.AdminService;
-
-    constructor() {
-        this.userService = new MyApp.UserService();
-        this.adminService = new MyApp.AdminService();
-    }
-
-    createUser(id: number, name: string): void {
-        this.userService.addUser({ id, name });
-    }
-
-    createAdmin(id: number, name: string, permissions: string[]): void {
-        this.adminService.addAdmin({ id, name, permissions });
-    }
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Classes should be converted (including namespace classes)
-    assert!(
-        output.contains("UserService") && output.contains("AdminService") && output.contains("function AppController"),
-        "Expected ES5 class constructors: {}",
-        output
-    );
-
-    // MyApp namespace should exist
-    assert!(
-        output.contains("MyApp"),
-        "Expected MyApp namespace: {}",
-        output
-    );
-
-    // Methods preserved
-    assert!(
-        output.contains("addUser") && output.contains("getUser"),
-        "Expected service methods: {}",
-        output
-    );
-}
-
-/// Test module augmentation patterns: class augmentation with declare module
-#[test]
-fn test_class_es5_module_augmentation_class() {
-    let source = r#"
-declare module "express" {
-    interface Request {
-        user?: { id: string; role: string };
-    }
-
-    interface Response {
-        success(data: unknown): void;
-        error(message: string): void;
-    }
-}
-
-class RequestHandler {
-    private userId: string | null = null;
-    private role: string | null = null;
-
-    setUser(id: string, role: string): void {
-        this.userId = id;
-        this.role = role;
-    }
-
-    getUserId(): string | null {
-        return this.userId;
-    }
-
-    getRole(): string | null {
-        return this.role;
-    }
-
-    isAdmin(): boolean {
-        return this.role === "admin";
-    }
-}
-
-class ResponseBuilder {
-    private data: unknown = null;
-    private errorMessage: string | null = null;
-
-    setData(data: unknown): this {
-        this.data = data;
+    setId(id: string): this {
+        this.data.id = id;
         return this;
     }
 
-    setError(message: string): this {
-        this.errorMessage = message;
+    setName(name: string): this {
+        this.data.name = name;
         return this;
     }
 
-    build(): { success: boolean; data?: unknown; error?: string } {
-        if (this.errorMessage) {
-            return { success: false, error: this.errorMessage };
-        }
-        return { success: true, data: this.data };
+    setAge(age: number): this {
+        this.data.age = age;
+        return this;
+    }
+
+    build(): IdentifiedPerson {
+        return this.data as IdentifiedPerson;
+    }
+
+    reset(): void {
+        this.data = {};
     }
 }
 
-class MiddlewareHandler {
-    private handlers: ((req: unknown, res: unknown, next: () => void) => void)[] = [];
+class EntityManager<T extends Entity> {
+    private entities: Map<string, T> = new Map();
 
-    use(handler: (req: unknown, res: unknown, next: () => void) => void): void {
-        this.handlers.push(handler);
+    add(entity: T): void {
+        this.entities.set(entity.id, entity);
     }
 
-    execute(req: unknown, res: unknown): void {
-        let index = 0;
-        const next = () => {
-            if (index < this.handlers.length) {
-                this.handlers[index++](req, res, next);
-            }
-        };
-        next();
+    get(id: string): T | undefined {
+        return this.entities.get(id);
+    }
+
+    getAll(): T[] {
+        return Array.from(this.entities.values());
+    }
+
+    findByDateRange(start: Date, end: Date): T[] {
+        return this.getAll().filter(
+            e => e.createdAt >= start && e.createdAt <= end
+        );
+    }
+}
+
+class MixinApplier<T extends object> {
+    private base: T;
+
+    constructor(base: T) {
+        this.base = base;
+    }
+
+    with<U extends object>(mixin: U): T & U {
+        return { ...this.base, ...mixin };
+    }
+
+    withAll<U extends object[]>(...mixins: U): T {
+        return Object.assign({}, this.base, ...mixins);
     }
 }
 "#;
@@ -33878,136 +33651,117 @@ class MiddlewareHandler {
 
     // Classes should be converted
     assert!(
-        output.contains("function RequestHandler") &&
-        output.contains("function ResponseBuilder") &&
-        output.contains("function MiddlewareHandler"),
-        "Expected ES5 class constructors: {}",
+        output.contains("PersonBuilder") && output.contains("EntityManager") && output.contains("MixinApplier"),
+        "Expected intersection type alias classes: {}",
         output
     );
 
-    // Methods preserved
+    // PersonBuilder methods
     assert!(
-        output.contains("setUser") && output.contains("getUserId") && output.contains("isAdmin"),
-        "Expected RequestHandler methods: {}",
+        output.contains("setId") && output.contains("setName") && output.contains("setAge") && output.contains("build"),
+        "Expected PersonBuilder methods: {}",
         output
     );
 
-    // Builder pattern preserved
+    // EntityManager methods
     assert!(
-        output.contains("setData") && output.contains("setError") && output.contains("build"),
-        "Expected ResponseBuilder methods: {}",
+        output.contains("add") && output.contains("getAll") && output.contains("findByDateRange"),
+        "Expected EntityManager methods: {}",
         output
     );
 
-    // Middleware methods
+    // MixinApplier methods
     assert!(
-        output.contains("use") && output.contains("execute"),
-        "Expected MiddlewareHandler methods: {}",
+        output.contains("withAll"),
+        "Expected MixinApplier methods: {}",
         output
     );
 }
 
-/// Test module augmentation patterns: combined module augmentation patterns
+/// Test ES5 class downleveling with conditional type alias patterns
 #[test]
-fn test_class_es5_module_augmentation_combined() {
+fn test_class_es5_type_alias_conditional() {
     let source = r#"
-declare module "lodash" {
-    export function merge<T, U>(obj1: T, obj2: U): T & U;
-    export function clone<T>(value: T): T;
-}
+type NonNullable<T> = T extends null | undefined ? never : T;
+type ExtractArray<T> = T extends (infer U)[] ? U : T;
+type ReturnType<T> = T extends (...args: any[]) => infer R ? R : never;
+type PromiseValue<T> = T extends Promise<infer V> ? V : T;
 
-declare global {
-    interface ObjectConstructor {
-        deepMerge<T, U>(target: T, source: U): T & U;
+class NullableHandler<T> {
+    private value: T | null | undefined;
+
+    constructor(value: T | null | undefined) {
+        this.value = value;
     }
 
-    namespace NodeJS {
-        interface ProcessEnv {
-            NODE_ENV: "development" | "production" | "test";
-            API_KEY?: string;
-        }
-    }
-}
-
-namespace Utils {
-    export class ObjectHelper {
-        merge<T extends object, U extends object>(target: T, source: U): T & U {
-            return Object.assign({}, target, source) as T & U;
-        }
-
-        clone<T extends object>(obj: T): T {
-            return Object.assign({}, obj);
-        }
-
-        deepClone<T>(obj: T): T {
-            return JSON.parse(JSON.stringify(obj));
-        }
+    isNull(): boolean {
+        return this.value === null;
     }
 
-    export class EnvHelper {
-        private env: Record<string, string | undefined>;
+    isUndefined(): boolean {
+        return this.value === undefined;
+    }
 
-        constructor() {
-            this.env = typeof process !== "undefined" ? process.env as Record<string, string | undefined> : {};
-        }
+    isDefined(): boolean {
+        return this.value !== null && this.value !== undefined;
+    }
 
-        get(key: string): string | undefined {
-            return this.env[key];
+    getOrDefault(defaultValue: T): T {
+        if (this.value === null || this.value === undefined) {
+            return defaultValue;
         }
+        return this.value;
+    }
 
-        getOrDefault(key: string, defaultValue: string): string {
-            return this.env[key] || defaultValue;
+    map<U>(fn: (value: T) => U): NullableHandler<U> {
+        if (this.value === null || this.value === undefined) {
+            return new NullableHandler<U>(null);
         }
-
-        isDevelopment(): boolean {
-            return this.get("NODE_ENV") === "development";
-        }
-
-        isProduction(): boolean {
-            return this.get("NODE_ENV") === "production";
-        }
+        return new NullableHandler<U>(fn(this.value));
     }
 }
 
-class ApplicationConfig {
-    private objectHelper: Utils.ObjectHelper;
-    private envHelper: Utils.EnvHelper;
+class ArrayExtractor<T> {
+    private array: T[];
 
-    constructor() {
-        this.objectHelper = new Utils.ObjectHelper();
-        this.envHelper = new Utils.EnvHelper();
+    constructor(array: T[]) {
+        this.array = array;
     }
 
-    mergeConfig<T extends object, U extends object>(base: T, override: U): T & U {
-        return this.objectHelper.merge(base, override);
+    extract(): T[] {
+        return [...this.array];
     }
 
-    getEnv(key: string): string | undefined {
-        return this.envHelper.get(key);
+    head(): T | undefined {
+        return this.array[0];
     }
 
-    getApiKey(): string {
-        return this.envHelper.getOrDefault("API_KEY", "default-key");
+    tail(): T[] {
+        return this.array.slice(1);
+    }
+
+    flatten<U>(this: ArrayExtractor<U[]>): U[] {
+        return this.array.flat();
     }
 }
 
-class ConfigLoader {
-    private config: Record<string, unknown> = {};
+class FunctionAnalyzer<T extends (...args: any[]) => any> {
+    private fn: T;
 
-    load(data: Record<string, unknown>): void {
-        this.config = { ...this.config, ...data };
+    constructor(fn: T) {
+        this.fn = fn;
     }
 
-    get<T>(key: string): T | undefined {
-        return this.config[key] as T | undefined;
+    call(...args: Parameters<T>): ReturnType<T> {
+        return this.fn(...args);
     }
 
-    getAll(): Record<string, unknown> {
-        return { ...this.config };
+    bind<U>(thisArg: U): (...args: Parameters<T>) => ReturnType<T> {
+        return this.fn.bind(thisArg);
     }
 
-    clear(): void {
-        this.config = {};
+    getArity(): number {
+        return this.fn.length;
     }
 }
 "#;
@@ -34027,48 +33781,31 @@ class ConfigLoader {
 
     let output = printer.get_output().to_string();
 
-    // All classes should be converted
+    // Classes should be converted
     assert!(
-        output.contains("ObjectHelper") &&
-        output.contains("EnvHelper") &&
-        output.contains("function ApplicationConfig") &&
-        output.contains("function ConfigLoader"),
-        "Expected ES5 class constructors: {}",
+        output.contains("NullableHandler") && output.contains("ArrayExtractor") && output.contains("FunctionAnalyzer"),
+        "Expected conditional type alias classes: {}",
         output
     );
 
-    // Utils namespace should exist
+    // NullableHandler methods
     assert!(
-        output.contains("Utils"),
-        "Expected Utils namespace: {}",
+        output.contains("isNull") && output.contains("isUndefined") && output.contains("isDefined") && output.contains("getOrDefault"),
+        "Expected NullableHandler methods: {}",
         output
     );
 
-    // ObjectHelper methods
+    // ArrayExtractor methods
     assert!(
-        output.contains("merge") && output.contains("clone") && output.contains("deepClone"),
-        "Expected ObjectHelper methods: {}",
+        output.contains("extract") && output.contains("head") && output.contains("tail"),
+        "Expected ArrayExtractor methods: {}",
         output
     );
 
-    // EnvHelper methods
+    // FunctionAnalyzer methods
     assert!(
-        output.contains("isDevelopment") && output.contains("isProduction"),
-        "Expected EnvHelper methods: {}",
-        output
-    );
-
-    // ConfigLoader methods
-    assert!(
-        output.contains("load") && output.contains("getAll") && output.contains("clear"),
-        "Expected ConfigLoader methods: {}",
-        output
-    );
-
-    // Object.assign preserved
-    assert!(
-        output.contains("Object.assign"),
-        "Expected Object.assign: {}",
+        output.contains("call") && output.contains("bind") && output.contains("getArity"),
+        "Expected FunctionAnalyzer methods: {}",
         output
     );
 }
