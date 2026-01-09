@@ -7,10 +7,10 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-None - awaiting next task
+- [ ] Add async ES5 tests for async class patterns: async constructor simulation, async static initialization, async factory methods, async singleton pattern, async dependency injection, async lifecycle hooks. Tests: `./wasm/test.sh async_es5_tests`
 
 ## Task Queue
-- [ ] Add async ES5 tests for async class patterns: async constructor simulation, async static initialization
+- [ ] Add async ES5 tests for async decorator patterns: async method decorators, async class decorators
 
 ## Completed
 - [x] Added 12 async iteration pattern tests (for-of await body, await expression, async generator, break, continue, nested, destructure, array destructure, try/catch, return, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (592 tests PASS).
