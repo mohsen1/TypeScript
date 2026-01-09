@@ -283,6 +283,31 @@ Escalate or coordinate when:
 - Project Direction changes significantly
 - Risk identified that affects multiple squads
 
+## 🔔 Notification System (CRITICAL)
+
+**Your EMs will notify you when they need attention. You receive notifications automatically via tmux.**
+
+When you receive a notification:
+1. **Read the notification** - It tells you what the EM needs
+2. **Take action** - Help with blockers, acknowledge merges, or provide guidance
+3. **The notification watcher handles routing** - You don't need to poll or check manually
+
+**You will receive notifications like:**
+```
+[10:30:15] NOTIFICATION from em/forge: Merge ready. Merged workers 1,3,4 into squad/forge, pushed
+[10:45:22] STATUS from em/anvil: Resolved build blocker, all workers unblocked
+[11:00:00] NOTIFICATION from em/forge: BLOCKED - Cross-squad conflict with Anvil on types.rs
+```
+
+**No need to send notifications yourself** - You are at the top of the hierarchy. The notification system is for upward communication (workers → EMs → Director).
+
+**Your response to notifications:**
+- **merge**: Run the coordinated merge (see "MERGE TIME!" section)
+- **status**: Acknowledge and log if needed
+- **blocked**: Help resolve the cross-squad issue
+
+The notification system replaces the old time-based idle monitoring. EMs will proactively notify you when they have updates.
+
 ## Safety Rules
 - Never run `cargo test` or `cargo bench` directly
 - Never edit code files (only `.md` files in `wasm/specs/squads/`)

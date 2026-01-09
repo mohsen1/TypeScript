@@ -360,6 +360,39 @@ tmux capture-pane -p -t zang-org:<squad>.<pane> -S -200
 - Only redirect if two workers are editing the *same file*
 - Let the earlier worker finish, then reassign the other
 
+## 🔔 Notification System (CRITICAL)
+
+**Your workers will notify you when they need attention. You receive notifications automatically via tmux.**
+
+When you receive a notification:
+1. **Read the notification** - It tells you what the worker needs
+2. **Take action** - Assign a task, review their work, or help with a blocker
+3. **Notify the Director** - After handling significant events
+
+**Notify the Director using:**
+```bash
+# After merging worker branches
+.notify/notify.sh merge "Merged workers 1,3,4 into squad/$SQUAD_NAME, pushed"
+
+# After handling a significant issue
+.notify/notify.sh status "Resolved build blocker, all workers unblocked"
+
+# If you're blocked and need Director help
+.notify/notify.sh blocked "Cross-squad conflict with Anvil on types.rs"
+```
+
+**You will receive notifications like:**
+```
+[10:23:45] NOTIFICATION from worker/forge-1: Needs a task. Worker is idle and ready for assignment.
+[10:25:12] NOTIFICATION from worker/forge-2: Ready for review/merge. Completed inference tests.
+```
+
+**ALWAYS notify the Director after:**
+1. Merging worker branches into squad branch
+2. Fixing team-wide blockers
+3. Encountering cross-squad issues
+4. Significant status changes
+
 ## Safety Rules
 - Never run `cargo test` or `cargo bench` directly on host
   - Use `./wasm/test.sh` and `./wasm/bench.sh` (Docker wrappers)
