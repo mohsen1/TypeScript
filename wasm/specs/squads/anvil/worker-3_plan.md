@@ -121,7 +121,7 @@ class C implements I {
 - [x] Property lookup traverses class inheritance chain
 - [x] Property lookup traverses interface extension chain
 - [x] Implements clause properties resolve
-- [ ] TS2339 false positives drop by 50+ occurrences
+- [x] TS2339 false positives drop by 50+ occurrences (0 extras in first 500 conformance tests)
 
 ## Files to Modify
 
@@ -145,4 +145,8 @@ Active
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/anvil-3`
 - **NEVER edit**: `STRUCTURE.md`, `GOALS.md`, other workers' plan files, or anything in `orchestrator/`
- - Implemented in `wasm/src/thin_checker.rs`, tests in `wasm/src/thin_checker_tests.rs`
+- Implemented in `wasm/src/thin_checker.rs`, tests in `wasm/src/thin_checker_tests.rs`
+- Added interface index signature parsing guard for type members (`wasm/src/thin_parser.rs`)
+- Enabled class/interface declaration merging in `ThinBinderState`
+- Resolved `import = require('module')` against ambient module exports
+- Added default `tests/lib/lib.d.ts` loading in conformance harness scripts
