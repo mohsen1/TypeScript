@@ -62612,3 +62612,627 @@ const service = new UserService();
         "expected mappings to reference source file"
     );
 }
+
+// =============================================================================
+// ES5 SOURCE MAP TESTS - GENERATOR TRANSFORM PATTERNS
+// =============================================================================
+// Tests for generator transform patterns with ES5 target to verify source maps
+// work correctly with generator state machine transforms.
+
+/// Test generator function basic yield mapping with typed parameters
+#[test]
+fn test_source_map_generator_transform_es5_basic_yield_mapping() {
+    let source = r#"function* numberSequence(start: number, end: number): Generator<number, void, unknown> {
+    for (let i = start; i <= end; i++) {
+        yield i;
+    }
+}
+
+function* alphabetGenerator(): Generator<string, void, unknown> {
+    const letters = "abcdefghijklmnopqrstuvwxyz";
+    for (const letter of letters) {
+        yield letter;
+    }
+}
+
+// Using the generators
+const numbers = numberSequence(1, 5);
+for (const n of numbers) {
+    console.log("Number:", n);
+}
+
+const alphabet = alphabetGenerator();
+console.log(alphabet.next().value);
+console.log(alphabet.next().value);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("numberSequence"),
+        "expected numberSequence in output. output: {output}"
+    );
+    assert!(
+        output.contains("alphabetGenerator"),
+        "expected alphabetGenerator in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for basic yield mapping"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+/// Test generator with multiple yields and complex expressions
+#[test]
+fn test_source_map_generator_transform_es5_multiple_yields() {
+    let source = r#"function* dataProcessor(items: string[]): Generator<{ index: number; value: string; processed: boolean }, number, unknown> {
+    let processedCount = 0;
+
+    for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+
+        // Yield before processing
+        yield { index: i, value: item, processed: false };
+
+        // Simulate processing
+        const processed = item.toUpperCase();
+        processedCount++;
+
+        // Yield after processing
+        yield { index: i, value: processed, processed: true };
+    }
+
+    // Final yield with count
+    yield { index: -1, value: `Total: ${processedCount}`, processed: true };
+
+    return processedCount;
+}
+
+const processor = dataProcessor(["hello", "world", "test"]);
+let result = processor.next();
+while (!result.done) {
+    console.log(result.value);
+    result = processor.next();
+}
+console.log("Final count:", result.value);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("dataProcessor"),
+        "expected dataProcessor in output. output: {output}"
+    );
+    assert!(
+        output.contains("processedCount"),
+        "expected processedCount in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for multiple yields"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+/// Test generator delegation with yield*
+#[test]
+fn test_source_map_generator_transform_es5_delegation() {
+    let source = r#"function* innerGenerator(prefix: string): Generator<string, void, unknown> {
+    yield `${prefix}-1`;
+    yield `${prefix}-2`;
+    yield `${prefix}-3`;
+}
+
+function* middleGenerator(): Generator<string, void, unknown> {
+    yield "start";
+    yield* innerGenerator("middle");
+    yield "end";
+}
+
+function* outerGenerator(): Generator<string, void, unknown> {
+    yield "outer-start";
+    yield* middleGenerator();
+    yield* innerGenerator("outer");
+    yield "outer-end";
+}
+
+// Test chained delegation
+function* chainedDelegation(): Generator<number, void, unknown> {
+    const arrays = [[1, 2], [3, 4], [5, 6]];
+    for (const arr of arrays) {
+        yield* arr;
+    }
+}
+
+const outer = outerGenerator();
+for (const value of outer) {
+    console.log(value);
+}
+
+const chained = chainedDelegation();
+console.log([...chained]);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("innerGenerator"),
+        "expected innerGenerator in output. output: {output}"
+    );
+    assert!(
+        output.contains("outerGenerator"),
+        "expected outerGenerator in output. output: {output}"
+    );
+    assert!(
+        output.contains("chainedDelegation"),
+        "expected chainedDelegation in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for generator delegation"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+/// Test generator in class method with instance access
+#[test]
+fn test_source_map_generator_transform_es5_class_method() {
+    let source = r#"class DataIterator {
+    private data: number[];
+    private name: string;
+
+    constructor(name: string, data: number[]) {
+        this.name = name;
+        this.data = data;
+    }
+
+    *iterate(): Generator<number, void, unknown> {
+        console.log(`Starting iteration for ${this.name}`);
+        for (const item of this.data) {
+            yield item;
+        }
+        console.log(`Finished iteration for ${this.name}`);
+    }
+
+    *iterateWithIndex(): Generator<[number, number], void, unknown> {
+        for (let i = 0; i < this.data.length; i++) {
+            yield [i, this.data[i]];
+        }
+    }
+
+    *filter(predicate: (n: number) => boolean): Generator<number, void, unknown> {
+        for (const item of this.data) {
+            if (predicate(item)) {
+                yield item;
+            }
+        }
+    }
+
+    static *range(start: number, end: number): Generator<number, void, unknown> {
+        for (let i = start; i <= end; i++) {
+            yield i;
+        }
+    }
+}
+
+const iterator = new DataIterator("test", [1, 2, 3, 4, 5]);
+for (const num of iterator.iterate()) {
+    console.log("Value:", num);
+}
+
+for (const [idx, val] of iterator.iterateWithIndex()) {
+    console.log(`Index ${idx}: ${val}`);
+}
+
+for (const even of iterator.filter(n => n % 2 === 0)) {
+    console.log("Even:", even);
+}
+
+for (const n of DataIterator.range(10, 15)) {
+    console.log("Range:", n);
+}"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("DataIterator"),
+        "expected DataIterator in output. output: {output}"
+    );
+    assert!(
+        output.contains("iterate"),
+        "expected iterate method in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for generator class method"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+/// Test generator with try/finally for cleanup
+#[test]
+fn test_source_map_generator_transform_es5_try_finally() {
+    let source = r#"function* resourceManager(): Generator<string, void, unknown> {
+    console.log("Acquiring resource");
+    try {
+        yield "resource acquired";
+
+        console.log("Using resource");
+        yield "resource in use";
+
+        console.log("Still using resource");
+        yield "still in use";
+    } finally {
+        console.log("Releasing resource (cleanup)");
+    }
+}
+
+function* nestedTryFinally(): Generator<number, void, unknown> {
+    try {
+        yield 1;
+        try {
+            yield 2;
+            try {
+                yield 3;
+            } finally {
+                console.log("Inner cleanup");
+            }
+            yield 4;
+        } finally {
+            console.log("Middle cleanup");
+        }
+        yield 5;
+    } finally {
+        console.log("Outer cleanup");
+    }
+}
+
+function* tryCatchFinally(): Generator<string, void, unknown> {
+    try {
+        yield "before";
+        throw new Error("test error");
+    } catch (e) {
+        yield `caught: ${(e as Error).message}`;
+    } finally {
+        yield "finally block";
+    }
+}
+
+// Test resource management pattern
+const rm = resourceManager();
+rm.next();
+rm.next();
+rm.return(); // Early termination triggers finally
+
+// Test nested cleanup
+const nested = nestedTryFinally();
+for (const n of nested) {
+    console.log("Nested value:", n);
+}
+
+// Test full try/catch/finally
+const tcf = tryCatchFinally();
+for (const s of tcf) {
+    console.log("TCF:", s);
+}"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("resourceManager"),
+        "expected resourceManager in output. output: {output}"
+    );
+    assert!(
+        output.contains("nestedTryFinally"),
+        "expected nestedTryFinally in output. output: {output}"
+    );
+    assert!(
+        output.contains("tryCatchFinally"),
+        "expected tryCatchFinally in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for generator try/finally"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+/// Test combined generator source map patterns
+#[test]
+fn test_source_map_generator_transform_es5_comprehensive() {
+    let source = r#"// Comprehensive generator transform test
+interface Task {
+    id: number;
+    name: string;
+    status: "pending" | "running" | "completed";
+}
+
+class TaskQueue {
+    private tasks: Task[] = [];
+    private idCounter = 0;
+
+    add(name: string): Task {
+        const task: Task = {
+            id: this.idCounter++,
+            name,
+            status: "pending"
+        };
+        this.tasks.push(task);
+        return task;
+    }
+
+    *pending(): Generator<Task, void, unknown> {
+        for (const task of this.tasks) {
+            if (task.status === "pending") {
+                yield task;
+            }
+        }
+    }
+
+    *all(): Generator<Task, void, unknown> {
+        yield* this.tasks;
+    }
+
+    *process(): Generator<Task, number, unknown> {
+        let processed = 0;
+        for (const task of this.tasks) {
+            if (task.status === "pending") {
+                task.status = "running";
+                yield task;
+                task.status = "completed";
+                processed++;
+            }
+        }
+        return processed;
+    }
+}
+
+function* pipeline<T, U>(
+    source: Generator<T, void, unknown>,
+    transform: (item: T) => U
+): Generator<U, void, unknown> {
+    for (const item of source) {
+        yield transform(item);
+    }
+}
+
+function* take<T>(source: Generator<T, void, unknown>, count: number): Generator<T, void, unknown> {
+    let taken = 0;
+    for (const item of source) {
+        if (taken >= count) break;
+        yield item;
+        taken++;
+    }
+}
+
+function* infiniteCounter(start: number = 0): Generator<number, never, unknown> {
+    let count = start;
+    while (true) {
+        yield count++;
+    }
+}
+
+// Usage
+const queue = new TaskQueue();
+queue.add("Task 1");
+queue.add("Task 2");
+queue.add("Task 3");
+
+// Iterator over pending tasks
+for (const task of queue.pending()) {
+    console.log("Pending:", task.name);
+}
+
+// Pipeline with transform
+const taskNames = pipeline(queue.all(), task => task.name.toUpperCase());
+for (const name of taskNames) {
+    console.log("Name:", name);
+}
+
+// Take from infinite sequence
+const firstFive = take(infiniteCounter(100), 5);
+console.log([...firstFive]);
+
+// Process tasks
+const processor = queue.process();
+let result = processor.next();
+while (!result.done) {
+    console.log("Processing:", (result.value as Task).name);
+    result = processor.next();
+}
+console.log("Total processed:", result.value);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("TaskQueue"),
+        "expected TaskQueue in output. output: {output}"
+    );
+    assert!(
+        output.contains("pipeline"),
+        "expected pipeline in output. output: {output}"
+    );
+    assert!(
+        output.contains("infiniteCounter"),
+        "expected infiniteCounter in output. output: {output}"
+    );
+    assert!(
+        output.contains("pending"),
+        "expected pending method in output. output: {output}"
+    );
+    assert!(
+        output.contains("process"),
+        "expected process method in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for comprehensive generator transform"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
