@@ -7,12 +7,13 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] Add ES5 async method parity tests in `wasm/src/emitter_parity_tests.rs`. Run `./wasm/test.sh emitter_parity`.
+- [ ] (none)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 async method parity tests (this-context, static, params, inheritance) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (216 tests).
 - [x] Added ES5 generator method parity tests (this-context, static, params, inheritance) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (212 tests).
 - [x] Added ES5 for-of loop parity tests (async, try-catch, labeled, arrow) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (208 tests).
 - [x] Added ES5 for-of loop parity tests (iterables, control-flow, generator, class-method) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (204 tests).
