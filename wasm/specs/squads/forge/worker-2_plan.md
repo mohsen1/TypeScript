@@ -10,12 +10,22 @@ Priority: 2
 - [x] ReturnType/Parameters edge case tests (per GOALS.md W2/Pane4 assignment)
 - [x] Distributive conditional type stress tests (per GOALS.md objective #2)
 - [x] Context-sensitive typing tests (generic function call inference, contextual parameter types)
+- [x] Function return type inference tests for conditional types
 
 ## Task Queue
 - [ ] Implement TypeResolver for TypeEvaluator to resolve Refs inside Mapped/Conditional types
 - [ ] This would enable full evaluation of complex patterns like `{ [K in keyof R]: ExtractAction<R[K]> }[keyof R]`
 
 ## Completed
+- [x] Added 24 function return type inference tests for conditional types including:
+  - Basic conditional return type evaluation (true/false branches)
+  - Distributive conditional types with unions
+  - Infer keyword for extracting return/param types
+  - Never absorption and any special cases
+  - Literal type and object structural subtyping conditionals
+  - Tuple/array element inference, Promise unwrap
+  - Generic inference context integration
+  - Constructor/InstanceType inference patterns
 - [x] Added 24 context-sensitive typing tests including:
   - Generic function call inference (single/multiple args, different type params)
   - Contextual callback parameter and return types
@@ -85,6 +95,7 @@ Worker 2 branch now contains:
 - 28 new utility type edge case tests (ReturnType, Parameters, InstanceType, etc.)
 - 18 distributive conditional type stress tests
 - 24 context-sensitive typing tests (generic inference, contextual typing)
+- 24 function return type inference tests for conditional types
 - No modifications to evaluate.rs or other core files
 - Pure test additions that can be safely merged
 
