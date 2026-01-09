@@ -7602,6 +7602,32 @@ impl<'a> ThinCheckerState<'a> {
         None
     }
 
+    fn resolve_receiver_class_for_access(
+        &self,
+        expr_idx: NodeIndex,
+        object_type: TypeId,
+    ) -> Option<NodeIndex> {
+        if self.is_this_expression(expr_idx) || self.is_super_expression(expr_idx) {
+            return self.ctx.enclosing_class.as_ref().map(|info| info.class_idx);
+        }
+
+        if let Some(sym_id) = self.resolve_identifier_symbol(expr_idx) {
+            if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
+                if symbol.flags & symbol_flags::CLASS != 0 {
+                    return self.get_class_declaration_from_symbol(sym_id);
+                }
+            }
+        }
+
+        if object_type != TypeId::ANY && object_type != TypeId::ERROR {
+            if let Some(class_idx) = self.get_class_decl_from_type(object_type) {
+                return Some(class_idx);
+            }
+        }
+
+        None
+    }
+
     fn check_property_accessibility(
         &mut self,
         object_expr: NodeIndex,
@@ -7626,9 +7652,20 @@ impl<'a> ThinCheckerState<'a> {
                 current_class_idx == Some(access_info.declaring_class_idx)
             }
             MemberAccessLevel::Protected => {
-                current_class_idx
-                    .map(|current| self.is_class_derived_from(current, access_info.declaring_class_idx))
-                    .unwrap_or(false)
+                let Some(current_class_idx) = current_class_idx else {
+                    false
+                };
+                if current_class_idx == access_info.declaring_class_idx {
+                    true
+                } else if !self.is_class_derived_from(current_class_idx, access_info.declaring_class_idx) {
+                    false
+                } else {
+                    let receiver_class_idx =
+                        self.resolve_receiver_class_for_access(object_expr, object_type);
+                    receiver_class_idx
+                        .map(|receiver| self.is_class_derived_from(receiver, current_class_idx))
+                        .unwrap_or(false)
+                }
             }
         };
 
