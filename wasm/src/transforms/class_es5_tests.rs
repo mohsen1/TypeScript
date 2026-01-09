@@ -24311,3 +24311,393 @@ class ArgumentValidator<F extends (...args: any[]) => any> {
         output
     );
 }
+
+// ============================================================================
+// BRANDED TYPE PATTERN TESTS
+// ============================================================================
+
+/// Test ES5 class with nominal types using brand pattern
+#[test]
+fn test_class_es5_branded_nominal_types() {
+    let source = r#"
+// Nominal types using brand pattern
+type UserId = string & { readonly __brand: unique symbol };
+type OrderId = string & { readonly __brand: unique symbol };
+type ProductId = string & { readonly __brand: unique symbol };
+
+class UserIdFactory {
+    private static counter = 0;
+
+    static create(): UserId {
+        return `user_${++this.counter}` as UserId;
+    }
+
+    static validate(id: string): id is UserId {
+        return id.startsWith("user_");
+    }
+}
+
+class OrderService {
+    private orders: Map<OrderId, { userId: UserId; items: ProductId[] }> = new Map();
+
+    createOrder(userId: UserId, items: ProductId[]): OrderId {
+        const orderId = `order_${Date.now()}` as OrderId;
+        this.orders.set(orderId, { userId, items });
+        return orderId;
+    }
+
+    getOrder(orderId: OrderId): { userId: UserId; items: ProductId[] } | undefined {
+        return this.orders.get(orderId);
+    }
+}
+
+class EntityIdManager<T extends string & { readonly __brand: unique symbol }> {
+    private ids: Set<T> = new Set();
+
+    register(id: T): void {
+        this.ids.add(id);
+    }
+
+    has(id: T): boolean {
+        return this.ids.has(id);
+    }
+
+    all(): T[] {
+        return Array.from(this.ids);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("UserIdFactory") && output.contains("OrderService") && output.contains("EntityIdManager"),
+        "Expected nominal type classes: {}",
+        output
+    );
+
+    // Type aliases should be stripped
+    assert!(
+        !output.contains("type UserId") && !output.contains("type OrderId") && !output.contains("type ProductId"),
+        "Expected type aliases to be stripped: {}",
+        output
+    );
+
+    // Brand annotations should be stripped
+    assert!(
+        !output.contains("__brand") && !output.contains("unique symbol"),
+        "Expected brand type annotations to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with opaque types
+#[test]
+fn test_class_es5_branded_opaque_types() {
+    let source = r#"
+// Opaque type pattern using module augmentation
+declare const OpaqueTag: unique symbol;
+type Opaque<T, Token> = T & { readonly [OpaqueTag]: Token };
+
+type Email = Opaque<string, "Email">;
+type URL = Opaque<string, "URL">;
+type PositiveNumber = Opaque<number, "PositiveNumber">;
+
+class EmailValidator {
+    private static emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    static validate(input: string): Email | null {
+        if (this.emailRegex.test(input)) {
+            return input as Email;
+        }
+        return null;
+    }
+
+    static unsafeCreate(input: string): Email {
+        return input as Email;
+    }
+}
+
+class UrlParser {
+    static parse(input: string): URL | null {
+        try {
+            new globalThis.URL(input);
+            return input as URL;
+        } catch {
+            return null;
+        }
+    }
+
+    static getHost(url: URL): string {
+        return new globalThis.URL(url).host;
+    }
+}
+
+class NumericValidator {
+    static positive(n: number): PositiveNumber | null {
+        return n > 0 ? (n as PositiveNumber) : null;
+    }
+
+    static multiply(a: PositiveNumber, b: PositiveNumber): PositiveNumber {
+        return (a * b) as PositiveNumber;
+    }
+
+    static add(a: PositiveNumber, b: PositiveNumber): PositiveNumber {
+        return (a + b) as PositiveNumber;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("EmailValidator") && output.contains("UrlParser") && output.contains("NumericValidator"),
+        "Expected opaque type classes: {}",
+        output
+    );
+
+    // Opaque type definitions should be stripped
+    assert!(
+        !output.contains("type Opaque") && !output.contains("type Email =") && !output.contains("type URL ="),
+        "Expected opaque type definitions to be stripped: {}",
+        output
+    );
+
+    // Declare statement should be stripped
+    assert!(
+        !output.contains("declare const OpaqueTag"),
+        "Expected declare statement to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with type branding utilities
+#[test]
+fn test_class_es5_branded_type_branding() {
+    let source = r#"
+// Type branding utilities
+interface Brand<B> {
+    readonly __brand: B;
+}
+
+type Branded<T, B> = T & Brand<B>;
+
+type Celsius = Branded<number, "Celsius">;
+type Fahrenheit = Branded<number, "Fahrenheit">;
+type Kelvin = Branded<number, "Kelvin">;
+
+class TemperatureConverter {
+    static toCelsius(f: Fahrenheit): Celsius {
+        return ((f - 32) * 5 / 9) as Celsius;
+    }
+
+    static toFahrenheit(c: Celsius): Fahrenheit {
+        return ((c * 9 / 5) + 32) as Fahrenheit;
+    }
+
+    static toKelvin(c: Celsius): Kelvin {
+        return (c + 273.15) as Kelvin;
+    }
+
+    static celsiusFromKelvin(k: Kelvin): Celsius {
+        return (k - 273.15) as Celsius;
+    }
+}
+
+class TemperatureStore {
+    private celsius: Celsius[] = [];
+    private fahrenheit: Fahrenheit[] = [];
+
+    addCelsius(temp: Celsius): void {
+        this.celsius.push(temp);
+    }
+
+    addFahrenheit(temp: Fahrenheit): void {
+        this.fahrenheit.push(temp);
+    }
+
+    getAllInCelsius(): Celsius[] {
+        const converted = this.fahrenheit.map(f => TemperatureConverter.toCelsius(f));
+        return [...this.celsius, ...converted];
+    }
+}
+
+class BrandedFactory<T, B extends string> {
+    constructor(private readonly brand: B) {}
+
+    create(value: T): Branded<T, B> {
+        return value as Branded<T, B>;
+    }
+
+    isBranded(value: unknown): value is Branded<T, B> {
+        return typeof value === typeof ({} as T);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("TemperatureConverter") && output.contains("TemperatureStore") && output.contains("BrandedFactory"),
+        "Expected branded type classes: {}",
+        output
+    );
+
+    // Interface and type definitions should be stripped
+    assert!(
+        !output.contains("interface Brand") && !output.contains("type Branded") && !output.contains("type Celsius"),
+        "Expected interface and type definitions to be stripped: {}",
+        output
+    );
+
+    // Brand property should be stripped
+    assert!(
+        !output.contains("__brand"),
+        "Expected __brand property to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with unique symbol types
+#[test]
+fn test_class_es5_branded_unique_symbol() {
+    let source = r#"
+// Unique symbol types for nominal typing
+declare const UserIdSymbol: unique symbol;
+declare const SessionIdSymbol: unique symbol;
+declare const TokenSymbol: unique symbol;
+
+type UserId = string & { readonly [UserIdSymbol]: never };
+type SessionId = string & { readonly [SessionIdSymbol]: never };
+type AuthToken = string & { readonly [TokenSymbol]: never };
+
+class AuthenticationService {
+    private sessions: Map<SessionId, { userId: UserId; token: AuthToken }> = new Map();
+
+    createSession(userId: UserId): { sessionId: SessionId; token: AuthToken } {
+        const sessionId = `sess_${Date.now()}` as SessionId;
+        const token = `tok_${Math.random().toString(36)}` as AuthToken;
+        this.sessions.set(sessionId, { userId, token });
+        return { sessionId, token };
+    }
+
+    validateToken(sessionId: SessionId, token: AuthToken): UserId | null {
+        const session = this.sessions.get(sessionId);
+        if (session && session.token === token) {
+            return session.userId;
+        }
+        return null;
+    }
+
+    revokeSession(sessionId: SessionId): boolean {
+        return this.sessions.delete(sessionId);
+    }
+}
+
+class SymbolBrandedId<S extends symbol> {
+    private value: string & { readonly [K in S]: never };
+
+    constructor(value: string) {
+        this.value = value as string & { readonly [K in S]: never };
+    }
+
+    toString(): string {
+        return this.value;
+    }
+
+    equals(other: SymbolBrandedId<S>): boolean {
+        return this.value === other.value;
+    }
+}
+
+class UserIdGenerator {
+    private static readonly prefix = "usr_";
+    private counter = 0;
+
+    generate(): UserId {
+        return `${UserIdGenerator.prefix}${++this.counter}` as UserId;
+    }
+
+    parse(input: string): UserId | null {
+        if (input.startsWith(UserIdGenerator.prefix)) {
+            return input as UserId;
+        }
+        return null;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("AuthenticationService") && output.contains("SymbolBrandedId") && output.contains("UserIdGenerator"),
+        "Expected unique symbol type classes: {}",
+        output
+    );
+
+    // Declare statements should be stripped
+    assert!(
+        !output.contains("declare const UserIdSymbol") && !output.contains("declare const SessionIdSymbol"),
+        "Expected declare statements to be stripped: {}",
+        output
+    );
+
+    // Type aliases should be stripped
+    assert!(
+        !output.contains("type UserId =") && !output.contains("type SessionId =") && !output.contains("type AuthToken ="),
+        "Expected type aliases to be stripped: {}",
+        output
+    );
+}
