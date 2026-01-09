@@ -28677,3 +28677,637 @@ async function fetchData(): Promise<AsyncResult<object>> {
         output
     );
 }
+
+// ============================================================================
+// ES5 Union/Intersection Type Patterns Parity Tests
+// ============================================================================
+
+/// Test ES5 basic union type
+#[test]
+fn test_parity_es5_union_basic() {
+    let source = r#"
+type StringOrNumber = string | number;
+type Primitive = string | number | boolean | null | undefined;
+type Status = "pending" | "success" | "error";
+
+function formatValue(value: StringOrNumber): string {
+    if (typeof value === "string") {
+        return value.toUpperCase();
+    }
+    return value.toFixed(2);
+}
+
+function getStatus(): Status {
+    return "success";
+}
+
+function processPrimitive(p: Primitive): string {
+    if (p === null || p === undefined) {
+        return "empty";
+    }
+    return String(p);
+}
+
+class UnionHandler {
+    private value: StringOrNumber;
+
+    constructor(initial: StringOrNumber) {
+        this.value = initial;
+    }
+
+    getValue(): StringOrNumber {
+        return this.value;
+    }
+
+    setValue(value: StringOrNumber): void {
+        this.value = value;
+    }
+}
+
+const val1: StringOrNumber = "hello";
+const val2: StringOrNumber = 42;
+const status: Status = "pending";
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions and class should be present
+    assert!(
+        output.contains("formatValue") && output.contains("getStatus") && output.contains("UnionHandler"),
+        "Functions and class should be present: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type StringOrNumber") && !output.contains("type Primitive") && !output.contains("type Status"),
+        "Type aliases should be erased: {}",
+        output
+    );
+    // Union type annotations should be erased
+    assert!(
+        !output.contains(": StringOrNumber") && !output.contains(": Status") && !output.contains(": Primitive"),
+        "Union type annotations should be erased: {}",
+        output
+    );
+    // Private modifier should be erased
+    assert!(
+        !output.contains("private value"),
+        "Private modifier should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 discriminated union
+#[test]
+fn test_parity_es5_union_discriminated() {
+    let source = r#"
+interface Circle {
+    kind: "circle";
+    radius: number;
+}
+
+interface Rectangle {
+    kind: "rectangle";
+    width: number;
+    height: number;
+}
+
+interface Triangle {
+    kind: "triangle";
+    base: number;
+    height: number;
+}
+
+type Shape = Circle | Rectangle | Triangle;
+
+function getArea(shape: Shape): number {
+    switch (shape.kind) {
+        case "circle":
+            return Math.PI * shape.radius ** 2;
+        case "rectangle":
+            return shape.width * shape.height;
+        case "triangle":
+            return (shape.base * shape.height) / 2;
+    }
+}
+
+function isCircle(shape: Shape): shape is Circle {
+    return shape.kind === "circle";
+}
+
+class ShapeProcessor {
+    process(shape: Shape): string {
+        return `Area: ${getArea(shape)}`;
+    }
+
+    filterCircles(shapes: Shape[]): Circle[] {
+        return shapes.filter(isCircle);
+    }
+}
+
+const circle: Circle = { kind: "circle", radius: 5 };
+const rect: Rectangle = { kind: "rectangle", width: 10, height: 20 };
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions and class should be present
+    assert!(
+        output.contains("getArea") && output.contains("isCircle") && output.contains("ShapeProcessor"),
+        "Functions and class should be present: {}",
+        output
+    );
+    // Interfaces should be erased
+    assert!(
+        !output.contains("interface Circle") && !output.contains("interface Rectangle") && !output.contains("interface Triangle"),
+        "Interfaces should be erased: {}",
+        output
+    );
+    // Type alias should be erased
+    assert!(
+        !output.contains("type Shape"),
+        "Type alias should be erased: {}",
+        output
+    );
+    // Type predicate should be erased
+    assert!(
+        !output.contains("shape is Circle"),
+        "Type predicate should be erased: {}",
+        output
+    );
+    // Parameter type annotations should be erased
+    assert!(
+        !output.contains("shape: Shape") && !output.contains("shapes: Shape[]"),
+        "Parameter type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 intersection type
+#[test]
+fn test_parity_es5_intersection_basic() {
+    let source = r#"
+interface Named {
+    name: string;
+}
+
+interface Aged {
+    age: number;
+}
+
+interface Emailable {
+    email: string;
+}
+
+type Person = Named & Aged;
+type Contact = Named & Emailable;
+type FullContact = Named & Aged & Emailable;
+
+function greet(person: Person): string {
+    return `Hello, ${person.name}! You are ${person.age} years old.`;
+}
+
+function sendEmail(contact: Contact): void {
+    console.log(`Sending to ${contact.email}`);
+}
+
+function processFullContact(contact: FullContact): string {
+    return `${contact.name} (${contact.age}): ${contact.email}`;
+}
+
+class ContactManager {
+    private contacts: FullContact[] = [];
+
+    add(contact: FullContact): void {
+        this.contacts.push(contact);
+    }
+
+    findByName(name: string): FullContact | undefined {
+        return this.contacts.find(c => c.name === name);
+    }
+}
+
+const person: Person = { name: "Alice", age: 30 };
+const fullContact: FullContact = { name: "Bob", age: 25, email: "bob@example.com" };
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions and class should be present
+    assert!(
+        output.contains("greet") && output.contains("sendEmail") && output.contains("ContactManager"),
+        "Functions and class should be present: {}",
+        output
+    );
+    // Interfaces should be erased
+    assert!(
+        !output.contains("interface Named") && !output.contains("interface Aged") && !output.contains("interface Emailable"),
+        "Interfaces should be erased: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type Person") && !output.contains("type Contact") && !output.contains("type FullContact"),
+        "Type aliases should be erased: {}",
+        output
+    );
+    // Intersection type annotations should be erased
+    assert!(
+        !output.contains(": Person") && !output.contains(": FullContact"),
+        "Intersection type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 union with null/undefined
+#[test]
+fn test_parity_es5_union_nullable() {
+    let source = r#"
+type Nullable<T> = T | null;
+type Optional<T> = T | undefined;
+type Maybe<T> = T | null | undefined;
+
+function getValue<T>(value: Nullable<T>, defaultValue: T): T {
+    return value !== null ? value : defaultValue;
+}
+
+function processOptional<T>(value: Optional<T>): T | undefined {
+    return value;
+}
+
+function handleMaybe<T>(value: Maybe<T>, fallback: T): T {
+    return value ?? fallback;
+}
+
+class NullableContainer<T> {
+    private value: Nullable<T>;
+
+    constructor(value: Nullable<T>) {
+        this.value = value;
+    }
+
+    get(): Nullable<T> {
+        return this.value;
+    }
+
+    getOrDefault(defaultValue: T): T {
+        return this.value ?? defaultValue;
+    }
+
+    map<U>(fn: (v: T) => U): NullableContainer<U> {
+        return new NullableContainer(this.value !== null ? fn(this.value) : null);
+    }
+}
+
+function strictNullCheck(value: string | null | undefined): string {
+    if (value === null) return "null";
+    if (value === undefined) return "undefined";
+    return value;
+}
+
+const nullable: Nullable<string> = null;
+const optional: Optional<number> = undefined;
+const maybe: Maybe<boolean> = true;
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions and class should be present
+    assert!(
+        output.contains("getValue") && output.contains("handleMaybe") && output.contains("NullableContainer"),
+        "Functions and class should be present: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type Nullable") && !output.contains("type Optional") && !output.contains("type Maybe"),
+        "Type aliases should be erased: {}",
+        output
+    );
+    // Generic type parameters should be erased
+    assert!(
+        !output.contains("<T>") && !output.contains("<U>"),
+        "Generic type parameters should be erased: {}",
+        output
+    );
+    // Nullable type annotations should be erased
+    assert!(
+        !output.contains(": Nullable<") && !output.contains(": Maybe<"),
+        "Nullable type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 complex intersection patterns
+#[test]
+fn test_parity_es5_intersection_complex() {
+    let source = r#"
+interface Timestamped {
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+interface Identifiable {
+    id: string;
+}
+
+interface Serializable {
+    toJSON(): object;
+}
+
+type Entity = Identifiable & Timestamped;
+type SerializableEntity = Entity & Serializable;
+
+type WithMethods<T> = T & {
+    clone(): T;
+    equals(other: T): boolean;
+};
+
+function createEntity<T extends object>(data: T): T & Entity {
+    return {
+        ...data,
+        id: Math.random().toString(36),
+        createdAt: new Date(),
+        updatedAt: new Date()
+    };
+}
+
+abstract class BaseEntity implements Entity {
+    id: string;
+    createdAt: Date;
+    updatedAt: Date;
+
+    constructor() {
+        this.id = Math.random().toString(36);
+        this.createdAt = new Date();
+        this.updatedAt = new Date();
+    }
+}
+
+class User extends BaseEntity implements SerializableEntity {
+    constructor(public name: string, public email: string) {
+        super();
+    }
+
+    toJSON(): object {
+        return { id: this.id, name: this.name, email: this.email };
+    }
+}
+
+type Mixin<T, U> = T & U;
+type ReadonlyEntity<T> = Readonly<T> & Entity;
+
+const user: SerializableEntity = new User("Alice", "alice@example.com");
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions and classes should be present
+    assert!(
+        output.contains("createEntity") && output.contains("BaseEntity") && output.contains("User"),
+        "Functions and classes should be present: {}",
+        output
+    );
+    // Interfaces should be erased
+    assert!(
+        !output.contains("interface Timestamped") && !output.contains("interface Identifiable"),
+        "Interfaces should be erased: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type Entity") && !output.contains("type SerializableEntity") && !output.contains("type WithMethods"),
+        "Type aliases should be erased: {}",
+        output
+    );
+    // Implements clause should be erased
+    assert!(
+        !output.contains("implements Entity") && !output.contains("implements SerializableEntity"),
+        "Implements clause should be erased: {}",
+        output
+    );
+    // Abstract keyword should be erased
+    assert!(
+        !output.contains("abstract class"),
+        "Abstract keyword should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 combined union/intersection patterns
+#[test]
+fn test_parity_es5_union_intersection_combined() {
+    let source = r#"
+interface Success<T> {
+    status: "success";
+    data: T;
+}
+
+interface Failure {
+    status: "failure";
+    error: Error;
+}
+
+type Result<T> = Success<T> | Failure;
+type AsyncResult<T> = Promise<Result<T>>;
+
+interface Logger {
+    log(message: string): void;
+}
+
+interface Metrics {
+    track(event: string, data?: object): void;
+}
+
+type Instrumented<T> = T & Logger & Metrics;
+
+function isSuccess<T>(result: Result<T>): result is Success<T> {
+    return result.status === "success";
+}
+
+async function fetchData<T>(url: string): AsyncResult<T> {
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+        return { status: "success", data };
+    } catch (e) {
+        return { status: "failure", error: e as Error };
+    }
+}
+
+class InstrumentedService<T> implements Logger, Metrics {
+    private data: Result<T> | null = null;
+
+    log(message: string): void {
+        console.log(`[LOG] ${message}`);
+    }
+
+    track(event: string, data?: object): void {
+        console.log(`[TRACK] ${event}`, data);
+    }
+
+    async execute(fn: () => Promise<T>): AsyncResult<T> {
+        this.log("Starting execution");
+        try {
+            const result = await fn();
+            this.data = { status: "success", data: result };
+            this.track("success");
+            return this.data;
+        } catch (e) {
+            this.data = { status: "failure", error: e as Error };
+            this.track("failure", { error: (e as Error).message });
+            return this.data;
+        }
+    }
+}
+
+type Either<L, R> = { tag: "left"; value: L } | { tag: "right"; value: R };
+type PromiseOr<T> = T | Promise<T>;
+type ArrayOr<T> = T | T[];
+
+function normalizeArray<T>(input: ArrayOr<T>): T[] {
+    return Array.isArray(input) ? input : [input];
+}
+
+const service: Instrumented<{ name: string }> = {
+    name: "test",
+    log: (msg) => console.log(msg),
+    track: (evt) => console.log(evt)
+};
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions and class should be present
+    assert!(
+        output.contains("isSuccess") && output.contains("fetchData") && output.contains("InstrumentedService"),
+        "Functions and class should be present: {}",
+        output
+    );
+    // Interfaces should be erased
+    assert!(
+        !output.contains("interface Success") && !output.contains("interface Failure") && !output.contains("interface Logger"),
+        "Interfaces should be erased: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type Result") && !output.contains("type AsyncResult") && !output.contains("type Instrumented"),
+        "Type aliases should be erased: {}",
+        output
+    );
+    // Type predicate should be erased
+    assert!(
+        !output.contains("result is Success"),
+        "Type predicate should be erased: {}",
+        output
+    );
+    // Implements clause should be erased
+    assert!(
+        !output.contains("implements Logger") && !output.contains("implements Metrics"),
+        "Implements clause should be erased: {}",
+        output
+    );
+    // Generic type parameters should be erased
+    assert!(
+        !output.contains("<T>") && !output.contains("<L, R>"),
+        "Generic type parameters should be erased: {}",
+        output
+    );
+}
