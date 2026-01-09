@@ -36600,3 +36600,820 @@ class Application {
         output
     );
 }
+
+// ============================================================================
+// AMBIENT MODULE PATTERN TESTS
+// ============================================================================
+
+/// Test basic declare module for ambient declarations
+#[test]
+fn test_class_es5_ambient_module_basic() {
+    let source = r#"
+declare module "external-api" {
+    export interface ApiResponse<T> {
+        data: T;
+        status: number;
+        message: string;
+    }
+
+    export function fetch<T>(url: string): Promise<ApiResponse<T>>;
+    export function post<T>(url: string, body: any): Promise<ApiResponse<T>>;
+}
+
+class ApiClient {
+    private baseUrl: string;
+
+    constructor(baseUrl: string) {
+        this.baseUrl = baseUrl;
+    }
+
+    getUrl(endpoint: string): string {
+        return this.baseUrl + endpoint;
+    }
+
+    async fetchData(endpoint: string): Promise<any> {
+        const url = this.getUrl(endpoint);
+        return { data: null, status: 200, message: "OK" };
+    }
+
+    async postData(endpoint: string, data: any): Promise<any> {
+        const url = this.getUrl(endpoint);
+        return { data: null, status: 201, message: "Created" };
+    }
+}
+
+class UserApiClient extends ApiClient {
+    constructor() {
+        super("https://api.example.com");
+    }
+
+    async getUsers(): Promise<any> {
+        return this.fetchData("/users");
+    }
+
+    async createUser(userData: any): Promise<any> {
+        return this.postData("/users", userData);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // ApiClient class should be ES5 constructor
+    assert!(
+        output.contains("function ApiClient"),
+        "Expected ES5 ApiClient class: {}",
+        output
+    );
+
+    // UserApiClient class should be ES5 constructor
+    assert!(
+        output.contains("function UserApiClient"),
+        "Expected ES5 UserApiClient class: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("getUrl") && output.contains("fetchData") && output.contains("postData"),
+        "Expected ApiClient methods: {}",
+        output
+    );
+
+    // Inheritance should be present
+    assert!(
+        output.contains("__extends") || output.contains("_super"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+}
+
+/// Test global augmentation with declare global
+#[test]
+fn test_class_es5_ambient_global_augmentation() {
+    let source = r#"
+declare global {
+    interface Window {
+        customProperty: string;
+        customMethod(): void;
+    }
+
+    interface Array<T> {
+        customArrayMethod(): T[];
+    }
+
+    var globalConfig: {
+        debug: boolean;
+        version: string;
+    };
+}
+
+class WindowHelper {
+    private window: Window;
+
+    constructor() {
+        this.window = window;
+    }
+
+    setCustomProperty(value: string): void {
+        this.window.customProperty = value;
+    }
+
+    getCustomProperty(): string {
+        return this.window.customProperty;
+    }
+
+    callCustomMethod(): void {
+        this.window.customMethod();
+    }
+}
+
+class ArrayHelper<T> {
+    private items: T[];
+
+    constructor(items: T[]) {
+        this.items = items;
+    }
+
+    getItems(): T[] {
+        return this.items;
+    }
+
+    addItem(item: T): void {
+        this.items.push(item);
+    }
+
+    getLength(): number {
+        return this.items.length;
+    }
+}
+
+class ConfigManager {
+    isDebug(): boolean {
+        return globalConfig.debug;
+    }
+
+    getVersion(): string {
+        return globalConfig.version;
+    }
+
+    setDebug(debug: boolean): void {
+        globalConfig.debug = debug;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // WindowHelper class should be ES5 constructor
+    assert!(
+        output.contains("function WindowHelper"),
+        "Expected ES5 WindowHelper class: {}",
+        output
+    );
+
+    // ArrayHelper class should be ES5 constructor
+    assert!(
+        output.contains("function ArrayHelper"),
+        "Expected ES5 ArrayHelper class: {}",
+        output
+    );
+
+    // ConfigManager class should be ES5 constructor
+    assert!(
+        output.contains("function ConfigManager"),
+        "Expected ES5 ConfigManager class: {}",
+        output
+    );
+
+    // WindowHelper methods
+    assert!(
+        output.contains("setCustomProperty") && output.contains("getCustomProperty"),
+        "Expected WindowHelper methods: {}",
+        output
+    );
+
+    // ConfigManager methods
+    assert!(
+        output.contains("isDebug") && output.contains("getVersion"),
+        "Expected ConfigManager methods: {}",
+        output
+    );
+}
+
+/// Test declare module with namespace content
+#[test]
+fn test_class_es5_ambient_module_namespace() {
+    let source = r#"
+declare module "lodash" {
+    export function map<T, U>(arr: T[], fn: (item: T) => U): U[];
+    export function filter<T>(arr: T[], predicate: (item: T) => boolean): T[];
+    export function reduce<T, U>(arr: T[], fn: (acc: U, item: T) => U, initial: U): U;
+}
+
+declare module "moment" {
+    export interface Moment {
+        format(pattern: string): string;
+        add(amount: number, unit: string): Moment;
+        subtract(amount: number, unit: string): Moment;
+    }
+
+    export function moment(input?: string | Date): Moment;
+}
+
+class DataTransformer<T> {
+    private data: T[];
+
+    constructor(data: T[]) {
+        this.data = data;
+    }
+
+    getData(): T[] {
+        return this.data;
+    }
+
+    transform<U>(fn: (item: T) => U): DataTransformer<U> {
+        const transformed = this.data.map(fn);
+        return new DataTransformer(transformed);
+    }
+
+    filterBy(predicate: (item: T) => boolean): DataTransformer<T> {
+        const filtered = this.data.filter(predicate);
+        return new DataTransformer(filtered);
+    }
+
+    reduce<U>(fn: (acc: U, item: T) => U, initial: U): U {
+        return this.data.reduce(fn, initial);
+    }
+}
+
+class DateFormatter {
+    private date: Date;
+
+    constructor(date: Date = new Date()) {
+        this.date = date;
+    }
+
+    getDate(): Date {
+        return this.date;
+    }
+
+    setDate(date: Date): void {
+        this.date = date;
+    }
+
+    toISOString(): string {
+        return this.date.toISOString();
+    }
+
+    toLocaleDateString(): string {
+        return this.date.toLocaleDateString();
+    }
+
+    addDays(days: number): void {
+        this.date.setDate(this.date.getDate() + days);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // DataTransformer class should be ES5 constructor
+    assert!(
+        output.contains("function DataTransformer"),
+        "Expected ES5 DataTransformer class: {}",
+        output
+    );
+
+    // DateFormatter class should be ES5 constructor
+    assert!(
+        output.contains("function DateFormatter"),
+        "Expected ES5 DateFormatter class: {}",
+        output
+    );
+
+    // DataTransformer methods
+    assert!(
+        output.contains("transform") && output.contains("filterBy") && output.contains("reduce"),
+        "Expected DataTransformer methods: {}",
+        output
+    );
+
+    // DateFormatter methods
+    assert!(
+        output.contains("toISOString") && output.contains("toLocaleDateString") && output.contains("addDays"),
+        "Expected DateFormatter methods: {}",
+        output
+    );
+}
+
+/// Test ambient module with class declarations
+#[test]
+fn test_class_es5_ambient_module_with_class() {
+    let source = r#"
+declare module "event-emitter" {
+    export class EventEmitter {
+        on(event: string, handler: (...args: any[]) => void): this;
+        off(event: string, handler: (...args: any[]) => void): this;
+        emit(event: string, ...args: any[]): boolean;
+        once(event: string, handler: (...args: any[]) => void): this;
+    }
+}
+
+declare module "http-client" {
+    export class HttpClient {
+        get<T>(url: string): Promise<T>;
+        post<T>(url: string, data: any): Promise<T>;
+        put<T>(url: string, data: any): Promise<T>;
+        delete<T>(url: string): Promise<T>;
+    }
+}
+
+class CustomEventEmitter {
+    private handlers: Map<string, Function[]> = new Map();
+
+    on(event: string, handler: Function): void {
+        if (!this.handlers.has(event)) {
+            this.handlers.set(event, []);
+        }
+        this.handlers.get(event)!.push(handler);
+    }
+
+    off(event: string, handler: Function): void {
+        const handlers = this.handlers.get(event);
+        if (handlers) {
+            const index = handlers.indexOf(handler);
+            if (index !== -1) {
+                handlers.splice(index, 1);
+            }
+        }
+    }
+
+    emit(event: string, ...args: any[]): void {
+        const handlers = this.handlers.get(event);
+        if (handlers) {
+            handlers.forEach(handler => handler(...args));
+        }
+    }
+
+    clear(): void {
+        this.handlers.clear();
+    }
+}
+
+class NotificationService extends CustomEventEmitter {
+    notify(message: string): void {
+        this.emit("notification", message);
+    }
+
+    onNotification(handler: (message: string) => void): void {
+        this.on("notification", handler);
+    }
+
+    offNotification(handler: (message: string) => void): void {
+        this.off("notification", handler);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // CustomEventEmitter class should be ES5 constructor
+    assert!(
+        output.contains("function CustomEventEmitter"),
+        "Expected ES5 CustomEventEmitter class: {}",
+        output
+    );
+
+    // NotificationService class should be ES5 constructor
+    assert!(
+        output.contains("function NotificationService"),
+        "Expected ES5 NotificationService class: {}",
+        output
+    );
+
+    // CustomEventEmitter methods
+    assert!(
+        output.contains(".on") && output.contains(".off") && output.contains(".emit"),
+        "Expected CustomEventEmitter methods: {}",
+        output
+    );
+
+    // NotificationService methods
+    assert!(
+        output.contains("notify") && output.contains("onNotification") && output.contains("offNotification"),
+        "Expected NotificationService methods: {}",
+        output
+    );
+}
+
+/// Test wildcard module declarations
+#[test]
+fn test_class_es5_ambient_module_wildcard() {
+    let source = r#"
+declare module "*.json" {
+    const value: any;
+    export default value;
+}
+
+declare module "*.css" {
+    const styles: { [key: string]: string };
+    export default styles;
+}
+
+declare module "*.svg" {
+    const content: string;
+    export default content;
+}
+
+class AssetLoader {
+    private basePath: string;
+    private cache: Map<string, any> = new Map();
+
+    constructor(basePath: string = "") {
+        this.basePath = basePath;
+    }
+
+    getBasePath(): string {
+        return this.basePath;
+    }
+
+    setBasePath(path: string): void {
+        this.basePath = path;
+    }
+
+    async loadJson(path: string): Promise<any> {
+        if (this.cache.has(path)) {
+            return this.cache.get(path);
+        }
+        const data = { loaded: true, path };
+        this.cache.set(path, data);
+        return data;
+    }
+
+    async loadCss(path: string): Promise<Record<string, string>> {
+        if (this.cache.has(path)) {
+            return this.cache.get(path);
+        }
+        const styles = { main: "loaded" };
+        this.cache.set(path, styles);
+        return styles;
+    }
+
+    async loadSvg(path: string): Promise<string> {
+        if (this.cache.has(path)) {
+            return this.cache.get(path);
+        }
+        const content = "<svg></svg>";
+        this.cache.set(path, content);
+        return content;
+    }
+
+    clearCache(): void {
+        this.cache.clear();
+    }
+}
+
+class ThemeManager {
+    private loader: AssetLoader;
+    private currentTheme: string = "default";
+
+    constructor() {
+        this.loader = new AssetLoader("/themes");
+    }
+
+    async loadTheme(name: string): Promise<void> {
+        const styles = await this.loader.loadCss(name + ".css");
+        this.currentTheme = name;
+    }
+
+    getCurrentTheme(): string {
+        return this.currentTheme;
+    }
+
+    async getThemeConfig(name: string): Promise<any> {
+        return this.loader.loadJson(name + ".json");
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // AssetLoader class should be ES5 constructor
+    assert!(
+        output.contains("function AssetLoader"),
+        "Expected ES5 AssetLoader class: {}",
+        output
+    );
+
+    // ThemeManager class should be ES5 constructor
+    assert!(
+        output.contains("function ThemeManager"),
+        "Expected ES5 ThemeManager class: {}",
+        output
+    );
+
+    // AssetLoader methods
+    assert!(
+        output.contains("loadJson") && output.contains("loadCss") && output.contains("loadSvg"),
+        "Expected AssetLoader methods: {}",
+        output
+    );
+
+    // ThemeManager methods
+    assert!(
+        output.contains("loadTheme") && output.contains("getCurrentTheme") && output.contains("getThemeConfig"),
+        "Expected ThemeManager methods: {}",
+        output
+    );
+}
+
+/// Test combined ambient module patterns
+#[test]
+fn test_class_es5_ambient_module_combined() {
+    let source = r#"
+// External library ambient declaration
+declare module "database" {
+    export interface Connection {
+        query<T>(sql: string): Promise<T[]>;
+        execute(sql: string): Promise<void>;
+        close(): Promise<void>;
+    }
+
+    export interface PoolConfig {
+        host: string;
+        port: number;
+        database: string;
+        maxConnections: number;
+    }
+
+    export function createPool(config: PoolConfig): ConnectionPool;
+
+    export class ConnectionPool {
+        getConnection(): Promise<Connection>;
+        releaseConnection(conn: Connection): void;
+        end(): Promise<void>;
+    }
+}
+
+// Global augmentation
+declare global {
+    interface Console {
+        sql(query: string): void;
+    }
+
+    var dbPool: any;
+}
+
+// Another ambient module
+declare module "cache" {
+    export interface CacheOptions {
+        ttl: number;
+        maxSize: number;
+    }
+
+    export class Cache<T> {
+        get(key: string): T | undefined;
+        set(key: string, value: T): void;
+        delete(key: string): boolean;
+        clear(): void;
+    }
+}
+
+class DatabaseService {
+    private config: { host: string; port: number; database: string };
+    private connected: boolean = false;
+
+    constructor(host: string, port: number, database: string) {
+        this.config = { host, port, database };
+    }
+
+    async connect(): Promise<void> {
+        this.connected = true;
+    }
+
+    async disconnect(): Promise<void> {
+        this.connected = false;
+    }
+
+    isConnected(): boolean {
+        return this.connected;
+    }
+
+    getConfig(): { host: string; port: number; database: string } {
+        return this.config;
+    }
+
+    async query<T>(sql: string): Promise<T[]> {
+        if (!this.connected) {
+            throw new Error("Not connected");
+        }
+        return [];
+    }
+
+    async execute(sql: string): Promise<void> {
+        if (!this.connected) {
+            throw new Error("Not connected");
+        }
+    }
+}
+
+class CacheService<T> {
+    private cache: Map<string, { value: T; expires: number }> = new Map();
+    private ttl: number;
+
+    constructor(ttl: number = 60000) {
+        this.ttl = ttl;
+    }
+
+    get(key: string): T | undefined {
+        const entry = this.cache.get(key);
+        if (!entry) return undefined;
+        if (Date.now() > entry.expires) {
+            this.cache.delete(key);
+            return undefined;
+        }
+        return entry.value;
+    }
+
+    set(key: string, value: T): void {
+        this.cache.set(key, {
+            value,
+            expires: Date.now() + this.ttl
+        });
+    }
+
+    delete(key: string): boolean {
+        return this.cache.delete(key);
+    }
+
+    clear(): void {
+        this.cache.clear();
+    }
+
+    has(key: string): boolean {
+        return this.get(key) !== undefined;
+    }
+}
+
+class DataRepository<T extends { id: string }> {
+    private db: DatabaseService;
+    private cache: CacheService<T>;
+    private tableName: string;
+
+    constructor(db: DatabaseService, tableName: string) {
+        this.db = db;
+        this.cache = new CacheService<T>();
+        this.tableName = tableName;
+    }
+
+    async findById(id: string): Promise<T | undefined> {
+        const cached = this.cache.get(id);
+        if (cached) return cached;
+
+        const results = await this.db.query<T>("SELECT * FROM " + this.tableName + " WHERE id = '" + id + "'");
+        if (results.length > 0) {
+            this.cache.set(id, results[0]);
+            return results[0];
+        }
+        return undefined;
+    }
+
+    async save(item: T): Promise<void> {
+        await this.db.execute("INSERT INTO " + this.tableName + " VALUES (...)");
+        this.cache.set(item.id, item);
+    }
+
+    async delete(id: string): Promise<void> {
+        await this.db.execute("DELETE FROM " + this.tableName + " WHERE id = '" + id + "'");
+        this.cache.delete(id);
+    }
+
+    clearCache(): void {
+        this.cache.clear();
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // DatabaseService class should be ES5 constructor
+    assert!(
+        output.contains("function DatabaseService"),
+        "Expected ES5 DatabaseService class: {}",
+        output
+    );
+
+    // CacheService class should be ES5 constructor
+    assert!(
+        output.contains("function CacheService"),
+        "Expected ES5 CacheService class: {}",
+        output
+    );
+
+    // DataRepository class should be ES5 constructor
+    assert!(
+        output.contains("function DataRepository"),
+        "Expected ES5 DataRepository class: {}",
+        output
+    );
+
+    // DatabaseService methods
+    assert!(
+        output.contains("connect") && output.contains("disconnect") && output.contains("query"),
+        "Expected DatabaseService methods: {}",
+        output
+    );
+
+    // CacheService methods
+    assert!(
+        output.contains(".get") && output.contains(".set") && output.contains(".delete"),
+        "Expected CacheService methods: {}",
+        output
+    );
+
+    // DataRepository methods
+    assert!(
+        output.contains("findById") && output.contains("save") && output.contains("clearCache"),
+        "Expected DataRepository methods: {}",
+        output
+    );
+}
