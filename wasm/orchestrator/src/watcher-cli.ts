@@ -4,6 +4,7 @@
  *
  * Runs as a background process to watch for notifications from agents
  * and forward them to the appropriate managers via tmux.
+ * Also runs the heartbeat daemon to periodically poke the director.
  *
  * Usage:
  *   watcher [options]
@@ -12,6 +13,7 @@
  *   --notify-dir <path>   Directory for notification files (default: ~/code/TypeScript/.notify)
  *   --session <name>      Tmux session name (default: zang-org)
  *   --poll-interval <ms>  Polling interval in ms (default: 1000)
+ *   --heartbeat <sec>     Heartbeat interval in seconds (default: 300, 0 to disable)
  *   --verbose             Enable verbose logging
  */
 
@@ -19,11 +21,13 @@ import { NotificationWatcher, createTmuxNotificationHandler } from './notify/ind
 import { TmuxClient } from './tmux/index.js';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
+import { spawn } from 'node:child_process';
 
 interface WatcherOptions {
   notifyDir: string;
   session: string;
   pollInterval: number;
+  heartbeatInterval: number;
   verbose: boolean;
 }
 
@@ -33,6 +37,7 @@ function parseArgs(): WatcherOptions {
     notifyDir: join(homedir(), 'code', 'TypeScript', '.notify'),
     session: 'zang-org',
     pollInterval: 1000,
+    heartbeatInterval: 300,
     verbose: false,
   };
 
@@ -47,6 +52,12 @@ function parseArgs(): WatcherOptions {
         break;
       case '--poll-interval':
         options.pollInterval = parseInt(args[++i] ?? '1000', 10);
+        break;
+      case '--heartbeat':
+        options.heartbeatInterval = parseInt(args[++i] ?? '300', 10);
+        break;
+      case '--no-heartbeat':
+        options.heartbeatInterval = 0;
         break;
       case '--verbose':
       case '-v':
@@ -66,13 +77,18 @@ Options:
                         Default: zang-org
   --poll-interval <ms>  Polling interval in milliseconds
                         Default: 1000
+  --heartbeat <sec>     Heartbeat interval in seconds (pokes director)
+                        Default: 300 (5 minutes)
+  --no-heartbeat        Disable heartbeat
   --verbose, -v         Enable verbose logging
   --help, -h            Show this help message
 
 Examples:
-  watcher                                    # Use defaults
+  watcher                                    # Use defaults (with heartbeat)
   watcher --session test-org --verbose       # Custom session with logging
   watcher --poll-interval 500                # Faster polling
+  watcher --heartbeat 600                    # Poke director every 10 minutes
+  watcher --no-heartbeat                     # Disable heartbeat
 `);
         process.exit(0);
     }
@@ -90,6 +106,7 @@ async function main(): Promise<void> {
   console.log(`Notify Directory: ${options.notifyDir}`);
   console.log(`Tmux Session:     ${options.session}`);
   console.log(`Poll Interval:    ${options.pollInterval}ms`);
+  console.log(`Heartbeat:        ${options.heartbeatInterval > 0 ? `${options.heartbeatInterval}s` : 'disabled'}`);
   console.log('===========================================');
 
   const tmux = new TmuxClient();
@@ -118,20 +135,51 @@ async function main(): Promise<void> {
     tmux
   );
 
-  // Handle graceful shutdown
-  process.on('SIGINT', () => {
-    console.log('\nShutting down watcher...');
-    watcher.stop();
-    process.exit(0);
-  });
+  // Start heartbeat daemon if enabled
+  let heartbeatProcess: ReturnType<typeof spawn> | null = null;
 
-  process.on('SIGTERM', () => {
+  // Handle graceful shutdown
+  const shutdown = (): void => {
     console.log('\nShutting down watcher...');
     watcher.stop();
+    if (heartbeatProcess) {
+      console.log('[Heartbeat] Stopping...');
+      heartbeatProcess.kill();
+    }
     process.exit(0);
-  });
+  };
+
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
 
   watcher.start();
+  if (options.heartbeatInterval > 0) {
+    const heartbeatScript = join(options.notifyDir, 'heartbeat.sh');
+    heartbeatProcess = spawn('bash', [heartbeatScript, '--session', options.session, '--interval', String(options.heartbeatInterval)], {
+      detached: false,
+      stdio: options.verbose ? 'inherit' : 'ignore',
+    });
+
+    heartbeatProcess.on('error', (err) => {
+      console.error('[Heartbeat] Failed to start:', err.message);
+    });
+
+    heartbeatProcess.on('exit', (code) => {
+      if (code !== 0 && code !== null) {
+        console.error(`[Heartbeat] Exited with code ${code}`);
+      }
+    });
+
+    console.log(`[Heartbeat] Started (interval: ${options.heartbeatInterval}s)`);
+  }
+
+  // Clean up heartbeat on exit
+  process.on('beforeExit', () => {
+    if (heartbeatProcess) {
+      heartbeatProcess.kill();
+    }
+  });
+
   console.log('\nWatcher is running. Press Ctrl+C to stop.\n');
 }
 
