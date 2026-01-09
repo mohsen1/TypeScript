@@ -6584,3 +6584,196 @@ fn test_async_generator_method_conditional() {
         output
     );
 }
+
+// ============================================================================
+// ASYNC ARROW EXPRESSION TESTS
+// ============================================================================
+
+fn parse_and_emit_async_arrow_expression(source: &str) -> String {
+    use crate::parser::syntax_kind_ext;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &stmt_idx in &source_file.statements.nodes {
+                if let Some(stmt_node) = parser.arena.get(stmt_idx) {
+                    if stmt_node.kind == syntax_kind_ext::FUNCTION_DECLARATION {
+                        if let Some(func_data) = parser.arena.get_function(stmt_node) {
+                            let emitter = AsyncES5Emitter::new(&parser.arena);
+                            let has_await = emitter.body_contains_await(func_data.body);
+                            let mut emitter = AsyncES5Emitter::new(&parser.arena);
+                            if has_await {
+                                return emitter.emit_generator_body_with_await(func_data.body);
+                            } else {
+                                return emitter.emit_simple_generator_body(func_data.body);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    String::new()
+}
+
+fn async_arrow_expression_contains_await(source: &str) -> bool {
+    use crate::parser::syntax_kind_ext;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &stmt_idx in &source_file.statements.nodes {
+                if let Some(stmt_node) = parser.arena.get(stmt_idx) {
+                    if stmt_node.kind == syntax_kind_ext::FUNCTION_DECLARATION {
+                        if let Some(func_data) = parser.arena.get_function(stmt_node) {
+                            let emitter = AsyncES5Emitter::new(&parser.arena);
+                            return emitter.body_contains_await(func_data.body);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+#[test]
+fn test_async_arrow_expression_basic() {
+    let output = parse_and_emit_async_arrow_expression(
+        "async function foo() { await init(); const fn = async () => { return 42; }; return fn; }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Async arrow expression after await should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_arrow_expression_with_await() {
+    let output = parse_and_emit_async_arrow_expression(
+        "async function foo() { await setup(); const fn = async () => { return await getData(); }; return fn; }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Async arrow with await should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_arrow_expression_no_await() {
+    let output = parse_and_emit_async_arrow_expression(
+        "async function foo() { const fn = async () => { return 42; }; return fn; }",
+    );
+    assert!(
+        output.contains("[2 /*return*/"),
+        "Sync async arrow should have return: {}",
+        output
+    );
+    assert!(
+        !output.contains("switch"),
+        "No await should skip switch: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_arrow_expression_concise_body() {
+    let output = parse_and_emit_async_arrow_expression(
+        "async function foo() { await init(); const fn = async (x: number) => x * 2; return fn; }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Concise body async arrow should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_arrow_expression_body_contains_await() {
+    assert!(
+        async_arrow_expression_contains_await(
+            "async function foo() { await process(); const fn = async () => 1; return fn; }"
+        ),
+        "Should detect await with async arrow expression"
+    );
+}
+
+#[test]
+fn test_async_arrow_expression_body_no_await() {
+    assert!(
+        !async_arrow_expression_contains_await(
+            "async function foo() { const fn = async () => { return 42; }; return fn; }"
+        ),
+        "Should not detect await when none present"
+    );
+}
+
+#[test]
+fn test_async_arrow_expression_ignores_nested_await() {
+    assert!(
+        !async_arrow_expression_contains_await(
+            "async function foo() { const fn = async () => { await getData(); }; return 1; }"
+        ),
+        "Should ignore await in nested async arrow"
+    );
+}
+
+#[test]
+fn test_async_arrow_expression_with_params() {
+    let output = parse_and_emit_async_arrow_expression(
+        "async function foo() { await init(); const fn = async (a: number, b: string) => { return a + b.length; }; return fn; }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Async arrow with params should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_arrow_expression_with_try_catch() {
+    assert!(
+        async_arrow_expression_contains_await(
+            "async function foo() { try { await riskyOp(); const fn = async () => 1; return fn; } catch (e) { return null; } }"
+        ),
+        "Should detect await in try block with async arrow"
+    );
+}
+
+#[test]
+fn test_async_arrow_expression_destructuring_params() {
+    let output = parse_and_emit_async_arrow_expression(
+        "async function foo() { await init(); const fn = async ({ x, y }: any) => x + y; return fn; }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Async arrow with destructuring params should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_arrow_expression_rest_params() {
+    let output = parse_and_emit_async_arrow_expression(
+        "async function foo() { await init(); const fn = async (...args: any[]) => args.length; return fn; }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Async arrow with rest params should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_arrow_expression_conditional() {
+    let output = parse_and_emit_async_arrow_expression(
+        "async function foo(cond: boolean) { if (cond) { await process(); } const fn = async () => 1; return fn; }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Conditional async arrow should have switch or yield: {}",
+        output
+    );
+}
