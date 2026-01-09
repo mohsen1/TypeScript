@@ -9092,3 +9092,309 @@ const UserRepo = createRepository<{ id: number; name: string }>();
         output
     );
 }
+
+// =============================================================================
+// Private Static Methods Tests
+// =============================================================================
+
+#[test]
+fn test_class_es5_private_static_method_validation() {
+    // Private static method for validation
+    let source = r#"
+class Calculator {
+    static #validate(n: number): boolean {
+        return !isNaN(n);
+    }
+
+    static add(a: number, b: number): number {
+        if (!this.#validate(a) || !this.#validate(b)) {
+            throw new Error("Invalid number");
+        }
+        return a + b;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be present
+    assert!(
+        output.contains("Calculator"),
+        "Expected Calculator class: {}",
+        output
+    );
+
+    // Public static method should be present
+    assert!(
+        output.contains("add"),
+        "Expected add method: {}",
+        output
+    );
+
+    // Private method name should be mangled or handled
+    assert!(
+        output.contains("validate"),
+        "Expected validate (private method): {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_private_static_method_multiple() {
+    // Multiple private static methods
+    let source = r#"
+class StringProcessor {
+    static #trim(s: string): string {
+        return s.trim();
+    }
+
+    static #capitalize(s: string): string {
+        return s.charAt(0).toUpperCase() + s.slice(1);
+    }
+
+    static #clean(s: string): string {
+        return this.#trim(s).toLowerCase();
+    }
+
+    static process(input: string): string {
+        const cleaned = this.#clean(input);
+        return this.#capitalize(cleaned);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be present
+    assert!(
+        output.contains("StringProcessor"),
+        "Expected StringProcessor class: {}",
+        output
+    );
+
+    // Public method should be present
+    assert!(
+        output.contains("process"),
+        "Expected process method: {}",
+        output
+    );
+
+    // Private methods should be present (mangled)
+    assert!(
+        output.contains("trim") && output.contains("capitalize") && output.contains("clean"),
+        "Expected private methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_private_static_method_with_field() {
+    // Private static method accessing private static field
+    let source = r#"
+class Counter {
+    static #count: number = 0;
+
+    static #increment(): void {
+        this.#count++;
+    }
+
+    static #reset(): void {
+        this.#count = 0;
+    }
+
+    static tick(): number {
+        this.#increment();
+        return this.#count;
+    }
+
+    static clear(): void {
+        this.#reset();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be present
+    assert!(
+        output.contains("Counter"),
+        "Expected Counter class: {}",
+        output
+    );
+
+    // Public methods should be present
+    assert!(
+        output.contains("tick") && output.contains("clear"),
+        "Expected tick and clear methods: {}",
+        output
+    );
+
+    // Private methods should be present
+    assert!(
+        output.contains("increment") && output.contains("reset"),
+        "Expected increment and reset methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_private_static_method_async() {
+    // Private static async method
+    let source = r#"
+class ApiClient {
+    static #baseUrl: string = "https://api.example.com";
+
+    static async #fetch(endpoint: string): Promise<any> {
+        const response = await fetch(this.#baseUrl + endpoint);
+        return response.json();
+    }
+
+    static async getUsers(): Promise<any[]> {
+        return this.#fetch("/users");
+    }
+
+    static async getUser(id: number): Promise<any> {
+        return this.#fetch("/users/" + id);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be present
+    assert!(
+        output.contains("ApiClient"),
+        "Expected ApiClient class: {}",
+        output
+    );
+
+    // Public methods should be present
+    assert!(
+        output.contains("getUsers") && output.contains("getUser"),
+        "Expected getUsers and getUser methods: {}",
+        output
+    );
+
+    // Async should be transformed (awaiter helper or similar)
+    assert!(
+        output.contains("__awaiter") || output.contains("return") || output.contains("Promise"),
+        "Expected async transformation: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_private_static_method_inheritance() {
+    // Private static method in inheritance context
+    let source = r#"
+class Base {
+    static #log(msg: string): void {
+        console.log("[Base]", msg);
+    }
+
+    static init(): void {
+        this.#log("initializing");
+    }
+}
+
+class Derived extends Base {
+    static #log(msg: string): void {
+        console.log("[Derived]", msg);
+    }
+
+    static setup(): void {
+        this.#log("setting up");
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be present
+    assert!(
+        output.contains("Base") && output.contains("Derived"),
+        "Expected Base and Derived classes: {}",
+        output
+    );
+
+    // Public methods should be present
+    assert!(
+        output.contains("init") && output.contains("setup"),
+        "Expected init and setup methods: {}",
+        output
+    );
+
+    // Inheritance should be present
+    assert!(
+        output.contains("__extends") || output.contains("prototype"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+
+    // Private log methods should be present
+    assert!(
+        output.contains("log"),
+        "Expected log method: {}",
+        output
+    );
+}
