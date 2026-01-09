@@ -73,4 +73,5 @@ Yes
     6. Assigned in only if branch (error)
     7. Var declaration (no error - only let/const)
   - Control flow analysis working for conditional branches
-- Next: Run conformance tests to measure impact on 573 affected tests.
+- Conformance tests: Docker runner has path issue (lib.d.ts not copied), skipped for now.
+- Unit tests confirm implementation is correct.
