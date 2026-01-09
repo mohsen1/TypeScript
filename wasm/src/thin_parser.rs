@@ -7466,6 +7466,9 @@ impl ThinParserState {
         let mut current = element_type;
 
         while self.is_token(SyntaxKind::OpenBracketToken) {
+            if self.look_ahead_is_index_signature() {
+                break;
+            }
             self.next_token();
 
             // Check if this is array type [] or indexed access type [K]
