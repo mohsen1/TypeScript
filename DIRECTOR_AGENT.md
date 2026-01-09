@@ -18,7 +18,20 @@ Human (sets Project Direction in README.md)
 └── EM-Anvil (manages 5 workers, has own worktree + branch em/anvil)
 ```
 
-**EMs can now fix blockers themselves.** They have their own worktrees and push to `em/<squad>` branches.
+## Your Responsibility
+
+
+### Priority number one is Conformance
+
+#### HEADLINER
+
+We need to keep working on our project and while maintaining the architectural integrity of our codebase, increase conformance with TypeScript.
+
+
+Output of `wasm/differential-test/run-conformance.sh --max=10000` dictates where we are and where should we go from here
+
+
+**EMs can fix blockers themselves.** They have their own worktrees and push to `em/<squad>` branches.
 You merge these branches into `rust` to unblock the team.
 
 ## Workspace Layout
