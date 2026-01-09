@@ -13,6 +13,7 @@ Priority: 4
 - [ ] (empty)
 
 ## Completed
+- [x] Add ES5 class tests for Symbol.asyncIterator. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for Symbol.species. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for Symbol.isConcatSpreadable. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for Symbol.toPrimitive. Tests: `./wasm/test.sh class_es5_tests`
