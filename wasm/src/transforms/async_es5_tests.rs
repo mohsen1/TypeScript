@@ -9917,3 +9917,108 @@ fn test_async_iteration_pattern_ignores_nested_async() {
     );
     assert!(!result, "Should not detect await inside nested async in iteration");
 }
+
+// ============================================================================
+// ASYNC CLASS PATTERN TESTS
+// ============================================================================
+
+// Tests for async class patterns: async constructor simulation, async static
+// initialization, async factory methods, async singleton pattern, async
+// dependency injection, async lifecycle hooks.
+
+#[test]
+fn test_async_class_pattern_constructor_simulation() {
+    // Simulating async constructor via static factory
+    let result = async_static_method_contains_await(
+        "class Foo { static async create() { const instance = new Foo(); await instance.init(); return instance; } }",
+    );
+    assert!(result, "Should detect await in async constructor simulation");
+}
+
+#[test]
+fn test_async_class_pattern_static_init() {
+    let result = async_static_method_contains_await(
+        "class Config { static async initialize() { Config.settings = await loadSettings(); } }",
+    );
+    assert!(result, "Should detect await in static initialization");
+}
+
+#[test]
+fn test_async_class_pattern_factory_method() {
+    let result = async_static_method_contains_await(
+        "class UserFactory { static async createUser(data: any) { return await UserFactory.build(data); } }",
+    );
+    assert!(result, "Should detect await in async factory method");
+}
+
+#[test]
+fn test_async_class_pattern_singleton() {
+    let result = async_static_method_contains_await(
+        "class Singleton { static async getInstance() { if (!Singleton.instance) { Singleton.instance = await Singleton.create(); } return Singleton.instance; } }",
+    );
+    assert!(result, "Should detect await in async singleton pattern");
+}
+
+#[test]
+fn test_async_class_pattern_dependency_injection() {
+    let result = async_class_method_extra_contains_await(
+        "class Service { async configure(deps: any) { this.db = await deps.getDatabase(); this.cache = await deps.getCache(); } }",
+    );
+    assert!(result, "Should detect await in async dependency injection");
+}
+
+#[test]
+fn test_async_class_pattern_lifecycle_init() {
+    let result = async_class_method_extra_contains_await(
+        "class Component { async onInit() { await this.loadData(); await this.render(); } }",
+    );
+    assert!(result, "Should detect await in async lifecycle init hook");
+}
+
+#[test]
+fn test_async_class_pattern_lifecycle_destroy() {
+    let result = async_class_method_extra_contains_await(
+        "class Component { async onDestroy() { await this.cleanup(); await this.saveState(); } }",
+    );
+    assert!(result, "Should detect await in async lifecycle destroy hook");
+}
+
+#[test]
+fn test_async_class_pattern_builder() {
+    let result = async_class_method_extra_contains_await(
+        "class Builder { async build() { await this.validate(); return await this.construct(); } }",
+    );
+    assert!(result, "Should detect await in async builder pattern");
+}
+
+#[test]
+fn test_async_class_pattern_repository() {
+    let result = async_class_method_extra_contains_await(
+        "class Repository { async findById(id: string) { return await this.db.query(id); } }",
+    );
+    assert!(result, "Should detect await in async repository pattern");
+}
+
+#[test]
+fn test_async_class_pattern_service_layer() {
+    let result = async_class_method_extra_contains_await(
+        "class UserService { async getUser(id: string) { const user = await this.repo.find(id); return await this.transform(user); } }",
+    );
+    assert!(result, "Should detect await in async service layer pattern");
+}
+
+#[test]
+fn test_async_class_pattern_no_await() {
+    let result = async_class_method_extra_contains_await(
+        "class Foo { async getValue() { return this.cachedValue; } }",
+    );
+    assert!(!result, "Should not detect await when class method has no await");
+}
+
+#[test]
+fn test_async_class_pattern_ignores_nested_async() {
+    let result = async_class_method_extra_contains_await(
+        "class Foo { async setup() { const loader = async () => await loadData(); } }",
+    );
+    assert!(!result, "Should not detect await inside nested async in class");
+}
