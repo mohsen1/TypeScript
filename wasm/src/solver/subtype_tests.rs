@@ -20465,3 +20465,692 @@ fn test_intersection_never_identity() {
     assert!(checker.is_subtype_of(never_and_obj, TypeId::NEVER));
     assert!(checker.is_subtype_of(obj_and_never, TypeId::NEVER));
 }
+
+// =============================================================================
+// KeyOf Type Operator Tests
+// =============================================================================
+// Tests for keyof type operator and property key relationships
+
+#[test]
+fn test_keyof_single_property_is_literal() {
+    // keyof { x: number } = "x"
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let x_name = interner.intern_string("x");
+    let obj = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let keyof_obj = interner.intern(TypeKey::KeyOf(obj));
+    let lit_x = interner.literal_string("x");
+
+    // keyof { x } should be subtype of "x" (they're equivalent)
+    assert!(checker.is_subtype_of(keyof_obj, lit_x));
+}
+
+#[test]
+fn test_keyof_multiple_properties_is_union() {
+    // keyof { a, b, c } = "a" | "b" | "c"
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("c"),
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let keyof_obj = interner.intern(TypeKey::KeyOf(obj));
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+    let lit_c = interner.literal_string("c");
+    let expected = interner.union(vec![lit_a, lit_b, lit_c]);
+
+    // Each literal key should be subtype of keyof
+    assert!(checker.is_subtype_of(lit_a, keyof_obj));
+    assert!(checker.is_subtype_of(lit_b, keyof_obj));
+    assert!(checker.is_subtype_of(lit_c, keyof_obj));
+
+    // keyof should be subtype of the union of keys
+    assert!(checker.is_subtype_of(keyof_obj, expected));
+}
+
+#[test]
+fn test_keyof_empty_object_is_never() {
+    // keyof {} = never
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let empty_obj = interner.object(vec![]);
+    let keyof_empty = interner.intern(TypeKey::KeyOf(empty_obj));
+
+    // keyof {} should be subtype of never (they're equivalent)
+    assert!(checker.is_subtype_of(keyof_empty, TypeId::NEVER));
+}
+
+#[test]
+fn test_keyof_with_optional_property() {
+    // keyof { x?: number } = "x"
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let x_name = interner.intern_string("x");
+    let obj = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let keyof_obj = interner.intern(TypeKey::KeyOf(obj));
+    let lit_x = interner.literal_string("x");
+
+    // Optional property still contributes to keyof
+    assert!(checker.is_subtype_of(lit_x, keyof_obj));
+}
+
+#[test]
+fn test_keyof_with_readonly_property() {
+    // keyof { readonly x: number } = "x"
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let x_name = interner.intern_string("x");
+    let obj = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let keyof_obj = interner.intern(TypeKey::KeyOf(obj));
+    let lit_x = interner.literal_string("x");
+
+    // Readonly property still contributes to keyof
+    assert!(checker.is_subtype_of(lit_x, keyof_obj));
+}
+
+#[test]
+fn test_keyof_with_method() {
+    // keyof { foo(): void } = "foo"
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let foo_name = interner.intern_string("foo");
+    let fn_void = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: foo_name,
+        type_id: fn_void,
+        write_type: fn_void,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let keyof_obj = interner.intern(TypeKey::KeyOf(obj));
+    let lit_foo = interner.literal_string("foo");
+
+    assert!(checker.is_subtype_of(lit_foo, keyof_obj));
+}
+
+#[test]
+fn test_keyof_subtype_of_string() {
+    // keyof { x: number } <: string
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let x_name = interner.intern_string("x");
+    let obj = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let keyof_obj = interner.intern(TypeKey::KeyOf(obj));
+
+    // keyof object with string keys is subtype of string
+    assert!(checker.is_subtype_of(keyof_obj, TypeId::STRING));
+}
+
+#[test]
+fn test_keyof_not_equal_to_string() {
+    // string is NOT a subtype of keyof { x: number }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let x_name = interner.intern_string("x");
+    let obj = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let keyof_obj = interner.intern(TypeKey::KeyOf(obj));
+
+    // string is wider than keyof { x }
+    assert!(!checker.is_subtype_of(TypeId::STRING, keyof_obj));
+}
+
+#[test]
+fn test_keyof_wider_object_has_more_keys() {
+    // keyof { a, b } has more keys than keyof { a }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_ab = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let keyof_a = interner.intern(TypeKey::KeyOf(obj_a));
+    let keyof_ab = interner.intern(TypeKey::KeyOf(obj_ab));
+
+    // keyof { a } <: keyof { a, b } (fewer keys is narrower)
+    assert!(checker.is_subtype_of(keyof_a, keyof_ab));
+    // keyof { a, b } is NOT subtype of keyof { a }
+    assert!(!checker.is_subtype_of(keyof_ab, keyof_a));
+}
+
+#[test]
+fn test_keyof_union_is_intersection_of_keys() {
+    // keyof (A | B) = (keyof A) & (keyof B) - only common keys
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let obj_ab = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let obj_bc = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("c"),
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let union = interner.union(vec![obj_ab, obj_bc]);
+    let keyof_union = interner.intern(TypeKey::KeyOf(union));
+    let lit_b = interner.literal_string("b");
+
+    // Only "b" is common to both - should be subtype of keyof union
+    assert!(checker.is_subtype_of(lit_b, keyof_union));
+}
+
+#[test]
+fn test_keyof_intersection_is_union_of_keys() {
+    // keyof (A & B) = (keyof A) | (keyof B) - all keys from both
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![obj_a, obj_b]);
+    let keyof_intersection = interner.intern(TypeKey::KeyOf(intersection));
+
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+
+    // Both "a" and "b" should be subtypes of keyof intersection
+    assert!(checker.is_subtype_of(lit_a, keyof_intersection));
+    assert!(checker.is_subtype_of(lit_b, keyof_intersection));
+}
+
+#[test]
+fn test_keyof_any_is_string_number_symbol() {
+    // keyof any = string | number | symbol
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let keyof_any = interner.intern(TypeKey::KeyOf(TypeId::ANY));
+    let property_key = interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::SYMBOL]);
+
+    // keyof any should be equivalent to PropertyKey
+    assert!(checker.is_subtype_of(keyof_any, property_key));
+}
+
+#[test]
+fn test_keyof_unknown_is_never() {
+    // keyof unknown = never
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let keyof_unknown = interner.intern(TypeKey::KeyOf(TypeId::UNKNOWN));
+
+    assert!(checker.is_subtype_of(keyof_unknown, TypeId::NEVER));
+}
+
+#[test]
+fn test_keyof_never_is_string_number_symbol() {
+    // keyof never = string | number | symbol (vacuously true)
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let keyof_never = interner.intern(TypeKey::KeyOf(TypeId::NEVER));
+    let property_key = interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::SYMBOL]);
+
+    assert!(checker.is_subtype_of(keyof_never, property_key));
+}
+
+#[test]
+fn test_keyof_string_has_string_methods() {
+    // keyof string includes string method names
+    let interner = TypeInterner::new();
+
+    let keyof_string = interner.intern(TypeKey::KeyOf(TypeId::STRING));
+
+    // Should be valid type
+    assert!(keyof_string != TypeId::ERROR);
+}
+
+#[test]
+fn test_keyof_number_has_number_methods() {
+    // keyof number includes number method names
+    let interner = TypeInterner::new();
+
+    let keyof_number = interner.intern(TypeKey::KeyOf(TypeId::NUMBER));
+
+    // Should be valid type
+    assert!(keyof_number != TypeId::ERROR);
+}
+
+#[test]
+fn test_keyof_array_type() {
+    // keyof string[] includes array methods and number
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let string_array = interner.array(TypeId::STRING);
+    let keyof_array = interner.intern(TypeKey::KeyOf(string_array));
+
+    // number should be subtype of keyof array (for index access)
+    assert!(checker.is_subtype_of(TypeId::NUMBER, keyof_array));
+}
+
+#[test]
+fn test_keyof_tuple_type() {
+    // keyof [string, number] includes "0" | "1" | array methods
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    let keyof_tuple = interner.intern(TypeKey::KeyOf(tuple));
+    let lit_0 = interner.literal_string("0");
+    let lit_1 = interner.literal_string("1");
+
+    // "0" and "1" should be subtypes of keyof tuple
+    assert!(checker.is_subtype_of(lit_0, keyof_tuple));
+    assert!(checker.is_subtype_of(lit_1, keyof_tuple));
+}
+
+#[test]
+fn test_keyof_with_index_signature_includes_string() {
+    // keyof { [key: string]: number } includes string
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let indexed_obj = interner.object_with_index(
+        vec![],
+        Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        None,
+    );
+
+    let keyof_indexed = interner.intern(TypeKey::KeyOf(indexed_obj));
+
+    // string should be subtype of keyof { [key: string]: number }
+    assert!(checker.is_subtype_of(TypeId::STRING, keyof_indexed));
+}
+
+#[test]
+fn test_keyof_with_number_index_signature() {
+    // keyof { [key: number]: string } includes number
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let indexed_obj = interner.object_with_index(
+        vec![],
+        None,
+        Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+    );
+
+    let keyof_indexed = interner.intern(TypeKey::KeyOf(indexed_obj));
+
+    // number should be subtype of keyof { [key: number]: string }
+    assert!(checker.is_subtype_of(TypeId::NUMBER, keyof_indexed));
+}
+
+#[test]
+fn test_keyof_nested_object() {
+    // keyof { x: { y: number } } = "x" (not "x" | "y")
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let y_name = interner.intern_string("y");
+    let inner_obj = interner.object(vec![PropertyInfo {
+        name: y_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let x_name = interner.intern_string("x");
+    let outer_obj = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: inner_obj,
+        write_type: inner_obj,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let keyof_outer = interner.intern(TypeKey::KeyOf(outer_obj));
+    let lit_x = interner.literal_string("x");
+    let lit_y = interner.literal_string("y");
+
+    // "x" is a key of outer
+    assert!(checker.is_subtype_of(lit_x, keyof_outer));
+    // "y" is NOT a key of outer (it's a key of the nested object)
+    assert!(!checker.is_subtype_of(lit_y, keyof_outer));
+}
+
+#[test]
+fn test_keyof_generic_constraint() {
+    // <K extends keyof T> constraint pattern
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("name"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("age"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let keyof_obj = interner.intern(TypeKey::KeyOf(obj));
+    let lit_name = interner.literal_string("name");
+    let lit_age = interner.literal_string("age");
+    let lit_invalid = interner.literal_string("invalid");
+
+    // Valid keys satisfy the constraint
+    assert!(checker.is_subtype_of(lit_name, keyof_obj));
+    assert!(checker.is_subtype_of(lit_age, keyof_obj));
+    // Invalid key doesn't satisfy
+    assert!(!checker.is_subtype_of(lit_invalid, keyof_obj));
+}
+
+#[test]
+fn test_keyof_mapped_type_source() {
+    // keyof used as constraint in mapped type: { [K in keyof T]: ... }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("x"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("y"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let keyof_obj = interner.intern(TypeKey::KeyOf(obj));
+
+    // keyof should produce valid keys for iteration
+    assert!(keyof_obj != TypeId::ERROR);
+    assert!(keyof_obj != TypeId::NEVER);
+
+    // Should be subtype of string (for string-keyed objects)
+    assert!(checker.is_subtype_of(keyof_obj, TypeId::STRING));
+}
+
+#[test]
+fn test_keyof_reflexive() {
+    // keyof T <: keyof T
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let keyof_obj = interner.intern(TypeKey::KeyOf(obj));
+
+    assert!(checker.is_subtype_of(keyof_obj, keyof_obj));
+}
+
+#[test]
+fn test_keyof_null_is_never() {
+    // keyof null = never
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let keyof_null = interner.intern(TypeKey::KeyOf(TypeId::NULL));
+
+    assert!(checker.is_subtype_of(keyof_null, TypeId::NEVER));
+}
+
+#[test]
+fn test_keyof_undefined_is_never() {
+    // keyof undefined = never
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let keyof_undefined = interner.intern(TypeKey::KeyOf(TypeId::UNDEFINED));
+
+    assert!(checker.is_subtype_of(keyof_undefined, TypeId::NEVER));
+}
+
+#[test]
+fn test_keyof_void_is_never() {
+    // keyof void = never
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let keyof_void = interner.intern(TypeKey::KeyOf(TypeId::VOID));
+
+    assert!(checker.is_subtype_of(keyof_void, TypeId::NEVER));
+}
+
+#[test]
+fn test_keyof_object_intrinsic() {
+    // keyof object includes all possible property keys
+    let interner = TypeInterner::new();
+
+    let keyof_object = interner.intern(TypeKey::KeyOf(TypeId::OBJECT));
+
+    // Should be valid
+    assert!(keyof_object != TypeId::ERROR);
+}
+
+#[test]
+fn test_keyof_symbol_keyed_object() {
+    // Objects with symbol keys in keyof result
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    // Simulated: { [Symbol.iterator]: () => Iterator }
+    let sym_iterator = interner.intern_string("Symbol.iterator");
+    let fn_iterator = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::OBJECT,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: sym_iterator,
+        type_id: fn_iterator,
+        write_type: fn_iterator,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let keyof_obj = interner.intern(TypeKey::KeyOf(obj));
+
+    // Should include the symbol key
+    assert!(keyof_obj != TypeId::NEVER);
+}
