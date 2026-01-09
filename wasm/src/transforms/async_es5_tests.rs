@@ -12864,3 +12864,205 @@ fn test_async_pubsub_ignores_nested_async() {
     );
     assert!(!result, "Should not detect await inside nested async pub/sub handler");
 }
+
+// ============================================================================
+// ASYNC RESOURCE POOL PATTERN TESTS
+// Tests for resource pool patterns: acquire, release, drain, resize
+// ============================================================================
+
+#[test]
+fn test_async_respool_acquire() {
+    let result = async_error_propagation_contains_await(
+        "async function acquire() { return await pool.acquire(); }",
+    );
+    assert!(result, "Should detect await in resource pool acquire");
+}
+
+#[test]
+fn test_async_respool_release() {
+    let result = async_error_propagation_contains_await(
+        "async function release(resource) { await pool.release(resource); }",
+    );
+    assert!(result, "Should detect await in resource pool release");
+}
+
+#[test]
+fn test_async_respool_drain() {
+    let result = async_error_propagation_contains_await(
+        "async function drain() { await pool.drain(); }",
+    );
+    assert!(result, "Should detect await in resource pool drain");
+}
+
+#[test]
+fn test_async_respool_resize() {
+    let result = async_error_propagation_contains_await(
+        "async function resize(size) { await pool.resize(size); }",
+    );
+    assert!(result, "Should detect await in resource pool resize");
+}
+
+#[test]
+fn test_async_respool_create() {
+    let result = async_error_propagation_contains_await(
+        "async function create() { return await factory.create(); }",
+    );
+    assert!(result, "Should detect await in resource pool create");
+}
+
+#[test]
+fn test_async_respool_destroy() {
+    let result = async_error_propagation_contains_await(
+        "async function destroy(resource) { await resource.destroy(); }",
+    );
+    assert!(result, "Should detect await in resource pool destroy");
+}
+
+#[test]
+fn test_async_respool_validate() {
+    let result = async_error_propagation_contains_await(
+        "async function validate(resource) { return await resource.validate(); }",
+    );
+    assert!(result, "Should detect await in resource pool validate");
+}
+
+#[test]
+fn test_async_respool_evict() {
+    let result = async_error_propagation_contains_await(
+        "async function evict(predicate) { await pool.evict(predicate); }",
+    );
+    assert!(result, "Should detect await in resource pool evict");
+}
+
+#[test]
+fn test_async_respool_warmup() {
+    let result = async_error_propagation_contains_await(
+        "async function warmup(count) { await pool.warmup(count); }",
+    );
+    assert!(result, "Should detect await in resource pool warmup");
+}
+
+#[test]
+fn test_async_respool_health_check() {
+    let result = async_error_propagation_contains_await(
+        "async function healthCheck() { return await pool.healthCheck(); }",
+    );
+    assert!(result, "Should detect await in resource pool health check");
+}
+
+#[test]
+fn test_async_respool_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function syncPool() { return pool.available(); }",
+    );
+    assert!(!result, "Should not detect await when resource pool is sync");
+}
+
+#[test]
+fn test_async_respool_ignores_nested_async() {
+    let result = async_error_propagation_contains_await(
+        "async function outer() { const factory = async () => await createResource(); }",
+    );
+    assert!(!result, "Should not detect await inside nested async resource pool factory");
+}
+
+// ============================================================================
+// ASYNC TRANSACTION PATTERN TESTS
+// Tests for transaction patterns: begin, commit, rollback, savepoint
+// ============================================================================
+
+#[test]
+fn test_async_transaction_begin() {
+    let result = async_error_propagation_contains_await(
+        "async function begin() { return await db.beginTransaction(); }",
+    );
+    assert!(result, "Should detect await in transaction begin");
+}
+
+#[test]
+fn test_async_transaction_commit() {
+    let result = async_error_propagation_contains_await(
+        "async function commit(tx) { await tx.commit(); }",
+    );
+    assert!(result, "Should detect await in transaction commit");
+}
+
+#[test]
+fn test_async_transaction_rollback() {
+    let result = async_error_propagation_contains_await(
+        "async function rollback(tx) { await tx.rollback(); }",
+    );
+    assert!(result, "Should detect await in transaction rollback");
+}
+
+#[test]
+fn test_async_transaction_savepoint() {
+    let result = async_error_propagation_contains_await(
+        "async function savepoint(tx, name) { await tx.savepoint(name); }",
+    );
+    assert!(result, "Should detect await in transaction savepoint");
+}
+
+#[test]
+fn test_async_transaction_nested() {
+    let result = async_error_propagation_contains_await(
+        "async function nested(tx) { await tx.begin(); await inner(); await tx.commit(); }",
+    );
+    assert!(result, "Should detect await in nested transactions");
+}
+
+#[test]
+fn test_async_transaction_timeout() {
+    let result = async_error_propagation_contains_await(
+        "async function withTimeout() { return await db.transaction({ timeout: 5000 }); }",
+    );
+    assert!(result, "Should detect await in transaction timeout");
+}
+
+#[test]
+fn test_async_transaction_try_catch() {
+    let result = async_error_propagation_contains_await(
+        "async function safe(tx) { try { await tx.execute(); await tx.commit(); } catch { await tx.rollback(); } }",
+    );
+    assert!(result, "Should detect await in transaction try/catch");
+}
+
+#[test]
+fn test_async_transaction_conditional() {
+    let result = async_error_propagation_contains_await(
+        "async function conditional(tx) { if (valid) { await tx.commit(); } else { await tx.rollback(); } }",
+    );
+    assert!(result, "Should detect await in conditional transaction");
+}
+
+#[test]
+fn test_async_transaction_isolation() {
+    let result = async_error_propagation_contains_await(
+        "async function isolation() { return await db.transaction({ isolation: 'serializable' }); }",
+    );
+    assert!(result, "Should detect await in transaction isolation");
+}
+
+#[test]
+fn test_async_transaction_execute() {
+    let result = async_error_propagation_contains_await(
+        "async function execute(tx, query) { return await tx.execute(query); }",
+    );
+    assert!(result, "Should detect await in transaction execute");
+}
+
+#[test]
+fn test_async_transaction_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function syncTx() { return db.inTransaction; }",
+    );
+    assert!(!result, "Should not detect await when transaction is sync");
+}
+
+#[test]
+fn test_async_transaction_ignores_nested_async() {
+    let result = async_error_propagation_contains_await(
+        "async function outer() { const handler = async (tx) => await tx.commit(); }",
+    );
+    assert!(!result, "Should not detect await inside nested async transaction handler");
+}

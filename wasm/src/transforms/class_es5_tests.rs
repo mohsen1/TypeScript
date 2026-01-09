@@ -37061,3 +37061,478 @@ class JSONPathQuery {
         output
     );
 }
+
+// =============================================================================
+// VARIADIC TUPLE PATTERN TESTS - spread, labeled, optional
+// =============================================================================
+
+#[test]
+fn test_class_es5_variadic_tuple_spread() {
+    let source = r#"
+// Variadic tuple spread pattern
+type Prepend<T, U extends unknown[]> = [T, ...U];
+type Append<T extends unknown[], U> = [...T, U];
+type Concat<T extends unknown[], U extends unknown[]> = [...T, ...U];
+
+class TupleBuilder<T extends unknown[]> {
+    private items: T;
+
+    constructor(...items: T) {
+        this.items = items;
+    }
+
+    getItems(): T {
+        return this.items;
+    }
+
+    prepend<U>(item: U): TupleBuilder<[U, ...T]> {
+        return new TupleBuilder(item, ...this.items) as TupleBuilder<[U, ...T]>;
+    }
+
+    append<U>(item: U): TupleBuilder<[...T, U]> {
+        return new TupleBuilder(...this.items, item) as TupleBuilder<[...T, U]>;
+    }
+
+    concat<U extends unknown[]>(other: TupleBuilder<U>): TupleBuilder<[...T, ...U]> {
+        return new TupleBuilder(...this.items, ...other.getItems()) as TupleBuilder<[...T, ...U]>;
+    }
+
+    getLength(): number {
+        return this.items.length;
+    }
+}
+
+class SpreadOperations<T extends unknown[]> {
+    private data: T;
+
+    constructor(data: T) {
+        this.data = data;
+    }
+
+    getData(): T {
+        return this.data;
+    }
+
+    first(): T[0] {
+        return this.data[0];
+    }
+
+    rest(): T extends [unknown, ...infer R] ? R : never {
+        return this.data.slice(1) as T extends [unknown, ...infer R] ? R : never;
+    }
+
+    last(): T extends [...unknown[], infer L] ? L : never {
+        return this.data[this.data.length - 1] as T extends [...unknown[], infer L] ? L : never;
+    }
+
+    init(): T extends [...infer I, unknown] ? I : never {
+        return this.data.slice(0, -1) as T extends [...infer I, unknown] ? I : never;
+    }
+}
+
+class FunctionComposer {
+    compose<A, B, C>(f: (a: A) => B, g: (b: B) => C): (a: A) => C {
+        return (a: A) => g(f(a));
+    }
+
+    pipe<T extends unknown[], R>(
+        ...fns: [...{ [K in keyof T]: (arg: K extends 0 ? T[0] : unknown) => unknown }, (arg: unknown) => R]
+    ): (arg: T[0]) => R {
+        return (arg: T[0]) => fns.reduce((acc, fn) => (fn as Function)(acc), arg) as R;
+    }
+
+    identity<T>(value: T): T {
+        return value;
+    }
+
+    constant<T>(value: T): () => T {
+        return () => value;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("TupleBuilder") && output.contains("SpreadOperations") && output.contains("FunctionComposer"),
+        "Expected variadic tuple spread classes: {}",
+        output
+    );
+
+    // TupleBuilder methods
+    assert!(
+        output.contains("getItems") && output.contains("prepend") && output.contains("append") && output.contains("concat"),
+        "Expected TupleBuilder methods: {}",
+        output
+    );
+
+    // SpreadOperations methods
+    assert!(
+        output.contains("first") && output.contains("rest") && output.contains("last") && output.contains("init"),
+        "Expected SpreadOperations methods: {}",
+        output
+    );
+
+    // FunctionComposer methods
+    assert!(
+        output.contains("compose") && output.contains("pipe") && output.contains("identity"),
+        "Expected FunctionComposer methods: {}",
+        output
+    );
+
+    // Type aliases should be stripped
+    assert!(
+        !output.contains("type Prepend") && !output.contains("type Append") && !output.contains("type Concat"),
+        "Expected type aliases to be stripped: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_variadic_tuple_labeled() {
+    let source = r#"
+// Variadic tuple labeled pattern
+type Point2D = [x: number, y: number];
+type Point3D = [x: number, y: number, z: number];
+type RGB = [red: number, green: number, blue: number];
+type RGBA = [red: number, green: number, blue: number, alpha: number];
+
+class Point2DHandler {
+    private point: Point2D;
+
+    constructor(x: number, y: number) {
+        this.point = [x, y];
+    }
+
+    getX(): number {
+        return this.point[0];
+    }
+
+    getY(): number {
+        return this.point[1];
+    }
+
+    getPoint(): Point2D {
+        return this.point;
+    }
+
+    distanceFromOrigin(): number {
+        return Math.sqrt(this.point[0] ** 2 + this.point[1] ** 2);
+    }
+
+    add(other: Point2D): Point2DHandler {
+        return new Point2DHandler(this.point[0] + other[0], this.point[1] + other[1]);
+    }
+}
+
+class Point3DHandler {
+    private point: Point3D;
+
+    constructor(x: number, y: number, z: number) {
+        this.point = [x, y, z];
+    }
+
+    getX(): number {
+        return this.point[0];
+    }
+
+    getY(): number {
+        return this.point[1];
+    }
+
+    getZ(): number {
+        return this.point[2];
+    }
+
+    getPoint(): Point3D {
+        return this.point;
+    }
+
+    distanceFromOrigin(): number {
+        return Math.sqrt(this.point[0] ** 2 + this.point[1] ** 2 + this.point[2] ** 2);
+    }
+
+    toPoint2D(): Point2DHandler {
+        return new Point2DHandler(this.point[0], this.point[1]);
+    }
+}
+
+class ColorHandler {
+    private color: RGB | RGBA;
+
+    constructor(red: number, green: number, blue: number, alpha?: number) {
+        if (alpha !== undefined) {
+            this.color = [red, green, blue, alpha];
+        } else {
+            this.color = [red, green, blue];
+        }
+    }
+
+    getRed(): number {
+        return this.color[0];
+    }
+
+    getGreen(): number {
+        return this.color[1];
+    }
+
+    getBlue(): number {
+        return this.color[2];
+    }
+
+    getAlpha(): number | undefined {
+        return this.color.length === 4 ? this.color[3] : undefined;
+    }
+
+    hasAlpha(): boolean {
+        return this.color.length === 4;
+    }
+
+    toHexString(): string {
+        const r = this.color[0].toString(16).padStart(2, "0");
+        const g = this.color[1].toString(16).padStart(2, "0");
+        const b = this.color[2].toString(16).padStart(2, "0");
+        return r + g + b;
+    }
+
+    toRGBString(): string {
+        return "rgb(" + this.color[0] + ", " + this.color[1] + ", " + this.color[2] + ")";
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Point2DHandler") && output.contains("Point3DHandler") && output.contains("ColorHandler"),
+        "Expected variadic tuple labeled classes: {}",
+        output
+    );
+
+    // Point2DHandler methods
+    assert!(
+        output.contains("getX") && output.contains("getY") && output.contains("distanceFromOrigin") && output.contains("add"),
+        "Expected Point2DHandler methods: {}",
+        output
+    );
+
+    // Point3DHandler methods
+    assert!(
+        output.contains("getZ") && output.contains("toPoint2D"),
+        "Expected Point3DHandler methods: {}",
+        output
+    );
+
+    // ColorHandler methods
+    assert!(
+        output.contains("getRed") && output.contains("getGreen") && output.contains("getBlue") && output.contains("getAlpha"),
+        "Expected ColorHandler methods: {}",
+        output
+    );
+
+    // Type aliases should be stripped
+    assert!(
+        !output.contains("type Point2D") && !output.contains("type Point3D") && !output.contains("type RGB"),
+        "Expected type aliases to be stripped: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_variadic_tuple_optional() {
+    let source = r#"
+// Variadic tuple optional pattern
+type OptionalTail<T, U?, V?> = [T, U?, V?];
+type ConfigTuple = [host: string, port?: number, secure?: boolean];
+type CallbackTuple = [success: () => void, error?: (err: Error) => void, complete?: () => void];
+
+class ConfigManager {
+    private config: ConfigTuple;
+
+    constructor(host: string, port?: number, secure?: boolean) {
+        this.config = [host, port, secure];
+    }
+
+    getHost(): string {
+        return this.config[0];
+    }
+
+    getPort(): number | undefined {
+        return this.config[1];
+    }
+
+    getSecure(): boolean | undefined {
+        return this.config[2];
+    }
+
+    getPortOrDefault(defaultPort: number): number {
+        return this.config[1] ?? defaultPort;
+    }
+
+    isSecure(): boolean {
+        return this.config[2] ?? false;
+    }
+
+    getUrl(): string {
+        const protocol = this.isSecure() ? "https" : "http";
+        const port = this.getPort();
+        if (port) {
+            return protocol + "://" + this.getHost() + ":" + port;
+        }
+        return protocol + "://" + this.getHost();
+    }
+}
+
+class CallbackManager {
+    private callbacks: CallbackTuple;
+
+    constructor(success: () => void, error?: (err: Error) => void, complete?: () => void) {
+        this.callbacks = [success, error, complete];
+    }
+
+    getSuccess(): () => void {
+        return this.callbacks[0];
+    }
+
+    getError(): ((err: Error) => void) | undefined {
+        return this.callbacks[1];
+    }
+
+    getComplete(): (() => void) | undefined {
+        return this.callbacks[2];
+    }
+
+    execute(): void {
+        try {
+            this.callbacks[0]();
+        } catch (err) {
+            if (this.callbacks[1]) {
+                this.callbacks[1](err as Error);
+            }
+        } finally {
+            if (this.callbacks[2]) {
+                this.callbacks[2]();
+            }
+        }
+    }
+
+    hasErrorHandler(): boolean {
+        return this.callbacks[1] !== undefined;
+    }
+
+    hasCompleteHandler(): boolean {
+        return this.callbacks[2] !== undefined;
+    }
+}
+
+class OptionalArgsHandler<T extends unknown[]> {
+    private args: T;
+
+    constructor(...args: T) {
+        this.args = args;
+    }
+
+    getArgs(): T {
+        return this.args;
+    }
+
+    getArg<K extends keyof T>(index: K): T[K] {
+        return this.args[index];
+    }
+
+    hasArg(index: number): boolean {
+        return index < this.args.length && this.args[index] !== undefined;
+    }
+
+    getArgCount(): number {
+        return this.args.filter(arg => arg !== undefined).length;
+    }
+
+    getTotalSlots(): number {
+        return this.args.length;
+    }
+
+    mapArgs<U>(fn: (arg: T[number]) => U): U[] {
+        return this.args.map(fn);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("ConfigManager") && output.contains("CallbackManager") && output.contains("OptionalArgsHandler"),
+        "Expected variadic tuple optional classes: {}",
+        output
+    );
+
+    // ConfigManager methods
+    assert!(
+        output.contains("getHost") && output.contains("getPort") && output.contains("getSecure") && output.contains("getUrl"),
+        "Expected ConfigManager methods: {}",
+        output
+    );
+
+    // CallbackManager methods
+    assert!(
+        output.contains("getSuccess") && output.contains("getError") && output.contains("execute"),
+        "Expected CallbackManager methods: {}",
+        output
+    );
+
+    // OptionalArgsHandler methods
+    assert!(
+        output.contains("getArgs") && output.contains("getArg") && output.contains("hasArg") && output.contains("getArgCount"),
+        "Expected OptionalArgsHandler methods: {}",
+        output
+    );
+
+    // Type aliases should be stripped
+    assert!(
+        !output.contains("type OptionalTail") && !output.contains("type ConfigTuple") && !output.contains("type CallbackTuple"),
+        "Expected type aliases to be stripped: {}",
+        output
+    );
+}
