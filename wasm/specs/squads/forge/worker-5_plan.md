@@ -172,7 +172,21 @@ Added 40 comprehensive stress tests in `evaluate_tests.rs` covering:
 - `test_distributive_literal_type_filter` - literal type filtering
 - `test_distributive_numeric_literal_filter` - numeric literal range filtering
 
+## Current Assignment (TS7030 - noImplicitReturns)
+- [x] Add `no_implicit_returns` flag to CheckerContext
+- [x] Add TS7030 diagnostic code and message
+- [x] Parse @noImplicitReturns compiler option from source comments
+- [x] Implement TS7030 check in function/method/accessor declarations
+- [x] Add regression tests: `test_no_implicit_returns_ts7030`, `test_no_implicit_returns_disabled`
+
+### TS7030 Implementation Details
+- Error: "Not all code paths return a value."
+- Emits when: `noImplicitReturns && has_return && falls_through`
+- Checks: function declarations, method declarations, getter accessors
+- Unlike TS2366 (requires explicit return type), TS7030 fires even for inferred return types
+
 ## Completed
+- [x] **TS7030 noImplicitReturns**: Implemented check for functions with implicit return paths
 - [x] **Subtype.rs Compilation Fix**: Removed dead code in `(_, TypeKey::TypeQuery(t_sym))` match arm that referenced undefined `s_sym` variable; code was unreachable since resolve_ref would return None in both places.
 - [x] **Class This/Constructor Bug Tests**: Added two ignored tests in `thin_checker_tests.rs` documenting the `this` return type and generic constructor return type bugs (`test_class_method_return_this_no_error`, `test_generic_constructor_return_type_no_error`).
 - [x] **Redux/Lodash Generics Fix**: Cross-file type param resolution for Application expansion; allow mapped keys with `symbol` in unions; treat `any[K]` index access as `any` to satisfy ReducersMapObject constraints and unblock redux test.
