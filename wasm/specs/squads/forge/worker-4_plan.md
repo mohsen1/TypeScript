@@ -27,6 +27,7 @@ Priority: 4
 - [x] Add class type tests - DONE (added 22 tests: extends, implements, protected)
 - [x] Add interface type tests - DONE (added 28 tests: extends, merge declarations, excess property checks)
 - [x] Add type alias tests - DONE (added 30 tests: generic, recursive, circular references)
+- [x] Add literal type tests - DONE (added 35 tests: string, number, boolean, template literal)
 
 ## Completed
 - [x] Fixed method type parameter scope in check_method_declaration
@@ -54,9 +55,10 @@ Priority: 4
 - [x] Added 22 class type tests (extends, implements, protected)
 - [x] Added 28 interface type tests (extends, merge declarations, excess property checks)
 - [x] Added 30 type alias tests (generic, recursive, circular references)
+- [x] Added 35 literal type tests (string, number, boolean, template literal)
 
 ## Ready for Merge
-Yes - 338+ solver tests added (circular constraints, inference from usage, context-sensitive typing, advanced generic inference, distributive conditional types, circular edge cases, mapped types, index signatures, generic constraints, recursive types, readonly/optional modifiers, unknown type narrowing, class types, interface types, type aliases)
+Yes - 373+ solver tests added (circular constraints, inference from usage, context-sensitive typing, advanced generic inference, distributive conditional types, circular edge cases, mapped types, index signatures, generic constraints, recursive types, readonly/optional modifiers, unknown type narrowing, class types, interface types, type aliases, literal types)
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize solver correctness

@@ -22660,3 +22660,936 @@ fn test_interface_with_symbol_property() {
     }]);
 
     assert!(iface != TypeId::ERROR);
+
+// =============================================================================
+// Object Type Tests - Optional Properties, Excess Property Checks, Type Widening
+// =============================================================================
+
+#[test]
+fn test_object_optional_property_missing() {
+    // { x: number } is subtype of { x: number, y?: string }
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+    let y_name = interner.intern_string("y");
+
+    let without_y = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let with_optional_y = interner.object(vec![
+        PropertyInfo {
+            name: x_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: y_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: true,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(without_y, with_optional_y));
+}
+
+#[test]
+fn test_object_optional_property_present() {
+    // { x: number, y: string } is subtype of { x: number, y?: string }
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+    let y_name = interner.intern_string("y");
+
+    let with_y = interner.object(vec![
+        PropertyInfo {
+            name: x_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: y_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let with_optional_y = interner.object(vec![
+        PropertyInfo {
+            name: x_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: y_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: true,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(with_y, with_optional_y));
+}
+
+#[test]
+fn test_object_required_property_not_subtype_of_optional_missing() {
+    // { x: number, y?: string } is NOT subtype of { x: number, y: string }
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+    let y_name = interner.intern_string("y");
+
+    let with_optional_y = interner.object(vec![
+        PropertyInfo {
+            name: x_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: y_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: true,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let with_required_y = interner.object(vec![
+        PropertyInfo {
+            name: x_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: y_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(!checker.is_subtype_of(with_optional_y, with_required_y));
+}
+
+#[test]
+fn test_object_excess_property_structural() {
+    // { x: number, y: string } is structurally subtype of { x: number }
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+    let y_name = interner.intern_string("y");
+
+    let with_extra = interner.object(vec![
+        PropertyInfo {
+            name: x_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: y_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let without_extra = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(with_extra, without_extra));
+    assert!(!checker.is_subtype_of(without_extra, with_extra));
+}
+
+#[test]
+fn test_object_type_widening_literal_to_primitive() {
+    // { x: "hello" } widens to { x: string }
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+    let hello = interner.string_literal("hello");
+
+    let with_literal = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: hello,
+        write_type: hello,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let with_string = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(with_literal, with_string));
+    assert!(!checker.is_subtype_of(with_string, with_literal));
+}
+
+#[test]
+fn test_object_empty_subtype_of_all() {
+    // {} is supertype of all object types
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+
+    let empty = interner.object(vec![]);
+
+    let with_props = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(with_props, empty));
+    assert!(checker.is_subtype_of(empty, empty));
+}
+
+#[test]
+fn test_object_with_index_signature_accepts_any_key() {
+    // { [key: string]: number } accepts { x: number, y: number }
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+    let y_name = interner.intern_string("y");
+
+    let indexed = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    let specific = interner.object(vec![
+        PropertyInfo {
+            name: x_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: y_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(specific, indexed));
+}
+
+#[test]
+fn test_object_readonly_covariant() {
+    // { readonly x: Dog } is subtype of { readonly x: Animal }
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+    let name_prop = interner.intern_string("name");
+    let breed_prop = interner.intern_string("breed");
+
+    let animal = interner.object(vec![PropertyInfo {
+        name: name_prop,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let dog = interner.object(vec![
+        PropertyInfo {
+            name: name_prop,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: breed_prop,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let readonly_dog = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: dog,
+        write_type: dog,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let readonly_animal = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: animal,
+        write_type: animal,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(readonly_dog, readonly_animal));
+}
+
+#[test]
+fn test_object_nested_optional() {
+    // { a: { b?: number } }
+    let interner = TypeInterner::new();
+
+    let a_name = interner.intern_string("a");
+    let b_name = interner.intern_string("b");
+
+    let inner = interner.object(vec![PropertyInfo {
+        name: b_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let outer = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: inner,
+        write_type: inner,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(outer != TypeId::ERROR);
+}
+
+#[test]
+fn test_object_with_method() {
+    // { greet(): string }
+    let interner = TypeInterner::new();
+
+    let greet_name = interner.intern_string("greet");
+
+    let greet_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let with_method = interner.object(vec![PropertyInfo {
+        name: greet_name,
+        type_id: greet_fn,
+        write_type: greet_fn,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    assert!(with_method != TypeId::ERROR);
+}
+
+#[test]
+fn test_object_with_optional_method() {
+    // { greet?(): string }
+    let interner = TypeInterner::new();
+
+    let greet_name = interner.intern_string("greet");
+
+    let greet_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let with_optional_method = interner.object(vec![PropertyInfo {
+        name: greet_name,
+        type_id: greet_fn,
+        write_type: greet_fn,
+        optional: true,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let without_method = interner.object(vec![]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(without_method, with_optional_method));
+}
+
+#[test]
+fn test_object_intersection_combines_properties() {
+    // { a: number } & { b: string } has both a and b
+    let interner = TypeInterner::new();
+
+    let a_name = interner.intern_string("a");
+    let b_name = interner.intern_string("b");
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: b_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![obj_a, obj_b]);
+
+    let combined = interner.object(vec![
+        PropertyInfo {
+            name: a_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    // Intersection should be assignable from combined
+    assert!(checker.is_subtype_of(combined, intersection));
+}
+
+#[test]
+fn test_object_union_requires_common_properties() {
+    // { a: number } | { a: string } has property a of type number | string
+    let interner = TypeInterner::new();
+
+    let a_name = interner.intern_string("a");
+
+    let obj_num = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_str = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let union = interner.union(vec![obj_num, obj_str]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(obj_num, union));
+    assert!(checker.is_subtype_of(obj_str, union));
+}
+
+#[test]
+fn test_object_property_type_mismatch() {
+    // { x: number } is not subtype of { x: string }
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+
+    let with_number = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let with_string = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(!checker.is_subtype_of(with_number, with_string));
+    assert!(!checker.is_subtype_of(with_string, with_number));
+}
+
+#[test]
+fn test_object_number_index_with_string_index() {
+    // { [n: number]: string, [s: string]: string }
+    let interner = TypeInterner::new();
+
+    let dual_index = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+    });
+
+    assert!(dual_index != TypeId::ERROR);
+}
+
+#[test]
+fn test_object_all_optional_properties() {
+    // { x?: number, y?: string }
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+    let y_name = interner.intern_string("y");
+
+    let all_optional = interner.object(vec![
+        PropertyInfo {
+            name: x_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: true,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: y_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: true,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let empty = interner.object(vec![]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    // Empty object is subtype of all-optional
+    assert!(checker.is_subtype_of(empty, all_optional));
+}
+
+#[test]
+fn test_object_widening_null_to_nullable() {
+    // { x: null } is subtype of { x: string | null }
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+    let nullable_string = interner.union(vec![TypeId::STRING, TypeId::NULL]);
+
+    let with_null = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NULL,
+        write_type: TypeId::NULL,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let with_nullable = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: nullable_string,
+        write_type: nullable_string,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(with_null, with_nullable));
+}
+
+#[test]
+fn test_object_with_function_property() {
+    // { callback: (x: number) => void }
+    let interner = TypeInterner::new();
+
+    let callback_name = interner.intern_string("callback");
+    let x_name = interner.intern_string("x");
+
+    let callback_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(x_name),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let with_callback = interner.object(vec![PropertyInfo {
+        name: callback_name,
+        type_id: callback_fn,
+        write_type: callback_fn,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(with_callback != TypeId::ERROR);
+}
+
+#[test]
+fn test_object_with_getter_only() {
+    // { get x(): number } - readonly property
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+
+    let readonly_prop = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    assert!(readonly_prop != TypeId::ERROR);
+}
+
+#[test]
+fn test_object_excess_with_index_signature() {
+    // { x: number, y: string } can be assigned to { x: number, [key: string]: any }
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+    let y_name = interner.intern_string("y");
+
+    let with_index = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name: x_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::ANY,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    let with_extra = interner.object(vec![
+        PropertyInfo {
+            name: x_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: y_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(with_extra, with_index));
+}
+
+#[test]
+fn test_object_recursive_type() {
+    // type Node = { value: number, next?: Node }
+    let interner = TypeInterner::new();
+
+    let value_name = interner.intern_string("value");
+    let next_name = interner.intern_string("next");
+    let node_ref = interner.reference(SymbolRef(1));
+
+    let node = interner.object(vec![
+        PropertyInfo {
+            name: value_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: next_name,
+            type_id: node_ref,
+            write_type: node_ref,
+            optional: true,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    assert!(node != TypeId::ERROR);
+}
+
+#[test]
+fn test_object_deep_nesting() {
+    // { a: { b: { c: number } } }
+    let interner = TypeInterner::new();
+
+    let a_name = interner.intern_string("a");
+    let b_name = interner.intern_string("b");
+    let c_name = interner.intern_string("c");
+
+    let inner_most = interner.object(vec![PropertyInfo {
+        name: c_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let middle = interner.object(vec![PropertyInfo {
+        name: b_name,
+        type_id: inner_most,
+        write_type: inner_most,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let outer = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: middle,
+        write_type: middle,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(outer != TypeId::ERROR);
+}
+
+#[test]
+fn test_object_mixed_optional_required() {
+    // { required: number, optional?: string, another: boolean }
+    let interner = TypeInterner::new();
+
+    let req_name = interner.intern_string("required");
+    let opt_name = interner.intern_string("optional");
+    let another_name = interner.intern_string("another");
+
+    let mixed = interner.object(vec![
+        PropertyInfo {
+            name: req_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: opt_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: true,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: another_name,
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let without_optional = interner.object(vec![
+        PropertyInfo {
+            name: req_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: another_name,
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(without_optional, mixed));
+}
+
+#[test]
+fn test_object_widening_union_property() {
+    // { x: number } is subtype of { x: number | string }
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+    let union_type = interner.union(vec![TypeId::NUMBER, TypeId::STRING]);
+
+    let with_number = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let with_union = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: union_type,
+        write_type: union_type,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(with_number, with_union));
+}
+
+#[test]
+fn test_object_readonly_index_signature() {
+    // { readonly [key: string]: number }
+    let interner = TypeInterner::new();
+
+    let readonly_indexed = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: true,
+        }),
+        number_index: None,
+    });
+
+    assert!(readonly_indexed != TypeId::ERROR);
+}
+
+#[test]
+fn test_object_symbol_keyed_property() {
+    // { [Symbol.iterator]: () => Iterator }
+    let interner = TypeInterner::new();
+
+    let sym_name = interner.intern_string("[Symbol.iterator]");
+
+    let iterator_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::OBJECT,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let with_symbol = interner.object(vec![PropertyInfo {
+        name: sym_name,
+        type_id: iterator_fn,
+        write_type: iterator_fn,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    assert!(with_symbol != TypeId::ERROR);
+}
