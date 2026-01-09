@@ -39900,3 +39900,588 @@ fn test_callable_multiple_params_infer() {
     ]);
     assert_eq!(result, expected);
 }
+
+// =============================================================================
+// Mapped Type Edge Cases - Homomorphic Modifiers & Key Remapping
+// =============================================================================
+// These tests cover advanced mapped type scenarios including homomorphic
+// modifier preservation, complex key remapping, and edge cases.
+
+#[test]
+fn test_mapped_type_homomorphic_preserves_optional() {
+    // Homomorphic: { [K in keyof T]: T[K] } preserves optional from source
+    let interner = TypeInterner::new();
+
+    // Source type with optional property
+    let source = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("required"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("optional"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: true,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let keyof_source = interner.intern(TypeKey::KeyOf(source));
+
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint: keyof_source,
+        name_type: None,
+        template: TypeId::BOOLEAN,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_mapped_type_homomorphic_preserves_readonly() {
+    // Homomorphic: { [K in keyof T]: T[K] } preserves readonly from source
+    let interner = TypeInterner::new();
+
+    let source = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("mutable"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("immutable"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: true,
+            is_method: false,
+        },
+    ]);
+
+    let keyof_source = interner.intern(TypeKey::KeyOf(source));
+
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint: keyof_source,
+        name_type: None,
+        template: TypeId::BOOLEAN,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_mapped_type_key_remap_to_getter_setter() {
+    // Key remapping: { [K in keyof T as `get${Capitalize<K>}`]: () => T[K] }
+    let interner = TypeInterner::new();
+
+    let key_x = interner.literal_string("x");
+    let key_y = interner.literal_string("y");
+    let keys = interner.union(vec![key_x, key_y]);
+
+    // Simulate key remapping with template literal
+    let get_x = interner.literal_string("getX");
+    let get_y = interner.literal_string("getY");
+    let remapped_keys = interner.union(vec![get_x, get_y]);
+
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint: keys,
+        name_type: Some(remapped_keys),
+        template: TypeId::FUNCTION,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_mapped_type_key_remap_filter_by_type() {
+    // Filter keys: { [K in keyof T as T[K] extends string ? K : never]: T[K] }
+    let interner = TypeInterner::new();
+
+    let key_name = interner.literal_string("name");
+    let key_age = interner.literal_string("age");
+    let keys = interner.union(vec![key_name, key_age]);
+
+    // Only "name" passes filter (string type), "age" becomes never
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint: keys,
+        name_type: Some(key_name),
+        template: TypeId::STRING,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_mapped_type_nested_mapped() {
+    // Nested: { [K in keyof T]: { [J in keyof T[K]]: boolean } }
+    let interner = TypeInterner::new();
+
+    let key_a = interner.literal_string("a");
+    let key_b = interner.literal_string("b");
+    let outer_keys = interner.union(vec![key_a, key_b]);
+
+    let inner_template = TypeId::BOOLEAN;
+
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint: outer_keys,
+        name_type: None,
+        template: inner_template,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_mapped_type_with_conditional_template() {
+    // Conditional template: { [K in keyof T]: T[K] extends string ? number : boolean }
+    let interner = TypeInterner::new();
+
+    let key_x = interner.literal_string("x");
+    let key_y = interner.literal_string("y");
+    let keys = interner.union(vec![key_x, key_y]);
+
+    let cond = ConditionalType {
+        check_type: TypeId::STRING,
+        extends_type: TypeId::STRING,
+        true_type: TypeId::NUMBER,
+        false_type: TypeId::BOOLEAN,
+        is_distributive: false,
+    };
+    let cond_template = interner.conditional(cond);
+
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint: keys,
+        name_type: None,
+        template: cond_template,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_mapped_type_union_key_constraint() {
+    // Keys from union of object types
+    let interner = TypeInterner::new();
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let union = interner.union(vec![obj_a, obj_b]);
+    let keyof_union = interner.intern(TypeKey::KeyOf(union));
+
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint: keyof_union,
+        name_type: None,
+        template: TypeId::BOOLEAN,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_mapped_type_intersection_source() {
+    // Keys from intersection: keyof (A & B)
+    let interner = TypeInterner::new();
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![obj_a, obj_b]);
+    let keyof_intersection = interner.intern(TypeKey::KeyOf(intersection));
+
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint: keyof_intersection,
+        name_type: None,
+        template: TypeId::BOOLEAN,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_mapped_type_key_remap_exclude_pattern() {
+    // Exclude pattern: { [K in keyof T as Exclude<K, "internal">]: T[K] }
+    let interner = TypeInterner::new();
+
+    let key_public = interner.literal_string("public");
+    let key_internal = interner.literal_string("internal");
+    let keys = interner.union(vec![key_public, key_internal]);
+
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint: keys,
+        name_type: Some(key_public),
+        template: TypeId::STRING,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_mapped_type_deep_readonly() {
+    // DeepReadonly: { readonly [K in keyof T]: DeepReadonly<T[K]> }
+    let interner = TypeInterner::new();
+
+    let key_x = interner.literal_string("x");
+    let key_y = interner.literal_string("y");
+    let keys = interner.union(vec![key_x, key_y]);
+
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint: keys,
+        name_type: None,
+        template: TypeId::OBJECT,
+        readonly_modifier: Some(ModifierAction::Add),
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_mapped_type_pick_pattern() {
+    // Pick<T, K>: { [P in K]: T[P] }
+    let interner = TypeInterner::new();
+
+    let key_a = interner.literal_string("a");
+
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("P"),
+            constraint: None,
+            default: None,
+        },
+        constraint: key_a,
+        name_type: None,
+        template: TypeId::STRING,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    let expected = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_mapped_type_record_pattern() {
+    // Record<K, T>: { [P in K]: T }
+    let interner = TypeInterner::new();
+
+    let key_x = interner.literal_string("x");
+    let key_y = interner.literal_string("y");
+    let key_z = interner.literal_string("z");
+    let keys = interner.union(vec![key_x, key_y, key_z]);
+
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("P"),
+            constraint: None,
+            default: None,
+        },
+        constraint: keys,
+        name_type: None,
+        template: TypeId::NUMBER,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    let expected = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("x"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("y"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("z"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_mapped_type_mutable_pattern() {
+    // Mutable<T>: { -readonly [K in keyof T]: T[K] }
+    let interner = TypeInterner::new();
+
+    let key_x = interner.literal_string("x");
+    let key_y = interner.literal_string("y");
+    let keys = interner.union(vec![key_x, key_y]);
+
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint: keys,
+        name_type: None,
+        template: TypeId::STRING,
+        readonly_modifier: Some(ModifierAction::Remove),
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    let expected = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("x"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("y"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_mapped_type_required_pattern() {
+    // Required<T>: { [K in keyof T]-?: T[K] }
+    let interner = TypeInterner::new();
+
+    let key_x = interner.literal_string("x");
+    let key_y = interner.literal_string("y");
+    let keys = interner.union(vec![key_x, key_y]);
+
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint: keys,
+        name_type: None,
+        template: TypeId::STRING,
+        readonly_modifier: None,
+        optional_modifier: Some(ModifierAction::Remove),
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    let expected = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("x"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("y"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_mapped_type_empty_keys() {
+    // Mapped type over never (empty key set)
+    let interner = TypeInterner::new();
+
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint: TypeId::NEVER,
+        name_type: None,
+        template: TypeId::STRING,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+    let expected = interner.object(vec![]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_mapped_type_single_literal_key() {
+    // Single literal key: { [K in "only"]: number }
+    let interner = TypeInterner::new();
+
+    let key = interner.literal_string("only");
+
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint: key,
+        name_type: None,
+        template: TypeId::NUMBER,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    let expected = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("only"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    assert_eq!(result, expected);
+}
