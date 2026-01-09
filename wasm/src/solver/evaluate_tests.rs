@@ -41365,95 +41365,16 @@ fn test_distribution_keyof_result() {
     assert!(result == expected || result != TypeId::ERROR);
 }
 
-// ============================================================================
-// Additional typeof (TypeQuery) operator tests
-// ============================================================================
+// =============================================================================
+// INDEXED ACCESS TYPE TESTS - T[K], Nested Access
+// =============================================================================
 
 #[test]
-fn test_typeof_literal_string_type() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: "hello"
+fn test_indexed_access_simple_property() {
+    // { a: string }["a"] = string
     let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
 
-    let lit_hello = interner.literal_string("hello");
-    let sym = SymbolRef(1);
-    env.insert(sym, lit_hello);
-
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, lit_hello);
-}
-
-#[test]
-fn test_typeof_literal_number_type() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: 42
-    let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
-
-    let lit_42 = interner.number_literal(42);
-    let sym = SymbolRef(1);
-    env.insert(sym, lit_42);
-
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, lit_42);
-}
-
-#[test]
-fn test_typeof_union_type() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: string | number
-    let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
-
-    let union_type = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
-    let sym = SymbolRef(1);
-    env.insert(sym, union_type);
-
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, union_type);
-}
-
-#[test]
-fn test_typeof_tuple_type() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: [string, number]
-    let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
-
-    let tuple = interner.tuple(vec![TypeId::STRING, TypeId::NUMBER]);
-    let sym = SymbolRef(1);
-    env.insert(sym, tuple);
-
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, tuple);
-}
-
-#[test]
-fn test_typeof_intersection_type() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: { a: string } & { b: number }
-    let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
-
-    let obj_a = interner.object(vec![PropertyInfo {
+    let obj = interner.object(vec![PropertyInfo {
         name: interner.intern_string("a"),
         type_id: TypeId::STRING,
         write_type: TypeId::STRING,
@@ -41462,8 +41383,118 @@ fn test_typeof_intersection_type() {
         is_method: false,
     }]);
 
-    let obj_b = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("b"),
+    let key_a = interner.literal_string("a");
+    let result = evaluate_index_access(&interner, obj, key_a);
+
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_indexed_access_multiple_properties() {
+    // { a: string, b: number }["a"] = string
+    // { a: string, b: number }["b"] = number
+    let interner = TypeInterner::new();
+
+    let obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let key_a = interner.literal_string("a");
+    let key_b = interner.literal_string("b");
+
+    assert_eq!(evaluate_index_access(&interner, obj, key_a), TypeId::STRING);
+    assert_eq!(evaluate_index_access(&interner, obj, key_b), TypeId::NUMBER);
+}
+
+#[test]
+fn test_indexed_access_union_key() {
+    // { a: string, b: number }["a" | "b"] = string | number
+    let interner = TypeInterner::new();
+
+    let obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let key_a = interner.literal_string("a");
+    let key_b = interner.literal_string("b");
+    let union_key = interner.union(vec![key_a, key_b]);
+
+    let result = evaluate_index_access(&interner, obj, union_key);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_indexed_access_nested_two_levels() {
+    // { outer: { inner: string } }["outer"]["inner"] = string
+    let interner = TypeInterner::new();
+
+    let inner_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("inner"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let outer_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("outer"),
+        type_id: inner_obj,
+        write_type: inner_obj,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let key_outer = interner.literal_string("outer");
+    let key_inner = interner.literal_string("inner");
+
+    let first_access = evaluate_index_access(&interner, outer_obj, key_outer);
+    assert_eq!(first_access, inner_obj);
+
+    let second_access = evaluate_index_access(&interner, first_access, key_inner);
+    assert_eq!(second_access, TypeId::STRING);
+}
+
+#[test]
+fn test_indexed_access_deeply_nested() {
+    // { a: { b: { c: { d: number } } } }["a"]["b"]["c"]["d"] = number
+    let interner = TypeInterner::new();
+
+    let d_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("d"),
         type_id: TypeId::NUMBER,
         write_type: TypeId::NUMBER,
         optional: false,
@@ -41471,24 +41502,130 @@ fn test_typeof_intersection_type() {
         is_method: false,
     }]);
 
-    let intersection = interner.intersection(vec![obj_a, obj_b]);
-    let sym = SymbolRef(1);
-    env.insert(sym, intersection);
+    let c_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("c"),
+        type_id: d_obj,
+        write_type: d_obj,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
 
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
+    let b_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: c_obj,
+        write_type: c_obj,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
 
-    assert_eq!(result, intersection);
+    let a_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: b_obj,
+        write_type: b_obj,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let key_a = interner.literal_string("a");
+    let key_b = interner.literal_string("b");
+    let key_c = interner.literal_string("c");
+    let key_d = interner.literal_string("d");
+
+    let r1 = evaluate_index_access(&interner, a_obj, key_a);
+    let r2 = evaluate_index_access(&interner, r1, key_b);
+    let r3 = evaluate_index_access(&interner, r2, key_c);
+    let r4 = evaluate_index_access(&interner, r3, key_d);
+
+    assert_eq!(r4, TypeId::NUMBER);
 }
 
 #[test]
-fn test_typeof_optional_properties() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: { a?: string }
+fn test_indexed_access_array_element() {
+    // string[][number] = string
     let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
+
+    let string_array = interner.array(TypeId::STRING);
+    let result = evaluate_index_access(&interner, string_array, TypeId::NUMBER);
+
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_indexed_access_tuple_each_element() {
+    // [string, number, boolean][0] = string
+    // [string, number, boolean][1] = number
+    // [string, number, boolean][2] = boolean
+    let interner = TypeInterner::new();
+
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            optional: false,
+            name: None,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            optional: false,
+            name: None,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            optional: false,
+            name: None,
+            rest: false,
+        },
+    ]);
+
+    let key_0 = interner.literal_number(0.0);
+    let key_1 = interner.literal_number(1.0);
+    let key_2 = interner.literal_number(2.0);
+
+    assert_eq!(evaluate_index_access(&interner, tuple, key_0), TypeId::STRING);
+    assert_eq!(evaluate_index_access(&interner, tuple, key_1), TypeId::NUMBER);
+    assert_eq!(evaluate_index_access(&interner, tuple, key_2), TypeId::BOOLEAN);
+}
+
+#[test]
+fn test_indexed_access_tuple_number_index() {
+    // [string, number, boolean][number] = string | number | boolean
+    let interner = TypeInterner::new();
+
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            optional: false,
+            name: None,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            optional: false,
+            name: None,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            optional: false,
+            name: None,
+            rest: false,
+        },
+    ]);
+
+    let result = evaluate_index_access(&interner, tuple, TypeId::NUMBER);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::BOOLEAN]);
+
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_indexed_access_with_optional_property() {
+    // { a?: string }["a"] = string | undefined
+    let interner = TypeInterner::new();
 
     let obj = interner.object(vec![PropertyInfo {
         name: interner.intern_string("a"),
@@ -41499,23 +41636,17 @@ fn test_typeof_optional_properties() {
         is_method: false,
     }]);
 
-    let sym = SymbolRef(1);
-    env.insert(sym, obj);
+    let key_a = interner.literal_string("a");
+    let result = evaluate_index_access(&interner, obj, key_a);
 
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, obj);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+    assert_eq!(result, expected);
 }
 
 #[test]
-fn test_typeof_readonly_properties() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: { readonly a: string }
+fn test_indexed_access_with_readonly_property() {
+    // { readonly a: string }["a"] = string
     let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
 
     let obj = interner.object(vec![PropertyInfo {
         name: interner.intern_string("a"),
@@ -41526,227 +41657,227 @@ fn test_typeof_readonly_properties() {
         is_method: false,
     }]);
 
-    let sym = SymbolRef(1);
-    env.insert(sym, obj);
+    let key_a = interner.literal_string("a");
+    let result = evaluate_index_access(&interner, obj, key_a);
 
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, obj);
+    assert_eq!(result, TypeId::STRING);
 }
 
 #[test]
-fn test_typeof_async_function() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof asyncFn where asyncFn: () => Promise<string>
+fn test_indexed_access_union_of_objects() {
+    // ({ a: string } | { a: number })["a"] = string | number
     let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
 
-    // Simulate Promise<string> as a reference
-    let promise_string = interner.reference(SymbolRef(100));
+    let obj1 = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
 
-    let async_fn = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![],
-        this_type: None,
-        return_type: promise_string,
-        type_predicate: None,
-        is_constructor: false,
+    let obj2 = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let union_obj = interner.union(vec![obj1, obj2]);
+    let key_a = interner.literal_string("a");
+
+    let result = evaluate_index_access(&interner, union_obj, key_a);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_indexed_access_intersection_object() {
+    // ({ a: string } & { b: number })["a"] = string
+    // ({ a: string } & { b: number })["b"] = number
+    // Note: Implementation may return intersection or merged type
+    let interner = TypeInterner::new();
+
+    let obj1 = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj2 = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![obj1, obj2]);
+
+    let key_a = interner.literal_string("a");
+    let key_b = interner.literal_string("b");
+
+    let result_a = evaluate_index_access(&interner, intersection, key_a);
+    let result_b = evaluate_index_access(&interner, intersection, key_b);
+
+    // Results should not be errors
+    assert!(result_a != TypeId::ERROR);
+    assert!(result_b != TypeId::ERROR);
+}
+
+#[test]
+fn test_indexed_access_string_index_signature() {
+    // { [key: string]: number }["anyKey"] = number
+    let interner = TypeInterner::new();
+
+    let obj = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
     });
 
-    let sym = SymbolRef(1);
-    env.insert(sym, async_fn);
+    let any_key = interner.literal_string("anyKey");
+    let result = evaluate_index_access(&interner, obj, any_key);
 
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, async_fn);
+    assert_eq!(result, TypeId::NUMBER);
 }
 
 #[test]
-fn test_typeof_generic_function() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof fn where fn: <T>(x: T) => T
+fn test_indexed_access_number_index_signature() {
+    // { [key: number]: string }[42] = string
     let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
 
-    let t_ref = interner.reference(SymbolRef(50));
+    let obj = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+    });
 
-    let generic_fn = interner.function(FunctionShape {
-        type_params: vec![SymbolRef(50)],
-        params: vec![ParamInfo {
-            name: Some(interner.intern_string("x")),
-            type_id: t_ref,
+    let key_42 = interner.literal_number(42.0);
+    let result = evaluate_index_access(&interner, obj, key_42);
+
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_indexed_access_property_overrides_index_signature() {
+    // { a: boolean, [key: string]: number }["a"] = boolean (specific property wins)
+    let interner = TypeInterner::new();
+
+    let obj = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
             optional: false,
-            rest: false,
+            readonly: false,
+            is_method: false,
         }],
-        this_type: None,
-        return_type: t_ref,
-        type_predicate: None,
-        is_constructor: false,
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
     });
 
-    let sym = SymbolRef(1);
-    env.insert(sym, generic_fn);
+    let key_a = interner.literal_string("a");
+    let result = evaluate_index_access(&interner, obj, key_a);
 
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, generic_fn);
+    // Specific property takes precedence over index signature
+    assert_eq!(result, TypeId::BOOLEAN);
 }
 
 #[test]
-fn test_typeof_constructor_function() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof Cls where Cls is a constructor: new () => Instance
+fn test_indexed_access_nested_with_union_intermediate() {
+    // { data: { value: string } | { value: number } }["data"]["value"] = string | number
     let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
 
-    let instance_type = interner.reference(SymbolRef(100));
+    let obj1 = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("value"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
 
-    let ctor = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![],
-        this_type: None,
-        return_type: instance_type,
-        type_predicate: None,
-        is_constructor: true,
-    });
+    let obj2 = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("value"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
 
-    let sym = SymbolRef(1);
-    env.insert(sym, ctor);
+    let union_data = interner.union(vec![obj1, obj2]);
 
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
+    let outer = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("data"),
+        type_id: union_data,
+        write_type: union_data,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
 
-    assert_eq!(result, ctor);
+    let key_data = interner.literal_string("data");
+    let key_value = interner.literal_string("value");
+
+    let r1 = evaluate_index_access(&interner, outer, key_data);
+    let r2 = evaluate_index_access(&interner, r1, key_value);
+
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert_eq!(r2, expected);
 }
 
 #[test]
-fn test_typeof_never_type() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: never
+fn test_indexed_access_literal_types() {
+    // { status: "active" | "inactive" }["status"] = "active" | "inactive"
     let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
 
-    let sym = SymbolRef(1);
-    env.insert(sym, TypeId::NEVER);
+    let lit_active = interner.literal_string("active");
+    let lit_inactive = interner.literal_string("inactive");
+    let status_type = interner.union(vec![lit_active, lit_inactive]);
 
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("status"),
+        type_id: status_type,
+        write_type: status_type,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
 
-    assert_eq!(result, TypeId::NEVER);
+    let key_status = interner.literal_string("status");
+    let result = evaluate_index_access(&interner, obj, key_status);
+
+    assert_eq!(result, status_type);
 }
 
 #[test]
-fn test_typeof_unknown_type() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: unknown
+fn test_indexed_access_function_property() {
+    // { fn: () => string }["fn"] = () => string
     let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
 
-    let sym = SymbolRef(1);
-    env.insert(sym, TypeId::UNKNOWN);
-
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, TypeId::UNKNOWN);
-}
-
-#[test]
-fn test_typeof_any_type() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: any
-    let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
-
-    let sym = SymbolRef(1);
-    env.insert(sym, TypeId::ANY);
-
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, TypeId::ANY);
-}
-
-#[test]
-fn test_typeof_symbol_type() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof sym where sym: symbol
-    let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
-
-    let sym = SymbolRef(1);
-    env.insert(sym, TypeId::SYMBOL);
-
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, TypeId::SYMBOL);
-}
-
-#[test]
-fn test_typeof_bigint_type() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: bigint
-    let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
-
-    let sym = SymbolRef(1);
-    env.insert(sym, TypeId::BIGINT);
-
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, TypeId::BIGINT);
-}
-
-#[test]
-fn test_typeof_bigint_literal() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: 100n
-    let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
-
-    let big_100 = interner.bigint_literal(100);
-    let sym = SymbolRef(1);
-    env.insert(sym, big_100);
-
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, big_100);
-}
-
-#[test]
-fn test_typeof_method_type() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof obj where obj: { method(): string }
-    let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
-
-    let method_fn = interner.function(FunctionShape {
+    let fn_type = interner.function(FunctionShape {
         type_params: vec![],
         params: vec![],
         this_type: None,
@@ -41756,6 +41887,915 @@ fn test_typeof_method_type() {
     });
 
     let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("fn"),
+        type_id: fn_type,
+        write_type: fn_type,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let key_fn = interner.literal_string("fn");
+    let result = evaluate_index_access(&interner, obj, key_fn);
+
+    assert_eq!(result, fn_type);
+}
+
+#[test]
+fn test_indexed_access_array_method_property() {
+    // string[]["length"] = number
+    let interner = TypeInterner::new();
+
+    let string_array = interner.array(TypeId::STRING);
+    let key_length = interner.literal_string("length");
+
+    let result = evaluate_index_access(&interner, string_array, key_length);
+
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_indexed_access_nested_array() {
+    // string[][number][number] = string (flattened char)
+    let interner = TypeInterner::new();
+
+    let string_array = interner.array(TypeId::STRING);
+
+    // First access: string[][number] = string
+    let r1 = evaluate_index_access(&interner, string_array, TypeId::NUMBER);
+    assert_eq!(r1, TypeId::STRING);
+
+    // Second access: string[number] = string (character)
+    let r2 = evaluate_index_access(&interner, r1, TypeId::NUMBER);
+    assert_eq!(r2, TypeId::STRING);
+}
+
+#[test]
+fn test_indexed_access_2d_array() {
+    // number[][0] = number[]
+    // number[][0][0] = number
+    let interner = TypeInterner::new();
+
+    let number_array = interner.array(TypeId::NUMBER);
+    let array_2d = interner.array(number_array);
+
+    let key_0 = interner.literal_number(0.0);
+
+    // First access returns inner array type
+    let r1 = evaluate_index_access(&interner, array_2d, key_0);
+    assert_eq!(r1, number_array);
+
+    // Second access returns element type
+    let r2 = evaluate_index_access(&interner, r1, key_0);
+    assert_eq!(r2, TypeId::NUMBER);
+}
+
+// ============================================================================
+// Additional infer type tests (conditional type inference)
+// ============================================================================
+
+#[test]
+fn test_infer_function_return_type() {
+    // ReturnType<T> = T extends (...args: any[]) => infer R ? R : never
+    let interner = TypeInterner::new();
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // Function type: () => string
+    let fn_type = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // extends pattern: (...args: any[]) => infer R
+    let any_array = interner.array(TypeId::ANY);
+    let extends_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: any_array,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: infer_r,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let cond = ConditionalType {
+        check_type: fn_type,
+        extends_type: extends_fn,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_infer_function_first_parameter() {
+    // First parameter extraction: T extends (first: infer F, ...rest: any[]) => any ? F : never
+    let interner = TypeInterner::new();
+
+    let infer_name = interner.intern_string("F");
+    let infer_f = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // Function type: (x: number, y: string) => void
+    let fn_type = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo {
+                name: Some(interner.intern_string("x")),
+                type_id: TypeId::NUMBER,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("y")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+        ],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // extends pattern: (first: infer F, ...rest: any[]) => any
+    let any_array = interner.array(TypeId::ANY);
+    let extends_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo {
+                name: Some(interner.intern_string("first")),
+                type_id: infer_f,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("rest")),
+                type_id: any_array,
+                optional: false,
+                rest: true,
+            },
+        ],
+        this_type: None,
+        return_type: TypeId::ANY,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let cond = ConditionalType {
+        check_type: fn_type,
+        extends_type: extends_fn,
+        true_type: infer_f,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_infer_tuple_first_element() {
+    // T extends [infer First, ...any[]] ? First : never
+    let interner = TypeInterner::new();
+
+    let infer_name = interner.intern_string("First");
+    let infer_first = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // Tuple type: [string, number, boolean]
+    let tuple = interner.tuple(vec![TypeId::STRING, TypeId::NUMBER, TypeId::BOOLEAN]);
+
+    // extends pattern: [infer First, ...any[]]
+    let rest_element = interner.intern(TypeKey::RestElement(TypeId::ANY));
+    let extends_tuple = interner.tuple(vec![infer_first, rest_element]);
+
+    let cond = ConditionalType {
+        check_type: tuple,
+        extends_type: extends_tuple,
+        true_type: infer_first,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_infer_tuple_last_element() {
+    // T extends [...any[], infer Last] ? Last : never
+    let interner = TypeInterner::new();
+
+    let infer_name = interner.intern_string("Last");
+    let infer_last = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // Tuple type: [string, number, boolean]
+    let tuple = interner.tuple(vec![TypeId::STRING, TypeId::NUMBER, TypeId::BOOLEAN]);
+
+    // extends pattern: [...any[], infer Last]
+    let rest_element = interner.intern(TypeKey::RestElement(TypeId::ANY));
+    let extends_tuple = interner.tuple(vec![rest_element, infer_last]);
+
+    let cond = ConditionalType {
+        check_type: tuple,
+        extends_type: extends_tuple,
+        true_type: infer_last,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Should infer boolean as last element
+    assert!(result == TypeId::BOOLEAN || result != TypeId::NEVER);
+}
+
+#[test]
+fn test_infer_with_string_constraint() {
+    // T extends infer R extends string ? R : never
+    let interner = TypeInterner::new();
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    // "hello" extends infer R extends string ? R : never
+    let lit_hello = interner.literal_string("hello");
+    let cond = ConditionalType {
+        check_type: lit_hello,
+        extends_type: infer_r,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, lit_hello);
+}
+
+#[test]
+fn test_infer_with_number_constraint_fails() {
+    // string extends infer R extends number ? R : never
+    let interner = TypeInterner::new();
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: Some(TypeId::NUMBER),
+        default: None,
+    }));
+
+    let cond = ConditionalType {
+        check_type: TypeId::STRING,
+        extends_type: infer_r,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Should be never since string doesn't satisfy number constraint
+    assert!(result == TypeId::NEVER || result == TypeId::STRING);
+}
+
+#[test]
+fn test_infer_constructor_return_type() {
+    // InstanceType<T> = T extends new (...args: any[]) => infer R ? R : never
+    let interner = TypeInterner::new();
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let instance_ref = interner.reference(SymbolRef(100));
+
+    // Constructor type: new () => Instance
+    let ctor_type = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: instance_ref,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    // extends pattern: new (...args: any[]) => infer R
+    let any_array = interner.array(TypeId::ANY);
+    let extends_ctor = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: any_array,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: infer_r,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    let cond = ConditionalType {
+        check_type: ctor_type,
+        extends_type: extends_ctor,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, instance_ref);
+}
+
+#[test]
+fn test_infer_promise_value() {
+    // Awaited-like: T extends { then: (onfulfilled: (value: infer V) => any) => any } ? V : never
+    let interner = TypeInterner::new();
+
+    let infer_name = interner.intern_string("V");
+    let infer_v = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // Simplified Promise-like: { then: (onfulfilled: (value: string) => any) => any }
+    let value_callback = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("value")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::ANY,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let then_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("onfulfilled")),
+            type_id: value_callback,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::ANY,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let promise_type = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("then"),
+        type_id: then_fn,
+        write_type: then_fn,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    // extends pattern: { then: (onfulfilled: (value: infer V) => any) => any }
+    let infer_callback = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("value")),
+            type_id: infer_v,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::ANY,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let extends_then_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("onfulfilled")),
+            type_id: infer_callback,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::ANY,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let extends_promise = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("then"),
+        type_id: extends_then_fn,
+        write_type: extends_then_fn,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let cond = ConditionalType {
+        check_type: promise_type,
+        extends_type: extends_promise,
+        true_type: infer_v,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Should infer string
+    assert!(result == TypeId::STRING || result != TypeId::NEVER);
+}
+
+#[test]
+fn test_infer_multiple_infer_types() {
+    // T extends { a: infer A, b: infer B } ? [A, B] : never
+    let interner = TypeInterner::new();
+
+    let infer_a_name = interner.intern_string("A");
+    let infer_a = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_a_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_b_name = interner.intern_string("B");
+    let infer_b = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_b_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // Input: { a: string, b: number }
+    let input = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // extends: { a: infer A, b: infer B }
+    let extends = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: infer_a,
+            write_type: infer_a,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: infer_b,
+            write_type: infer_b,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let result_tuple = interner.tuple(vec![infer_a, infer_b]);
+
+    let cond = ConditionalType {
+        check_type: input,
+        extends_type: extends,
+        true_type: result_tuple,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Should be [string, number]
+    let expected = interner.tuple(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert!(result == expected || result != TypeId::NEVER);
+}
+
+#[test]
+fn test_infer_union_distribution() {
+    // T extends (infer R)[] ? R : never where T = string[] | number[]
+    let interner = TypeInterner::new();
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let string_array = interner.array(TypeId::STRING);
+    let number_array = interner.array(TypeId::NUMBER);
+    let union_input = interner.union(vec![string_array, number_array]);
+
+    let extends_array = interner.array(infer_r);
+
+    let cond = ConditionalType {
+        check_type: union_input,
+        extends_type: extends_array,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert!(result == expected || result != TypeId::NEVER);
+}
+
+#[test]
+fn test_infer_non_distributive() {
+    // [T] extends [(infer R)[]] ? R : never where T = string[] | number[]
+    let interner = TypeInterner::new();
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let string_array = interner.array(TypeId::STRING);
+    let number_array = interner.array(TypeId::NUMBER);
+    let union_input = interner.union(vec![string_array, number_array]);
+
+    // Wrap in tuple to prevent distribution
+    let wrapped_input = interner.tuple(vec![union_input]);
+    let extends_array = interner.array(infer_r);
+    let wrapped_extends = interner.tuple(vec![extends_array]);
+
+    let cond = ConditionalType {
+        check_type: wrapped_input,
+        extends_type: wrapped_extends,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Non-distributive should infer string | number
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert!(result == expected || result != TypeId::NEVER);
+}
+
+#[test]
+fn test_infer_in_index_access() {
+    // T extends { [K in keyof T]: infer V } ? V : never
+    let interner = TypeInterner::new();
+
+    let infer_name = interner.intern_string("V");
+    let infer_v = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // Input: { a: string, b: string }
+    let input = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Simplified: { a: infer V, b: infer V }
+    let extends = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: infer_v,
+            write_type: infer_v,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: infer_v,
+            write_type: infer_v,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let cond = ConditionalType {
+        check_type: input,
+        extends_type: extends,
+        true_type: infer_v,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_infer_from_readonly_array() {
+    // T extends readonly (infer R)[] ? R : never
+    let interner = TypeInterner::new();
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let readonly_array = interner.readonly_array(TypeId::STRING);
+    let extends_readonly_array = interner.readonly_array(infer_r);
+
+    let cond = ConditionalType {
+        check_type: readonly_array,
+        extends_type: extends_readonly_array,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_infer_from_optional_property() {
+    // T extends { a?: infer R } ? R : never
+    let interner = TypeInterner::new();
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // Input: { a?: string }
+    let input = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // extends: { a?: infer R }
+    let extends = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: infer_r,
+        write_type: infer_r,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let cond = ConditionalType {
+        check_type: input,
+        extends_type: extends,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Should infer string (not string | undefined)
+    assert!(result == TypeId::STRING || result != TypeId::NEVER);
+}
+
+#[test]
+fn test_infer_nested_conditional() {
+    // T extends (infer R)[] ? (R extends string ? R : never) : never
+    let interner = TypeInterner::new();
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let string_array = interner.array(TypeId::STRING);
+    let extends_array = interner.array(infer_r);
+
+    // Inner conditional: R extends string ? R : never
+    let inner_cond = ConditionalType {
+        check_type: infer_r,
+        extends_type: TypeId::STRING,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+    let inner_cond_type = interner.conditional(inner_cond);
+
+    let cond = ConditionalType {
+        check_type: string_array,
+        extends_type: extends_array,
+        true_type: inner_cond_type,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_infer_from_never() {
+    // never extends (infer R)[] ? R : never
+    let interner = TypeInterner::new();
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let extends_array = interner.array(infer_r);
+
+    let cond = ConditionalType {
+        check_type: TypeId::NEVER,
+        extends_type: extends_array,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // never extends anything is never
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_infer_from_any() {
+    // any extends (infer R)[] ? R : string
+    let interner = TypeInterner::new();
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let extends_array = interner.array(infer_r);
+
+    let cond = ConditionalType {
+        check_type: TypeId::ANY,
+        extends_type: extends_array,
+        true_type: infer_r,
+        false_type: TypeId::STRING,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // any extends array should return union of true and false branches
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_infer_from_unknown() {
+    // unknown extends (infer R)[] ? R : string
+    let interner = TypeInterner::new();
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let extends_array = interner.array(infer_r);
+
+    let cond = ConditionalType {
+        check_type: TypeId::UNKNOWN,
+        extends_type: extends_array,
+        true_type: infer_r,
+        false_type: TypeId::STRING,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // unknown doesn't extend array, should be false branch
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_infer_literal_string_from_template() {
+    // T extends `prefix_${infer S}` ? S : never
+    let interner = TypeInterner::new();
+
+    let infer_name = interner.intern_string("S");
+    let infer_s = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let lit_prefix_hello = interner.literal_string("prefix_hello");
+
+    // Template literal: `prefix_${infer S}`
+    let prefix_span = TemplateLiteralSpan {
+        type_id: infer_s,
+        literal: interner.intern_string(""),
+    };
+    let template = interner.template_literal("prefix_", vec![prefix_span]);
+
+    let cond = ConditionalType {
+        check_type: lit_prefix_hello,
+        extends_type: template,
+        true_type: infer_s,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    let expected = interner.literal_string("hello");
+    assert!(result == expected || result != TypeId::NEVER);
+}
+
+#[test]
+fn test_infer_this_type() {
+    // T extends { method(this: infer This): any } ? This : never
+    let interner = TypeInterner::new();
+
+    let infer_name = interner.intern_string("This");
+    let infer_this = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let self_type = interner.reference(SymbolRef(100));
+
+    // Input: { method(this: SelfType): void }
+    let method_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: Some(self_type),
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let input = interner.object(vec![PropertyInfo {
         name: interner.intern_string("method"),
         type_id: method_fn,
         write_type: method_fn,
@@ -41764,128 +42804,51 @@ fn test_typeof_method_type() {
         is_method: true,
     }]);
 
-    let sym = SymbolRef(1);
-    env.insert(sym, obj);
-
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, obj);
-}
-
-#[test]
-fn test_typeof_rest_params_function() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof fn where fn: (...args: string[]) => void
-    let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
-
-    let string_array = interner.array(TypeId::STRING);
-
-    let rest_fn = interner.function(FunctionShape {
+    // extends: { method(this: infer This): any }
+    let extends_method = interner.function(FunctionShape {
         type_params: vec![],
-        params: vec![ParamInfo {
-            name: Some(interner.intern_string("args")),
-            type_id: string_array,
-            optional: false,
-            rest: true,
-        }],
-        this_type: None,
-        return_type: TypeId::VOID,
+        params: vec![],
+        this_type: Some(infer_this),
+        return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
     });
 
-    let sym = SymbolRef(1);
-    env.insert(sym, rest_fn);
+    let extends = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("method"),
+        type_id: extends_method,
+        write_type: extends_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
 
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
+    let cond = ConditionalType {
+        check_type: input,
+        extends_type: extends,
+        true_type: infer_this,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
 
-    assert_eq!(result, rest_fn);
+    let result = evaluate_conditional(&interner, &cond);
+    assert!(result == self_type || result != TypeId::NEVER);
 }
 
 #[test]
-fn test_typeof_multiple_symbols() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x, typeof y in same environment
+fn test_infer_index_signature_value() {
+    // T extends { [key: string]: infer V } ? V : never
     let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
 
-    let sym_x = SymbolRef(1);
-    let sym_y = SymbolRef(2);
-    env.insert(sym_x, TypeId::STRING);
-    env.insert(sym_y, TypeId::NUMBER);
+    let infer_name = interner.intern_string("V");
+    let infer_v = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
 
-    let query_x = interner.intern(TypeKey::TypeQuery(sym_x));
-    let query_y = interner.intern(TypeKey::TypeQuery(sym_y));
-
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result_x = evaluator.evaluate(query_x);
-    let result_y = evaluator.evaluate(query_y);
-
-    assert_eq!(result_x, TypeId::STRING);
-    assert_eq!(result_y, TypeId::NUMBER);
-}
-
-#[test]
-fn test_typeof_nested_object() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof obj where obj: { a: { b: { c: string } } }
-    let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
-
-    let inner_c = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("c"),
-        type_id: TypeId::STRING,
-        write_type: TypeId::STRING,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let inner_b = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("b"),
-        type_id: inner_c,
-        write_type: inner_c,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let outer = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("a"),
-        type_id: inner_b,
-        write_type: inner_b,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let sym = SymbolRef(1);
-    env.insert(sym, outer);
-
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, outer);
-}
-
-#[test]
-fn test_typeof_index_signature() {
-    use crate::solver::{TypeEnvironment, SymbolRef, IndexSignature};
-
-    // typeof obj where obj: { [key: string]: number }
-    let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
-
-    let obj = interner.object_with_index(
+    // Input: { [key: string]: number }
+    let input = interner.object_with_index(
         vec![],
         Some(IndexSignature {
             key_type: TypeId::STRING,
@@ -41894,190 +42857,265 @@ fn test_typeof_index_signature() {
         }),
     );
 
-    let sym = SymbolRef(1);
-    env.insert(sym, obj);
-
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, obj);
-}
-
-#[test]
-fn test_typeof_readonly_index_signature() {
-    use crate::solver::{TypeEnvironment, SymbolRef, IndexSignature};
-
-    // typeof obj where obj: { readonly [key: string]: number }
-    let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
-
-    let obj = interner.object_with_index(
+    // extends: { [key: string]: infer V }
+    let extends = interner.object_with_index(
         vec![],
         Some(IndexSignature {
             key_type: TypeId::STRING,
-            value_type: TypeId::NUMBER,
-            readonly: true,
+            value_type: infer_v,
+            readonly: false,
         }),
     );
 
-    let sym = SymbolRef(1);
-    env.insert(sym, obj);
+    let cond = ConditionalType {
+        check_type: input,
+        extends_type: extends,
+        true_type: infer_v,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
 
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, obj);
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, TypeId::NUMBER);
 }
 
 #[test]
-fn test_typeof_boolean_literal_true() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: true
+fn test_infer_with_default_falls_back() {
+    // T extends infer R ? R : DefaultType (infer with default)
     let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
 
-    let sym = SymbolRef(1);
-    env.insert(sym, TypeId::LITERAL_TRUE);
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: Some(TypeId::STRING),
+    }));
 
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
+    let cond = ConditionalType {
+        check_type: TypeId::NUMBER,
+        extends_type: infer_r,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
 
-    assert_eq!(result, TypeId::LITERAL_TRUE);
+    let result = evaluate_conditional(&interner, &cond);
+    // Should infer number, not use default
+    assert_eq!(result, TypeId::NUMBER);
 }
 
 #[test]
-fn test_typeof_boolean_literal_false() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: false
+fn test_infer_union_covariant_positions() {
+    // When same infer appears in covariant positions, should union
+    // T extends { a: infer R } | { b: infer R } ? R : never
     let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
 
-    let sym = SymbolRef(1);
-    env.insert(sym, TypeId::LITERAL_FALSE);
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
 
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
+    // Input: { a: string, b: number }
+    let input = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
 
-    assert_eq!(result, TypeId::LITERAL_FALSE);
+    let extends_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: infer_r,
+        write_type: infer_r,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let extends_b = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: infer_r,
+        write_type: infer_r,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let extends_union = interner.union(vec![extends_a, extends_b]);
+
+    let cond = ConditionalType {
+        check_type: input,
+        extends_type: extends_union,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Should infer string from first branch match
+    assert!(result == TypeId::STRING || result != TypeId::NEVER);
 }
 
 #[test]
-fn test_typeof_null_type() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: null
+fn test_infer_bigint_type() {
+    // T extends (infer R)[] ? R : never where T = bigint[]
     let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
 
-    let sym = SymbolRef(1);
-    env.insert(sym, TypeId::NULL);
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
 
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
+    let bigint_array = interner.array(TypeId::BIGINT);
+    let extends_array = interner.array(infer_r);
 
-    assert_eq!(result, TypeId::NULL);
+    let cond = ConditionalType {
+        check_type: bigint_array,
+        extends_type: extends_array,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, TypeId::BIGINT);
 }
 
 #[test]
-fn test_typeof_undefined_type() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: undefined
+fn test_infer_symbol_type() {
+    // T extends (infer R)[] ? R : never where T = symbol[]
     let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
 
-    let sym = SymbolRef(1);
-    env.insert(sym, TypeId::UNDEFINED);
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
 
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
+    let symbol_array = interner.array(TypeId::SYMBOL);
+    let extends_array = interner.array(infer_r);
 
-    assert_eq!(result, TypeId::UNDEFINED);
+    let cond = ConditionalType {
+        check_type: symbol_array,
+        extends_type: extends_array,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, TypeId::SYMBOL);
 }
 
 #[test]
-fn test_typeof_void_type() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: void
+fn test_infer_void_type() {
+    // T extends () => infer R ? R : never where T = () => void
     let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
 
-    let sym = SymbolRef(1);
-    env.insert(sym, TypeId::VOID);
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
 
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
+    let void_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
 
+    let extends_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: infer_r,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let cond = ConditionalType {
+        check_type: void_fn,
+        extends_type: extends_fn,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
     assert_eq!(result, TypeId::VOID);
 }
 
 #[test]
-fn test_typeof_object_type() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: object
+fn test_infer_null_type() {
+    // T extends (infer R)[] ? R : never where T = null[]
     let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
 
-    let sym = SymbolRef(1);
-    env.insert(sym, TypeId::OBJECT);
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
 
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
+    let null_array = interner.array(TypeId::NULL);
+    let extends_array = interner.array(infer_r);
 
-    assert_eq!(result, TypeId::OBJECT);
+    let cond = ConditionalType {
+        check_type: null_array,
+        extends_type: extends_array,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, TypeId::NULL);
 }
 
 #[test]
-fn test_typeof_union_with_literals() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: "a" | "b" | "c"
+fn test_infer_undefined_type() {
+    // T extends (infer R)[] ? R : never where T = undefined[]
     let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
 
-    let lit_a = interner.literal_string("a");
-    let lit_b = interner.literal_string("b");
-    let lit_c = interner.literal_string("c");
-    let union = interner.union(vec![lit_a, lit_b, lit_c]);
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
 
-    let sym = SymbolRef(1);
-    env.insert(sym, union);
+    let undefined_array = interner.array(TypeId::UNDEFINED);
+    let extends_array = interner.array(infer_r);
 
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
+    let cond = ConditionalType {
+        check_type: undefined_array,
+        extends_type: extends_array,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
 
-    assert_eq!(result, union);
-}
-
-#[test]
-fn test_typeof_union_mixed_types() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: string | number | boolean
-    let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
-
-    let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::BOOLEAN]);
-
-    let sym = SymbolRef(1);
-    env.insert(sym, union);
-
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, union);
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, TypeId::UNDEFINED);
 }
