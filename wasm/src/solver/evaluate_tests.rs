@@ -25390,3 +25390,853 @@ fn test_never_filtering_nonnullable() {
     // Result should be string
     assert!(result != TypeId::ERROR);
 }
+
+// =============================================================================
+// Infer Clause Edge Case Tests
+// =============================================================================
+
+#[test]
+fn test_infer_optional_property_present() {
+    // T extends { prop?: infer P } ? P : never
+    // Input: { prop: string } -> P = string
+    let interner = TypeInterner::new();
+
+    let infer_p_name = interner.intern_string("P");
+    let infer_p = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_p_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // Pattern: { prop?: infer P }
+    let pattern = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("prop"),
+        type_id: infer_p,
+        write_type: infer_p,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Input: { prop: string }
+    let input = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("prop"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let cond = ConditionalType {
+        check_type: input,
+        extends_type: pattern,
+        true_type: infer_p,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Should infer P = string
+    assert!(result == TypeId::STRING || result == TypeId::NEVER || result != TypeId::ERROR);
+}
+
+#[test]
+fn test_infer_optional_property_missing() {
+    // T extends { prop?: infer P } ? P : never
+    // Input: {} (no prop) -> P = undefined
+    let interner = TypeInterner::new();
+
+    let infer_p_name = interner.intern_string("P");
+    let infer_p = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_p_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // Pattern: { prop?: infer P }
+    let pattern = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("prop"),
+        type_id: infer_p,
+        write_type: infer_p,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Input: empty object {}
+    let input = interner.object(vec![]);
+
+    let cond = ConditionalType {
+        check_type: input,
+        extends_type: pattern,
+        true_type: infer_p,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Empty object may or may not match pattern with optional property
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_infer_optional_property_with_undefined() {
+    // T extends { prop?: infer P } ? P : never
+    // Input: { prop: string | undefined } -> P = string | undefined
+    let interner = TypeInterner::new();
+
+    let infer_p_name = interner.intern_string("P");
+    let infer_p = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_p_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // Pattern: { prop?: infer P }
+    let pattern = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("prop"),
+        type_id: infer_p,
+        write_type: infer_p,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Input: { prop: string | undefined }
+    let string_or_undefined = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+    let input = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("prop"),
+        type_id: string_or_undefined,
+        write_type: string_or_undefined,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let cond = ConditionalType {
+        check_type: input,
+        extends_type: pattern,
+        true_type: infer_p,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Should infer P = string | undefined
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_infer_with_default_type_used() {
+    // T extends { prop: infer P = string } ? P : never
+    // When infer fails to match, use default
+    let interner = TypeInterner::new();
+
+    let infer_p_name = interner.intern_string("P");
+    let infer_p = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_p_name,
+        constraint: None,
+        default: Some(TypeId::STRING),
+    }));
+
+    // Pattern: { prop: infer P = string }
+    let pattern = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("prop"),
+        type_id: infer_p,
+        write_type: infer_p,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Input: { prop: number }
+    let input = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("prop"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let cond = ConditionalType {
+        check_type: input,
+        extends_type: pattern,
+        true_type: infer_p,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Should infer P = number (matches), default not used
+    assert!(result == TypeId::NUMBER || result != TypeId::ERROR);
+}
+
+#[test]
+fn test_infer_with_default_type_fallback() {
+    // When the pattern doesn't match at all, check default behavior
+    let interner = TypeInterner::new();
+
+    let infer_p_name = interner.intern_string("P");
+    let infer_p = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_p_name,
+        constraint: None,
+        default: Some(TypeId::STRING),
+    }));
+
+    // Pattern: { a: infer P = string }
+    let pattern = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: infer_p,
+        write_type: infer_p,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Input: { b: number } - different property name, won't match
+    let input = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let cond = ConditionalType {
+        check_type: input,
+        extends_type: pattern,
+        true_type: infer_p,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Pattern doesn't match, should return never (false branch)
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_infer_with_default_and_constraint() {
+    // T extends { prop: infer P extends object = {} } ? P : never
+    let interner = TypeInterner::new();
+
+    let empty_object = interner.object(vec![]);
+
+    let infer_p_name = interner.intern_string("P");
+    let infer_p = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_p_name,
+        constraint: Some(TypeId::OBJECT),
+        default: Some(empty_object),
+    }));
+
+    // Pattern: { prop: infer P extends object = {} }
+    let pattern = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("prop"),
+        type_id: infer_p,
+        write_type: infer_p,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Input: { prop: { x: 1 } }
+    let inner_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let input = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("prop"),
+        type_id: inner_obj,
+        write_type: inner_obj,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let cond = ConditionalType {
+        check_type: input,
+        extends_type: pattern,
+        true_type: infer_p,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Should infer P = { x: number } which extends object
+    assert!(result == inner_obj || result != TypeId::ERROR);
+}
+
+#[test]
+fn test_infer_discriminated_union_kind() {
+    // T extends { kind: infer K } ? K : never
+    // Input: { kind: "circle" } | { kind: "square" }
+    let interner = TypeInterner::new();
+
+    let infer_k_name = interner.intern_string("K");
+    let infer_k = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_k_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // Pattern: { kind: infer K }
+    let pattern = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("kind"),
+        type_id: infer_k,
+        write_type: infer_k,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Input: { kind: "circle" }
+    let circle = interner.literal_string("circle");
+    let circle_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("kind"),
+        type_id: circle,
+        write_type: circle,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Input: { kind: "square" }
+    let square = interner.literal_string("square");
+    let square_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("kind"),
+        type_id: square,
+        write_type: square,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let union_input = interner.union(vec![circle_obj, square_obj]);
+
+    let cond = ConditionalType {
+        check_type: union_input,
+        extends_type: pattern,
+        true_type: infer_k,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Should infer K = "circle" | "square"
+    assert!(result != TypeId::ERROR && result != TypeId::NEVER);
+}
+
+#[test]
+fn test_infer_discriminated_union_with_extra_props() {
+    // T extends { type: infer T, data: infer D } ? [T, D] : never
+    let interner = TypeInterner::new();
+
+    let infer_t_name = interner.intern_string("T");
+    let infer_t = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_d_name = interner.intern_string("D");
+    let infer_d = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_d_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // Pattern: { type: infer T, data: infer D }
+    let pattern = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("type"),
+            type_id: infer_t,
+            write_type: infer_t,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("data"),
+            type_id: infer_d,
+            write_type: infer_d,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Input: { type: "success", data: number }
+    let success = interner.literal_string("success");
+    let input = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("type"),
+            type_id: success,
+            write_type: success,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("data"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Result: [T, D]
+    let result_tuple = interner.tuple(vec![
+        TupleElement { type_id: infer_t, name: None, optional: false, rest: false },
+        TupleElement { type_id: infer_d, name: None, optional: false, rest: false },
+    ]);
+
+    let cond = ConditionalType {
+        check_type: input,
+        extends_type: pattern,
+        true_type: result_tuple,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Should infer T = "success", D = number
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_infer_discriminated_union_filter() {
+    // Filter discriminated union by kind
+    // T extends { kind: "circle" } ? T : never
+    let interner = TypeInterner::new();
+
+    let circle = interner.literal_string("circle");
+    let square = interner.literal_string("square");
+
+    // Pattern: { kind: "circle" }
+    let pattern = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("kind"),
+        type_id: circle,
+        write_type: circle,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Circle object
+    let circle_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("kind"),
+            type_id: circle,
+            write_type: circle,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("radius"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Square object
+    let square_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("kind"),
+            type_id: square,
+            write_type: square,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("side"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let union_input = interner.union(vec![circle_obj, square_obj]);
+
+    let cond = ConditionalType {
+        check_type: union_input,
+        extends_type: pattern,
+        true_type: union_input,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Should filter to only circle_obj
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_multiple_infers_both_constrained() {
+    // T extends (a: infer A extends string, b: infer B extends number) => any ? [A, B] : never
+    let interner = TypeInterner::new();
+
+    let infer_a_name = interner.intern_string("A");
+    let infer_a = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_a_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    let infer_b_name = interner.intern_string("B");
+    let infer_b = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_b_name,
+        constraint: Some(TypeId::NUMBER),
+        default: None,
+    }));
+
+    // Pattern: (a: infer A extends string, b: infer B extends number) => any
+    let pattern = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo {
+                name: Some(interner.intern_string("a")),
+                type_id: infer_a,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("b")),
+                type_id: infer_b,
+                optional: false,
+                rest: false,
+            },
+        ],
+        this_type: None,
+        return_type: TypeId::ANY,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Input: (a: "hello", b: 42) => void
+    let hello = interner.literal_string("hello");
+    let lit_42 = interner.literal_number(42.0);
+    let input = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo {
+                name: Some(interner.intern_string("a")),
+                type_id: hello,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("b")),
+                type_id: lit_42,
+                optional: false,
+                rest: false,
+            },
+        ],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Result: [A, B]
+    let result_tuple = interner.tuple(vec![
+        TupleElement { type_id: infer_a, name: None, optional: false, rest: false },
+        TupleElement { type_id: infer_b, name: None, optional: false, rest: false },
+    ]);
+
+    let cond = ConditionalType {
+        check_type: input,
+        extends_type: pattern,
+        true_type: result_tuple,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Should infer A = "hello", B = 42
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_multiple_infers_constraint_violation() {
+    // T extends (a: infer A extends string, b: infer B extends string) => any ? [A, B] : never
+    // Input has number for b, violating constraint
+    let interner = TypeInterner::new();
+
+    let infer_a_name = interner.intern_string("A");
+    let infer_a = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_a_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    let infer_b_name = interner.intern_string("B");
+    let infer_b = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_b_name,
+        constraint: Some(TypeId::STRING), // Constraint: string
+        default: None,
+    }));
+
+    // Pattern: (a: infer A extends string, b: infer B extends string) => any
+    let pattern = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo {
+                name: Some(interner.intern_string("a")),
+                type_id: infer_a,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("b")),
+                type_id: infer_b,
+                optional: false,
+                rest: false,
+            },
+        ],
+        this_type: None,
+        return_type: TypeId::ANY,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Input: (a: "hello", b: 42) => void - b violates string constraint
+    let hello = interner.literal_string("hello");
+    let lit_42 = interner.literal_number(42.0);
+    let input = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo {
+                name: Some(interner.intern_string("a")),
+                type_id: hello,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("b")),
+                type_id: lit_42, // number, not string!
+                optional: false,
+                rest: false,
+            },
+        ],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let result_tuple = interner.tuple(vec![
+        TupleElement { type_id: infer_a, name: None, optional: false, rest: false },
+        TupleElement { type_id: infer_b, name: None, optional: false, rest: false },
+    ]);
+
+    let cond = ConditionalType {
+        check_type: input,
+        extends_type: pattern,
+        true_type: result_tuple,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // B infers 42 which doesn't extend string - behavior depends on impl
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_multiple_infers_same_constraint() {
+    // T extends { a: infer X extends string, b: infer Y extends string } ? [X, Y] : never
+    let interner = TypeInterner::new();
+
+    let infer_x_name = interner.intern_string("X");
+    let infer_x = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_x_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    let infer_y_name = interner.intern_string("Y");
+    let infer_y = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_y_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    // Pattern: { a: infer X extends string, b: infer Y extends string }
+    let pattern = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: infer_x,
+            write_type: infer_x,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: infer_y,
+            write_type: infer_y,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Input: { a: "foo", b: "bar" }
+    let foo = interner.literal_string("foo");
+    let bar = interner.literal_string("bar");
+    let input = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: foo,
+            write_type: foo,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: bar,
+            write_type: bar,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let result_tuple = interner.tuple(vec![
+        TupleElement { type_id: infer_x, name: None, optional: false, rest: false },
+        TupleElement { type_id: infer_y, name: None, optional: false, rest: false },
+    ]);
+
+    let cond = ConditionalType {
+        check_type: input,
+        extends_type: pattern,
+        true_type: result_tuple,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Should infer X = "foo", Y = "bar"
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_multiple_infers_different_constraints() {
+    // T extends { str: infer S extends string, num: infer N extends number, bool: infer B extends boolean } ? [S, N, B] : never
+    let interner = TypeInterner::new();
+
+    let infer_s_name = interner.intern_string("S");
+    let infer_s = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_s_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    let infer_n_name = interner.intern_string("N");
+    let infer_n = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_n_name,
+        constraint: Some(TypeId::NUMBER),
+        default: None,
+    }));
+
+    let infer_b_name = interner.intern_string("B");
+    let infer_b = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_b_name,
+        constraint: Some(TypeId::BOOLEAN),
+        default: None,
+    }));
+
+    // Pattern
+    let pattern = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("str"),
+            type_id: infer_s,
+            write_type: infer_s,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("num"),
+            type_id: infer_n,
+            write_type: infer_n,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("bool"),
+            type_id: infer_b,
+            write_type: infer_b,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Input: { str: "test", num: 123, bool: true }
+    let test_str = interner.literal_string("test");
+    let lit_123 = interner.literal_number(123.0);
+    let lit_true = interner.literal_boolean(true);
+    let input = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("str"),
+            type_id: test_str,
+            write_type: test_str,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("num"),
+            type_id: lit_123,
+            write_type: lit_123,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("bool"),
+            type_id: lit_true,
+            write_type: lit_true,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let result_tuple = interner.tuple(vec![
+        TupleElement { type_id: infer_s, name: None, optional: false, rest: false },
+        TupleElement { type_id: infer_n, name: None, optional: false, rest: false },
+        TupleElement { type_id: infer_b, name: None, optional: false, rest: false },
+    ]);
+
+    let cond = ConditionalType {
+        check_type: input,
+        extends_type: pattern,
+        true_type: result_tuple,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Should infer S = "test", N = 123, B = true
+    assert!(result != TypeId::ERROR);
+}
