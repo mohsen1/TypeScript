@@ -12922,3 +12922,50 @@ x.type;
     let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
 }
+
+#[test]
+fn test_static_member_inheritance() {
+    // Tests that static methods are inherited from base class to derived class
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class C {
+    foo: string;
+    thing() { }
+    static other() { }
+}
+
+class D extends C {
+    bar: string;
+}
+
+// Direct access on base class - should work
+C.other();
+
+// Access on derived class - should inherit static method
+D.other();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Debug: print all diagnostics
+    eprintln!("=== Diagnostics for static member inheritance ===");
+    for d in &checker.ctx.diagnostics {
+        eprintln!("  code={}, msg={}", d.code, d.message_text);
+    }
+
+    // There should be NO errors - both C.other() and D.other() should work
+    let error_codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(!error_codes.contains(&2339),
+        "Should not have TS2339 error - static members should be inherited. Errors: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
+}
