@@ -37,9 +37,9 @@ Reduce false positives for property access errors by aligning TS2339 behavior wi
 - Extra errors do not increase (no regressions)
 
 ## Task Queue
-- Add targeted tests for union property access and `any`/`unknown` behavior.
+- Re-run TS2339 conformance scan and log deltas.
+- Investigate remaining TS2339 diffs (Symbol.iterator, index-signature property access, private names).
 - Confirm behavior for property access on intersection types.
-- Verify no regressions in existing TS2339 tests.
 
 ## Completed
 - Implemented property access on constrained type parameters in checker and solver.
@@ -47,7 +47,11 @@ Reduce false positives for property access errors by aligning TS2339 behavior wi
 - Added recursion guard for class instance type resolution to avoid stack overflow.
 - Updated cross-scope generic constraints test to expect no errors.
 - Added TS2339 tests for any/unknown/union optional property access.
-- Ran `./wasm/test.sh test_ts2339` (passes; full run still fails: TS2792 module resolution in multi-file import tests).
+- Tracked `this` types for class members and added computed-name checking.
+- Added Object prototype members and static inheritance/namespace merging for TS2339.
+- Allowed class/interface declaration merging in the binder.
+- Added TS2339 tests for static-instance access, computed `this` names, class/interface merges.
+- Ran `./wasm/test.sh test_ts2339_` (passes; full run still fails: TS2792 module resolution in multi-file import tests).
 
 ## Ready for Merge
 Yes

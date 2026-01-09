@@ -1077,6 +1077,18 @@ impl BinderState {
             return true;
         }
 
+        // Interface can merge with class
+        if (existing_flags & symbol_flags::INTERFACE) != 0
+            && (new_flags & symbol_flags::CLASS) != 0
+        {
+            return true;
+        }
+        if (existing_flags & symbol_flags::CLASS) != 0
+            && (new_flags & symbol_flags::INTERFACE) != 0
+        {
+            return true;
+        }
+
         // Namespace/module can merge with namespace/module
         if (existing_flags & symbol_flags::MODULE) != 0
             && (new_flags & symbol_flags::MODULE) != 0

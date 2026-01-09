@@ -169,6 +169,8 @@ pub struct CheckerContext<'a> {
 
     /// Stack of expected return types for functions.
     pub return_type_stack: Vec<TypeId>,
+    /// Stack of current `this` types for class member bodies.
+    pub this_type_stack: Vec<TypeId>,
 
     /// Current enclosing class info.
     pub enclosing_class: Option<EnclosingClassInfo>,
@@ -227,6 +229,7 @@ impl<'a> CheckerContext<'a> {
             instantiation_depth: RefCell::new(0),
             call_depth: RefCell::new(0),
             return_type_stack: Vec::new(),
+            this_type_stack: Vec::new(),
             enclosing_class: None,
             type_env: RefCell::new(TypeEnvironment::new()),
             all_arenas: None,
@@ -267,6 +270,7 @@ impl<'a> CheckerContext<'a> {
             instantiation_depth: RefCell::new(0),
             call_depth: RefCell::new(0),
             return_type_stack: Vec::new(),
+            this_type_stack: Vec::new(),
             enclosing_class: None,
             type_env: RefCell::new(TypeEnvironment::new()),
             all_arenas: None,
