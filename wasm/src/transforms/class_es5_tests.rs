@@ -37536,3 +37536,970 @@ class OptionalArgsHandler<T extends unknown[]> {
         output
     );
 }
+
+// =============================================================================
+// KEY REMAPPING PATTERN TESTS - as clause, template literals
+// =============================================================================
+
+#[test]
+fn test_class_es5_key_remapping_basic_as_clause() {
+    let source = r#"
+// Basic as clause in mapped types
+type Getters<T> = {
+    [K in keyof T as `get${Capitalize<string & K>}`]: () => T[K];
+};
+
+type Setters<T> = {
+    [K in keyof T as `set${Capitalize<string & K>}`]: (value: T[K]) => void;
+};
+
+interface Person {
+    name: string;
+    age: number;
+    email: string;
+}
+
+class PersonAccessors {
+    private data: Person;
+
+    constructor(name: string, age: number, email: string) {
+        this.data = { name, age, email };
+    }
+
+    getName(): string {
+        return this.data.name;
+    }
+
+    setName(value: string): void {
+        this.data.name = value;
+    }
+
+    getAge(): number {
+        return this.data.age;
+    }
+
+    setAge(value: number): void {
+        this.data.age = value;
+    }
+
+    getEmail(): string {
+        return this.data.email;
+    }
+
+    setEmail(value: string): void {
+        this.data.email = value;
+    }
+
+    getData(): Person {
+        return { ...this.data };
+    }
+}
+
+class PropertyMapper<T extends object> {
+    private source: T;
+
+    constructor(source: T) {
+        this.source = source;
+    }
+
+    getSource(): T {
+        return this.source;
+    }
+
+    get<K extends keyof T>(key: K): T[K] {
+        return this.source[key];
+    }
+
+    set<K extends keyof T>(key: K, value: T[K]): void {
+        this.source[key] = value;
+    }
+
+    keys(): (keyof T)[] {
+        return Object.keys(this.source) as (keyof T)[];
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("PersonAccessors") && output.contains("PropertyMapper"),
+        "Expected basic as clause classes: {}",
+        output
+    );
+
+    // PersonAccessors methods
+    assert!(
+        output.contains("getName") && output.contains("setName") && output.contains("getAge") && output.contains("setAge"),
+        "Expected PersonAccessors methods: {}",
+        output
+    );
+
+    // PropertyMapper methods
+    assert!(
+        output.contains("getSource") && output.contains("get") && output.contains("set") && output.contains("keys"),
+        "Expected PropertyMapper methods: {}",
+        output
+    );
+
+    // Type aliases and interface should be stripped
+    assert!(
+        !output.contains("type Getters") && !output.contains("type Setters") && !output.contains("interface Person"),
+        "Expected type aliases to be stripped: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_key_remapping_template_literal() {
+    let source = r#"
+// Template literal key remapping
+type EventHandlers<T> = {
+    [K in keyof T as `on${Capitalize<string & K>}Change`]: (newValue: T[K], oldValue: T[K]) => void;
+};
+
+type PrefixedKeys<T, P extends string> = {
+    [K in keyof T as `${P}_${string & K}`]: T[K];
+};
+
+type SuffixedKeys<T, S extends string> = {
+    [K in keyof T as `${string & K}_${S}`]: T[K];
+};
+
+class EventEmitter<T extends object> {
+    private state: T;
+    private handlers: Map<string, Function[]> = new Map();
+
+    constructor(initialState: T) {
+        this.state = initialState;
+    }
+
+    getState(): T {
+        return { ...this.state };
+    }
+
+    on(event: string, handler: Function): void {
+        if (!this.handlers.has(event)) {
+            this.handlers.set(event, []);
+        }
+        this.handlers.get(event)!.push(handler);
+    }
+
+    off(event: string, handler: Function): void {
+        const handlers = this.handlers.get(event);
+        if (handlers) {
+            const index = handlers.indexOf(handler);
+            if (index >= 0) {
+                handlers.splice(index, 1);
+            }
+        }
+    }
+
+    emit(event: string, ...args: unknown[]): void {
+        const handlers = this.handlers.get(event);
+        if (handlers) {
+            handlers.forEach(h => h(...args));
+        }
+    }
+
+    update<K extends keyof T>(key: K, value: T[K]): void {
+        const oldValue = this.state[key];
+        this.state[key] = value;
+        this.emit("on" + String(key) + "Change", value, oldValue);
+    }
+}
+
+class PrefixedStorage<T extends object> {
+    private prefix: string;
+    private data: Map<string, unknown> = new Map();
+
+    constructor(prefix: string) {
+        this.prefix = prefix;
+    }
+
+    getPrefix(): string {
+        return this.prefix;
+    }
+
+    set<K extends keyof T>(key: K, value: T[K]): void {
+        this.data.set(this.prefix + "_" + String(key), value);
+    }
+
+    get<K extends keyof T>(key: K): T[K] | undefined {
+        return this.data.get(this.prefix + "_" + String(key)) as T[K] | undefined;
+    }
+
+    has<K extends keyof T>(key: K): boolean {
+        return this.data.has(this.prefix + "_" + String(key));
+    }
+
+    delete<K extends keyof T>(key: K): boolean {
+        return this.data.delete(this.prefix + "_" + String(key));
+    }
+
+    clear(): void {
+        this.data.clear();
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("EventEmitter") && output.contains("PrefixedStorage"),
+        "Expected template literal key remapping classes: {}",
+        output
+    );
+
+    // EventEmitter methods
+    assert!(
+        output.contains("getState") && output.contains("on") && output.contains("off") && output.contains("emit") && output.contains("update"),
+        "Expected EventEmitter methods: {}",
+        output
+    );
+
+    // PrefixedStorage methods
+    assert!(
+        output.contains("getPrefix") && output.contains("set") && output.contains("get") && output.contains("has") && output.contains("delete"),
+        "Expected PrefixedStorage methods: {}",
+        output
+    );
+
+    // Type aliases should be stripped
+    assert!(
+        !output.contains("type EventHandlers") && !output.contains("type PrefixedKeys") && !output.contains("type SuffixedKeys"),
+        "Expected type aliases to be stripped: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_key_remapping_conditional_as() {
+    let source = r#"
+// Conditional as clause
+type OnlyStrings<T> = {
+    [K in keyof T as T[K] extends string ? K : never]: T[K];
+};
+
+type OnlyNumbers<T> = {
+    [K in keyof T as T[K] extends number ? K : never]: T[K];
+};
+
+type OnlyFunctions<T> = {
+    [K in keyof T as T[K] extends Function ? K : never]: T[K];
+};
+
+interface MixedData {
+    name: string;
+    age: number;
+    active: boolean;
+    greet: () => string;
+    calculate: (x: number) => number;
+}
+
+class StringFieldsHandler<T extends object> {
+    private data: T;
+
+    constructor(data: T) {
+        this.data = data;
+    }
+
+    getData(): T {
+        return this.data;
+    }
+
+    getStringFields(): string[] {
+        return Object.entries(this.data)
+            .filter(([_, value]) => typeof value === "string")
+            .map(([key, _]) => key);
+    }
+
+    getStringValue(key: string): string | undefined {
+        const value = (this.data as Record<string, unknown>)[key];
+        return typeof value === "string" ? value : undefined;
+    }
+
+    setStringValue(key: string, value: string): void {
+        if (typeof (this.data as Record<string, unknown>)[key] === "string") {
+            (this.data as Record<string, unknown>)[key] = value;
+        }
+    }
+}
+
+class NumberFieldsHandler<T extends object> {
+    private data: T;
+
+    constructor(data: T) {
+        this.data = data;
+    }
+
+    getData(): T {
+        return this.data;
+    }
+
+    getNumberFields(): string[] {
+        return Object.entries(this.data)
+            .filter(([_, value]) => typeof value === "number")
+            .map(([key, _]) => key);
+    }
+
+    sum(): number {
+        return Object.values(this.data)
+            .filter((value): value is number => typeof value === "number")
+            .reduce((acc, val) => acc + val, 0);
+    }
+
+    average(): number {
+        const numbers = Object.values(this.data).filter((value): value is number => typeof value === "number");
+        return numbers.length > 0 ? numbers.reduce((acc, val) => acc + val, 0) / numbers.length : 0;
+    }
+}
+
+class FunctionFieldsHandler<T extends object> {
+    private data: T;
+
+    constructor(data: T) {
+        this.data = data;
+    }
+
+    getData(): T {
+        return this.data;
+    }
+
+    getFunctionFields(): string[] {
+        return Object.entries(this.data)
+            .filter(([_, value]) => typeof value === "function")
+            .map(([key, _]) => key);
+    }
+
+    invoke(key: string, ...args: unknown[]): unknown {
+        const fn = (this.data as Record<string, unknown>)[key];
+        if (typeof fn === "function") {
+            return fn(...args);
+        }
+        return undefined;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("StringFieldsHandler") && output.contains("NumberFieldsHandler") && output.contains("FunctionFieldsHandler"),
+        "Expected conditional as clause classes: {}",
+        output
+    );
+
+    // StringFieldsHandler methods
+    assert!(
+        output.contains("getStringFields") && output.contains("getStringValue") && output.contains("setStringValue"),
+        "Expected StringFieldsHandler methods: {}",
+        output
+    );
+
+    // NumberFieldsHandler methods
+    assert!(
+        output.contains("getNumberFields") && output.contains("sum") && output.contains("average"),
+        "Expected NumberFieldsHandler methods: {}",
+        output
+    );
+
+    // FunctionFieldsHandler methods
+    assert!(
+        output.contains("getFunctionFields") && output.contains("invoke"),
+        "Expected FunctionFieldsHandler methods: {}",
+        output
+    );
+
+    // Type aliases and interface should be stripped
+    assert!(
+        !output.contains("type OnlyStrings") && !output.contains("type OnlyNumbers") && !output.contains("interface MixedData"),
+        "Expected type aliases to be stripped: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_key_remapping_nested() {
+    let source = r#"
+// Nested key remapping
+type DeepGetters<T> = {
+    [K in keyof T as `get${Capitalize<string & K>}`]: T[K] extends object
+        ? () => DeepGetters<T[K]>
+        : () => T[K];
+};
+
+type NestedKeys<T, Prefix extends string = ""> = {
+    [K in keyof T as `${Prefix}${Prefix extends "" ? "" : "."}${string & K}`]: T[K] extends object
+        ? NestedKeys<T[K], `${Prefix}${Prefix extends "" ? "" : "."}${string & K}`>
+        : T[K];
+};
+
+interface NestedConfig {
+    database: {
+        host: string;
+        port: number;
+    };
+    server: {
+        host: string;
+        port: number;
+    };
+}
+
+class NestedConfigHandler {
+    private config: NestedConfig;
+
+    constructor(config: NestedConfig) {
+        this.config = config;
+    }
+
+    getConfig(): NestedConfig {
+        return this.config;
+    }
+
+    getDatabaseHost(): string {
+        return this.config.database.host;
+    }
+
+    getDatabasePort(): number {
+        return this.config.database.port;
+    }
+
+    getServerHost(): string {
+        return this.config.server.host;
+    }
+
+    getServerPort(): number {
+        return this.config.server.port;
+    }
+
+    setDatabaseHost(host: string): void {
+        this.config.database.host = host;
+    }
+
+    setDatabasePort(port: number): void {
+        this.config.database.port = port;
+    }
+
+    setServerHost(host: string): void {
+        this.config.server.host = host;
+    }
+
+    setServerPort(port: number): void {
+        this.config.server.port = port;
+    }
+}
+
+class DeepPropertyAccessor<T extends object> {
+    private data: T;
+
+    constructor(data: T) {
+        this.data = data;
+    }
+
+    getData(): T {
+        return this.data;
+    }
+
+    getByPath(path: string): unknown {
+        const keys = path.split(".");
+        let current: unknown = this.data;
+        for (const key of keys) {
+            if (current === null || current === undefined) {
+                return undefined;
+            }
+            current = (current as Record<string, unknown>)[key];
+        }
+        return current;
+    }
+
+    setByPath(path: string, value: unknown): void {
+        const keys = path.split(".");
+        let current: unknown = this.data;
+        for (let i = 0; i < keys.length - 1; i++) {
+            if (current === null || current === undefined) {
+                return;
+            }
+            current = (current as Record<string, unknown>)[keys[i]];
+        }
+        if (current !== null && current !== undefined) {
+            (current as Record<string, unknown>)[keys[keys.length - 1]] = value;
+        }
+    }
+
+    hasPath(path: string): boolean {
+        return this.getByPath(path) !== undefined;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("NestedConfigHandler") && output.contains("DeepPropertyAccessor"),
+        "Expected nested key remapping classes: {}",
+        output
+    );
+
+    // NestedConfigHandler methods
+    assert!(
+        output.contains("getDatabaseHost") && output.contains("getDatabasePort") && output.contains("getServerHost") && output.contains("getServerPort"),
+        "Expected NestedConfigHandler methods: {}",
+        output
+    );
+
+    // DeepPropertyAccessor methods
+    assert!(
+        output.contains("getByPath") && output.contains("setByPath") && output.contains("hasPath"),
+        "Expected DeepPropertyAccessor methods: {}",
+        output
+    );
+
+    // Type aliases and interface should be stripped
+    assert!(
+        !output.contains("type DeepGetters") && !output.contains("type NestedKeys") && !output.contains("interface NestedConfig"),
+        "Expected type aliases to be stripped: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_key_remapping_filtering() {
+    let source = r#"
+// Key filtering with as
+type ExcludeKeys<T, K extends keyof T> = {
+    [P in keyof T as P extends K ? never : P]: T[P];
+};
+
+type IncludeKeys<T, K extends keyof T> = {
+    [P in keyof T as P extends K ? P : never]: T[P];
+};
+
+type OmitByType<T, U> = {
+    [K in keyof T as T[K] extends U ? never : K]: T[K];
+};
+
+type PickByType<T, U> = {
+    [K in keyof T as T[K] extends U ? K : never]: T[K];
+};
+
+interface FullUser {
+    id: number;
+    name: string;
+    email: string;
+    password: string;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+class PublicUserView {
+    private user: FullUser;
+
+    constructor(user: FullUser) {
+        this.user = user;
+    }
+
+    getId(): number {
+        return this.user.id;
+    }
+
+    getName(): string {
+        return this.user.name;
+    }
+
+    getEmail(): string {
+        return this.user.email;
+    }
+
+    getCreatedAt(): Date {
+        return this.user.createdAt;
+    }
+
+    toJSON(): object {
+        return {
+            id: this.user.id,
+            name: this.user.name,
+            email: this.user.email,
+            createdAt: this.user.createdAt
+        };
+    }
+}
+
+class FilteredDataHandler<T extends object> {
+    private data: T;
+    private excludedKeys: Set<string>;
+
+    constructor(data: T, excludedKeys: string[] = []) {
+        this.data = data;
+        this.excludedKeys = new Set(excludedKeys);
+    }
+
+    getData(): T {
+        return this.data;
+    }
+
+    getFiltered(): Partial<T> {
+        const result: Partial<T> = {};
+        for (const key of Object.keys(this.data) as (keyof T)[]) {
+            if (!this.excludedKeys.has(key as string)) {
+                result[key] = this.data[key];
+            }
+        }
+        return result;
+    }
+
+    exclude(key: string): void {
+        this.excludedKeys.add(key);
+    }
+
+    include(key: string): void {
+        this.excludedKeys.delete(key);
+    }
+
+    isExcluded(key: string): boolean {
+        return this.excludedKeys.has(key);
+    }
+
+    getExcludedKeys(): string[] {
+        return Array.from(this.excludedKeys);
+    }
+}
+
+class TypeFilteredHandler<T extends object> {
+    private data: T;
+
+    constructor(data: T) {
+        this.data = data;
+    }
+
+    getData(): T {
+        return this.data;
+    }
+
+    pickByType<U>(typeChecker: (value: unknown) => value is U): Record<string, U> {
+        const result: Record<string, U> = {};
+        for (const [key, value] of Object.entries(this.data)) {
+            if (typeChecker(value)) {
+                result[key] = value;
+            }
+        }
+        return result;
+    }
+
+    omitByType<U>(typeChecker: (value: unknown) => value is U): Record<string, unknown> {
+        const result: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(this.data)) {
+            if (!typeChecker(value)) {
+                result[key] = value;
+            }
+        }
+        return result;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("PublicUserView") && output.contains("FilteredDataHandler") && output.contains("TypeFilteredHandler"),
+        "Expected key filtering classes: {}",
+        output
+    );
+
+    // PublicUserView methods
+    assert!(
+        output.contains("getId") && output.contains("getName") && output.contains("getEmail") && output.contains("toJSON"),
+        "Expected PublicUserView methods: {}",
+        output
+    );
+
+    // FilteredDataHandler methods
+    assert!(
+        output.contains("getFiltered") && output.contains("exclude") && output.contains("include") && output.contains("isExcluded"),
+        "Expected FilteredDataHandler methods: {}",
+        output
+    );
+
+    // TypeFilteredHandler methods
+    assert!(
+        output.contains("pickByType") && output.contains("omitByType"),
+        "Expected TypeFilteredHandler methods: {}",
+        output
+    );
+
+    // Type aliases and interface should be stripped
+    assert!(
+        !output.contains("type ExcludeKeys") && !output.contains("type PickByType") && !output.contains("interface FullUser"),
+        "Expected type aliases to be stripped: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_key_remapping_combined() {
+    let source = r#"
+// Combined key remapping patterns
+type AsyncMethods<T> = {
+    [K in keyof T as T[K] extends (...args: infer A) => infer R
+        ? `${string & K}Async`
+        : never]: T[K] extends (...args: infer A) => infer R
+        ? (...args: A) => Promise<R>
+        : never;
+};
+
+type ObservableProps<T> = {
+    [K in keyof T as T[K] extends Function ? never : `${string & K}$`]: {
+        subscribe: (callback: (value: T[K]) => void) => () => void;
+        getValue: () => T[K];
+    };
+};
+
+type ValidatedFields<T> = {
+    [K in keyof T as `validate${Capitalize<string & K>}`]: (value: T[K]) => boolean;
+} & {
+    [K in keyof T as `${string & K}Error`]: string | null;
+};
+
+class AsyncWrapper<T extends object> {
+    private target: T;
+
+    constructor(target: T) {
+        this.target = target;
+    }
+
+    getTarget(): T {
+        return this.target;
+    }
+
+    async callAsync<K extends keyof T>(
+        method: K,
+        ...args: T[K] extends (...args: infer A) => unknown ? A : never[]
+    ): Promise<T[K] extends (...args: unknown[]) => infer R ? R : never> {
+        const fn = this.target[method];
+        if (typeof fn === "function") {
+            return Promise.resolve(fn.apply(this.target, args));
+        }
+        throw new Error("Not a function: " + String(method));
+    }
+
+    wrapMethod<K extends keyof T>(method: K): (...args: unknown[]) => Promise<unknown> {
+        return async (...args: unknown[]) => {
+            const fn = this.target[method];
+            if (typeof fn === "function") {
+                return fn.apply(this.target, args);
+            }
+            throw new Error("Not a function: " + String(method));
+        };
+    }
+}
+
+class ObservableState<T extends object> {
+    private state: T;
+    private subscribers: Map<keyof T, Set<(value: unknown) => void>> = new Map();
+
+    constructor(initialState: T) {
+        this.state = initialState;
+    }
+
+    getState(): T {
+        return { ...this.state };
+    }
+
+    getValue<K extends keyof T>(key: K): T[K] {
+        return this.state[key];
+    }
+
+    setValue<K extends keyof T>(key: K, value: T[K]): void {
+        this.state[key] = value;
+        this.notify(key, value);
+    }
+
+    subscribe<K extends keyof T>(key: K, callback: (value: T[K]) => void): () => void {
+        if (!this.subscribers.has(key)) {
+            this.subscribers.set(key, new Set());
+        }
+        this.subscribers.get(key)!.add(callback as (value: unknown) => void);
+        return () => {
+            this.subscribers.get(key)?.delete(callback as (value: unknown) => void);
+        };
+    }
+
+    private notify<K extends keyof T>(key: K, value: T[K]): void {
+        const callbacks = this.subscribers.get(key);
+        if (callbacks) {
+            callbacks.forEach(cb => cb(value));
+        }
+    }
+}
+
+class FormValidator<T extends object> {
+    private data: T;
+    private errors: Map<keyof T, string | null> = new Map();
+    private validators: Map<keyof T, (value: unknown) => boolean> = new Map();
+
+    constructor(data: T) {
+        this.data = data;
+    }
+
+    getData(): T {
+        return this.data;
+    }
+
+    addValidator<K extends keyof T>(field: K, validator: (value: T[K]) => boolean): void {
+        this.validators.set(field, validator as (value: unknown) => boolean);
+    }
+
+    validate<K extends keyof T>(field: K): boolean {
+        const validator = this.validators.get(field);
+        if (validator) {
+            const isValid = validator(this.data[field]);
+            this.errors.set(field, isValid ? null : "Validation failed for " + String(field));
+            return isValid;
+        }
+        return true;
+    }
+
+    validateAll(): boolean {
+        let allValid = true;
+        for (const field of Object.keys(this.data) as (keyof T)[]) {
+            if (!this.validate(field)) {
+                allValid = false;
+            }
+        }
+        return allValid;
+    }
+
+    getError<K extends keyof T>(field: K): string | null {
+        return this.errors.get(field) ?? null;
+    }
+
+    getAllErrors(): Record<string, string | null> {
+        const result: Record<string, string | null> = {};
+        for (const [key, value] of this.errors) {
+            result[key as string] = value;
+        }
+        return result;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("AsyncWrapper") && output.contains("ObservableState") && output.contains("FormValidator"),
+        "Expected combined key remapping classes: {}",
+        output
+    );
+
+    // AsyncWrapper methods
+    assert!(
+        output.contains("getTarget") && output.contains("callAsync") && output.contains("wrapMethod"),
+        "Expected AsyncWrapper methods: {}",
+        output
+    );
+
+    // ObservableState methods
+    assert!(
+        output.contains("getState") && output.contains("getValue") && output.contains("setValue") && output.contains("subscribe"),
+        "Expected ObservableState methods: {}",
+        output
+    );
+
+    // FormValidator methods
+    assert!(
+        output.contains("addValidator") && output.contains("validate") && output.contains("validateAll") && output.contains("getError"),
+        "Expected FormValidator methods: {}",
+        output
+    );
+
+    // Type aliases should be stripped
+    assert!(
+        !output.contains("type AsyncMethods") && !output.contains("type ObservableProps") && !output.contains("type ValidatedFields"),
+        "Expected type aliases to be stripped: {}",
+        output
+    );
+}
