@@ -12,7 +12,9 @@ Priority: 5
 - [x] Add regression test for missing returns and implicit-any diagnostics in `wasm/src/thin_checker_tests.rs`
 
 ### Test Status
-- Not run (`./wasm/test.sh`)
+- Library compiles (`cargo build --lib`)
+- Test suite has pre-existing API mismatch errors in test files (unrelated to TS2366/TS7006 work)
+- Fixed compilation errors: `get_labeled` -> `get_labeled_statement`, added `is_function_declaration` variable, added `BindResult` import
 
 ## Current Assignment
 - [x] Investigate `ExtractState<R>` and `ExtractAction<R>` conditional infer patterns from `test_check_redux_lodash_style_generics`. These use `infer S` inside mapped type values. Test in isolation in `wasm/src/solver/evaluate_tests.rs`.
