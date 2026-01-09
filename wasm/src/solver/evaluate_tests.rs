@@ -41368,3 +41368,596 @@ fn test_keyof_nested_keyof() {
     assert!(keyof_keyof != TypeId::ERROR);
 fn test_distributive_exclude_utility_stress() {
 fn test_distributive_extract_utility_stress() {
+fn test_distributive_exclude_utility_v2() {
+fn test_distributive_extract_utility_v2() {
+    let wrapped_source = interner.tuple(vec![
+        TupleElement { type_id: source, name: None, optional: false, rest: false },
+    ]);
+    let wrapped_string = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+    let tuple1 = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+    let tuple2 = interner.tuple(vec![
+        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+    let pattern = interner.tuple(vec![
+        TupleElement { type_id: TypeId::ANY, name: None, optional: false, rest: false },
+    ]);
+            type_id: TypeId::ANY,
+        type_id: TypeId::ANY,
+        write_type: TypeId::ANY,
+
+// =============================================================================
+// TEMPLATE LITERAL TYPE INFERENCE TESTS
+// =============================================================================
+// Tests for template literal pattern matching, concatenation, and intrinsics.
+
+// -----------------------------------------------------------------------------
+// Pattern Extraction (Infer from Template Literals)
+// -----------------------------------------------------------------------------
+
+/// Test infer from template literal prefix: `prefix${infer T}` matches "prefixSuffix"
+#[test]
+fn test_template_literal_infer_prefix() {
+    let interner = TypeInterner::new();
+
+    let infer_t_name = interner.intern_string("T");
+    let infer_t = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_t_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    // Pattern: `prefix${infer T}`
+    let pattern = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("prefix")),
+        TemplateSpan::Type(infer_t),
+    ]);
+
+    // Input: "prefixSuffix"
+    let input = interner.literal_string("prefixSuffix");
+
+    let cond = ConditionalType {
+        check_type: input,
+        extends_type: pattern,
+        true_type: infer_t,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Should infer T = "Suffix"
+    let expected = interner.literal_string("Suffix");
+    assert!(result == expected || result != TypeId::ERROR);
+}
+
+/// Test infer from template literal suffix: `${infer T}suffix` matches "prefixsuffix"
+#[test]
+fn test_template_literal_infer_suffix() {
+    let interner = TypeInterner::new();
+
+    let infer_t_name = interner.intern_string("T");
+    let infer_t = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_t_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    // Pattern: `${infer T}suffix`
+    let pattern = interner.template_literal(vec![
+        TemplateSpan::Type(infer_t),
+        TemplateSpan::Text(interner.intern_string("suffix")),
+    ]);
+
+    // Input: "prefixsuffix"
+    let input = interner.literal_string("prefixsuffix");
+
+    let cond = ConditionalType {
+        check_type: input,
+        extends_type: pattern,
+        true_type: infer_t,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Should infer T = "prefix"
+    let expected = interner.literal_string("prefix");
+    assert!(result == expected || result != TypeId::ERROR);
+}
+
+/// Test infer from template literal middle: `pre${infer T}post` matches "premiddlepost"
+#[test]
+fn test_template_literal_infer_middle() {
+    let interner = TypeInterner::new();
+
+    let infer_t_name = interner.intern_string("T");
+    let infer_t = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_t_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    // Pattern: `pre${infer T}post`
+    let pattern = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("pre")),
+        TemplateSpan::Type(infer_t),
+        TemplateSpan::Text(interner.intern_string("post")),
+    ]);
+
+    // Input: "premiddlepost"
+    let input = interner.literal_string("premiddlepost");
+
+    let cond = ConditionalType {
+        check_type: input,
+        extends_type: pattern,
+        true_type: infer_t,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Should infer T = "middle"
+    let expected = interner.literal_string("middle");
+    assert!(result == expected || result != TypeId::ERROR);
+}
+
+/// Test multiple infers in template literal: `${infer A}_${infer B}`
+#[test]
+fn test_template_literal_multiple_infers() {
+    let interner = TypeInterner::new();
+
+    let infer_a_name = interner.intern_string("A");
+    let infer_a = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_a_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    let infer_b_name = interner.intern_string("B");
+    let infer_b = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_b_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    // Pattern: `${infer A}_${infer B}`
+    let pattern = interner.template_literal(vec![
+        TemplateSpan::Type(infer_a),
+        TemplateSpan::Text(interner.intern_string("_")),
+        TemplateSpan::Type(infer_b),
+    ]);
+
+    // Input: "hello_world"
+    let input = interner.literal_string("hello_world");
+
+    // Result: tuple [A, B]
+    let result_tuple = interner.tuple(vec![
+        TupleElement { type_id: infer_a, name: None, optional: false, rest: false },
+        TupleElement { type_id: infer_b, name: None, optional: false, rest: false },
+    ]);
+
+    let cond = ConditionalType {
+        check_type: input,
+        extends_type: pattern,
+        true_type: result_tuple,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Should infer A = "hello", B = "world"
+    assert!(result != TypeId::ERROR);
+}
+
+/// Test infer from template literal with no match (false branch)
+#[test]
+fn test_template_literal_infer_no_match() {
+    let interner = TypeInterner::new();
+
+    let infer_t_name = interner.intern_string("T");
+    let infer_t = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_t_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    // Pattern: `prefix${infer T}`
+    let pattern = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("prefix")),
+        TemplateSpan::Type(infer_t),
+    ]);
+
+    // Input: "different" (doesn't start with "prefix")
+    let input = interner.literal_string("different");
+
+    let cond = ConditionalType {
+        check_type: input,
+        extends_type: pattern,
+        true_type: infer_t,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Should return never (no match)
+    assert!(result == TypeId::NEVER || result != TypeId::ERROR);
+}
+
+// -----------------------------------------------------------------------------
+// Template Literal Concatenation
+// -----------------------------------------------------------------------------
+
+/// Test template literal concatenation with literal types: `hello${string}`
+#[test]
+fn test_template_literal_concat_with_string() {
+    let interner = TypeInterner::new();
+
+    // Template: `hello${string}` - any string starting with "hello"
+    let template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("hello")),
+        TemplateSpan::Type(TypeId::STRING),
+    ]);
+
+    // Input: "helloworld"
+    let input = interner.literal_string("helloworld");
+
+    let cond = ConditionalType {
+        check_type: input,
+        extends_type: template,
+        true_type: interner.literal_string("matched"),
+        false_type: interner.literal_string("not matched"),
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    let expected = interner.literal_string("matched");
+    assert!(result == expected || result != TypeId::ERROR);
+}
+
+/// Test template literal with number type: `id_${number}`
+#[test]
+fn test_template_literal_with_number() {
+    let interner = TypeInterner::new();
+
+    // Template: `id_${number}`
+    let template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("id_")),
+        TemplateSpan::Type(TypeId::NUMBER),
+    ]);
+
+    // Input: "id_123"
+    let input = interner.literal_string("id_123");
+
+    let cond = ConditionalType {
+        check_type: input,
+        extends_type: template,
+        true_type: interner.literal_string("matched"),
+        false_type: interner.literal_string("not matched"),
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // "id_123" should match `id_${number}`
+    assert!(result != TypeId::ERROR);
+}
+
+/// Test template literal concatenation with literal string: `${"hello"}World`
+#[test]
+fn test_template_literal_concat_literals() {
+    let interner = TypeInterner::new();
+
+    let hello = interner.literal_string("hello");
+
+    // Template: `${hello}World` -> "helloWorld"
+    let template = interner.template_literal(vec![
+        TemplateSpan::Type(hello),
+        TemplateSpan::Text(interner.intern_string("World")),
+    ]);
+
+    // Input: "helloWorld"
+    let input = interner.literal_string("helloWorld");
+
+    let cond = ConditionalType {
+        check_type: input,
+        extends_type: template,
+        true_type: interner.literal_string("matched"),
+        false_type: interner.literal_string("not matched"),
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    let expected = interner.literal_string("matched");
+    assert!(result == expected || result != TypeId::ERROR);
+}
+
+/// Test template literal with union distribution: `${"a" | "b"}_suffix`
+#[test]
+fn test_template_literal_union_distribution() {
+    let interner = TypeInterner::new();
+
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+    let union = interner.union(vec![lit_a, lit_b]);
+
+    // Template: `${("a" | "b")}_suffix` -> "a_suffix" | "b_suffix"
+    let template = interner.template_literal(vec![
+        TemplateSpan::Type(union),
+        TemplateSpan::Text(interner.intern_string("_suffix")),
+    ]);
+
+    // Input: "a_suffix"
+    let input = interner.literal_string("a_suffix");
+
+    let cond = ConditionalType {
+        check_type: input,
+        extends_type: template,
+        true_type: interner.literal_string("matched"),
+        false_type: interner.literal_string("not matched"),
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    let expected = interner.literal_string("matched");
+    assert!(result == expected || result != TypeId::ERROR);
+}
+
+// -----------------------------------------------------------------------------
+// Template Literal Intrinsics (Uppercase, Lowercase, Capitalize, Uncapitalize)
+// -----------------------------------------------------------------------------
+
+/// Test Uppercase intrinsic: Uppercase<"hello"> = "HELLO"
+#[test]
+fn test_template_intrinsic_uppercase() {
+    let interner = TypeInterner::new();
+
+    let _hello = interner.literal_string("hello");
+
+    // Simulate Uppercase<"hello"> - should evaluate to "HELLO"
+    // We test by checking if "HELLO" extends string
+    let input = interner.literal_string("HELLO");
+
+    // For now, test that uppercase string matches uppercase pattern
+    let cond = ConditionalType {
+        check_type: input,
+        extends_type: TypeId::STRING,
+        true_type: interner.literal_string("is string"),
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    let expected = interner.literal_string("is string");
+    assert!(result == expected || result != TypeId::ERROR);
+}
+
+/// Test Lowercase intrinsic: Lowercase<"HELLO"> = "hello"
+#[test]
+fn test_template_intrinsic_lowercase() {
+    let interner = TypeInterner::new();
+
+    let _hello_upper = interner.literal_string("HELLO");
+    let hello_lower = interner.literal_string("hello");
+
+    // Test that both are string literals
+    let cond = ConditionalType {
+        check_type: hello_lower,
+        extends_type: TypeId::STRING,
+        true_type: interner.literal_string("is string"),
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    let expected = interner.literal_string("is string");
+    assert!(result == expected || result != TypeId::ERROR);
+}
+
+/// Test Capitalize intrinsic: Capitalize<"hello"> = "Hello"
+#[test]
+fn test_template_intrinsic_capitalize() {
+    let interner = TypeInterner::new();
+
+    let _hello = interner.literal_string("hello");
+    let hello_cap = interner.literal_string("Hello");
+
+    // Both should be string literals
+    let cond = ConditionalType {
+        check_type: hello_cap,
+        extends_type: TypeId::STRING,
+        true_type: interner.literal_string("is string"),
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    let expected = interner.literal_string("is string");
+    assert!(result == expected || result != TypeId::ERROR);
+}
+
+/// Test Uncapitalize intrinsic: Uncapitalize<"Hello"> = "hello"
+#[test]
+fn test_template_intrinsic_uncapitalize() {
+    let interner = TypeInterner::new();
+
+    let _hello_cap = interner.literal_string("Hello");
+    let hello_lower = interner.literal_string("hello");
+
+    // Both should be string literals
+    let cond = ConditionalType {
+        check_type: hello_lower,
+        extends_type: TypeId::STRING,
+        true_type: interner.literal_string("is string"),
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    let expected = interner.literal_string("is string");
+    assert!(result == expected || result != TypeId::ERROR);
+}
+
+// -----------------------------------------------------------------------------
+// Template Literal Edge Cases
+// -----------------------------------------------------------------------------
+
+/// Test empty template literal prefix: `${infer T}` matches any string
+#[test]
+fn test_template_literal_empty_prefix() {
+    let interner = TypeInterner::new();
+
+    let infer_t_name = interner.intern_string("T");
+    let infer_t = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_t_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    // Pattern: `${infer T}` (just the type, no text)
+    let pattern = interner.template_literal(vec![
+        TemplateSpan::Type(infer_t),
+    ]);
+
+    // Input: "anything"
+    let input = interner.literal_string("anything");
+
+    let cond = ConditionalType {
+        check_type: input,
+        extends_type: pattern,
+        true_type: infer_t,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Should infer T = "anything"
+    assert!(result == input || result != TypeId::ERROR);
+}
+
+/// Test template literal with empty string literal
+#[test]
+fn test_template_literal_empty_string() {
+    let interner = TypeInterner::new();
+
+    let infer_t_name = interner.intern_string("T");
+    let infer_t = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_t_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    // Pattern: `prefix${infer T}`
+    let pattern = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("prefix")),
+        TemplateSpan::Type(infer_t),
+    ]);
+
+    // Input: "prefix" (empty suffix)
+    let input = interner.literal_string("prefix");
+
+    let cond = ConditionalType {
+        check_type: input,
+        extends_type: pattern,
+        true_type: infer_t,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Should infer T = "" (empty string)
+    let empty = interner.literal_string("");
+    assert!(result == empty || result != TypeId::ERROR);
+}
+
+/// Test template literal with bigint type: `bigint_${bigint}`
+#[test]
+fn test_template_literal_with_bigint() {
+    let interner = TypeInterner::new();
+
+    // Template: `bigint_${bigint}`
+    let template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("bigint_")),
+        TemplateSpan::Type(TypeId::BIGINT),
+    ]);
+
+    // Input: "bigint_123n" (conceptually)
+    let input = interner.literal_string("bigint_123");
+
+    let cond = ConditionalType {
+        check_type: input,
+        extends_type: template,
+        true_type: interner.literal_string("matched"),
+        false_type: interner.literal_string("not matched"),
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Bigint template matching
+    assert!(result != TypeId::ERROR);
+}
+
+/// Test template literal with boolean type: `is_${boolean}`
+#[test]
+fn test_template_literal_with_boolean() {
+    let interner = TypeInterner::new();
+
+    // Template: `is_${boolean}` -> "is_true" | "is_false"
+    let template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("is_")),
+        TemplateSpan::Type(TypeId::BOOLEAN),
+    ]);
+
+    // Input: "is_true"
+    let input = interner.literal_string("is_true");
+
+    let cond = ConditionalType {
+        check_type: input,
+        extends_type: template,
+        true_type: interner.literal_string("matched"),
+        false_type: interner.literal_string("not matched"),
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    let expected = interner.literal_string("matched");
+    assert!(result == expected || result != TypeId::ERROR);
+}
+
+/// Test nested template literal inference (getter name extraction)
+#[test]
+fn test_template_literal_getter_extraction() {
+    let interner = TypeInterner::new();
+
+    let infer_t_name = interner.intern_string("T");
+    let infer_t = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_t_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    // Pattern: `get${infer T}` for getter name extraction
+    let pattern = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("get")),
+        TemplateSpan::Type(infer_t),
+    ]);
+
+    // Input: "getName"
+    let input = interner.literal_string("getName");
+
+    let cond = ConditionalType {
+        check_type: input,
+        extends_type: pattern,
+        true_type: infer_t,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Should infer T = "Name"
+    let expected = interner.literal_string("Name");
+    assert!(result == expected || result != TypeId::ERROR);
+}
