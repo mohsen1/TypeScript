@@ -37730,3 +37730,774 @@ export = Storage;
         output
     );
 }
+
+// ============================================================================
+// TRIPLE-SLASH DIRECTIVE PATTERN TESTS
+// ============================================================================
+
+/// Test /// <reference path="..."> directive
+#[test]
+fn test_class_es5_triple_slash_reference_path() {
+    let source = r#"
+/// <reference path="./types.d.ts" />
+/// <reference path="../common/utils.d.ts" />
+
+class FileManager {
+    private basePath: string;
+    private files: string[] = [];
+
+    constructor(basePath: string) {
+        this.basePath = basePath;
+    }
+
+    addFile(filename: string): void {
+        this.files.push(this.basePath + "/" + filename);
+    }
+
+    removeFile(filename: string): boolean {
+        const path = this.basePath + "/" + filename;
+        const index = this.files.indexOf(path);
+        if (index !== -1) {
+            this.files.splice(index, 1);
+            return true;
+        }
+        return false;
+    }
+
+    listFiles(): string[] {
+        return [...this.files];
+    }
+
+    getBasePath(): string {
+        return this.basePath;
+    }
+
+    getFileCount(): number {
+        return this.files.length;
+    }
+}
+
+class DirectoryManager extends FileManager {
+    private directories: string[] = [];
+
+    constructor(basePath: string) {
+        super(basePath);
+    }
+
+    addDirectory(dirname: string): void {
+        this.directories.push(this.getBasePath() + "/" + dirname);
+    }
+
+    listDirectories(): string[] {
+        return [...this.directories];
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // FileManager class should be ES5 constructor
+    assert!(
+        output.contains("function FileManager"),
+        "Expected ES5 FileManager class: {}",
+        output
+    );
+
+    // DirectoryManager class should be ES5 constructor
+    assert!(
+        output.contains("function DirectoryManager"),
+        "Expected ES5 DirectoryManager class: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("addFile") && output.contains("removeFile") && output.contains("listFiles"),
+        "Expected FileManager methods: {}",
+        output
+    );
+
+    // Inheritance should be present
+    assert!(
+        output.contains("__extends") || output.contains("_super"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+}
+
+/// Test /// <reference types="..."> directive
+#[test]
+fn test_class_es5_triple_slash_reference_types() {
+    let source = r#"
+/// <reference types="node" />
+/// <reference types="jest" />
+
+class TestRunner {
+    private tests: Map<string, () => void> = new Map();
+    private results: { name: string; passed: boolean }[] = [];
+
+    addTest(name: string, fn: () => void): void {
+        this.tests.set(name, fn);
+    }
+
+    run(): void {
+        this.tests.forEach((fn, name) => {
+            try {
+                fn();
+                this.results.push({ name, passed: true });
+            } catch (e) {
+                this.results.push({ name, passed: false });
+            }
+        });
+    }
+
+    getResults(): { name: string; passed: boolean }[] {
+        return [...this.results];
+    }
+
+    getPassedCount(): number {
+        return this.results.filter(r => r.passed).length;
+    }
+
+    getFailedCount(): number {
+        return this.results.filter(r => !r.passed).length;
+    }
+
+    clear(): void {
+        this.tests.clear();
+        this.results = [];
+    }
+}
+
+class MockTestRunner extends TestRunner {
+    private mocks: Map<string, any> = new Map();
+
+    mock(name: string, value: any): void {
+        this.mocks.set(name, value);
+    }
+
+    getMock(name: string): any {
+        return this.mocks.get(name);
+    }
+
+    clearMocks(): void {
+        this.mocks.clear();
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // TestRunner class should be ES5 constructor
+    assert!(
+        output.contains("function TestRunner"),
+        "Expected ES5 TestRunner class: {}",
+        output
+    );
+
+    // MockTestRunner class should be ES5 constructor
+    assert!(
+        output.contains("function MockTestRunner"),
+        "Expected ES5 MockTestRunner class: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("addTest") && output.contains("run") && output.contains("getResults"),
+        "Expected TestRunner methods: {}",
+        output
+    );
+
+    // MockTestRunner methods
+    assert!(
+        output.contains("mock") && output.contains("getMock") && output.contains("clearMocks"),
+        "Expected MockTestRunner methods: {}",
+        output
+    );
+}
+
+/// Test /// <amd-module name="..."> directive
+#[test]
+fn test_class_es5_triple_slash_amd_module() {
+    let source = r#"
+/// <amd-module name="MyModule" />
+
+class ModuleExport {
+    private name: string;
+    private version: string;
+
+    constructor(name: string, version: string) {
+        this.name = name;
+        this.version = version;
+    }
+
+    getName(): string {
+        return this.name;
+    }
+
+    getVersion(): string {
+        return this.version;
+    }
+
+    getFullName(): string {
+        return this.name + "@" + this.version;
+    }
+
+    isCompatible(other: ModuleExport): boolean {
+        return this.name === other.getName();
+    }
+}
+
+class ModuleRegistry {
+    private modules: Map<string, ModuleExport> = new Map();
+
+    register(module: ModuleExport): void {
+        this.modules.set(module.getName(), module);
+    }
+
+    get(name: string): ModuleExport | undefined {
+        return this.modules.get(name);
+    }
+
+    has(name: string): boolean {
+        return this.modules.has(name);
+    }
+
+    unregister(name: string): boolean {
+        return this.modules.delete(name);
+    }
+
+    list(): string[] {
+        return Array.from(this.modules.keys());
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // ModuleExport class should be ES5 constructor
+    assert!(
+        output.contains("function ModuleExport"),
+        "Expected ES5 ModuleExport class: {}",
+        output
+    );
+
+    // ModuleRegistry class should be ES5 constructor
+    assert!(
+        output.contains("function ModuleRegistry"),
+        "Expected ES5 ModuleRegistry class: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("getName") && output.contains("getVersion") && output.contains("getFullName"),
+        "Expected ModuleExport methods: {}",
+        output
+    );
+
+    // Registry methods
+    assert!(
+        output.contains("register") && output.contains(".get") && output.contains(".has"),
+        "Expected ModuleRegistry methods: {}",
+        output
+    );
+}
+
+/// Test /// <reference lib="..."> directive
+#[test]
+fn test_class_es5_triple_slash_reference_lib() {
+    let source = r#"
+/// <reference lib="es2015" />
+/// <reference lib="dom" />
+
+class DOMHelper {
+    private element: any;
+
+    constructor(selector: string) {
+        self.element = { selector };
+    }
+
+    getSelector(): string {
+        return this.element.selector;
+    }
+
+    addClass(className: string): void {
+        // Would add class to element
+    }
+
+    removeClass(className: string): void {
+        // Would remove class from element
+    }
+
+    toggleClass(className: string): void {
+        // Would toggle class on element
+    }
+
+    setAttribute(name: string, value: string): void {
+        // Would set attribute
+    }
+
+    getAttribute(name: string): string | null {
+        return null;
+    }
+}
+
+class EventHelper {
+    private listeners: Map<string, Function[]> = new Map();
+
+    on(event: string, handler: Function): void {
+        if (!this.listeners.has(event)) {
+            this.listeners.set(event, []);
+        }
+        this.listeners.get(event)!.push(handler);
+    }
+
+    off(event: string, handler: Function): void {
+        const handlers = this.listeners.get(event);
+        if (handlers) {
+            const index = handlers.indexOf(handler);
+            if (index !== -1) {
+                handlers.splice(index, 1);
+            }
+        }
+    }
+
+    trigger(event: string, ...args: any[]): void {
+        const handlers = this.listeners.get(event);
+        if (handlers) {
+            handlers.forEach(h => h(...args));
+        }
+    }
+
+    clear(): void {
+        this.listeners.clear();
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // DOMHelper class should be ES5 constructor
+    assert!(
+        output.contains("function DOMHelper"),
+        "Expected ES5 DOMHelper class: {}",
+        output
+    );
+
+    // EventHelper class should be ES5 constructor
+    assert!(
+        output.contains("function EventHelper"),
+        "Expected ES5 EventHelper class: {}",
+        output
+    );
+
+    // DOMHelper methods
+    assert!(
+        output.contains("addClass") && output.contains("removeClass") && output.contains("toggleClass"),
+        "Expected DOMHelper methods: {}",
+        output
+    );
+
+    // EventHelper methods
+    assert!(
+        output.contains(".on") && output.contains(".off") && output.contains("trigger"),
+        "Expected EventHelper methods: {}",
+        output
+    );
+}
+
+/// Test multiple triple-slash directives in a file
+#[test]
+fn test_class_es5_triple_slash_multiple_directives() {
+    let source = r#"
+/// <reference path="./interfaces.d.ts" />
+/// <reference path="./utils.d.ts" />
+/// <reference types="node" />
+/// <reference lib="es2015" />
+/// <amd-module name="ComplexModule" />
+
+class ConfigLoader {
+    private config: Record<string, any> = {};
+    private loaded: boolean = false;
+
+    async load(path: string): Promise<void> {
+        this.config = { path, loaded: true };
+        this.loaded = true;
+    }
+
+    get<T>(key: string): T | undefined {
+        return this.config[key] as T;
+    }
+
+    set(key: string, value: any): void {
+        this.config[key] = value;
+    }
+
+    has(key: string): boolean {
+        return key in this.config;
+    }
+
+    isLoaded(): boolean {
+        return this.loaded;
+    }
+
+    getAll(): Record<string, any> {
+        return { ...this.config };
+    }
+}
+
+class EnvironmentConfig extends ConfigLoader {
+    private env: string;
+
+    constructor(env: string = "development") {
+        super();
+        this.env = env;
+    }
+
+    getEnvironment(): string {
+        return this.env;
+    }
+
+    isDevelopment(): boolean {
+        return this.env === "development";
+    }
+
+    isProduction(): boolean {
+        return this.env === "production";
+    }
+
+    async loadForEnv(): Promise<void> {
+        await this.load("./config/" + this.env + ".json");
+    }
+}
+
+class SecureConfig extends EnvironmentConfig {
+    private secrets: Map<string, string> = new Map();
+
+    setSecret(key: string, value: string): void {
+        this.secrets.set(key, value);
+    }
+
+    getSecret(key: string): string | undefined {
+        return this.secrets.get(key);
+    }
+
+    hasSecret(key: string): boolean {
+        return this.secrets.has(key);
+    }
+
+    clearSecrets(): void {
+        this.secrets.clear();
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // ConfigLoader class should be ES5 constructor
+    assert!(
+        output.contains("function ConfigLoader"),
+        "Expected ES5 ConfigLoader class: {}",
+        output
+    );
+
+    // EnvironmentConfig class should be ES5 constructor
+    assert!(
+        output.contains("function EnvironmentConfig"),
+        "Expected ES5 EnvironmentConfig class: {}",
+        output
+    );
+
+    // SecureConfig class should be ES5 constructor
+    assert!(
+        output.contains("function SecureConfig"),
+        "Expected ES5 SecureConfig class: {}",
+        output
+    );
+
+    // ConfigLoader methods
+    assert!(
+        output.contains("load") && output.contains(".get") && output.contains(".set"),
+        "Expected ConfigLoader methods: {}",
+        output
+    );
+
+    // EnvironmentConfig methods
+    assert!(
+        output.contains("getEnvironment") && output.contains("isDevelopment") && output.contains("isProduction"),
+        "Expected EnvironmentConfig methods: {}",
+        output
+    );
+
+    // SecureConfig methods
+    assert!(
+        output.contains("setSecret") && output.contains("getSecret") && output.contains("clearSecrets"),
+        "Expected SecureConfig methods: {}",
+        output
+    );
+}
+
+/// Test combined triple-slash directives with complex class patterns
+#[test]
+fn test_class_es5_triple_slash_combined_patterns() {
+    let source = r#"
+/// <reference path="./base.d.ts" />
+/// <reference types="lodash" />
+/// <reference lib="es2015.collection" />
+
+interface Disposable {
+    dispose(): void;
+}
+
+interface Serializable {
+    toJSON(): string;
+    fromJSON(json: string): void;
+}
+
+class Resource implements Disposable, Serializable {
+    private id: string;
+    private data: any;
+    private disposed: boolean = false;
+
+    constructor(id: string, data: any = null) {
+        this.id = id;
+        this.data = data;
+    }
+
+    getId(): string {
+        return this.id;
+    }
+
+    getData(): any {
+        return this.data;
+    }
+
+    setData(data: any): void {
+        if (!this.disposed) {
+            this.data = data;
+        }
+    }
+
+    isDisposed(): boolean {
+        return this.disposed;
+    }
+
+    dispose(): void {
+        this.data = null;
+        this.disposed = true;
+    }
+
+    toJSON(): string {
+        return JSON.stringify({ id: this.id, data: this.data });
+    }
+
+    fromJSON(json: string): void {
+        const parsed = JSON.parse(json);
+        this.id = parsed.id;
+        this.data = parsed.data;
+    }
+}
+
+class ResourcePool {
+    private resources: Map<string, Resource> = new Map();
+    private maxSize: number;
+
+    constructor(maxSize: number = 100) {
+        this.maxSize = maxSize;
+    }
+
+    acquire(id: string): Resource {
+        if (this.resources.has(id)) {
+            return this.resources.get(id)!;
+        }
+        const resource = new Resource(id);
+        this.resources.set(id, resource);
+        return resource;
+    }
+
+    release(id: string): void {
+        const resource = this.resources.get(id);
+        if (resource) {
+            resource.dispose();
+            this.resources.delete(id);
+        }
+    }
+
+    getSize(): number {
+        return this.resources.size;
+    }
+
+    getMaxSize(): number {
+        return this.maxSize;
+    }
+
+    isFull(): boolean {
+        return this.resources.size >= this.maxSize;
+    }
+
+    clear(): void {
+        this.resources.forEach(r => r.dispose());
+        this.resources.clear();
+    }
+}
+
+class ManagedResourcePool extends ResourcePool {
+    private cleanupInterval: number;
+    private lastCleanup: Date;
+
+    constructor(maxSize: number = 100, cleanupInterval: number = 60000) {
+        super(maxSize);
+        this.cleanupInterval = cleanupInterval;
+        this.lastCleanup = new Date();
+    }
+
+    getCleanupInterval(): number {
+        return this.cleanupInterval;
+    }
+
+    getLastCleanup(): Date {
+        return this.lastCleanup;
+    }
+
+    cleanup(): void {
+        this.lastCleanup = new Date();
+        // Would clean up expired resources
+    }
+
+    setCleanupInterval(interval: number): void {
+        this.cleanupInterval = interval;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Resource class should be ES5 constructor
+    assert!(
+        output.contains("function Resource"),
+        "Expected ES5 Resource class: {}",
+        output
+    );
+
+    // ResourcePool class should be ES5 constructor
+    assert!(
+        output.contains("function ResourcePool"),
+        "Expected ES5 ResourcePool class: {}",
+        output
+    );
+
+    // ManagedResourcePool class should be ES5 constructor
+    assert!(
+        output.contains("function ManagedResourcePool"),
+        "Expected ES5 ManagedResourcePool class: {}",
+        output
+    );
+
+    // Resource methods (including interface implementations)
+    assert!(
+        output.contains("dispose") && output.contains("toJSON") && output.contains("fromJSON"),
+        "Expected Resource interface methods: {}",
+        output
+    );
+
+    // ResourcePool methods
+    assert!(
+        output.contains("acquire") && output.contains("release") && output.contains("isFull"),
+        "Expected ResourcePool methods: {}",
+        output
+    );
+
+    // ManagedResourcePool methods
+    assert!(
+        output.contains("cleanup") && output.contains("getCleanupInterval") && output.contains("setCleanupInterval"),
+        "Expected ManagedResourcePool methods: {}",
+        output
+    );
+
+    // Interfaces should be stripped
+    assert!(
+        !output.contains("interface Disposable") && !output.contains("interface Serializable"),
+        "Expected interfaces to be stripped: {}",
+        output
+    );
+}
