@@ -7639,3 +7639,5 @@ fn test_tuple_spread_with_rest() {
     assert_eq!(results[0].1, fixed_tuple);
     assert_eq!(results[1].1, TypeId::NUMBER);
 }
+fn test_circular_extends_three_way_cycle_additional() {
+fn test_circular_extends_self_reference_additional() {
