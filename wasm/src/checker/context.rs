@@ -116,6 +116,9 @@ pub struct CheckerContext<'a> {
     /// Cached types for symbols.
     pub symbol_types: FxHashMap<SymbolId, TypeId>,
 
+    /// Cached types for variable declarations (used for TS2403 checks).
+    pub var_decl_types: FxHashMap<SymbolId, TypeId>,
+
     /// Cached types for nodes.
     pub node_types: FxHashMap<u32, TypeId>,
 
@@ -127,6 +130,18 @@ pub struct CheckerContext<'a> {
 
     /// Cached type environment for resolving Ref types during assignability checks.
     pub type_environment: RefCell<Option<TypeEnvironment>>,
+
+    /// Cache for evaluated application types to avoid repeated expansion.
+    pub application_eval_cache: FxHashMap<TypeId, TypeId>,
+
+    /// Recursion guard for application evaluation.
+    pub application_eval_set: FxHashSet<TypeId>,
+
+    /// Cache for evaluated mapped types with symbol resolution.
+    pub mapped_eval_cache: FxHashMap<TypeId, TypeId>,
+
+    /// Recursion guard for mapped type evaluation with resolution.
+    pub mapped_eval_set: FxHashSet<TypeId>,
 
     /// Symbol dependency graph (symbol -> referenced symbols).
     pub symbol_dependencies: FxHashMap<SymbolId, FxHashSet<SymbolId>>,
@@ -145,6 +160,8 @@ pub struct CheckerContext<'a> {
     pub symbol_resolution_stack: Vec<SymbolId>,
     /// O(1) lookup set for symbol resolution stack.
     pub symbol_resolution_set: HashSet<SymbolId>,
+    /// O(1) lookup set for class instance type resolution to avoid recursion.
+    pub class_instance_resolution_set: HashSet<SymbolId>,
 
     /// Stack of nodes being resolved.
     pub node_resolution_stack: Vec<NodeIndex>,
@@ -167,6 +184,8 @@ pub struct CheckerContext<'a> {
 
     /// Stack of expected return types for functions.
     pub return_type_stack: Vec<TypeId>,
+    /// Stack of current `this` types for class member bodies.
+    pub this_type_stack: Vec<TypeId>,
 
     /// Current enclosing class info.
     pub enclosing_class: Option<EnclosingClassInfo>,
@@ -208,15 +227,21 @@ impl<'a> CheckerContext<'a> {
             file_name,
             no_implicit_any: true,
             symbol_types: FxHashMap::default(),
+            var_decl_types: FxHashMap::default(),
             node_types: FxHashMap::default(),
             type_parameter_names: FxHashMap::default(),
             relation_cache: RefCell::new(FxHashMap::default()),
             type_environment: RefCell::new(None),
+            application_eval_cache: FxHashMap::default(),
+            application_eval_set: FxHashSet::default(),
+            mapped_eval_cache: FxHashMap::default(),
+            mapped_eval_set: FxHashSet::default(),
             symbol_dependencies: FxHashMap::default(),
             symbol_dependency_stack: Vec::new(),
             diagnostics: Vec::new(),
             symbol_resolution_stack: Vec::new(),
             symbol_resolution_set: HashSet::new(),
+            class_instance_resolution_set: HashSet::new(),
             node_resolution_stack: Vec::new(),
             node_resolution_set: HashSet::new(),
             type_parameter_scope: HashMap::new(),
@@ -224,6 +249,7 @@ impl<'a> CheckerContext<'a> {
             instantiation_depth: RefCell::new(0),
             call_depth: RefCell::new(0),
             return_type_stack: Vec::new(),
+            this_type_stack: Vec::new(),
             enclosing_class: None,
             type_env: RefCell::new(TypeEnvironment::new()),
             all_arenas: None,
@@ -247,15 +273,21 @@ impl<'a> CheckerContext<'a> {
             file_name,
             no_implicit_any: true,
             symbol_types: cache.symbol_types,
+            var_decl_types: FxHashMap::default(),
             node_types: cache.node_types,
             type_parameter_names: cache.type_parameter_names,
             relation_cache: RefCell::new(cache.relation_cache),
             type_environment: RefCell::new(None),
+            application_eval_cache: FxHashMap::default(),
+            application_eval_set: FxHashSet::default(),
+            mapped_eval_cache: FxHashMap::default(),
+            mapped_eval_set: FxHashSet::default(),
             symbol_dependencies: cache.symbol_dependencies,
             symbol_dependency_stack: Vec::new(),
             diagnostics: Vec::new(),
             symbol_resolution_stack: Vec::new(),
             symbol_resolution_set: HashSet::new(),
+            class_instance_resolution_set: HashSet::new(),
             node_resolution_stack: Vec::new(),
             node_resolution_set: HashSet::new(),
             type_parameter_scope: HashMap::new(),
@@ -263,6 +295,7 @@ impl<'a> CheckerContext<'a> {
             instantiation_depth: RefCell::new(0),
             call_depth: RefCell::new(0),
             return_type_stack: Vec::new(),
+            this_type_stack: Vec::new(),
             enclosing_class: None,
             type_env: RefCell::new(TypeEnvironment::new()),
             all_arenas: None,

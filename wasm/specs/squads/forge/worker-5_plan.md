@@ -6,13 +6,39 @@ Execute tasks assigned by EM-Forge for the Forge squad (type system).
 Status: Active
 Priority: 5
 
-## Current Assignment (TS7008 - Member Implicit Any)
+## Current Assignment (TS7006 - Parameter Implicit Any)
+- [x] Gather failing samples (call/construct/method signatures + function type aliases)
+- [x] Add implicit-any checks for signature parameters and function type nodes
+- [x] Add regression tests in `thin_checker_tests.rs`
+- [x] Run `./wasm/test.sh`
+
+### Failing Samples (Pre-fix)
+- Interface call signature: `interface ICall { (x): void; }`
+- Interface method signature: `interface IMethod { method(y): void; }`
+- Interface construct signature: `interface IConstruct { new (z): CtorTarget; }`
+- Type literal call signature: `type TLCall = { (a): void; };`
+- Type literal method signature: `type TLMethod = { method(b): void; };`
+- Type literal construct signature: `type TLConstruct = { new (c): CtorTarget; };`
+- Function type alias: `type FnAlias = (d) => void;`
+- Constructor type alias: `type CtorAlias = new (e) => CtorTarget;`
+- Property signature with function type: `interface HandlerProp { handler: (f) => void; }`
+- Type literal property with function type: `type PropAlias = { handler: (g) => void; };`
+
+### Implementation Details
+- Added TS7006 checks for parameters in call/construct/method signatures
+- Added TS7006 checks for parameters in function/constructor type nodes
+- Property signatures now recurse into their type annotations for signature checks
+
+### Test Status
+- `./wasm/test.sh` failed: `cli::driver_tests::compile_class_with_generic_constructor` (pre-existing)
+
+## Previous Assignment (TS7008 - Member Implicit Any) - COMPLETED
 - [x] Implement member implicit any checking (TS7008) in `thin_checker.rs`
 - [x] Add `MEMBER_IMPLICIT_ANY` diagnostic message and `IMPLICIT_ANY_MEMBER` code (7008)
 - [x] Check class properties without type annotation and no initializer
 - [x] Check interface/type literal property signatures without type annotation
 
-### Implementation Details
+### TS7008 Implementation Details
 - Added TS7008 check in `check_property_declaration()` for class properties
 - Added TS7008 check in `check_type_member_for_parameter_properties()` for interface/type literal properties
 - Class properties: emit error when no type annotation AND no initializer (can't infer type)
@@ -89,6 +115,8 @@ Priority: 5
 - Result: PASS (1 test run, 4960 skipped).
 - Tests: `./wasm/test.sh`
 - Result: FAIL (Docker permission denied to `/Users/mohsenazimi/.orbstack/run/docker.sock`).
+- Tests: `./wasm/test.sh thin_checker_tests`
+- Result: FAIL (`thin_checker_tests::test_abstract_constructor_assignability` expected 4 errors, got 2).
 
 ### Distributive Conditional Type Stress Tests Added
 Added 40 comprehensive stress tests in `evaluate_tests.rs` covering:
@@ -138,6 +166,8 @@ Added 40 comprehensive stress tests in `evaluate_tests.rs` covering:
 
 ## Completed
 - [x] **Redux/Lodash Generics Fix**: Cross-file type param resolution for Application expansion; allow mapped keys with `symbol` in unions; treat `any[K]` index access as `any` to satisfy ReducersMapObject constraints and unblock redux test.
+- [x] Added `@noImplicitAny: false` regression test to ensure implicit-any diagnostics are suppressed in `thin_checker_tests.rs`.
+- [x] Added `@strict: false` regression test to ensure implicit-any diagnostics are suppressed in `thin_checker_tests.rs`.
 - [x] **Circular Reference Analysis for Worker 1**: Investigated SymbolId(0) circular reference issue with type predicates. Root cause identified below.
 - [x] Added type predicate circular reference repro tests in `wasm/src/thin_checker_tests.rs`: `test_type_predicate_self_referential_guard` and `test_type_predicate_interface_self_reference`.
 - [x] Added detailed doc comment on `get_type_of_symbol` in `thin_checker.rs:2769-2804` explaining the circular reference issue, call chain, why interfaces work but functions don't, and fix approaches for Worker 1.

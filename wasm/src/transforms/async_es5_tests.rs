@@ -179,6 +179,31 @@ fn test_body_contains_await_in_conditional_property_access() {
 }
 
 #[test]
+fn test_body_contains_await_in_object_literal_computed_name() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "async function foo() { return { [await key()]: value }; }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            if let Some(&func_idx) = source_file.statements.nodes.first() {
+                if let Some(func_node) = parser.arena.get(func_idx) {
+                    if let Some(func) = parser.arena.get_function(func_node) {
+                        let emitter = AsyncES5Emitter::new(&parser.arena);
+                        assert!(
+                            emitter.body_contains_await(func.body),
+                            "Should detect await in computed object literal name"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn test_body_contains_await_in_try_finally() {
     let mut parser = ThinParserState::new(
         "test.ts".to_string(),
@@ -2394,6 +2419,26 @@ fn test_async_method_expr_conditional() {
         output.contains("switch (_a.label)"),
         "Conditional await should emit switch: {}",
         output
+    );
+}
+
+#[test]
+fn test_async_method_expr_computed_name() {
+    let source = "const obj = { async [key]() { return await load(key); } };";
+    let output = parse_and_emit_async_method_expr(source);
+    assert!(
+        output.contains("switch (_a.label)"),
+        "Computed async method should emit switch: {}",
+        output
+    );
+    assert!(
+        output.contains("[4 /*yield*/"),
+        "Computed async method should emit yield: {}",
+        output
+    );
+    assert!(
+        method_expr_body_contains_await(source),
+        "Should detect await in computed async method expression"
     );
 }
 
