@@ -596,15 +596,15 @@ impl<'a> ThinCheckerState<'a> {
                 let name = ident.escaped_text.as_str();
 
                 if has_type_args {
-                    let is_builtin_array = name == "Array" || name == "ReadonlyArray";
-                    if !is_builtin_array
+                    let is_builtin_generic = matches!(name, "Array" | "ReadonlyArray" | "Promise" | "PromiseLike" | "Partial" | "Required" | "Readonly" | "Pick" | "Omit" | "Record" | "Exclude" | "Extract" | "NonNullable" | "Parameters" | "ReturnType" | "ConstructorParameters" | "InstanceType" | "ThisParameterType" | "OmitThisParameter" | "ThisType" | "Awaited" | "Map" | "Set" | "WeakMap" | "WeakSet" | "Iterator" | "IterableIterator" | "AsyncIterator" | "AsyncIterableIterator" | "Generator" | "AsyncGenerator" | "Iterable" | "AsyncIterable" | "ArrayLike" | "PropertyKey");
+                    if !is_builtin_generic
                         && self.lookup_type_parameter(name).is_none()
                         && self.resolve_identifier_symbol(type_name_idx).is_none()
                     {
                         self.error_cannot_find_name_at(name, type_name_idx);
                         return TypeId::ERROR;
                     }
-                    if !is_builtin_array {
+                    if !is_builtin_generic {
                         if let Some(sym_id) = self.resolve_identifier_symbol(type_name_idx) {
                             if self.alias_resolves_to_value_only(sym_id) || self.symbol_is_value_only(sym_id) {
                                 self.error_value_only_type_at(name, type_name_idx);
@@ -653,6 +653,15 @@ impl<'a> ThinCheckerState<'a> {
                     return array_type;
                 }
 
+                // Handle Promise<T> - return UNKNOWN when lib.d.ts isn't loaded
+                if name == "Promise" || name == "PromiseLike" {
+                    if let Some(type_id) = self.resolve_named_type_reference(name, type_name_idx) {
+                        return type_id;
+                    }
+                    // Just return UNKNOWN - Promise semantics aren't needed for type checking
+                    return TypeId::UNKNOWN;
+                }
+
                 // Check for built-in types (primitive keywords)
                 match name {
                     "number" => return TypeId::NUMBER,
@@ -667,16 +676,29 @@ impl<'a> ThinCheckerState<'a> {
                     "object" => return TypeId::OBJECT,
                     "bigint" => return TypeId::BIGINT,
                     "symbol" => return TypeId::SYMBOL,
-                    // Global interfaces from lib.es5.d.ts - these accept primitives via boxing
+                    // Global interfaces from lib.d.ts - these accept primitives via boxing
                     // Object/String/Number/Boolean are wide types that accept their primitive counterparts
                     // We use UNKNOWN as a permissive stand-in when lib.d.ts is not loaded
                     "Object" | "String" | "Number" | "Boolean" | "Symbol" | "Function" => {
                         return TypeId::UNKNOWN
                     }
+                    // Global generic types from lib.d.ts - return UNKNOWN when not loaded
+                    "Partial" | "Required" | "Readonly" | "Pick" | "Omit" | "Record" |
+                    "Exclude" | "Extract" | "NonNullable" | "Parameters" | "ReturnType" |
+                    "ConstructorParameters" | "InstanceType" | "ThisParameterType" |
+                    "OmitThisParameter" | "ThisType" | "Awaited" | "Map" | "Set" |
+                    "WeakMap" | "WeakSet" | "Iterator" | "IterableIterator" | "AsyncIterator" |
+                    "AsyncIterableIterator" | "Generator" | "AsyncGenerator" | "Iterable" |
+                    "AsyncIterable" | "ArrayLike" | "PropertyKey" | "RegExp" | "Error" |
+                    "Date" | "JSON" | "Math" | "Console" => {
+                        return TypeId::UNKNOWN
+                    }
                     _ => {}
                 }
 
-                if name != "Array" && name != "ReadonlyArray" {
+                // Don't emit errors for builtin generics
+                let is_builtin_generic = matches!(name, "Array" | "ReadonlyArray" | "Promise" | "PromiseLike" | "Partial" | "Required" | "Readonly" | "Pick" | "Omit" | "Record" | "Exclude" | "Extract" | "NonNullable" | "Parameters" | "ReturnType" | "ConstructorParameters" | "InstanceType" | "ThisParameterType" | "OmitThisParameter" | "ThisType" | "Awaited" | "Map" | "Set" | "WeakMap" | "WeakSet" | "Iterator" | "IterableIterator" | "AsyncIterator" | "AsyncIterableIterator" | "Generator" | "AsyncGenerator" | "Iterable" | "AsyncIterable" | "ArrayLike" | "PropertyKey");
+                if !is_builtin_generic {
                     if let Some(sym_id) = self.resolve_identifier_symbol(type_name_idx) {
                         if self.alias_resolves_to_value_only(sym_id) || self.symbol_is_value_only(sym_id) {
                             self.error_value_only_type_at(name, type_name_idx);
@@ -9463,7 +9485,11 @@ impl<'a> ThinCheckerState<'a> {
                 if self.resolve_heritage_symbol(expr_idx).is_none() {
                     // Get the name for the error message
                     if let Some(name) = self.heritage_name_text(expr_idx) {
-                        self.error_cannot_find_name_at(&name, expr_idx);
+                        // Don't emit error for builtin global types
+                        let is_builtin = matches!(name.as_str(), "Promise" | "PromiseLike" | "Array" | "ReadonlyArray" | "Error" | "Map" | "Set" | "WeakMap" | "WeakSet" | "Iterator" | "Iterable" | "AsyncIterator" | "AsyncIterable" | "Generator" | "AsyncGenerator" | "IterableIterator" | "AsyncIterableIterator" | "ArrayLike" | "PromiseConstructor" | "Object" | "String" | "Number" | "Boolean" | "Symbol" | "Function" | "RegExp" | "Date");
+                        if !is_builtin {
+                            self.error_cannot_find_name_at(&name, expr_idx);
+                        }
                     }
                 }
             }
