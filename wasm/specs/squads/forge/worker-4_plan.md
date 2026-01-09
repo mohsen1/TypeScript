@@ -7,11 +7,11 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [ ] Fix `test_namespace_value_member_access` and related namespace member access tests in `wasm/src/thin_checker_tests.rs`. These tests verify that namespace members can be accessed as values. Run `./wasm/test.sh -- test_namespace_value_member` to reproduce failures. Check `wasm/src/thin_checker.rs` for namespace member resolution logic.
+- [x] Fix `test_namespace_value_member_access` and related namespace member access tests - DONE (tests were passing, fixed blocking compilation error in subtype_tests.rs)
 
 ## Task Queue
-- [ ] Fix `test_nested_namespace_member_resolution` if still failing
-- [ ] Add coverage for namespace type member access patterns
+- [x] Fix `test_nested_namespace_member_resolution` if still failing - DONE (already passing)
+- [x] Add coverage for namespace type member access patterns - DONE (added 5 tests)
 
 ## Completed
 - [x] Fixed method type parameter scope in check_method_declaration
@@ -20,9 +20,12 @@ Priority: 4
 - [x] Added solver coverage for recursive conditional types and variadic tuples
 - [x] Added solver edge case tests (intersections, unions, generics, conditionals)
 - [x] Added checker coverage for class/enum/function namespace merges
+- [x] Fixed namespace value/type member access tests (all passing)
+- [x] Fixed compilation error in subtype_tests.rs (object_shape_with_index -> object_with_index)
+- [x] Added 5 namespace type member access pattern tests
 
 ## Ready for Merge
-No
+Yes - all namespace tests passing, added coverage for namespace type member access patterns
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize solver correctness

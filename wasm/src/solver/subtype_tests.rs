@@ -15818,7 +15818,7 @@ fn test_interface_vs_type_alias_index_signature() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
 
-    let interface_i = interner.object_with_index(crate::solver::types::ObjectShape {
+    let interface_i = interner.object_with_index(ObjectShape {
         properties: vec![],
         string_index: Some(crate::solver::types::IndexSignature {
             key_type: TypeId::STRING,
@@ -15828,7 +15828,7 @@ fn test_interface_vs_type_alias_index_signature() {
         number_index: None,
     });
 
-    let type_t = interner.object_with_index(crate::solver::types::ObjectShape {
+    let type_t = interner.object_with_index(ObjectShape {
         properties: vec![],
         string_index: Some(crate::solver::types::IndexSignature {
             key_type: TypeId::STRING,
@@ -16909,91 +16909,3 @@ fn test_enum_reverse_mapping_numeric() {
 
     assert!(checker.is_subtype_of(key_name, TypeId::STRING));
 }
-    let indexed_number = interner.object_with_index(ObjectShape {
-        properties: vec![],
-        string_index: Some(IndexSignature {
-            key_type: TypeId::STRING,
-            value_type: TypeId::NUMBER,
-            readonly: false,
-        }),
-        number_index: None,
-    let indexed_string = interner.object_with_index(ObjectShape {
-        properties: vec![],
-        string_index: Some(IndexSignature {
-            key_type: TypeId::STRING,
-            value_type: TypeId::STRING,
-            readonly: false,
-        }),
-        number_index: None,
-    let indexed_literal = interner.object_with_index(ObjectShape {
-        properties: vec![],
-        string_index: Some(IndexSignature {
-            key_type: TypeId::STRING,
-            value_type: hello,
-            readonly: false,
-        }),
-        number_index: None,
-    let indexed_string = interner.object_with_index(ObjectShape {
-        properties: vec![],
-        string_index: Some(IndexSignature {
-            key_type: TypeId::STRING,
-            value_type: TypeId::STRING,
-            readonly: false,
-        }),
-        number_index: None,
-    let indexed_with_prop = interner.object_with_index(ObjectShape {
-        properties: vec![PropertyInfo {
-        string_index: Some(IndexSignature {
-            key_type: TypeId::STRING,
-            value_type: TypeId::STRING,
-            readonly: false,
-        }),
-        number_index: None,
-    let indexed_only = interner.object_with_index(ObjectShape {
-        properties: vec![],
-        string_index: Some(IndexSignature {
-            key_type: TypeId::STRING,
-            value_type: TypeId::STRING,
-            readonly: false,
-        }),
-        number_index: None,
-    let number_indexed = interner.object_with_index(ObjectShape {
-        properties: vec![],
-        string_index: None,
-        number_index: Some(IndexSignature {
-            key_type: TypeId::NUMBER,
-            value_type: TypeId::STRING,
-            readonly: false,
-        }),
-    let string_indexed = interner.object_with_index(ObjectShape {
-        properties: vec![],
-        string_index: Some(IndexSignature {
-            key_type: TypeId::STRING,
-            value_type: TypeId::STRING,
-            readonly: false,
-        }),
-        number_index: None,
-    let indexed_union = interner.object_with_index(ObjectShape {
-        properties: vec![],
-        string_index: Some(IndexSignature {
-            key_type: TypeId::STRING,
-            value_type: union_value,
-            readonly: false,
-        }),
-        number_index: None,
-    let indexed_string = interner.object_with_index(ObjectShape {
-        properties: vec![],
-        string_index: Some(IndexSignature {
-            key_type: TypeId::STRING,
-            value_type: TypeId::STRING,
-            readonly: false,
-        }),
-        number_index: None,
-    let indexed = interner.object_with_index(ObjectShape {
-        properties: vec![],
-        string_index: Some(IndexSignature {
-            key_type: TypeId::STRING,
-            value_type: TypeId::STRING,
-            readonly: false,
-        }),
-        number_index: None,

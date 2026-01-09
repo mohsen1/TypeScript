@@ -590,8 +590,8 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             }
 
             // Source is Application, target is structural - try to expand and compare
-            (TypeKey::Application(_), _) => {
-                if let Some(expanded) = self.try_expand_application(source) {
+            (TypeKey::Application(app_id), _) => {
+                if let Some(expanded) = self.try_expand_application(*app_id) {
                     self.check_subtype(expanded, target)
                 } else {
                     // Can't expand - assume not a subtype
@@ -600,8 +600,28 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             }
 
             // Target is Application, source is structural - try to expand and compare
-            (_, TypeKey::Application(_)) => {
-                if let Some(expanded) = self.try_expand_application(target) {
+            (_, TypeKey::Application(app_id)) => {
+                if let Some(expanded) = self.try_expand_application(*app_id) {
+                    self.check_subtype(source, expanded)
+                } else {
+                    // Can't expand - assume not a subtype
+                    SubtypeResult::False
+                }
+            }
+
+            // Source is Mapped, target is structural - try to expand and compare
+            (TypeKey::Mapped(mapped_id), _) => {
+                if let Some(expanded) = self.try_expand_mapped(*mapped_id) {
+                    self.check_subtype(expanded, target)
+                } else {
+                    // Can't expand - assume not a subtype
+                    SubtypeResult::False
+                }
+            }
+
+            // Target is Mapped, source is structural - try to expand and compare
+            (_, TypeKey::Mapped(mapped_id)) => {
+                if let Some(expanded) = self.try_expand_mapped(*mapped_id) {
                     self.check_subtype(source, expanded)
                 } else {
                     // Can't expand - assume not a subtype
@@ -723,8 +743,161 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 SubtypeResult::True
             }
 
+            // Application to non-Application: try to evaluate the Application
+            (TypeKey::Application(app_id), _) => {
+                if let Some(expanded) = self.try_expand_application(*app_id) {
+                    self.check_subtype(expanded, target)
+                } else {
+                    SubtypeResult::False
+                }
+            }
+
+            // Non-Application to Application: try to evaluate the Application
+            (_, TypeKey::Application(app_id)) => {
+                if let Some(expanded) = self.try_expand_application(*app_id) {
+                    self.check_subtype(source, expanded)
+                } else {
+                    SubtypeResult::False
+                }
+            }
+
             // Default: not a subtype
             _ => SubtypeResult::False,
+        }
+    }
+
+    /// Try to expand an Application type to its structural form.
+    /// Returns None if the application cannot be expanded (missing type params or body).
+    fn try_expand_application(&mut self, app_id: TypeApplicationId) -> Option<TypeId> {
+        use crate::solver::{TypeSubstitution, instantiate_type};
+
+        let app = self.interner.type_application(app_id);
+
+        // Look up the base type key
+        let base_key = self.interner.lookup(app.base)?;
+
+        // If the base is a Ref, try to resolve and instantiate
+        if let TypeKey::Ref(symbol) = base_key {
+            // Get type parameters for this symbol
+            let type_params = self.resolver.get_type_params(symbol)?;
+
+            // Resolve the base type to get the body
+            let resolved = self.resolver.resolve_ref(symbol, self.interner)?;
+
+            // Skip expansion if the resolved type is just this Application
+            // (prevents infinite recursion on self-referential types)
+            let resolved_key = self.interner.lookup(resolved);
+            if let Some(TypeKey::Application(resolved_app_id)) = resolved_key {
+                if resolved_app_id == app_id {
+                    return None;
+                }
+            }
+
+            // Create substitution and instantiate
+            let substitution = TypeSubstitution::from_args(&type_params, &app.args);
+            let instantiated = instantiate_type(self.interner, resolved, &substitution);
+
+            // Return the instantiated type for recursive checking
+            Some(instantiated)
+        } else {
+            // Base is not a Ref - can't expand
+            None
+        }
+    }
+
+    /// Try to expand a Mapped type to its structural form.
+    /// Returns None if the mapped type cannot be expanded (unresolvable constraint).
+    fn try_expand_mapped(&mut self, mapped_id: MappedTypeId) -> Option<TypeId> {
+        use crate::solver::{PropertyInfo, LiteralValue, instantiate_type, TypeSubstitution, MappedModifier, evaluate_type};
+
+        let mapped = self.interner.mapped_type(mapped_id);
+
+        // Get concrete keys from the constraint
+        let keys = self.try_evaluate_mapped_constraint(mapped.constraint)?;
+        if keys.is_empty() {
+            return None;
+        }
+
+        // Build properties by instantiating template for each key
+        let mut properties = Vec::new();
+        for key_name in keys {
+            let key_literal = self.interner.intern(TypeKey::Literal(LiteralValue::String(key_name)));
+
+            let mut subst = TypeSubstitution::new();
+            subst.insert(mapped.type_param.name, key_literal);
+
+            let instantiated_type = instantiate_type(self.interner, mapped.template, &subst);
+            // Evaluate the instantiated type to resolve conditionals like T[K] extends object ? ... : T[K]
+            let property_type = evaluate_type(self.interner, instantiated_type);
+
+            let optional = matches!(mapped.optional_modifier, Some(MappedModifier::Add));
+            let readonly = matches!(mapped.readonly_modifier, Some(MappedModifier::Add));
+
+            properties.push(PropertyInfo {
+                name: key_name,
+                type_id: property_type,
+                write_type: property_type,
+                optional,
+                readonly,
+                is_method: false,
+            });
+        }
+
+        Some(self.interner.object(properties))
+    }
+
+    /// Try to evaluate a mapped type constraint to get concrete string keys.
+    /// Returns None if the constraint can't be resolved to concrete keys.
+    fn try_evaluate_mapped_constraint(&self, constraint: TypeId) -> Option<Vec<crate::interner::Atom>> {
+        use crate::solver::LiteralValue;
+
+        let key = self.interner.lookup(constraint)?;
+
+        match key {
+            TypeKey::KeyOf(operand) => {
+                // Try to resolve the operand to get concrete keys
+                self.try_get_keyof_keys(operand)
+            }
+            TypeKey::Literal(LiteralValue::String(name)) => {
+                Some(vec![name])
+            }
+            TypeKey::Union(list_id) => {
+                let members = self.interner.type_list(list_id);
+                let mut keys = Vec::new();
+                for &member in members.iter() {
+                    if let Some(TypeKey::Literal(LiteralValue::String(name))) = self.interner.lookup(member) {
+                        keys.push(name);
+                    }
+                }
+                if keys.is_empty() { None } else { Some(keys) }
+            }
+            _ => None,
+        }
+    }
+
+    /// Try to get keys from keyof an operand type.
+    fn try_get_keyof_keys(&self, operand: TypeId) -> Option<Vec<crate::interner::Atom>> {
+        use crate::solver::LiteralValue;
+
+        let key = self.interner.lookup(operand)?;
+
+        match key {
+            TypeKey::Object(shape_id) | TypeKey::ObjectWithIndex(shape_id) => {
+                let shape = self.interner.object_shape(shape_id);
+                if shape.properties.is_empty() {
+                    return None;
+                }
+                Some(shape.properties.iter().map(|p| p.name).collect())
+            }
+            TypeKey::Ref(symbol) => {
+                // Try to resolve the ref and get keys from the resolved type
+                let resolved = self.resolver.resolve_ref(symbol, self.interner)?;
+                if resolved == operand {
+                    return None; // Avoid infinite recursion
+                }
+                self.try_get_keyof_keys(resolved)
+            }
+            _ => None,
         }
     }
 
@@ -858,156 +1031,6 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 }
             }
             _ => false,
-        }
-    }
-
-    /// Try to expand an Application type to its underlying structural type.
-    /// For Application(Ref(sym), [arg1, arg2, ...]), resolves the Ref and
-    /// substitutes type parameters with the type arguments.
-    fn try_expand_application(&mut self, app_type_id: TypeId) -> Option<TypeId> {
-        let app_key = self.interner.lookup(app_type_id)?;
-        let TypeKey::Application(app_id) = app_key else {
-            return None;
-        };
-        let app = self.interner.type_application(app_id);
-
-        // Check if base is a Ref
-        let base_key = self.interner.lookup(app.base)?;
-        let TypeKey::Ref(sym_ref) = base_key else {
-            // Base is not a Ref, can't expand
-            return None;
-        };
-
-        // Resolve the Ref to get the underlying type
-        let resolved = self.resolver.resolve_ref(sym_ref, self.interner)?;
-
-        // First, try to get type parameters from the resolver (if implemented)
-        if let Some(type_params) = self.resolver.get_type_params(sym_ref) {
-            if !type_params.is_empty() && type_params.len() == app.args.len() {
-                // Build substitution: map type param names to type arguments
-                // Pre-expand args that are TypeQuery or Application types
-                let mut substitution = TypeSubstitution::new();
-                for (param, &arg) in type_params.iter().zip(app.args.iter()) {
-                    let expanded_arg = self.try_expand_type_arg(arg).unwrap_or(arg);
-                    substitution.insert(param.name, expanded_arg);
-                }
-                return Some(instantiate_type(self.interner, resolved, &substitution));
-            }
-        }
-
-        // Fallback: extract type parameters from the resolved type itself
-        // by scanning for TypeParameter types in declaration order.
-        // For class constructor types (Callable with construct signatures),
-        // we need to use the instance type (construct signature return type)
-        // instead of the constructor type for type parameter extraction.
-        let working_type = match self.interner.lookup(resolved) {
-            Some(TypeKey::Callable(callable_id)) => {
-                let callable = self.interner.callable_shape(callable_id);
-                if !callable.construct_signatures.is_empty() {
-                    // This is a class constructor - use the instance type
-                    callable.construct_signatures[0].return_type
-                } else {
-                    resolved
-                }
-            }
-            _ => resolved,
-        };
-
-        let type_params = self.extract_type_params_from_type(working_type);
-        if type_params.is_empty() || type_params.len() != app.args.len() {
-            // No type params or mismatch - just return resolved without substitution
-            return Some(working_type);
-        }
-
-        // Build substitution: map type param names to type arguments
-        // Pre-expand args that are TypeQuery or Application types
-        let mut substitution = TypeSubstitution::new();
-        for (param_name, &arg) in type_params.iter().zip(app.args.iter()) {
-            let expanded_arg = self.try_expand_type_arg(arg).unwrap_or(arg);
-            substitution.insert(*param_name, expanded_arg);
-        }
-
-        // Instantiate the resolved type with the substitution
-        Some(instantiate_type(self.interner, working_type, &substitution))
-    }
-
-    /// Try to expand a type argument that is a TypeQuery or Application.
-    /// Returns the expanded type or None if no expansion needed/possible.
-    fn try_expand_type_arg(&mut self, arg: TypeId) -> Option<TypeId> {
-        let key = self.interner.lookup(arg)?;
-        match key {
-            TypeKey::TypeQuery(sym_ref) => {
-                // Resolve typeof expression to its actual type
-                self.resolver.resolve_ref(sym_ref, self.interner)
-            }
-            TypeKey::Application(_) => {
-                // Recursively expand nested Application
-                self.try_expand_application(arg)
-            }
-            _ => None,
-        }
-    }
-
-    /// Extract type parameter names from a type in first-occurrence order.
-    /// This is used as a fallback when the resolver doesn't provide type params.
-    fn extract_type_params_from_type(&self, type_id: TypeId) -> Vec<Atom> {
-        let mut params = Vec::new();
-        let mut visited = HashSet::new();
-        self.collect_type_params(type_id, &mut params, &mut visited);
-        params
-    }
-
-    fn collect_type_params(&self, type_id: TypeId, params: &mut Vec<Atom>, visited: &mut HashSet<TypeId>) {
-        if !visited.insert(type_id) {
-            return;
-        }
-
-        let Some(key) = self.interner.lookup(type_id) else {
-            return;
-        };
-
-        match key {
-            TypeKey::TypeParameter(info) => {
-                if !params.contains(&info.name) {
-                    params.push(info.name);
-                }
-            }
-            TypeKey::Function(fn_id) => {
-                let fn_shape = self.interner.function_shape(fn_id);
-                // Collect from type params first (in declaration order)
-                for param in &fn_shape.type_params {
-                    if !params.contains(&param.name) {
-                        params.push(param.name);
-                    }
-                }
-                // Then collect from params and return type (for nested type params)
-                for param in &fn_shape.params {
-                    self.collect_type_params(param.type_id, params, visited);
-                }
-                self.collect_type_params(fn_shape.return_type, params, visited);
-            }
-            TypeKey::Object(shape_id) => {
-                let shape = self.interner.object_shape(shape_id);
-                for prop in &shape.properties {
-                    self.collect_type_params(prop.type_id, params, visited);
-                }
-            }
-            TypeKey::Union(list_id) | TypeKey::Intersection(list_id) => {
-                let types = self.interner.type_list(list_id);
-                for &t in &*types {
-                    self.collect_type_params(t, params, visited);
-                }
-            }
-            TypeKey::Array(elem) => {
-                self.collect_type_params(elem, params, visited);
-            }
-            TypeKey::Tuple(tuple_id) => {
-                let elements = self.interner.tuple_list(tuple_id);
-                for elem in &*elements {
-                    self.collect_type_params(elem.type_id, params, visited);
-                }
-            }
-            _ => {}
         }
     }
 
