@@ -7,10 +7,10 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-(awaiting assignment)
+- [ ] Add ES5 source map tests for class expression patterns: anonymous, named, in return, with extends, with static. Tests: `./wasm/test.sh source_map`
 
 ## Task Queue
-- [ ] Add ES5 source map tests for class expression patterns: anonymous, named, in return, with extends
+- [ ] Add ES5 source map tests for arrow function patterns: expression body, block body, this binding
 
 ## Completed
 - [x] Added spread/rest transform ES5 source map tests (array spread basic, object spread basic, function call spread, array with elements, object with properties, rest parameters, array rest elements, object rest properties, nested patterns, comprehensive); 747 tests pass.
