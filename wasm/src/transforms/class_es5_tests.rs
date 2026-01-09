@@ -13482,3 +13482,407 @@ class TemplateReplacer {
         output
     );
 }
+
+// ============================================================================
+// Object.freeze/Object.seal pattern tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_object_freeze_basic() {
+    // Basic Object.freeze usage
+    let source = r#"
+class ImmutablePoint {
+    readonly x: number;
+    readonly y: number;
+
+    constructor(x: number, y: number) {
+        this.x = x;
+        this.y = y;
+        Object.freeze(this);
+    }
+
+    static create(x: number, y: number): Readonly<ImmutablePoint> {
+        return Object.freeze(new ImmutablePoint(x, y));
+    }
+
+    distance(other: ImmutablePoint): number {
+        const dx = this.x - other.x;
+        const dy = this.y - other.y;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("ImmutablePoint"),
+        "Expected ImmutablePoint class: {}",
+        output
+    );
+
+    // Object.freeze should be present
+    assert!(
+        output.contains("Object.freeze"),
+        "Expected Object.freeze: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("distance") && output.contains("create"),
+        "Expected distance, create methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_object_seal_basic() {
+    // Basic Object.seal usage
+    let source = r#"
+class SealedConfig {
+    host: string = 'localhost';
+    port: number = 8080;
+    debug: boolean = false;
+
+    constructor() {
+        Object.seal(this);
+    }
+
+    update(key: 'host' | 'port' | 'debug', value: string | number | boolean): void {
+        (this as any)[key] = value;
+    }
+
+    static createSealed(): SealedConfig {
+        return Object.seal(new SealedConfig());
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("SealedConfig"),
+        "Expected SealedConfig class: {}",
+        output
+    );
+
+    // Object.seal should be present
+    assert!(
+        output.contains("Object.seal"),
+        "Expected Object.seal: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("update") && output.contains("createSealed"),
+        "Expected update, createSealed methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_object_freeze_deep() {
+    // Deep freeze pattern
+    let source = r#"
+class DeepFreezer {
+    static deepFreeze<T extends object>(obj: T): Readonly<T> {
+        Object.freeze(obj);
+
+        for (const key of Object.keys(obj)) {
+            const value = (obj as any)[key];
+            if (value !== null && typeof value === 'object') {
+                this.deepFreeze(value);
+            }
+        }
+
+        return obj;
+    }
+
+    static isDeepFrozen(obj: object): boolean {
+        if (!Object.isFrozen(obj)) {
+            return false;
+        }
+
+        for (const key of Object.keys(obj)) {
+            const value = (obj as any)[key];
+            if (value !== null && typeof value === 'object') {
+                if (!this.isDeepFrozen(value)) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("DeepFreezer"),
+        "Expected DeepFreezer class: {}",
+        output
+    );
+
+    // Object.freeze and Object.isFrozen should be present
+    assert!(
+        output.contains("Object.freeze") && output.contains("Object.isFrozen"),
+        "Expected Object.freeze and Object.isFrozen: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("deepFreeze") && output.contains("isDeepFrozen"),
+        "Expected deepFreeze, isDeepFrozen methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_object_freeze_seal_checks() {
+    // Object.isFrozen and Object.isSealed checks
+    let source = r#"
+class ObjectStateChecker {
+    private obj: object;
+
+    constructor(obj: object) {
+        this.obj = obj;
+    }
+
+    isFrozen(): boolean {
+        return Object.isFrozen(this.obj);
+    }
+
+    isSealed(): boolean {
+        return Object.isSealed(this.obj);
+    }
+
+    isExtensible(): boolean {
+        return Object.isExtensible(this.obj);
+    }
+
+    freeze(): void {
+        Object.freeze(this.obj);
+    }
+
+    seal(): void {
+        Object.seal(this.obj);
+    }
+
+    preventExtensions(): void {
+        Object.preventExtensions(this.obj);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("ObjectStateChecker"),
+        "Expected ObjectStateChecker class: {}",
+        output
+    );
+
+    // Object state methods should be present
+    assert!(
+        output.contains("Object.isFrozen") || output.contains("Object.isSealed"),
+        "Expected Object state check methods: {}",
+        output
+    );
+
+    // Instance methods should be present
+    assert!(
+        output.contains("isFrozen") && output.contains("isSealed"),
+        "Expected isFrozen, isSealed methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_immutable_record() {
+    // Immutable record pattern with freeze
+    let source = r#"
+class ImmutableRecord<T extends object> {
+    private readonly data: Readonly<T>;
+
+    constructor(data: T) {
+        this.data = Object.freeze({ ...data });
+    }
+
+    get<K extends keyof T>(key: K): T[K] {
+        return this.data[key];
+    }
+
+    set<K extends keyof T>(key: K, value: T[K]): ImmutableRecord<T> {
+        return new ImmutableRecord({ ...this.data, [key]: value });
+    }
+
+    toObject(): Readonly<T> {
+        return this.data;
+    }
+
+    static from<T extends object>(data: T): ImmutableRecord<T> {
+        return new ImmutableRecord(data);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("ImmutableRecord"),
+        "Expected ImmutableRecord class: {}",
+        output
+    );
+
+    // Object.freeze should be present
+    assert!(
+        output.contains("Object.freeze"),
+        "Expected Object.freeze: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("toObject"),
+        "Expected toObject method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_frozen_singleton() {
+    // Frozen singleton pattern
+    let source = r#"
+class FrozenSingleton {
+    private static instance: FrozenSingleton | null = null;
+    readonly id: string;
+    readonly createdAt: Date;
+
+    private constructor() {
+        this.id = Math.random().toString(36).substr(2, 9);
+        this.createdAt = new Date();
+        Object.freeze(this);
+    }
+
+    static getInstance(): Readonly<FrozenSingleton> {
+        if (!this.instance) {
+            this.instance = new FrozenSingleton();
+        }
+        return this.instance;
+    }
+
+    static isInstanceFrozen(): boolean {
+        return this.instance ? Object.isFrozen(this.instance) : false;
+    }
+
+    getId(): string {
+        return this.id;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("FrozenSingleton"),
+        "Expected FrozenSingleton class: {}",
+        output
+    );
+
+    // Object.freeze should be present
+    assert!(
+        output.contains("Object.freeze"),
+        "Expected Object.freeze: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("getInstance") && output.contains("isInstanceFrozen"),
+        "Expected getInstance, isInstanceFrozen methods: {}",
+        output
+    );
+}
