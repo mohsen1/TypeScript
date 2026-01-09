@@ -10333,3 +10333,106 @@ fn test_async_resource_pattern_ignores_nested_async() {
     );
     assert!(!result, "Should not detect await inside nested async in resource function");
 }
+
+// ============================================================================
+// ASYNC CONTEXT PATTERN TESTS
+// ============================================================================
+
+// Tests for async context patterns: AsyncLocalStorage simulation, context
+// propagation, zone-like patterns.
+
+#[test]
+fn test_async_context_pattern_run_basic() {
+    let result = async_error_propagation_contains_await(
+        "async function runWithContext() { return await context.run(fn); }",
+    );
+    assert!(result, "Should detect await in context run");
+}
+
+#[test]
+fn test_async_context_pattern_get_store() {
+    let result = async_error_propagation_contains_await(
+        "async function getContext() { return await storage.getStore(); }",
+    );
+    assert!(result, "Should detect await in storage getStore");
+}
+
+#[test]
+fn test_async_context_pattern_enter_exit() {
+    let result = async_error_propagation_contains_await(
+        "async function withZone() { await zone.enter(); await zone.exit(); }",
+    );
+    assert!(result, "Should detect await in zone enter/exit");
+}
+
+#[test]
+fn test_async_context_pattern_propagation() {
+    let result = async_error_propagation_contains_await(
+        "async function propagate() { return await context.propagate(task); }",
+    );
+    assert!(result, "Should detect await in context propagation");
+}
+
+#[test]
+fn test_async_context_pattern_wrap() {
+    let result = async_error_propagation_contains_await(
+        "async function wrapTask() { return await context.wrap(asyncFn)(); }",
+    );
+    assert!(result, "Should detect await in context wrap");
+}
+
+#[test]
+fn test_async_context_pattern_fork() {
+    let result = async_error_propagation_contains_await(
+        "async function forkContext() { return await context.fork().run(task); }",
+    );
+    assert!(result, "Should detect await in context fork");
+}
+
+#[test]
+fn test_async_context_pattern_bind() {
+    let result = async_error_propagation_contains_await(
+        "async function bindContext() { return await context.bind(handler)(); }",
+    );
+    assert!(result, "Should detect await in context bind");
+}
+
+#[test]
+fn test_async_context_pattern_scheduler() {
+    let result = async_error_propagation_contains_await(
+        "async function schedule() { return await scheduler.schedule(task); }",
+    );
+    assert!(result, "Should detect await in scheduler pattern");
+}
+
+#[test]
+fn test_async_context_pattern_trace() {
+    let result = async_error_propagation_contains_await(
+        "async function traced() { return await tracer.trace(operation); }",
+    );
+    assert!(result, "Should detect await in tracer pattern");
+}
+
+#[test]
+fn test_async_context_pattern_scope() {
+    let result = async_error_propagation_contains_await(
+        "async function scoped() { return await scope.execute(fn); }",
+    );
+    assert!(result, "Should detect await in scope execute");
+}
+
+#[test]
+fn test_async_context_pattern_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function syncContext() { return context.get(); }",
+    );
+    assert!(!result, "Should not detect await when context access is sync");
+}
+
+#[test]
+fn test_async_context_pattern_ignores_nested_async() {
+    let result = async_error_propagation_contains_await(
+        "async function outer() { const runner = async () => await context.run(fn); }",
+    );
+    assert!(!result, "Should not detect await inside nested async in context function");
+}
