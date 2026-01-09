@@ -10,7 +10,7 @@ Priority: 3
 - [ ] Add ES5 source map tests for generator transform patterns: yield expressions, generator delegation. Tests: `./wasm/test.sh source_map`
 
 ## Task Queue
-(empty)
+- [ ] Add ES5 source map tests for destructuring transform patterns: array destructuring, object destructuring, nested
 
 ## Completed
 - [x] Added async/await transform ES5 source map tests (try/catch basic, try/catch/finally, Promise chain, arrow functions, class methods, IIFE, nested try/catch, parallel await, error rethrow, comprehensive); 717 tests pass.
