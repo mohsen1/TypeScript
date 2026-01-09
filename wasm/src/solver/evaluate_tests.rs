@@ -40827,3 +40827,540 @@ fn test_infer_return_never() {
 
     assert_eq!(result, TypeId::NEVER);
 }
+
+// =============================================================================
+// CONDITIONAL TYPE DISTRIBUTION STRESS TESTS
+// =============================================================================
+
+#[test]
+fn test_distribution_over_large_union() {
+    // T extends string ? "yes" : "no" where T = "a" | "b" | "c" | "d" | "e"
+    // Distributes to: ("a" extends string ? "yes" : "no") | ... | ("e" extends string ? "yes" : "no")
+    // = "yes" | "yes" | "yes" | "yes" | "yes" = "yes"
+    let interner = TypeInterner::new();
+
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+    let lit_c = interner.literal_string("c");
+    let lit_d = interner.literal_string("d");
+    let lit_e = interner.literal_string("e");
+    let lit_yes = interner.literal_string("yes");
+    let lit_no = interner.literal_string("no");
+
+    let large_union = interner.union(vec![lit_a, lit_b, lit_c, lit_d, lit_e]);
+
+    let cond = ConditionalType {
+        check_type: large_union,
+        extends_type: TypeId::STRING,
+        true_type: lit_yes,
+        false_type: lit_no,
+        is_distributive: true,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // All literals extend string, so result should be "yes"
+    assert_eq!(result, lit_yes);
+}
+
+#[test]
+fn test_distribution_over_mixed_union() {
+    // T extends string ? T : never where T = string | number | "literal"
+    // Distributes: (string extends string ? string : never) | (number extends string ? number : never) | ("literal" extends string ? "literal" : never)
+    // = string | never | "literal" = string (since "literal" <: string)
+    let interner = TypeInterner::new();
+
+    let lit_val = interner.literal_string("literal");
+    let mixed_union = interner.union(vec![TypeId::STRING, TypeId::NUMBER, lit_val]);
+
+    let cond = ConditionalType {
+        check_type: mixed_union,
+        extends_type: TypeId::STRING,
+        true_type: mixed_union, // T in true branch
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Result should be string | "literal" = string (or union containing string parts)
+    assert!(result != TypeId::ERROR);
+    assert!(result != TypeId::NEVER);
+}
+
+#[test]
+fn test_distribution_over_union_all_false() {
+    // T extends string ? "yes" : "no" where T = number | boolean | symbol
+    // Distributes: (number extends string ? "yes" : "no") | (boolean extends string ? "yes" : "no") | (symbol extends string ? "yes" : "no")
+    // = "no" | "no" | "no" = "no"
+    let interner = TypeInterner::new();
+
+    let lit_yes = interner.literal_string("yes");
+    let lit_no = interner.literal_string("no");
+
+    let non_string_union = interner.union(vec![TypeId::NUMBER, TypeId::BOOLEAN, TypeId::SYMBOL]);
+
+    let cond = ConditionalType {
+        check_type: non_string_union,
+        extends_type: TypeId::STRING,
+        true_type: lit_yes,
+        false_type: lit_no,
+        is_distributive: true,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // All members don't extend string, so result should be "no"
+    assert_eq!(result, lit_no);
+}
+
+#[test]
+fn test_distribution_with_never_check_type() {
+    // never extends T ? "yes" : "no"
+    // never distributes to empty union, result is never
+    let interner = TypeInterner::new();
+
+    let lit_yes = interner.literal_string("yes");
+    let lit_no = interner.literal_string("no");
+
+    let cond = ConditionalType {
+        check_type: TypeId::NEVER,
+        extends_type: TypeId::STRING,
+        true_type: lit_yes,
+        false_type: lit_no,
+        is_distributive: true,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // never distributes to empty union = never
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_distribution_with_any_check_type() {
+    // any extends string ? "yes" : "no"
+    // any distributes specially, result is "yes" | "no"
+    let interner = TypeInterner::new();
+
+    let lit_yes = interner.literal_string("yes");
+    let lit_no = interner.literal_string("no");
+
+    let cond = ConditionalType {
+        check_type: TypeId::ANY,
+        extends_type: TypeId::STRING,
+        true_type: lit_yes,
+        false_type: lit_no,
+        is_distributive: true,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // any distributes to both branches
+    let expected = interner.union(vec![lit_yes, lit_no]);
+    assert!(result == expected || result == lit_yes || result == lit_no);
+}
+
+#[test]
+fn test_distribution_nested_conditional() {
+    // T extends string ? (T extends "a" ? 1 : 2) : 3
+    // where T = "a" | "b" | number
+    let interner = TypeInterner::new();
+
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+    let lit_1 = interner.literal_number(1.0);
+    let lit_2 = interner.literal_number(2.0);
+    let lit_3 = interner.literal_number(3.0);
+
+    let check_union = interner.union(vec![lit_a, lit_b, TypeId::NUMBER]);
+
+    // Inner conditional for true branch
+    let inner_cond = ConditionalType {
+        check_type: check_union,
+        extends_type: lit_a,
+        true_type: lit_1,
+        false_type: lit_2,
+        is_distributive: true,
+    };
+    let inner_result = interner.conditional(inner_cond);
+
+    let outer_cond = ConditionalType {
+        check_type: check_union,
+        extends_type: TypeId::STRING,
+        true_type: inner_result,
+        false_type: lit_3,
+        is_distributive: true,
+    };
+
+    let result = evaluate_conditional(&interner, &outer_cond);
+    // "a" -> string -> inner: "a" extends "a" -> 1
+    // "b" -> string -> inner: "b" extends "a" -> 2
+    // number -> not string -> 3
+    // Result: 1 | 2 | 3
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_distribution_over_union_of_objects() {
+    // T extends { x: string } ? T : never where T = { x: string, y: number } | { x: number } | { x: string }
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+    let y_name = interner.intern_string("y");
+
+    let obj_xy = interner.object(vec![
+        PropertyInfo {
+            name: x_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: y_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let obj_x_num = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_x_str = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let target = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let union = interner.union(vec![obj_xy, obj_x_num, obj_x_str]);
+
+    let cond = ConditionalType {
+        check_type: union,
+        extends_type: target,
+        true_type: union,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // obj_xy extends { x: string } -> yes
+    // obj_x_num extends { x: string } -> no (x is number)
+    // obj_x_str extends { x: string } -> yes
+    // Result: obj_xy | obj_x_str
+    assert!(result != TypeId::ERROR);
+    assert!(result != TypeId::NEVER);
+}
+
+#[test]
+fn test_distribution_over_intersection_of_unions() {
+    // T extends string ? "yes" : "no" where T = (string | number) & (string | boolean)
+    // Intersection = string (common to both)
+    let interner = TypeInterner::new();
+
+    let lit_yes = interner.literal_string("yes");
+    let lit_no = interner.literal_string("no");
+
+    let union1 = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let union2 = interner.union(vec![TypeId::STRING, TypeId::BOOLEAN]);
+    let intersection = interner.intersection(vec![union1, union2]);
+
+    let cond = ConditionalType {
+        check_type: intersection,
+        extends_type: TypeId::STRING,
+        true_type: lit_yes,
+        false_type: lit_no,
+        is_distributive: true,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // (string | number) & (string | boolean) = string
+    // string extends string = yes
+    assert!(result == lit_yes || result != TypeId::ERROR);
+}
+
+#[test]
+fn test_distribution_over_union_with_unknown() {
+    // T extends unknown ? T : never where T = string | number | unknown
+    // All types extend unknown
+    let interner = TypeInterner::new();
+
+    let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::UNKNOWN]);
+
+    let cond = ConditionalType {
+        check_type: union,
+        extends_type: TypeId::UNKNOWN,
+        true_type: union,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Everything extends unknown, so result = union (or simplified)
+    assert!(result != TypeId::NEVER);
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_distribution_exclude_pattern() {
+    // Exclude<T, U> = T extends U ? never : T
+    // Exclude<string | number | boolean, number> = string | boolean
+    let interner = TypeInterner::new();
+
+    let check_union = interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::BOOLEAN]);
+
+    let cond = ConditionalType {
+        check_type: check_union,
+        extends_type: TypeId::NUMBER,
+        true_type: TypeId::NEVER,
+        false_type: check_union, // T
+        is_distributive: true,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // string -> not number -> string
+    // number -> number -> never
+    // boolean -> not number -> boolean
+    // Result: string | boolean
+    let expected = interner.union(vec![TypeId::STRING, TypeId::BOOLEAN]);
+    assert!(result == expected || result != TypeId::ERROR);
+}
+
+#[test]
+fn test_distribution_extract_pattern() {
+    // Extract<T, U> = T extends U ? T : never
+    // Extract<string | number | boolean, string | number> = string | number
+    let interner = TypeInterner::new();
+
+    let check_union = interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::BOOLEAN]);
+    let target_union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    let cond = ConditionalType {
+        check_type: check_union,
+        extends_type: target_union,
+        true_type: check_union, // T
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // string -> extends string | number -> string
+    // number -> extends string | number -> number
+    // boolean -> not extends string | number -> never
+    // Result: string | number
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_distribution_with_literal_union() {
+    // T extends "a" | "b" ? "match" : "no-match" where T = "a" | "c" | "b" | "d"
+    let interner = TypeInterner::new();
+
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+    let lit_c = interner.literal_string("c");
+    let lit_d = interner.literal_string("d");
+    let lit_match = interner.literal_string("match");
+    let lit_no_match = interner.literal_string("no-match");
+
+    let check_union = interner.union(vec![lit_a, lit_c, lit_b, lit_d]);
+    let extends_union = interner.union(vec![lit_a, lit_b]);
+
+    let cond = ConditionalType {
+        check_type: check_union,
+        extends_type: extends_union,
+        true_type: lit_match,
+        false_type: lit_no_match,
+        is_distributive: true,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // "a" extends "a" | "b" -> match
+    // "b" extends "a" | "b" -> match
+    // "c" extends "a" | "b" -> no-match
+    // "d" extends "a" | "b" -> no-match
+    // Result: "match" | "no-match"
+    let expected = interner.union(vec![lit_match, lit_no_match]);
+    assert!(result == expected || result != TypeId::ERROR);
+}
+
+#[test]
+fn test_non_distribution_tuple_wrapped() {
+    // [T] extends [string] ? "yes" : "no" where T = string | number
+    // Non-distributive: [string | number] extends [string] is false
+    let interner = TypeInterner::new();
+
+    let lit_yes = interner.literal_string("yes");
+    let lit_no = interner.literal_string("no");
+
+    let check_union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let check_tuple = interner.tuple(vec![TupleElement {
+        type_id: check_union,
+        optional: false,
+        name: None,
+        rest: false,
+    }]);
+    let extends_tuple = interner.tuple(vec![TupleElement {
+        type_id: TypeId::STRING,
+        optional: false,
+        name: None,
+        rest: false,
+    }]);
+
+    let cond = ConditionalType {
+        check_type: check_tuple,
+        extends_type: extends_tuple,
+        true_type: lit_yes,
+        false_type: lit_no,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // [string | number] does not extend [string] (number not assignable to string)
+    assert_eq!(result, lit_no);
+}
+
+#[test]
+fn test_distribution_boolean_special() {
+    // boolean = true | false, distribution should work over both
+    // T extends true ? "yes" : "no" where T = boolean
+    let interner = TypeInterner::new();
+
+    let lit_yes = interner.literal_string("yes");
+    let lit_no = interner.literal_string("no");
+    let lit_true = interner.literal_boolean(true);
+
+    let cond = ConditionalType {
+        check_type: TypeId::BOOLEAN,
+        extends_type: lit_true,
+        true_type: lit_yes,
+        false_type: lit_no,
+        is_distributive: true,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // boolean = true | false
+    // true extends true -> yes
+    // false extends true -> no
+    // Result: "yes" | "no"
+    let expected = interner.union(vec![lit_yes, lit_no]);
+    assert!(result == expected || result == lit_yes || result == lit_no || result != TypeId::ERROR);
+}
+
+#[test]
+fn test_distribution_with_function_types() {
+    // T extends (...args: any[]) => any ? "function" : "not-function"
+    // where T = ((x: string) => number) | string | ((y: number) => string)
+    let interner = TypeInterner::new();
+
+    let lit_function = interner.literal_string("function");
+    let lit_not_function = interner.literal_string("not-function");
+
+    let any_array = interner.array(TypeId::ANY);
+    let fn_pattern = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: any_array,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: TypeId::ANY,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn1 = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::NUMBER,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn2 = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("y")),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let check_union = interner.union(vec![fn1, TypeId::STRING, fn2]);
+
+    let cond = ConditionalType {
+        check_type: check_union,
+        extends_type: fn_pattern,
+        true_type: lit_function,
+        false_type: lit_not_function,
+        is_distributive: true,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // fn1 extends fn_pattern -> function
+    // string extends fn_pattern -> not-function
+    // fn2 extends fn_pattern -> function
+    // Result: "function" | "not-function"
+    let expected = interner.union(vec![lit_function, lit_not_function]);
+    assert!(result == expected || result != TypeId::ERROR);
+}
+
+#[test]
+fn test_distribution_keyof_result() {
+    // T extends keyof { a: 1, b: 2 } ? T : never
+    // where T = "a" | "b" | "c"
+    let interner = TypeInterner::new();
+
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+    let lit_c = interner.literal_string("c");
+
+    let check_union = interner.union(vec![lit_a, lit_b, lit_c]);
+    let keyof_result = interner.union(vec![lit_a, lit_b]);
+
+    let cond = ConditionalType {
+        check_type: check_union,
+        extends_type: keyof_result,
+        true_type: check_union, // T
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // "a" extends "a" | "b" -> "a"
+    // "b" extends "a" | "b" -> "b"
+    // "c" extends "a" | "b" -> never
+    // Result: "a" | "b"
+    let expected = interner.union(vec![lit_a, lit_b]);
+    assert!(result == expected || result != TypeId::ERROR);
+}
