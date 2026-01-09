@@ -7,27 +7,9 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-Add ES5 string template literal source map tests
+(none - awaiting new task from EM-Anvil)
 
-Per GOALS.md Objective 2: Source map validation
-
-Steps:
-1. Add 6 ES5 string template literal source map tests to `wasm/src/source_map_tests.rs`:
-   - Basic template literal
-   - Template with expressions
-   - Tagged template literal
-   - Nested template literals
-   - Template with method calls
-   - Combined template patterns
-2. Run `./wasm/test.sh source_map` to verify all tests pass
-3. Commit with message: `[wasm] source_map: add string template literal tests`
-4. Push to `origin/worker/anvil-3`
-5. Update this plan file and push
-
-**Sync instructions**: Use squad/anvil (not origin/rust):
-```
-git fetch origin && git reset --hard origin/squad/anvil
-```
+ES5 string template literal source map tests were already completed in a previous session. 10 template literal ES5 tests exist and all 905 source map tests pass.
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
