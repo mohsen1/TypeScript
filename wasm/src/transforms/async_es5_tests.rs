@@ -3752,3 +3752,453 @@ fn test_async_decorator_factory() {
         output
     );
 }
+
+// ============================================================================
+// Async with computed property names tests
+// ============================================================================
+
+/// Helper to parse and emit an async method with computed property name
+fn parse_and_emit_async_computed_prop(source: &str) -> String {
+    use crate::parser::syntax_kind_ext;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &stmt_idx in &source_file.statements.nodes {
+                if let Some(stmt_node) = parser.arena.get(stmt_idx) {
+                    // Handle class declarations
+                    if stmt_node.kind == syntax_kind_ext::CLASS_DECLARATION {
+                        if let Some(class_data) = parser.arena.get_class(stmt_node) {
+                            for &member_idx in &class_data.members.nodes {
+                                if let Some(member_node) = parser.arena.get(member_idx) {
+                                    if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
+                                        if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                            let emitter = AsyncES5Emitter::new(&parser.arena);
+                                            let has_await = emitter.body_contains_await(method_data.body);
+                                            let mut emitter = AsyncES5Emitter::new(&parser.arena);
+                                            if has_await {
+                                                return emitter.emit_generator_body_with_await(method_data.body);
+                                            } else {
+                                                return emitter.emit_simple_generator_body(method_data.body);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    String::new()
+}
+
+/// Helper to check if computed property async method contains await
+fn computed_prop_method_contains_await(source: &str) -> bool {
+    use crate::parser::syntax_kind_ext;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &stmt_idx in &source_file.statements.nodes {
+                if let Some(stmt_node) = parser.arena.get(stmt_idx) {
+                    if stmt_node.kind == syntax_kind_ext::CLASS_DECLARATION {
+                        if let Some(class_data) = parser.arena.get_class(stmt_node) {
+                            for &member_idx in &class_data.members.nodes {
+                                if let Some(member_node) = parser.arena.get(member_idx) {
+                                    if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
+                                        if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                            let emitter = AsyncES5Emitter::new(&parser.arena);
+                                            return emitter.body_contains_await(method_data.body);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+#[test]
+fn test_async_computed_prop_class_method_basic() {
+    let output = parse_and_emit_async_computed_prop(
+        "const key = 'method'; class Foo { async [key]() { await process(); } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Computed property async method should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_computed_prop_with_return() {
+    let output = parse_and_emit_async_computed_prop(
+        "class Foo { async ['getValue']() { return await fetch(); } }",
+    );
+    assert!(
+        output.contains("return [2 /*return*/, _a.sent()]") || output.contains("[4 /*yield*/"),
+        "Computed property async with return should emit correctly: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_computed_prop_no_await() {
+    let output = parse_and_emit_async_computed_prop(
+        "class Foo { async ['sync']() { return 42; } }",
+    );
+    assert!(
+        output.contains("[2 /*return*/"),
+        "Computed property sync async should have return: {}",
+        output
+    );
+    assert!(
+        !output.contains("switch"),
+        "No await should skip switch: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_computed_prop_symbol() {
+    let output = parse_and_emit_async_computed_prop(
+        "class Foo { async [Symbol.asyncIterator]() { await init(); } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Symbol computed property async should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_computed_prop_body_contains_await() {
+    assert!(
+        computed_prop_method_contains_await(
+            "class Foo { async ['method']() { await process(); } }"
+        ),
+        "Should detect await in computed property method"
+    );
+}
+
+#[test]
+fn test_async_computed_prop_body_no_await() {
+    assert!(
+        !computed_prop_method_contains_await(
+            "class Foo { async ['method']() { return 1; } }"
+        ),
+        "Should not detect await when none present"
+    );
+}
+
+#[test]
+fn test_async_computed_prop_ignores_nested_async() {
+    assert!(
+        !computed_prop_method_contains_await(
+            "class Foo { async ['method']() { const inner = async () => { await x; }; return 1; } }"
+        ),
+        "Should ignore await in nested async"
+    );
+}
+
+#[test]
+fn test_async_computed_prop_template_literal() {
+    let output = parse_and_emit_async_computed_prop(
+        "class Foo { async [`method_${version}`]() { await process(); } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/") || output.contains("__generator"),
+        "Template literal computed property should have generator output: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_computed_prop_with_try_catch() {
+    assert!(
+        computed_prop_method_contains_await(
+            "class Foo { async ['risky']() { try { await riskyOp(); } catch (e) { log(e); } } }"
+        ),
+        "Should detect await in try block of computed property method"
+    );
+}
+
+#[test]
+fn test_async_computed_prop_static() {
+    let output = parse_and_emit_async_computed_prop(
+        "class Foo { static async ['factory']() { await setup(); } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Static computed property async should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_computed_prop_expression() {
+    let output = parse_and_emit_async_computed_prop(
+        "class Foo { async ['get' + 'Data']() { await load(); } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Expression computed property should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_computed_prop_multiple_awaits() {
+    let output = parse_and_emit_async_computed_prop(
+        "class Foo { async ['process']() { await a(); await b(); } }",
+    );
+    assert!(
+        output.contains("case 1:") && output.contains("case 2:"),
+        "Multiple awaits should have multiple cases: {}",
+        output
+    );
+}
+
+// ============================================================================
+// Async class field initializer tests
+// ============================================================================
+
+/// Helper to parse and emit an async arrow/function from a class field initializer
+fn parse_and_emit_async_field_initializer(source: &str) -> String {
+    use crate::parser::syntax_kind_ext;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &stmt_idx in &source_file.statements.nodes {
+                if let Some(stmt_node) = parser.arena.get(stmt_idx) {
+                    if stmt_node.kind == syntax_kind_ext::CLASS_DECLARATION {
+                        if let Some(class_data) = parser.arena.get_class(stmt_node) {
+                            for &member_idx in &class_data.members.nodes {
+                                if let Some(member_node) = parser.arena.get(member_idx) {
+                                    if member_node.kind == syntax_kind_ext::PROPERTY_DECLARATION {
+                                        if let Some(prop_data) = parser.arena.get_property_decl(member_node) {
+                                            let init_idx = prop_data.initializer;
+                                            if let Some(init_node) = parser.arena.get(init_idx) {
+                                                // Check for arrow function or function expression
+                                                if init_node.kind == syntax_kind_ext::ARROW_FUNCTION
+                                                    || init_node.kind == syntax_kind_ext::FUNCTION_EXPRESSION
+                                                {
+                                                    if let Some(func) = parser.arena.get_function(init_node) {
+                                                        let emitter = AsyncES5Emitter::new(&parser.arena);
+                                                        let has_await = emitter.body_contains_await(func.body);
+                                                        let mut emitter = AsyncES5Emitter::new(&parser.arena);
+                                                        if has_await {
+                                                            return emitter.emit_generator_body_with_await(func.body);
+                                                        } else {
+                                                            return emitter.emit_simple_generator_body(func.body);
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    String::new()
+}
+
+/// Helper to check if async field initializer contains await
+fn async_field_initializer_contains_await(source: &str) -> bool {
+    use crate::parser::syntax_kind_ext;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &stmt_idx in &source_file.statements.nodes {
+                if let Some(stmt_node) = parser.arena.get(stmt_idx) {
+                    if stmt_node.kind == syntax_kind_ext::CLASS_DECLARATION {
+                        if let Some(class_data) = parser.arena.get_class(stmt_node) {
+                            for &member_idx in &class_data.members.nodes {
+                                if let Some(member_node) = parser.arena.get(member_idx) {
+                                    if member_node.kind == syntax_kind_ext::PROPERTY_DECLARATION {
+                                        if let Some(prop_data) = parser.arena.get_property_decl(member_node) {
+                                            let init_idx = prop_data.initializer;
+                                            if let Some(init_node) = parser.arena.get(init_idx) {
+                                                if init_node.kind == syntax_kind_ext::ARROW_FUNCTION
+                                                    || init_node.kind == syntax_kind_ext::FUNCTION_EXPRESSION
+                                                {
+                                                    if let Some(func) = parser.arena.get_function(init_node) {
+                                                        let emitter = AsyncES5Emitter::new(&parser.arena);
+                                                        return emitter.body_contains_await(func.body);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+#[test]
+fn test_async_field_arrow_basic() {
+    let output = parse_and_emit_async_field_initializer(
+        "class Foo { handler = async () => { await process(); }; }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Async arrow field should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_field_arrow_with_return() {
+    let output = parse_and_emit_async_field_initializer(
+        "class Foo { getter = async () => { return await fetch(); }; }",
+    );
+    assert!(
+        output.contains("return [2 /*return*/, _a.sent()]") || output.contains("[4 /*yield*/"),
+        "Async arrow field with return should emit correctly: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_field_arrow_no_await() {
+    let output = parse_and_emit_async_field_initializer(
+        "class Foo { sync = async () => { return 42; }; }",
+    );
+    assert!(
+        output.contains("[2 /*return*/"),
+        "Sync async field should have return: {}",
+        output
+    );
+    assert!(
+        !output.contains("switch"),
+        "No await should skip switch: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_field_function_expression() {
+    let output = parse_and_emit_async_field_initializer(
+        "class Foo { handler = async function() { await process(); }; }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Async function field should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_field_body_contains_await() {
+    assert!(
+        async_field_initializer_contains_await(
+            "class Foo { handler = async () => { await process(); }; }"
+        ),
+        "Should detect await in async field initializer"
+    );
+}
+
+#[test]
+fn test_async_field_body_no_await() {
+    assert!(
+        !async_field_initializer_contains_await(
+            "class Foo { handler = async () => { return 1; }; }"
+        ),
+        "Should not detect await when none present"
+    );
+}
+
+#[test]
+fn test_async_field_ignores_nested_async() {
+    assert!(
+        !async_field_initializer_contains_await(
+            "class Foo { handler = async () => { const inner = async () => { await x; }; return 1; }; }"
+        ),
+        "Should ignore await in nested async"
+    );
+}
+
+#[test]
+fn test_async_field_with_params() {
+    let output = parse_and_emit_async_field_initializer(
+        "class Foo { handler = async (x: number, y: string) => { return await process(x, y); }; }",
+    );
+    assert!(
+        output.contains("[4 /*yield*/") || output.contains("switch (_a.label)"),
+        "Async field with params should have yield or switch: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_field_with_try_catch() {
+    assert!(
+        async_field_initializer_contains_await(
+            "class Foo { handler = async () => { try { await riskyOp(); } catch (e) { log(e); } }; }"
+        ),
+        "Should detect await in try block of async field"
+    );
+}
+
+#[test]
+fn test_async_static_field() {
+    let output = parse_and_emit_async_field_initializer(
+        "class Foo { static loader = async () => { await init(); }; }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Static async field should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_field_multiple_awaits() {
+    let output = parse_and_emit_async_field_initializer(
+        "class Foo { handler = async () => { await a(); await b(); }; }",
+    );
+    assert!(
+        output.contains("case 1:") && output.contains("case 2:"),
+        "Multiple awaits should have multiple cases: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_field_expression_body() {
+    let output = parse_and_emit_async_field_initializer(
+        "class Foo { getter = async () => await fetch(); }",
+    );
+    assert!(
+        output.contains("[4 /*yield*/") || output.contains("switch (_a.label)") || output.contains("__generator"),
+        "Async arrow expression body should have generator output: {}",
+        output
+    );
+}

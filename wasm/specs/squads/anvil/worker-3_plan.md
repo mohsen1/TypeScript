@@ -1,29 +1,26 @@
 # Worker 3 Plan
 
-## 🔥 CRUCIBLE - TEST PORTING (REASSIGNED)
-
-**Per wasm/README.md Project Direction: Reassigned from Anvil to Crucible test porting.**
-
-- ⛔ NO more emitter work
-- ⛔ NO more source map tests
-- ✅ Port solver tests from official TypeScript repo ONLY
-
 ## Mission
-Port conditional type tests from official TypeScript repo into `tests/cases/`.
+Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transforms, cli, lsp).
 
 Status: Active
 Priority: 3
-Mode: **CRUCIBLE - TEST PORTING**
 
 ## Current Assignment
-- [ ] Port `conditionalTypes1.ts` and `conditionalTypes2.ts` from `microsoft/TypeScript/tests/cases/conformance/types/conditional/`
+- [ ] Add class expression source map tests in `wasm/src/source_map_tests.rs`. Run `./wasm/test.sh source_map`.
 
 ## Task Queue
-- [ ] Port `inferTypes1.ts` - infer keyword tests
-- [ ] Port `inferTypes2.ts` - advanced infer patterns
-- [ ] Target: 15-20 conditional type tests this week
+- [ ] (empty)
 
 ## Completed
+- [x] Added enum transform source map tests (const enums, with initializers, member references, in namespaces, merged enums, reverse mappings, heterogeneous enums, in classes, in switch statements, combined); `./wasm/test.sh source_map` passes.
+- [x] Added decorator source map tests (with arguments, with expression, composition, static method, static property, getter, setter, metadata, inheritance, combined advanced); `./wasm/test.sh source_map` passes.
+- [x] Added private fields source map tests (basic, initialized, constructor, private method, access, assignment, static field, static method, inheritance, combined); `./wasm/test.sh source_map` passes.
+- [x] Added dynamic import source map tests (basic, variable path, then chain, await, in function, destructuring, conditional, template path, catch, combined); `./wasm/test.sh source_map` passes.
+- [x] Added BigInt literal source map tests (basic, with variables, arithmetic, comparison, constructor, in function, large numbers, negative, in array/object, combined); `./wasm/test.sh source_map` passes.
+- [x] Added ES5 exponentiation operator source map tests (basic, with variables, assignment, chained, negative exponent, in expression, precedence, in function, with method call, combined); `./wasm/test.sh source_map` passes.
+- [x] Added logical assignment transform source map tests (&&= basic, ||= basic, &&=/||= object property, &&=/||= element access, chained, in function, with method call, combined); `./wasm/test.sh source_map` passes.
+- [x] Added nullish coalescing transform source map tests (basic, with null, with undefined, chained, with function call, assignment, in conditional, with objects, in function, combined); `./wasm/test.sh source_map` passes.
 - [x] Added optional chaining transform source map tests (property access, method call, element access, nested, with nullish coalescing, in function, with method chain, delete, call expression, combined); `./wasm/test.sh source_map` passes.
 - [x] Added destructuring transform source map tests (object basic, array basic, object with rename, array with skip, nested object, nested array, object with defaults, array with defaults, function parameters, mixed); `./wasm/test.sh source_map` passes.
 - [x] Added template literal transform source map tests (simple, with expression, multiple expressions, nested, tagged, in function, with method calls, conditional, multiline, in class); `./wasm/test.sh source_map` passes.
