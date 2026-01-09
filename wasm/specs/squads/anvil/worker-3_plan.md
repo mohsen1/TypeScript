@@ -13,6 +13,7 @@ Priority: 3
 - [ ] (empty)
 
 ## Completed
+- [x] Added async generator ES5 source map tests (basic, with await, yield* and await, try-catch, class method, for-await-of, return value, expression, nested, combined); `./wasm/test.sh source_map` passes.
 - [x] Added arrow function source map tests (no params, single param, default params, rest params, destructuring params, class property, IIFE, object return, higher-order, combined); `./wasm/test.sh source_map` passes.
 - [x] Added import/export source map tests (named imports, default imports, namespace imports, named exports, default exports, export from, import with alias, type-only imports, side-effect imports, combined); `./wasm/test.sh source_map` passes.
 - [x] Added class expression source map tests (named, with extends, static methods, accessors, in function, with constructor, computed props, in array, in IIFE, combined); `./wasm/test.sh source_map` passes.
