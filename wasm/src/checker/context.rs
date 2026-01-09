@@ -49,6 +49,15 @@ pub struct TypeCache {
 
     /// Symbol dependency graph (symbol -> referenced symbols).
     pub symbol_dependencies: FxHashMap<SymbolId, FxHashSet<SymbolId>>,
+
+    /// Cached abstract constructor types (TypeIds) for assignability checks.
+    pub abstract_constructor_types: FxHashSet<TypeId>,
+
+    /// Cached protected constructor types (TypeIds) for assignability checks.
+    pub protected_constructor_types: FxHashSet<TypeId>,
+
+    /// Cached private constructor types (TypeIds) for assignability checks.
+    pub private_constructor_types: FxHashSet<TypeId>,
 }
 
 impl TypeCache {
@@ -89,6 +98,9 @@ impl TypeCache {
             self.symbol_dependencies.remove(sym_id);
         }
         self.node_types.clear();
+        self.abstract_constructor_types.clear();
+        self.protected_constructor_types.clear();
+        self.private_constructor_types.clear();
 
         affected.len()
     }
@@ -179,6 +191,15 @@ pub struct CheckerContext<'a> {
     /// Used by the evaluator to expand Application types.
     pub type_env: RefCell<TypeEnvironment>,
 
+    /// Abstract constructor types (TypeIds) produced for abstract classes.
+    pub abstract_constructor_types: FxHashSet<TypeId>,
+
+    /// Protected constructor types (TypeIds) produced for protected constructors.
+    pub protected_constructor_types: FxHashSet<TypeId>,
+
+    /// Private constructor types (TypeIds) produced for private constructors.
+    pub private_constructor_types: FxHashSet<TypeId>,
+
     /// All arenas for cross-file resolution (indexed by file_idx from Symbol.decl_file_idx).
     /// Set during multi-file type checking to allow resolving declarations across files.
     pub all_arenas: Option<Vec<Arc<ThinNodeArena>>>,
@@ -232,6 +253,9 @@ impl<'a> CheckerContext<'a> {
             this_type_stack: Vec::new(),
             enclosing_class: None,
             type_env: RefCell::new(TypeEnvironment::new()),
+            abstract_constructor_types: FxHashSet::default(),
+            protected_constructor_types: FxHashSet::default(),
+            private_constructor_types: FxHashSet::default(),
             all_arenas: None,
             lib_contexts: Vec::new(),
         }
@@ -273,6 +297,9 @@ impl<'a> CheckerContext<'a> {
             this_type_stack: Vec::new(),
             enclosing_class: None,
             type_env: RefCell::new(TypeEnvironment::new()),
+            abstract_constructor_types: cache.abstract_constructor_types,
+            protected_constructor_types: cache.protected_constructor_types,
+            private_constructor_types: cache.private_constructor_types,
             all_arenas: None,
             lib_contexts: Vec::new(),
         }
@@ -311,6 +338,9 @@ impl<'a> CheckerContext<'a> {
             type_parameter_names: self.type_parameter_names,
             relation_cache: self.relation_cache.into_inner(),
             symbol_dependencies: self.symbol_dependencies,
+            abstract_constructor_types: self.abstract_constructor_types,
+            protected_constructor_types: self.protected_constructor_types,
+            private_constructor_types: self.private_constructor_types,
         }
     }
 

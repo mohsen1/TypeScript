@@ -81,7 +81,16 @@ Improve assignability diagnostics and reduce false positives/negatives for TS232
 No
 
 ## Notes
+- Progress: added constructor-access TS2322 checks (assignment + var decl), suppressed TS2322 when types contain error, and return `error` type on private/protected access to avoid cascades.
+- Tests: `wasm-pack build wasm --target nodejs`; `node scripts/test-rust-compiler.mjs tests/cases/conformance/classes/constructorDeclarations/classConstructorAccessibility3.ts`; `node scripts/test-rust-compiler.mjs tests/cases/conformance/classes/members/accessibility/classPropertyAsPrivate.ts`; `node /tmp/ts2322-scan.js 6000` (Missing 3, Extra 4, Crashes 2685).
 - Run `./wasm/test.sh` before pushing.
 - Commit format: `[wasm] checker: improve TS2322 assignability diagnostics`
 - Push to: `origin/worker/forge-4`
 - **NEVER edit**: `STRUCTURE.md`, `GOALS.md`, other workers' plan files, or anything in `orchestrator/`
+
+## Resume
+- Branch/state: `worker/forge-4`, local changes in `package-lock.json`, `wasm/src/binder.rs`, `wasm/src/thin_binder.rs`, `wasm/src/parser/thin_node.rs`, `wasm/src/checker/context.rs`, `wasm/src/thin_checker.rs`, and this plan file.
+- Added: constructor-access tracking in `wasm/src/checker/context.rs` (protected/private sets) and related checks in `wasm/src/thin_checker.rs` (assignment/var-decl fallback for `typeof` class).
+- Added: `type_contains_error` to suppress TS2322 cascades; `check_property_accessibility` now returns bool and `get_type_of_property_access`/`get_type_of_element_access` return `TypeId::ERROR` on access violations.
+- Repro: `node scripts/test-rust-compiler.mjs tests/cases/conformance/classes/constructorDeclarations/classConstructorAccessibility3.ts` now matches TS2322 baseline; `classPropertyAsPrivate` matches 8x TS2341 but still emits extra TS7006/7010.
+- TS2322 scan: `/tmp/ts2322-scan.js 6000` => Missing: `constructorImplementationWithDefaultValues2`, `constructorWithAssignableReturnExpression`, `typeOfThisInstanceMemberNarrowedWithLoopAntecedent`; Extra: `derivedClassWithoutExplicitConstructor3`, `instancePropertiesInheritedIntoClassType`, `instancePropertyInClassType`, `derivedClassOverridesProtectedMembers3` (plus many crashes due to missing libs).
