@@ -7,10 +7,10 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-None - awaiting next task
+- [ ] Add async ES5 tests for async queue patterns: task queue, priority queue, rate limiting, backpressure. Tests: `./wasm/test.sh async_es5_tests`
 
 ## Task Queue
-- [ ] Add async ES5 tests for async queue patterns: task queue, priority queue, rate limiting
+- [ ] Add async ES5 tests for async retry patterns: exponential backoff, circuit breaker, retry with jitter
 
 ## Completed
 - [x] Added 12 async stream pattern tests (read basic, write basic, pipe, transform, reader, writer, getReader, cancel, abort, tee, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (664 tests PASS).
