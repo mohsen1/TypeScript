@@ -10577,3 +10577,251 @@ class Admin extends User {
         output
     );
 }
+
+#[test]
+fn test_parity_es5_private_method_this_binding() {
+    let source = r#"
+class Calculator {
+    private value: number = 0;
+
+    #add(n: number): void {
+        this.value += n;
+    }
+
+    #multiply(n: number): void {
+        this.value *= n;
+    }
+
+    #reset(): void {
+        this.value = 0;
+    }
+
+    compute(a: number, b: number): number {
+        this.#reset();
+        this.#add(a);
+        this.#multiply(b);
+        return this.value;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the class
+    assert!(
+        output.contains("Calculator"),
+        "Output should contain Calculator class: {}",
+        output
+    );
+    // Should contain this references
+    assert!(
+        output.contains("this"),
+        "Output should contain this references: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number") && !output.contains(": void"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_private_method_generic() {
+    let source = r#"
+class Container<T> {
+    private items: T[] = [];
+
+    #validate(item: T): boolean {
+        return item !== null && item !== undefined;
+    }
+
+    #transform<U>(item: T, fn: (x: T) => U): U {
+        return fn(item);
+    }
+
+    add(item: T): void {
+        if (this.#validate(item)) {
+            this.items.push(item);
+        }
+    }
+
+    map<U>(fn: (x: T) => U): U[] {
+        return this.items.map(item => this.#transform(item, fn));
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the class
+    assert!(
+        output.contains("Container"),
+        "Output should contain Container class: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains("<T>") && !output.contains("<U>") && !output.contains(": boolean"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_private_method_derived() {
+    let source = r#"
+class BaseService {
+    protected data: string[] = [];
+
+    #log(message: string): void {
+        console.log("[Base]", message);
+    }
+
+    protected process(item: string): void {
+        this.#log("Processing: " + item);
+        this.data.push(item);
+    }
+}
+
+class ExtendedService extends BaseService {
+    #validate(item: string): boolean {
+        return item.length > 0;
+    }
+
+    add(item: string): void {
+        if (this.#validate(item)) {
+            this.process(item);
+        }
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain both classes
+    assert!(
+        output.contains("BaseService") && output.contains("ExtendedService"),
+        "Output should contain classes: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string[]") && !output.contains(": void") && !output.contains(": boolean"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_private_method_callback() {
+    let source = r#"
+class EventHandler {
+    private handlers: Map<string, Function[]> = new Map();
+
+    #invoke(event: string, callback: (data: any) => void, data: any): void {
+        callback(data);
+    }
+
+    #getHandlers(event: string): Function[] {
+        return this.handlers.get(event) || [];
+    }
+
+    on(event: string, handler: (data: any) => void): void {
+        const handlers = this.#getHandlers(event);
+        handlers.push(handler);
+        this.handlers.set(event, handlers);
+    }
+
+    emit(event: string, data: any): void {
+        for (const handler of this.#getHandlers(event)) {
+            this.#invoke(event, handler as (data: any) => void, data);
+        }
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the class
+    assert!(
+        output.contains("EventHandler"),
+        "Output should contain EventHandler class: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": Map<") && !output.contains(": Function[]") && !output.contains(": void"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
