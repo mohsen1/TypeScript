@@ -9382,3 +9382,221 @@ class Config<T> {
         output
     );
 }
+
+#[test]
+fn test_parity_es5_spread_method_call() {
+    let source = r#"
+class Logger {
+    log(...args: any[]): void {
+        console.log(...args);
+    }
+}
+
+const logger = new Logger();
+const messages: string[] = ["hello", "world"];
+logger.log(...messages);
+
+class Math {
+    static max(...nums: number[]): number {
+        return Math.max(...nums);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the class
+    assert!(
+        output.contains("Logger"),
+        "Output should contain Logger class: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": any[]") && !output.contains(": void") && !output.contains(": string[]"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_spread_typed_array() {
+    let source = r#"
+function sumNumbers(...nums: number[]): number {
+    return nums.reduce((a, b) => a + b, 0);
+}
+
+const numbers: number[] = [1, 2, 3];
+const moreNumbers: number[] = [4, 5, 6];
+const allNumbers: number[] = [...numbers, ...moreNumbers];
+
+function concat<T>(...arrays: T[][]): T[] {
+    return ([] as T[]).concat(...arrays);
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the functions
+    assert!(
+        output.contains("sumNumbers") && output.contains("concat"),
+        "Output should contain functions: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number[]") && !output.contains(": number") && !output.contains("<T>"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_spread_constructor() {
+    let source = r#"
+class Point {
+    constructor(public x: number, public y: number) {}
+}
+
+class Rectangle {
+    constructor(public width: number, public height: number, public label: string = "") {}
+}
+
+const coords: [number, number] = [10, 20];
+const point = new Point(...coords);
+
+const dimensions: [number, number, string] = [100, 200, "rect"];
+const rect = new Rectangle(...dimensions);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the classes
+    assert!(
+        output.contains("Point") && output.contains("Rectangle"),
+        "Output should contain classes: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number") && !output.contains(": string"),
+        "Type annotations should be erased: {}",
+        output
+    );
+    // Tuple types should be erased
+    assert!(
+        !output.contains(": [number, number]"),
+        "Tuple types should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_spread_nested() {
+    let source = r#"
+function outer(callback: (...args: any[]) => void): void {
+    const inner = (...innerArgs: any[]) => {
+        callback(...innerArgs);
+    };
+    inner(1, 2, 3);
+}
+
+class EventEmitter {
+    emit(event: string, ...args: any[]): void {
+        this.listeners.forEach(listener => listener(...args));
+    }
+    listeners: ((...args: any[]) => void)[] = [];
+}
+
+const spread = (arr: number[]) => [...arr, ...[...arr]];
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the functions and class
+    assert!(
+        output.contains("outer") && output.contains("EventEmitter"),
+        "Output should contain outer function and EventEmitter class: {}",
+        output
+    );
+    // Arrow syntax should be transformed
+    assert!(
+        !output.contains("=>"),
+        "Arrow syntax should be transformed: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": any[]") && !output.contains(": void") && !output.contains(": number[]"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
