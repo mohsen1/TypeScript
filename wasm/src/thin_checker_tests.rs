@@ -1166,6 +1166,68 @@ new Foo(true);
 }
 
 #[test]
+fn test_new_expression_resolves_constructor_overloads() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Foo {
+    constructor(x: string);
+    constructor(x: number);
+    constructor(x: any) {}
+}
+new Foo("ok");
+new Foo(42);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Unexpected diagnostics: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_new_expression_resolves_constructor_overloads_with_rest() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Foo {
+    constructor(...args: number[]);
+    constructor(...args: string[]);
+    constructor(...args: any[]) {}
+}
+new Foo(1, 2, 3);
+new Foo("a", "b");
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Unexpected diagnostics: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
 fn test_parameter_property_in_function_2369() {
     use crate::thin_parser::ThinParserState;
     // Parameter properties (public/private/protected/readonly on params)

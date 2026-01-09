@@ -3748,31 +3748,31 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         let args = new_expr.arguments.as_ref().map(|a| &a.nodes).map(|n| n.as_slice()).unwrap_or(&[]);
-        let mut arg_types = Vec::with_capacity(args.len());
-        let ctx_helper = ContextualTypeContext::with_expected(self.ctx.types, construct_type);
-        let arg_count = args.len();
 
-        for (i, &arg_idx) in args.iter().enumerate() {
-            let expected_type = ctx_helper.get_parameter_type_for_call(i, arg_count);
-
-            let prev_context = self.ctx.contextual_type;
-            self.ctx.contextual_type = expected_type;
-
-            let arg_type = self.get_type_of_node(arg_idx);
-            arg_types.push(arg_type);
-
-            if let Some(expected) = expected_type {
-                if expected != TypeId::ANY && expected != TypeId::UNKNOWN {
-                    if let Some(arg_node) = self.ctx.arena.get(arg_idx) {
-                        if arg_node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION {
-                            self.check_object_literal_excess_properties(arg_type, expected, arg_idx);
-                        }
-                    }
+        let overload_signatures = match self.ctx.types.lookup(construct_type) {
+            Some(TypeKey::Callable(shape_id)) => {
+                let shape = self.ctx.types.callable_shape(shape_id);
+                if shape.call_signatures.len() > 1 {
+                    Some(shape.call_signatures.clone())
+                } else {
+                    None
                 }
             }
+            _ => None,
+        };
 
-            self.ctx.contextual_type = prev_context;
+        if let Some(signatures) = overload_signatures.as_deref() {
+            if let Some(return_type) = self.resolve_overloaded_call_with_signatures(args, signatures) {
+                return return_type;
+            }
         }
+
+        let ctx_helper = ContextualTypeContext::with_expected(self.ctx.types, construct_type);
+        let arg_types = self.collect_call_argument_types_with_context(
+            args,
+            |i, arg_count| ctx_helper.get_parameter_type_for_call(i, arg_count),
+            overload_signatures.is_none(),
+        );
 
         let mut checker = CompatChecker::new(self.ctx.types);
         let mut evaluator = CallEvaluator::new(self.ctx.types, &mut checker);
