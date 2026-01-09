@@ -114,7 +114,12 @@ This requires control flow analysis to track variable state through branches.
 - [x] Fixed property access on `error` type (suppresses cascading errors)
 - [x] Resolve application type arguments with type env to enable distributive conditional narrowing
 - [x] Substitute polymorphic `this` in call returns and merge interface/base intersections (fixes intersectionThisTypes extra TS2339)
+- [x] Add fallback lowering for unresolved utility types `Pick` and `Exclude` in `get_type_from_type_reference`
+- [x] Evaluate conditional constraints in mapped evaluation; handle `never` mapped keys as empty object
+- [x] Resolve intersection type nodes via checker path (so utility fallbacks apply inside intersections)
 - TS2339 extra errors reduced from 35 to 14
+- [ ] Implement TYPE_OPERATOR handling in `get_type_from_type_node` (keyof/etc) — currently returns `any`
+- [ ] Fix `intersectionWithIndexSignatures` remaining TS7053 extra + missing TS2339
 
 ## Ready for Merge
 No
@@ -127,3 +132,6 @@ No
 - Push to: `origin/worker/forge-3`
 - **NEVER edit**: `STRUCTURE.md`, `GOALS.md`, other workers' plan files, or anything in `orchestrator/`
 - Conformance (types/intersection, 24 tests): Exact 7 (29.2%), Same count 7 (29.2%), extra TS2339 removed; missing TS2339 remains in intersectionWithIndexSignatures
+- Manual check after latest fixes: `intersectionWithIndexSignatures.ts` now reports only TS7053 on `q["asd"]`/`q["asd"].b` (TS2339 + TS2322 missing). Indicates `keyof` type operator still lowers to `any`.
+- Debug clues: `TYPE_OPERATOR` nodes (kind 199) return `any`; `Pick`/`Exclude` fallbacks work in simple cases but fail inside intersection if `keyof` is `any`.
+- Working tree currently dirty: `wasm/src/thin_checker.rs`, `wasm/src/solver/evaluate.rs`, plus unrelated `package-lock.json` and `wasm/README.md` (leave untouched).
