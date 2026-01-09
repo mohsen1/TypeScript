@@ -318,7 +318,7 @@ impl TypeInterner {
                 call_signatures: Vec::new(),
                 construct_signatures: Vec::new(),
                 properties: Vec::new(),
-            }))
+            ..Default::default() }))
     }
 
     pub fn conditional_type(&self, id: ConditionalTypeId) -> Arc<ConditionalType> {

@@ -16737,7 +16737,7 @@ fn test_application_ref_expansion_with_callable_body() {
         call_signatures: vec![call_sig],
         construct_signatures: vec![],
         properties: vec![],
-    });
+    ..Default::default() });
 
     // Create Ref(1) for Callback type alias
     let callback_ref = interner.reference(SymbolRef(1));
@@ -16769,7 +16769,7 @@ fn test_application_ref_expansion_with_callable_body() {
         call_signatures: vec![expected_call_sig],
         construct_signatures: vec![],
         properties: vec![],
-    });
+    ..Default::default() });
 
     assert_eq!(
         result, expected,
@@ -16809,7 +16809,7 @@ fn test_application_ref_expansion_with_construct_signature() {
         call_signatures: vec![],
         construct_signatures: vec![construct_sig],
         properties: vec![],
-    });
+    ..Default::default() });
 
     // Create Ref(1) for Constructor type alias
     let constructor_ref = interner.reference(SymbolRef(1));
@@ -16847,7 +16847,7 @@ fn test_application_ref_expansion_with_construct_signature() {
         call_signatures: vec![],
         construct_signatures: vec![expected_construct_sig],
         properties: vec![],
-    });
+    ..Default::default() });
 
     assert_eq!(
         result, expected,

@@ -1568,6 +1568,13 @@ impl<'a> PropertyAccessEvaluator<'a> {
                         };
                     }
                 }
+                // Check string index signature (for static index signatures on class constructors)
+                if let Some(ref idx) = shape.string_index {
+                    return PropertyAccessResult::Success {
+                        type_id: self.add_undefined_if_unchecked(idx.value_type),
+                        from_index_signature: true,
+                    };
+                }
                 self.resolve_function_property(obj_type, prop_name, prop_atom)
             }
 
@@ -2284,6 +2291,7 @@ impl<'a> PropertyAccessEvaluator<'a> {
             call_signatures: vec![no_init, with_init],
             construct_signatures: Vec::new(),
             properties: Vec::new(),
+            ..Default::default()
         }
     }
 

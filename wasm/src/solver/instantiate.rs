@@ -380,7 +380,7 @@ impl<'a> TypeInstantiator<'a> {
                     call_signatures: instantiated_call,
                     construct_signatures: instantiated_construct,
                     properties: instantiated_props,
-                })
+                ..Default::default() })
             }
 
             // Conditional: instantiate all parts
