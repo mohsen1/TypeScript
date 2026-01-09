@@ -20814,3 +20814,372 @@ const wrapWithLogging = <T extends unknown[], R>(
         output
     );
 }
+
+// =============================================================================
+// ES5 Optional Chaining Patterns Parity Tests
+// =============================================================================
+
+/// Test: deeply nested optional chains
+#[test]
+fn test_parity_es5_optional_chaining_deep_nested() {
+    let source = r#"
+interface DeepObject {
+    level1?: {
+        level2?: {
+            level3?: {
+                level4?: {
+                    value: string;
+                    method(): string;
+                };
+            };
+        };
+    };
+}
+
+function getDeepValue(obj: DeepObject): string | undefined {
+    return obj?.level1?.level2?.level3?.level4?.value;
+}
+
+function callDeepMethod(obj: DeepObject): string | undefined {
+    return obj?.level1?.level2?.level3?.level4?.method?.();
+}
+
+const processDeep = (obj: DeepObject): { value?: string; called?: string } => {
+    return {
+        value: obj?.level1?.level2?.level3?.level4?.value,
+        called: obj?.level1?.level2?.level3?.level4?.method?.()
+    };
+};
+
+class DeepAccessor {
+    private data: DeepObject | null = null;
+
+    setData(data: DeepObject | null): void {
+        this.data = data;
+    }
+
+    getValue(): string | undefined {
+        return this.data?.level1?.level2?.level3?.level4?.value;
+    }
+
+    getWithDefault(defaultValue: string): string {
+        return this.data?.level1?.level2?.level3?.level4?.value ?? defaultValue;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions should be present
+    assert!(
+        output.contains("getDeepValue") && output.contains("callDeepMethod"),
+        "Output should contain functions: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("DeepAccessor"),
+        "Output should contain class: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface DeepObject"),
+        "Interface should be erased: {}",
+        output
+    );
+}
+
+/// Test: optional chaining in class method contexts
+#[test]
+fn test_parity_es5_optional_chaining_class_methods() {
+    let source = r#"
+interface Config {
+    api?: {
+        baseUrl?: string;
+        headers?: Record<string, string>;
+        timeout?: number;
+    };
+    logging?: {
+        level?: string;
+        handler?: (msg: string) => void;
+    };
+}
+
+class ConfigurableService {
+    constructor(private config?: Config) {}
+
+    getBaseUrl(): string {
+        return this.config?.api?.baseUrl ?? "https://default.api.com";
+    }
+
+    getHeader(name: string): string | undefined {
+        return this.config?.api?.headers?.[name];
+    }
+
+    log(message: string): void {
+        this.config?.logging?.handler?.(message);
+    }
+
+    getTimeout(): number {
+        return this.config?.api?.timeout ?? 5000;
+    }
+}
+
+class ChainedProcessor<T> {
+    private processor?: {
+        transform?: (item: T) => T;
+        validate?: (item: T) => boolean;
+        handlers?: Array<(item: T) => void>;
+    };
+
+    process(item: T): T | undefined {
+        if (this.processor?.validate?.(item)) {
+            return this.processor?.transform?.(item);
+        }
+        return undefined;
+    }
+
+    notify(item: T): void {
+        this.processor?.handlers?.forEach(h => h?.(item));
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes should be present
+    assert!(
+        output.contains("ConfigurableService") && output.contains("ChainedProcessor"),
+        "Output should contain classes: {}",
+        output
+    );
+    // Methods should be present
+    assert!(
+        output.contains("getBaseUrl") && output.contains("getHeader") && output.contains("process"),
+        "Output should contain methods: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface Config"),
+        "Interface should be erased: {}",
+        output
+    );
+}
+
+/// Test: optional chaining with generic types
+#[test]
+fn test_parity_es5_optional_chaining_generics() {
+    let source = r#"
+interface Container<T> {
+    value?: T;
+    nested?: Container<T>;
+    transform?: (v: T) => T;
+}
+
+function getValue<T>(container: Container<T> | undefined): T | undefined {
+    return container?.value;
+}
+
+function getNestedValue<T>(container: Container<T> | undefined): T | undefined {
+    return container?.nested?.value;
+}
+
+function transformValue<T>(container: Container<T> | undefined, defaultVal: T): T {
+    return container?.transform?.(container?.value ?? defaultVal) ?? defaultVal;
+}
+
+class GenericChainer<T, U> {
+    private mapper?: {
+        convert?: (item: T) => U;
+        validate?: (item: T) => boolean;
+    };
+
+    chain(item: T | undefined): U | undefined {
+        if (item === undefined) return undefined;
+        if (this.mapper?.validate?.(item) === false) return undefined;
+        return this.mapper?.convert?.(item);
+    }
+}
+
+const optionalMap = <T, U>(
+    value: T | undefined,
+    mapper?: (v: T) => U
+): U | undefined => {
+    return value !== undefined ? mapper?.(value) : undefined;
+};
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions should be present
+    assert!(
+        output.contains("getValue") && output.contains("getNestedValue") && output.contains("transformValue"),
+        "Output should contain functions: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("GenericChainer"),
+        "Output should contain class: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface Container"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Type parameters should be erased
+    assert!(
+        !output.contains("<T>") && !output.contains("<T, U>"),
+        "Type parameters should be erased: {}",
+        output
+    );
+}
+
+/// Test: mixed property access, method calls, and element access
+#[test]
+fn test_parity_es5_optional_chaining_mixed_access() {
+    let source = r#"
+interface DataStore {
+    items?: string[];
+    getItem?: (index: number) => string;
+    metadata?: {
+        tags?: string[];
+        getTag?: (name: string) => string | undefined;
+    };
+}
+
+function mixedAccess(store: DataStore | undefined, index: number): string | undefined {
+    // Property access
+    const firstItem = store?.items?.[0];
+    // Method call
+    const gotItem = store?.getItem?.(index);
+    // Nested property + element access
+    const tag = store?.metadata?.tags?.[0];
+    // Nested method call
+    const namedTag = store?.metadata?.getTag?.("main");
+
+    return firstItem ?? gotItem ?? tag ?? namedTag;
+}
+
+class MixedAccessor {
+    private stores: Map<string, DataStore> = new Map();
+
+    getFromStore(storeId: string, itemIndex: number): string | undefined {
+        const store = this.stores.get(storeId);
+        return store?.items?.[itemIndex] ?? store?.getItem?.(itemIndex);
+    }
+
+    getTag(storeId: string, tagIndex: number): string | undefined {
+        return this.stores.get(storeId)?.metadata?.tags?.[tagIndex];
+    }
+
+    callMethod(storeId: string, tagName: string): string | undefined {
+        return this.stores.get(storeId)?.metadata?.getTag?.(tagName);
+    }
+}
+
+const chainedOperations = (data: DataStore | null): string[] => {
+    const results: string[] = [];
+
+    const item = data?.items?.[0];
+    if (item) results.push(item);
+
+    const method = data?.getItem?.(0);
+    if (method) results.push(method);
+
+    const nested = data?.metadata?.tags?.[0];
+    if (nested) results.push(nested);
+
+    return results;
+};
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions should be present
+    assert!(
+        output.contains("mixedAccess") && output.contains("chainedOperations"),
+        "Output should contain functions: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("MixedAccessor"),
+        "Output should contain class: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface DataStore"),
+        "Interface should be erased: {}",
+        output
+    );
+}
