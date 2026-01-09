@@ -16408,3 +16408,1049 @@ class UserRepository extends AbstractRepository<{ id: string; name: string }> {
         output
     );
 }
+
+// ============================================================================
+// Private Static Field Pattern Tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_private_static_field_basic() {
+    // Basic private static field usage
+    let source = r#"
+class Counter {
+    static #count: number = 0;
+
+    constructor() {
+        Counter.#count++;
+    }
+
+    static getCount(): number {
+        return Counter.#count;
+    }
+
+    static reset(): void {
+        Counter.#count = 0;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function Counter"),
+        "Expected Counter function: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("getCount") && output.contains("reset"),
+        "Expected static methods: {}",
+        output
+    );
+
+    // Private field should use WeakMap or similar pattern
+    assert!(
+        output.contains("count") || output.contains("_count") || output.contains("WeakMap"),
+        "Expected private field handling: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_private_static_field_singleton() {
+    // Private static field for singleton pattern
+    let source = r#"
+class Singleton {
+    static #instance: Singleton | null = null;
+    private value: string;
+
+    private constructor(value: string) {
+        this.value = value;
+    }
+
+    static getInstance(): Singleton {
+        if (Singleton.#instance === null) {
+            Singleton.#instance = new Singleton("default");
+        }
+        return Singleton.#instance;
+    }
+
+    static hasInstance(): boolean {
+        return Singleton.#instance !== null;
+    }
+
+    getValue(): string {
+        return this.value;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function Singleton"),
+        "Expected Singleton function: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("getInstance") && output.contains("hasInstance"),
+        "Expected static methods: {}",
+        output
+    );
+
+    // Instance method should be present
+    assert!(
+        output.contains("getValue"),
+        "Expected getValue method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_private_static_field_cache() {
+    // Private static field for caching pattern
+    let source = r#"
+class ResourceLoader {
+    static #cache: Map<string, any> = new Map();
+    static #loading: Set<string> = new Set();
+
+    static async load(url: string): Promise<any> {
+        if (ResourceLoader.#cache.has(url)) {
+            return ResourceLoader.#cache.get(url);
+        }
+
+        if (ResourceLoader.#loading.has(url)) {
+            // Wait for existing load
+            return new Promise(resolve => {
+                setTimeout(() => resolve(ResourceLoader.load(url)), 100);
+            });
+        }
+
+        ResourceLoader.#loading.add(url);
+        const data = await fetch(url).then(r => r.json());
+        ResourceLoader.#cache.set(url, data);
+        ResourceLoader.#loading.delete(url);
+        return data;
+    }
+
+    static clearCache(): void {
+        ResourceLoader.#cache.clear();
+    }
+
+    static getCacheSize(): number {
+        return ResourceLoader.#cache.size;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function ResourceLoader"),
+        "Expected ResourceLoader function: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("load") && output.contains("clearCache"),
+        "Expected static methods: {}",
+        output
+    );
+
+    // Cache handling
+    assert!(
+        output.contains("getCacheSize"),
+        "Expected getCacheSize method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_private_static_field_registry() {
+    // Private static field for registry pattern
+    let source = r#"
+class ComponentRegistry {
+    static #components: Map<string, new () => object> = new Map();
+    static #instances: WeakMap<object, string> = new WeakMap();
+
+    static register(name: string, component: new () => object): void {
+        ComponentRegistry.#components.set(name, component);
+    }
+
+    static create(name: string): object | null {
+        const Component = ComponentRegistry.#components.get(name);
+        if (!Component) return null;
+
+        const instance = new Component();
+        ComponentRegistry.#instances.set(instance, name);
+        return instance;
+    }
+
+    static getComponentName(instance: object): string | undefined {
+        return ComponentRegistry.#instances.get(instance);
+    }
+
+    static getRegisteredNames(): string[] {
+        return Array.from(ComponentRegistry.#components.keys());
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function ComponentRegistry"),
+        "Expected ComponentRegistry function: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("register") && output.contains("create"),
+        "Expected register and create methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("getComponentName") && output.contains("getRegisteredNames"),
+        "Expected getter methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_private_static_field_config() {
+    // Private static field for configuration pattern
+    let source = r#"
+class AppConfig {
+    static #config: Record<string, any> = {};
+    static #frozen: boolean = false;
+    static #validators: Map<string, (value: any) => boolean> = new Map();
+
+    static set(key: string, value: any): void {
+        if (AppConfig.#frozen) {
+            throw new Error("Config is frozen");
+        }
+
+        const validator = AppConfig.#validators.get(key);
+        if (validator && !validator(value)) {
+            throw new Error(`Invalid value for ${key}`);
+        }
+
+        AppConfig.#config[key] = value;
+    }
+
+    static get(key: string): any {
+        return AppConfig.#config[key];
+    }
+
+    static addValidator(key: string, validator: (value: any) => boolean): void {
+        if (AppConfig.#frozen) {
+            throw new Error("Config is frozen");
+        }
+        AppConfig.#validators.set(key, validator);
+    }
+
+    static freeze(): void {
+        AppConfig.#frozen = true;
+    }
+
+    static isFrozen(): boolean {
+        return AppConfig.#frozen;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function AppConfig"),
+        "Expected AppConfig function: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("set") && output.contains("get"),
+        "Expected set and get methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("freeze") && output.contains("isFrozen"),
+        "Expected freeze methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("addValidator"),
+        "Expected addValidator method: {}",
+        output
+    );
+}
+
+// ============================================================================
+// Accessor Keyword (Auto-Accessors) Pattern Tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_accessor_keyword_basic() {
+    // Basic accessor keyword usage
+    let source = r#"
+class Person {
+    accessor name: string = "";
+    accessor age: number = 0;
+
+    constructor(name: string, age: number) {
+        this.name = name;
+        this.age = age;
+    }
+
+    greet(): string {
+        return `Hello, I'm ${this.name} and I'm ${this.age} years old`;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function Person"),
+        "Expected Person function: {}",
+        output
+    );
+
+    // Accessor should be transformed (defineProperty or getter/setter)
+    assert!(
+        output.contains("name") && output.contains("age"),
+        "Expected accessor fields: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("greet"),
+        "Expected greet method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_accessor_keyword_with_inheritance() {
+    // Accessor keyword with class inheritance
+    let source = r#"
+class BaseEntity {
+    accessor id: string = "";
+    accessor createdAt: Date = new Date();
+
+    constructor(id: string) {
+        this.id = id;
+    }
+}
+
+class User extends BaseEntity {
+    accessor email: string = "";
+    accessor isActive: boolean = true;
+
+    constructor(id: string, email: string) {
+        super(id);
+        this.email = email;
+    }
+
+    deactivate(): void {
+        this.isActive = false;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("function BaseEntity") && output.contains("function User"),
+        "Expected class functions: {}",
+        output
+    );
+
+    // Inheritance should work
+    assert!(
+        output.contains("_super.call") || output.contains("BaseEntity.call"),
+        "Expected super call: {}",
+        output
+    );
+
+    // Accessors should be present
+    assert!(
+        output.contains("id") && output.contains("email"),
+        "Expected accessor fields: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_accessor_keyword_private() {
+    // Private accessor keyword
+    let source = r#"
+class SecureStorage {
+    accessor #data: Map<string, any> = new Map();
+    accessor #encryptionKey: string = "";
+
+    constructor(key: string) {
+        this.#encryptionKey = key;
+    }
+
+    set(key: string, value: any): void {
+        this.#data.set(key, this.encrypt(value));
+    }
+
+    get(key: string): any {
+        const encrypted = this.#data.get(key);
+        return encrypted ? this.decrypt(encrypted) : undefined;
+    }
+
+    private encrypt(value: any): string {
+        return JSON.stringify(value) + this.#encryptionKey;
+    }
+
+    private decrypt(encrypted: string): any {
+        const data = encrypted.slice(0, -this.#encryptionKey.length);
+        return JSON.parse(data);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function SecureStorage"),
+        "Expected SecureStorage function: {}",
+        output
+    );
+
+    // Public methods should be present
+    assert!(
+        output.contains("set") && output.contains("get"),
+        "Expected set/get methods: {}",
+        output
+    );
+
+    // Private methods should be present
+    assert!(
+        output.contains("encrypt") && output.contains("decrypt"),
+        "Expected encrypt/decrypt methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_accessor_keyword_static() {
+    // Static accessor keyword
+    let source = r#"
+class Configuration {
+    static accessor debug: boolean = false;
+    static accessor logLevel: string = "info";
+    static accessor maxRetries: number = 3;
+
+    static enableDebug(): void {
+        Configuration.debug = true;
+        Configuration.logLevel = "debug";
+    }
+
+    static disableDebug(): void {
+        Configuration.debug = false;
+        Configuration.logLevel = "info";
+    }
+
+    static isDebugEnabled(): boolean {
+        return Configuration.debug;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function Configuration"),
+        "Expected Configuration function: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("enableDebug") && output.contains("disableDebug"),
+        "Expected static methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("isDebugEnabled"),
+        "Expected isDebugEnabled method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_accessor_keyword_reactive() {
+    // Accessor keyword for reactive pattern
+    let source = r#"
+class ReactiveValue<T> {
+    accessor value: T;
+    private listeners: Array<(value: T) => void> = [];
+
+    constructor(initialValue: T) {
+        this.value = initialValue;
+    }
+
+    subscribe(listener: (value: T) => void): () => void {
+        this.listeners.push(listener);
+        return () => {
+            const index = this.listeners.indexOf(listener);
+            if (index > -1) {
+                this.listeners.splice(index, 1);
+            }
+        };
+    }
+
+    update(newValue: T): void {
+        this.value = newValue;
+        this.notifyListeners();
+    }
+
+    private notifyListeners(): void {
+        for (const listener of this.listeners) {
+            listener(this.value);
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function ReactiveValue"),
+        "Expected ReactiveValue function: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("subscribe") && output.contains("update"),
+        "Expected subscribe/update methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("notifyListeners"),
+        "Expected notifyListeners method: {}",
+        output
+    );
+}
+
+// ============================================================================
+// Using Declarations (Resource Management) Pattern Tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_using_declaration_basic() {
+    // Basic using declaration with Symbol.dispose
+    let source = r#"
+class FileHandle {
+    private path: string;
+    private isOpen: boolean = true;
+
+    constructor(path: string) {
+        this.path = path;
+    }
+
+    read(): string {
+        if (!this.isOpen) throw new Error("File is closed");
+        return "file contents";
+    }
+
+    [Symbol.dispose](): void {
+        this.isOpen = false;
+        console.log(`Closing file: ${this.path}`);
+    }
+}
+
+function processFile(path: string): string {
+    using file = new FileHandle(path);
+    return file.read();
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function FileHandle"),
+        "Expected FileHandle function: {}",
+        output
+    );
+
+    // Symbol.dispose should be present
+    assert!(
+        output.contains("Symbol.dispose") || output.contains("dispose"),
+        "Expected dispose method: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("read"),
+        "Expected read method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_using_declaration_async() {
+    // Async using declaration with Symbol.asyncDispose
+    let source = r#"
+class AsyncConnection {
+    private url: string;
+    private connected: boolean = false;
+
+    constructor(url: string) {
+        this.url = url;
+    }
+
+    async connect(): Promise<void> {
+        this.connected = true;
+        console.log(`Connected to ${this.url}`);
+    }
+
+    async query(sql: string): Promise<any[]> {
+        if (!this.connected) throw new Error("Not connected");
+        return [];
+    }
+
+    async [Symbol.asyncDispose](): Promise<void> {
+        if (this.connected) {
+            this.connected = false;
+            console.log(`Disconnected from ${this.url}`);
+        }
+    }
+}
+
+async function runQuery(url: string, sql: string): Promise<any[]> {
+    await using conn = new AsyncConnection(url);
+    await conn.connect();
+    return await conn.query(sql);
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function AsyncConnection"),
+        "Expected AsyncConnection function: {}",
+        output
+    );
+
+    // Async methods should be transformed
+    assert!(
+        output.contains("connect") && output.contains("query"),
+        "Expected async methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_using_declaration_in_class_method() {
+    // Using declaration inside class methods
+    let source = r#"
+class Lock {
+    private locked: boolean = false;
+
+    acquire(): void {
+        this.locked = true;
+    }
+
+    [Symbol.dispose](): void {
+        this.locked = false;
+    }
+}
+
+class CriticalSection {
+    private lock: Lock = new Lock();
+
+    executeWithLock(callback: () => void): void {
+        using acquired = this.lock;
+        acquired.acquire();
+        callback();
+    }
+
+    async executeWithLockAsync(callback: () => Promise<void>): Promise<void> {
+        using acquired = this.lock;
+        acquired.acquire();
+        await callback();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("function Lock") && output.contains("function CriticalSection"),
+        "Expected class functions: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("executeWithLock") && output.contains("acquire"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_using_declaration_multiple() {
+    // Multiple using declarations
+    let source = r#"
+class Resource {
+    private name: string;
+    private disposed: boolean = false;
+
+    constructor(name: string) {
+        this.name = name;
+        console.log(`Acquired: ${name}`);
+    }
+
+    use(): void {
+        if (this.disposed) throw new Error(`${this.name} is disposed`);
+        console.log(`Using: ${this.name}`);
+    }
+
+    [Symbol.dispose](): void {
+        this.disposed = true;
+        console.log(`Disposed: ${this.name}`);
+    }
+}
+
+function useMultipleResources(): void {
+    using r1 = new Resource("first");
+    using r2 = new Resource("second");
+    using r3 = new Resource("third");
+
+    r1.use();
+    r2.use();
+    r3.use();
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function Resource"),
+        "Expected Resource function: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("use"),
+        "Expected use method: {}",
+        output
+    );
+
+    // Function should be present
+    assert!(
+        output.contains("useMultipleResources"),
+        "Expected useMultipleResources function: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_using_declaration_disposable_pattern() {
+    // Disposable pattern with inheritance
+    let source = r#"
+interface Disposable {
+    [Symbol.dispose](): void;
+}
+
+class BaseResource implements Disposable {
+    protected disposed: boolean = false;
+
+    [Symbol.dispose](): void {
+        this.disposed = true;
+    }
+
+    protected checkDisposed(): void {
+        if (this.disposed) {
+            throw new Error("Resource already disposed");
+        }
+    }
+}
+
+class DatabaseConnection extends BaseResource {
+    private connectionString: string;
+
+    constructor(connectionString: string) {
+        super();
+        this.connectionString = connectionString;
+    }
+
+    execute(query: string): any[] {
+        this.checkDisposed();
+        return [];
+    }
+
+    [Symbol.dispose](): void {
+        console.log("Closing database connection");
+        super[Symbol.dispose]();
+    }
+}
+
+class TransactionScope extends BaseResource {
+    private connection: DatabaseConnection;
+    private committed: boolean = false;
+
+    constructor(connection: DatabaseConnection) {
+        super();
+        this.connection = connection;
+    }
+
+    commit(): void {
+        this.checkDisposed();
+        this.committed = true;
+    }
+
+    rollback(): void {
+        this.checkDisposed();
+        this.committed = false;
+    }
+
+    [Symbol.dispose](): void {
+        if (!this.committed) {
+            console.log("Rolling back transaction");
+        }
+        super[Symbol.dispose]();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("function BaseResource"),
+        "Expected BaseResource function: {}",
+        output
+    );
+    assert!(
+        output.contains("function DatabaseConnection"),
+        "Expected DatabaseConnection function: {}",
+        output
+    );
+    assert!(
+        output.contains("function TransactionScope"),
+        "Expected TransactionScope function: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("execute") && output.contains("commit"),
+        "Expected methods: {}",
+        output
+    );
+}

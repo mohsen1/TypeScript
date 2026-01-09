@@ -10313,3 +10313,515 @@ const logEach = <T>(items: T[]): void => {
         output
     );
 }
+
+#[test]
+fn test_parity_es5_class_decorator_constructor() {
+    let source = r#"
+function sealed(constructor: Function) {
+    Object.seal(constructor);
+    Object.seal(constructor.prototype);
+}
+
+function logged(constructor: Function) {
+    console.log("Class created:", constructor.name);
+}
+
+@sealed
+@logged
+class Service {
+    private name: string;
+
+    constructor(name: string) {
+        this.name = name;
+    }
+
+    getName(): string {
+        return this.name;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the class and decorators
+    assert!(
+        output.contains("Service") && output.contains("sealed") && output.contains("logged"),
+        "Output should contain class and decorators: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": Function") && !output.contains(": string"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_class_decorator_static_members() {
+    let source = r#"
+function staticInit<T extends { new(...args: any[]): {} }>(constructor: T) {
+    return class extends constructor {
+        static initialized = true;
+    };
+}
+
+@staticInit
+class Config {
+    static version: string = "1.0.0";
+    static environment: string = "production";
+
+    private settings: Map<string, any> = new Map();
+
+    static getVersion(): string {
+        return Config.version;
+    }
+
+    get(key: string): any {
+        return this.settings.get(key);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the class
+    assert!(
+        output.contains("Config"),
+        "Output should contain Config class: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains("<T extends"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_class_decorator_metadata() {
+    let source = r#"
+function component(options: { selector: string; template: string }) {
+    return function<T extends { new(...args: any[]): {} }>(constructor: T) {
+        return class extends constructor {
+            selector = options.selector;
+            template = options.template;
+        };
+    };
+}
+
+function injectable() {
+    return function(constructor: Function) {
+        console.log("Injectable:", constructor.name);
+    };
+}
+
+@component({ selector: "app-root", template: "<div></div>" })
+@injectable()
+class AppComponent {
+    title: string = "My App";
+
+    constructor(private service: any) {}
+
+    render(): void {
+        console.log(this.title);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the class and decorators
+    assert!(
+        output.contains("AppComponent") && output.contains("component") && output.contains("injectable"),
+        "Output should contain class and decorators: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": void"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_class_decorator_inheritance() {
+    let source = r#"
+function tracked(constructor: Function) {
+    console.log("Tracking:", constructor.name);
+}
+
+function validated(constructor: Function) {
+    console.log("Validating:", constructor.name);
+}
+
+@tracked
+class BaseEntity {
+    id: number;
+
+    constructor(id: number) {
+        this.id = id;
+    }
+}
+
+@validated
+class User extends BaseEntity {
+    name: string;
+
+    constructor(id: number, name: string) {
+        super(id);
+        this.name = name;
+    }
+}
+
+@tracked
+@validated
+class Admin extends User {
+    permissions: string[];
+
+    constructor(id: number, name: string, permissions: string[]) {
+        super(id, name);
+        this.permissions = permissions;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain all classes
+    assert!(
+        output.contains("BaseEntity") && output.contains("User") && output.contains("Admin"),
+        "Output should contain all classes: {}",
+        output
+    );
+    // Should contain decorators
+    assert!(
+        output.contains("tracked") && output.contains("validated"),
+        "Output should contain decorators: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number") && !output.contains(": string") && !output.contains(": string[]"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_private_method_this_binding() {
+    let source = r#"
+class Calculator {
+    private value: number = 0;
+
+    #add(n: number): void {
+        this.value += n;
+    }
+
+    #multiply(n: number): void {
+        this.value *= n;
+    }
+
+    #reset(): void {
+        this.value = 0;
+    }
+
+    compute(a: number, b: number): number {
+        this.#reset();
+        this.#add(a);
+        this.#multiply(b);
+        return this.value;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the class
+    assert!(
+        output.contains("Calculator"),
+        "Output should contain Calculator class: {}",
+        output
+    );
+    // Should contain this references
+    assert!(
+        output.contains("this"),
+        "Output should contain this references: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number") && !output.contains(": void"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_private_method_generic() {
+    let source = r#"
+class Container<T> {
+    private items: T[] = [];
+
+    #validate(item: T): boolean {
+        return item !== null && item !== undefined;
+    }
+
+    #transform<U>(item: T, fn: (x: T) => U): U {
+        return fn(item);
+    }
+
+    add(item: T): void {
+        if (this.#validate(item)) {
+            this.items.push(item);
+        }
+    }
+
+    map<U>(fn: (x: T) => U): U[] {
+        return this.items.map(item => this.#transform(item, fn));
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the class
+    assert!(
+        output.contains("Container"),
+        "Output should contain Container class: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains("<T>") && !output.contains("<U>") && !output.contains(": boolean"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_private_method_derived() {
+    let source = r#"
+class BaseService {
+    protected data: string[] = [];
+
+    #log(message: string): void {
+        console.log("[Base]", message);
+    }
+
+    protected process(item: string): void {
+        this.#log("Processing: " + item);
+        this.data.push(item);
+    }
+}
+
+class ExtendedService extends BaseService {
+    #validate(item: string): boolean {
+        return item.length > 0;
+    }
+
+    add(item: string): void {
+        if (this.#validate(item)) {
+            this.process(item);
+        }
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain both classes
+    assert!(
+        output.contains("BaseService") && output.contains("ExtendedService"),
+        "Output should contain classes: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string[]") && !output.contains(": void") && !output.contains(": boolean"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_private_method_callback() {
+    let source = r#"
+class EventHandler {
+    private handlers: Map<string, Function[]> = new Map();
+
+    #invoke(event: string, callback: (data: any) => void, data: any): void {
+        callback(data);
+    }
+
+    #getHandlers(event: string): Function[] {
+        return this.handlers.get(event) || [];
+    }
+
+    on(event: string, handler: (data: any) => void): void {
+        const handlers = this.#getHandlers(event);
+        handlers.push(handler);
+        this.handlers.set(event, handlers);
+    }
+
+    emit(event: string, data: any): void {
+        for (const handler of this.#getHandlers(event)) {
+            this.#invoke(event, handler as (data: any) => void, data);
+        }
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the class
+    assert!(
+        output.contains("EventHandler"),
+        "Output should contain EventHandler class: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": Map<") && !output.contains(": Function[]") && !output.contains(": void"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
