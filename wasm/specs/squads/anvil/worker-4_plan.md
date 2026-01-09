@@ -7,10 +7,10 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-None - awaiting assignment from EM-Anvil.
+- [ ] Add ES5 class tests for using declarations patterns: sync using, async using, dispose patterns, Symbol.dispose. Tests: `./wasm/test.sh class_es5_tests`
 
 ## Task Queue
-- [ ] Add ES5 class tests for using declarations patterns: sync using, async using, dispose patterns
+- [ ] Add ES5 class tests for accessor keyword patterns: auto-accessor fields, accessor decorators
 
 ## Completed
 - [x] Add ES5 class tests for private method patterns. Tests: `./wasm/test.sh class_es5_tests`
