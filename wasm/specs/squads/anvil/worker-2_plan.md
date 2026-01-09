@@ -7,10 +7,25 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-(none - awaiting new assignment from EM-Anvil)
+Add ES5 class decorator patterns parity tests
+
+Per GOALS.md Objective 3: End-to-end conformance validation
+
+Steps:
+1. Add 6 ES5 class decorator parity tests to `wasm/src/emitter_parity_tests.rs`:
+   - Class decorator basic
+   - Method decorator with descriptor
+   - Property decorator
+   - Parameter decorator
+   - Accessor decorator
+   - Combined decorator patterns
+2. Run `./wasm/test.sh emitter_parity` to verify all tests pass
+3. Commit with message: `[wasm] emitter: add ES5 class decorator patterns parity tests`
+4. Push to `origin/worker/anvil-2`
+5. Update this plan file and push
 
 ## Task Queue
-(empty)
+(empty - will receive new tasks from EM after completing current assignment)
 
 ## Completed
 - [x] Added ES5 Generator patterns parity tests (basic-yield, yield-star, conditional-return, throw, resource-management, combined) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (389 tests).
