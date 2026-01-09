@@ -8114,3 +8114,203 @@ fn test_async_error_propagation_conditional() {
         output
     );
 }
+
+// ============================================================================
+// Async class inheritance pattern tests (super method calls, overrides)
+// ============================================================================
+
+fn parse_and_emit_async_class_inheritance(source: &str) -> String {
+    use crate::parser::syntax_kind_ext;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &stmt_idx in &source_file.statements.nodes {
+                if let Some(stmt_node) = parser.arena.get(stmt_idx) {
+                    if stmt_node.kind == syntax_kind_ext::CLASS_DECLARATION {
+                        if let Some(class_data) = parser.arena.get_class(stmt_node) {
+                            for &member_idx in &class_data.members.nodes {
+                                if let Some(member_node) = parser.arena.get(member_idx) {
+                                    if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
+                                        if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                            let emitter = AsyncES5Emitter::new(&parser.arena);
+                                            let has_await = emitter.body_contains_await(method_data.body);
+                                            let mut emitter = AsyncES5Emitter::new(&parser.arena);
+                                            if has_await {
+                                                return emitter.emit_generator_body_with_await(method_data.body);
+                                            } else {
+                                                return emitter.emit_simple_generator_body(method_data.body);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    String::new()
+}
+
+fn async_class_inheritance_contains_await(source: &str) -> bool {
+    use crate::parser::syntax_kind_ext;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &stmt_idx in &source_file.statements.nodes {
+                if let Some(stmt_node) = parser.arena.get(stmt_idx) {
+                    if stmt_node.kind == syntax_kind_ext::CLASS_DECLARATION {
+                        if let Some(class_data) = parser.arena.get_class(stmt_node) {
+                            for &member_idx in &class_data.members.nodes {
+                                if let Some(member_node) = parser.arena.get(member_idx) {
+                                    if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
+                                        if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                            let emitter = AsyncES5Emitter::new(&parser.arena);
+                                            return emitter.body_contains_await(method_data.body);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+#[test]
+fn test_async_class_inheritance_basic() {
+    let output = parse_and_emit_async_class_inheritance(
+        "class Child extends Base { async bar() { await super.init(); } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Async class inheritance should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_class_inheritance_super_call() {
+    let output = parse_and_emit_async_class_inheritance(
+        "class Child extends Base { async process() { await super.process(); return this.value; } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Super method call in async should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_class_inheritance_override() {
+    let output = parse_and_emit_async_class_inheritance(
+        "class Child extends Base { async fetch() { const base = await super.fetch(); return transform(base); } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Async override with super should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_class_inheritance_body_contains_await() {
+    let result = async_class_inheritance_contains_await(
+        "class Child extends Base { async bar() { await super.init(); } }",
+    );
+    assert!(result, "Should detect await in async inheritance pattern");
+}
+
+#[test]
+fn test_async_class_inheritance_body_no_await() {
+    let result = async_class_inheritance_contains_await(
+        "class Child extends Base { async bar() { return super.getValue(); } }",
+    );
+    assert!(!result, "Should not detect await when super call is not awaited");
+}
+
+#[test]
+fn test_async_class_inheritance_ignores_nested_async() {
+    let result = async_class_inheritance_contains_await(
+        "class Child extends Base { async bar() { const inner = async () => { await super.init(); }; return 1; } }",
+    );
+    assert!(!result, "Should not detect await inside nested async");
+}
+
+#[test]
+fn test_async_class_inheritance_multiple_super() {
+    let output = parse_and_emit_async_class_inheritance(
+        "class Child extends Base { async process() { await super.init(); await super.validate(); await super.save(); } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Multiple super calls should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_class_inheritance_with_try_catch() {
+    let output = parse_and_emit_async_class_inheritance(
+        "class Child extends Base { async bar() { try { await super.riskyOp(); } catch (e) { return null; } } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Super call with try/catch should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_class_inheritance_chain() {
+    let output = parse_and_emit_async_class_inheritance(
+        "class Child extends Base { async process() { const result = await super.process(); return await this.transform(result); } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Chained async calls with super should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_class_inheritance_static() {
+    let output = parse_and_emit_async_class_inheritance(
+        "class Child extends Base { static async create() { await super.init(); return new Child(); } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Static async with super should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_class_inheritance_property_access() {
+    let output = parse_and_emit_async_class_inheritance(
+        "class Child extends Base { async bar() { await init(); return super.value; } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Super property access in async should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_class_inheritance_conditional() {
+    let output = parse_and_emit_async_class_inheritance(
+        "class Child extends Base { async bar(useSuper: boolean) { if (useSuper) { return await super.process(); } return await this.process(); } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Conditional super call should have switch or yield: {}",
+        output
+    );
+}
