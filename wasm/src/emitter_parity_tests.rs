@@ -19054,3 +19054,373 @@ class ApiClient {
         output
     );
 }
+
+// =============================================================================
+// ES5 For-Of/For-In Patterns Parity Tests
+// =============================================================================
+
+/// Test: for-in loop with type annotations and object types
+#[test]
+fn test_parity_es5_for_in_typed() {
+    let source = r#"
+interface Config {
+    host: string;
+    port: number;
+    debug: boolean;
+}
+
+function getKeys<T extends object>(obj: T): (keyof T)[] {
+    const keys: (keyof T)[] = [];
+    for (const key in obj) {
+        if (Object.prototype.hasOwnProperty.call(obj, key)) {
+            keys.push(key as keyof T);
+        }
+    }
+    return keys;
+}
+
+function copyProperties<T extends object>(source: T, target: Partial<T>): void {
+    for (const prop in source) {
+        if (source.hasOwnProperty(prop)) {
+            target[prop] = source[prop];
+        }
+    }
+}
+
+class ObjectUtils {
+    static enumerate<T extends Record<string, unknown>>(obj: T): Array<[keyof T, T[keyof T]]> {
+        const entries: Array<[keyof T, T[keyof T]]> = [];
+        for (const key in obj) {
+            if (obj.hasOwnProperty(key)) {
+                entries.push([key as keyof T, obj[key]]);
+            }
+        }
+        return entries;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions should be present
+    assert!(
+        output.contains("getKeys") && output.contains("copyProperties"),
+        "Output should contain functions: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("ObjectUtils"),
+        "Output should contain class: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface Config"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Type parameters and annotations should be erased
+    assert!(
+        !output.contains("<T extends") && !output.contains("keyof T"),
+        "Type parameters should be erased: {}",
+        output
+    );
+}
+
+/// Test: for-in with computed property access
+#[test]
+fn test_parity_es5_for_in_computed() {
+    let source = r#"
+type IndexedObject = { [key: string]: number };
+
+function sumValues(obj: IndexedObject): number {
+    let sum = 0;
+    for (const key in obj) {
+        sum += obj[key];
+    }
+    return sum;
+}
+
+function transformObject<T, U>(
+    obj: Record<string, T>,
+    transform: (value: T, key: string) => U
+): Record<string, U> {
+    const result: Record<string, U> = {};
+    for (const key in obj) {
+        if (Object.prototype.hasOwnProperty.call(obj, key)) {
+            result[key] = transform(obj[key], key);
+        }
+    }
+    return result;
+}
+
+class DynamicAccessor {
+    private data: { [key: string]: unknown } = {};
+
+    setAll(source: object): void {
+        for (const prop in source) {
+            this.data[prop] = (source as any)[prop];
+        }
+    }
+
+    getFiltered(predicate: (key: string) => boolean): { [key: string]: unknown } {
+        const filtered: { [key: string]: unknown } = {};
+        for (const key in this.data) {
+            if (predicate(key)) {
+                filtered[key] = this.data[key];
+            }
+        }
+        return filtered;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions should be present
+    assert!(
+        output.contains("sumValues") && output.contains("transformObject"),
+        "Output should contain functions: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("DynamicAccessor"),
+        "Output should contain class: {}",
+        output
+    );
+    // Type alias should be erased
+    assert!(
+        !output.contains("type IndexedObject"),
+        "Type alias should be erased: {}",
+        output
+    );
+    // Generic parameters should be erased
+    assert!(
+        !output.contains("<T, U>") && !output.contains("Record<string"),
+        "Type parameters should be erased: {}",
+        output
+    );
+}
+
+/// Test: for-of with custom iterator protocol
+#[test]
+fn test_parity_es5_for_of_custom_iterator() {
+    let source = r#"
+interface IteratorResult<T> {
+    done: boolean;
+    value: T;
+}
+
+class Range implements Iterable<number> {
+    constructor(private start: number, private end: number) {}
+
+    [Symbol.iterator](): Iterator<number> {
+        let current = this.start;
+        const end = this.end;
+        return {
+            next(): IteratorResult<number> {
+                if (current <= end) {
+                    return { done: false, value: current++ };
+                }
+                return { done: true, value: undefined as any };
+            }
+        };
+    }
+}
+
+function* customGenerator<T>(items: T[]): Generator<T, void, unknown> {
+    for (const item of items) {
+        yield item;
+    }
+}
+
+function collectFromIterator<T>(iterable: Iterable<T>): T[] {
+    const result: T[] = [];
+    for (const item of iterable) {
+        result.push(item);
+    }
+    return result;
+}
+
+class IterableCollection<T> {
+    private items: T[] = [];
+
+    add(item: T): void {
+        this.items.push(item);
+    }
+
+    *[Symbol.iterator](): Generator<T, void, unknown> {
+        for (const item of this.items) {
+            yield item;
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes should be present
+    assert!(
+        output.contains("Range") && output.contains("IterableCollection"),
+        "Output should contain classes: {}",
+        output
+    );
+    // Functions should be present
+    assert!(
+        output.contains("customGenerator") && output.contains("collectFromIterator"),
+        "Output should contain functions: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface IteratorResult"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Type parameters should be erased
+    assert!(
+        !output.contains("<T>") && !output.contains("Iterable<number>"),
+        "Type parameters should be erased: {}",
+        output
+    );
+}
+
+/// Test: for-of with Map and Set destructuring
+#[test]
+fn test_parity_es5_for_of_map_set_destruct() {
+    let source = r#"
+function processMap<K, V>(map: Map<K, V>): Array<{ key: K; value: V }> {
+    const result: Array<{ key: K; value: V }> = [];
+    for (const [key, value] of map) {
+        result.push({ key, value });
+    }
+    return result;
+}
+
+function setToArray<T>(set: Set<T>): T[] {
+    const arr: T[] = [];
+    for (const item of set) {
+        arr.push(item);
+    }
+    return arr;
+}
+
+class MapReducer<K, V> {
+    constructor(private map: Map<K, V>) {}
+
+    reduce<R>(initial: R, reducer: (acc: R, key: K, value: V) => R): R {
+        let result = initial;
+        for (const [key, value] of this.map) {
+            result = reducer(result, key, value);
+        }
+        return result;
+    }
+
+    filterEntries(predicate: (key: K, value: V) => boolean): Map<K, V> {
+        const filtered = new Map<K, V>();
+        for (const [key, value] of this.map) {
+            if (predicate(key, value)) {
+                filtered.set(key, value);
+            }
+        }
+        return filtered;
+    }
+}
+
+async function asyncMapProcess<K, V>(
+    map: Map<K, V>,
+    processor: (key: K, value: V) => Promise<void>
+): Promise<void> {
+    for (const [key, value] of map) {
+        await processor(key, value);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions should be present
+    assert!(
+        output.contains("processMap") && output.contains("setToArray") && output.contains("asyncMapProcess"),
+        "Output should contain functions: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("MapReducer"),
+        "Output should contain class: {}",
+        output
+    );
+    // Type parameters should be erased
+    assert!(
+        !output.contains("<K, V>") && !output.contains("Map<K, V>") && !output.contains("Set<T>"),
+        "Type parameters should be erased: {}",
+        output
+    );
+}
