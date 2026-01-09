@@ -46711,3 +46711,1001 @@ const logger = new Logger();
         output
     );
 }
+
+/// Test ES5 class with revealing module pattern
+#[test]
+fn test_class_es5_revealing_module_pattern() {
+    let source = r#"
+const CounterModule = (function() {
+    let count = 0;
+
+    class Counter {
+        private _value: number;
+
+        constructor(initial: number = 0) {
+            this._value = initial;
+        }
+
+        increment(): number {
+            this._value++;
+            count++;
+            return this._value;
+        }
+
+        decrement(): number {
+            this._value--;
+            return this._value;
+        }
+
+        getValue(): number {
+            return this._value;
+        }
+    }
+
+    function createCounter(initial?: number): Counter {
+        return new Counter(initial);
+    }
+
+    function getTotalOperations(): number {
+        return count;
+    }
+
+    return {
+        Counter,
+        createCounter,
+        getTotalOperations
+    };
+})();
+
+const LoggerModule = (function() {
+    const logs: string[] = [];
+
+    class Logger {
+        private prefix: string;
+
+        constructor(prefix: string = "") {
+            this.prefix = prefix;
+        }
+
+        log(message: string): void {
+            const entry = this.prefix ? `[${this.prefix}] ${message}` : message;
+            logs.push(entry);
+            console.log(entry);
+        }
+
+        warn(message: string): void {
+            this.log(`WARN: ${message}`);
+        }
+
+        error(message: string): void {
+            this.log(`ERROR: ${message}`);
+        }
+    }
+
+    function getLogs(): string[] {
+        return [...logs];
+    }
+
+    function clearLogs(): void {
+        logs.length = 0;
+    }
+
+    return {
+        Logger,
+        getLogs,
+        clearLogs
+    };
+})();
+
+const counter = CounterModule.createCounter(10);
+const logger = new LoggerModule.Logger("App");
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Module names should exist
+    assert!(
+        output.contains("CounterModule") && output.contains("LoggerModule"),
+        "Expected module names: {}",
+        output
+    );
+
+    // Classes should be converted
+    assert!(
+        output.contains("Counter") && output.contains("Logger"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("increment") && output.contains("decrement") && output.contains("getValue"),
+        "Expected Counter methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("log") && output.contains("warn") && output.contains("error"),
+        "Expected Logger methods: {}",
+        output
+    );
+
+    // Module functions should exist
+    assert!(
+        output.contains("createCounter") && output.contains("getTotalOperations"),
+        "Expected CounterModule functions: {}",
+        output
+    );
+
+    assert!(
+        output.contains("getLogs") && output.contains("clearLogs"),
+        "Expected LoggerModule functions: {}",
+        output
+    );
+}
+
+/// Test ES5 class with namespace module pattern
+#[test]
+fn test_class_es5_namespace_module_pattern() {
+    let source = r#"
+namespace DataAccess {
+    export interface Repository<T> {
+        findAll(): T[];
+        findById(id: string): T | undefined;
+        save(entity: T): void;
+        delete(id: string): boolean;
+    }
+
+    export class BaseEntity {
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+
+        constructor(id: string) {
+            this.id = id;
+            this.createdAt = new Date();
+            this.updatedAt = new Date();
+        }
+
+        touch(): void {
+            this.updatedAt = new Date();
+        }
+    }
+
+    export class InMemoryRepository<T extends BaseEntity> implements Repository<T> {
+        protected entities: Map<string, T> = new Map();
+
+        findAll(): T[] {
+            return Array.from(this.entities.values());
+        }
+
+        findById(id: string): T | undefined {
+            return this.entities.get(id);
+        }
+
+        save(entity: T): void {
+            entity.touch();
+            this.entities.set(entity.id, entity);
+        }
+
+        delete(id: string): boolean {
+            return this.entities.delete(id);
+        }
+    }
+}
+
+namespace Services {
+    export class UserService {
+        private repo: DataAccess.Repository<DataAccess.BaseEntity>;
+
+        constructor(repo: DataAccess.Repository<DataAccess.BaseEntity>) {
+            this.repo = repo;
+        }
+
+        getAllUsers(): DataAccess.BaseEntity[] {
+            return this.repo.findAll();
+        }
+
+        getUserById(id: string): DataAccess.BaseEntity | undefined {
+            return this.repo.findById(id);
+        }
+    }
+}
+
+const repo = new DataAccess.InMemoryRepository<DataAccess.BaseEntity>();
+const service = new Services.UserService(repo);
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Namespaces should exist
+    assert!(
+        output.contains("DataAccess") && output.contains("Services"),
+        "Expected namespaces: {}",
+        output
+    );
+
+    // Classes should be converted
+    assert!(
+        output.contains("BaseEntity") && output.contains("InMemoryRepository") && output.contains("UserService"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("findAll") && output.contains("findById") && output.contains("save"),
+        "Expected Repository methods: {}",
+        output
+    );
+
+    // Interface should be stripped
+    assert!(
+        !output.contains("interface Repository"),
+        "Expected interface to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with import/export class patterns
+#[test]
+fn test_class_es5_import_export_class_pattern() {
+    let source = r#"
+export interface Serializable {
+    serialize(): string;
+    deserialize(data: string): void;
+}
+
+export abstract class Model implements Serializable {
+    abstract id: string;
+
+    abstract serialize(): string;
+    abstract deserialize(data: string): void;
+
+    clone(): this {
+        const data = this.serialize();
+        const clone = Object.create(Object.getPrototypeOf(this));
+        clone.deserialize(data);
+        return clone;
+    }
+}
+
+export class User extends Model {
+    id: string;
+    name: string;
+    email: string;
+
+    constructor(id: string, name: string, email: string) {
+        super();
+        this.id = id;
+        this.name = name;
+        this.email = email;
+    }
+
+    serialize(): string {
+        return JSON.stringify({ id: this.id, name: this.name, email: this.email });
+    }
+
+    deserialize(data: string): void {
+        const obj = JSON.parse(data);
+        this.id = obj.id;
+        this.name = obj.name;
+        this.email = obj.email;
+    }
+}
+
+export class Product extends Model {
+    id: string;
+    title: string;
+    price: number;
+
+    constructor(id: string, title: string, price: number) {
+        super();
+        this.id = id;
+        this.title = title;
+        this.price = price;
+    }
+
+    serialize(): string {
+        return JSON.stringify({ id: this.id, title: this.title, price: this.price });
+    }
+
+    deserialize(data: string): void {
+        const obj = JSON.parse(data);
+        this.id = obj.id;
+        this.title = obj.title;
+        this.price = obj.price;
+    }
+}
+
+export default class DefaultExportClass {
+    value: string;
+
+    constructor(value: string) {
+        this.value = value;
+    }
+
+    getValue(): string {
+        return this.value;
+    }
+}
+
+const user = new User("1", "John", "john@example.com");
+const product = new Product("1", "Widget", 9.99);
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Model") && output.contains("User") && output.contains("Product"),
+        "Expected classes: {}",
+        output
+    );
+
+    assert!(
+        output.contains("DefaultExportClass"),
+        "Expected default export class: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("serialize") && output.contains("deserialize") && output.contains("clone"),
+        "Expected Model methods: {}",
+        output
+    );
+
+    // Interface should be stripped
+    assert!(
+        !output.contains("interface Serializable"),
+        "Expected interface to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with barrel export variation pattern
+#[test]
+fn test_class_es5_barrel_export_variation_pattern() {
+    let source = r#"
+// models/user.ts style
+class UserModel {
+    id: string;
+    username: string;
+
+    constructor(id: string, username: string) {
+        this.id = id;
+        this.username = username;
+    }
+
+    toJSON(): object {
+        return { id: this.id, username: this.username };
+    }
+}
+
+// models/product.ts style
+class ProductModel {
+    id: string;
+    name: string;
+    price: number;
+
+    constructor(id: string, name: string, price: number) {
+        this.id = id;
+        this.name = name;
+        this.price = price;
+    }
+
+    toJSON(): object {
+        return { id: this.id, name: this.name, price: this.price };
+    }
+}
+
+// models/order.ts style
+class OrderModel {
+    id: string;
+    userId: string;
+    products: ProductModel[];
+
+    constructor(id: string, userId: string, products: ProductModel[] = []) {
+        this.id = id;
+        this.userId = userId;
+        this.products = products;
+    }
+
+    addProduct(product: ProductModel): void {
+        this.products.push(product);
+    }
+
+    getTotal(): number {
+        return this.products.reduce((sum, p) => sum + p.price, 0);
+    }
+
+    toJSON(): object {
+        return {
+            id: this.id,
+            userId: this.userId,
+            products: this.products.map(p => p.toJSON())
+        };
+    }
+}
+
+// models/index.ts barrel export style
+const Models = {
+    User: UserModel,
+    Product: ProductModel,
+    Order: OrderModel
+};
+
+// Export types for convenience
+type User = UserModel;
+type Product = ProductModel;
+type Order = OrderModel;
+
+// Factory functions
+function createUser(id: string, username: string): UserModel {
+    return new UserModel(id, username);
+}
+
+function createProduct(id: string, name: string, price: number): ProductModel {
+    return new ProductModel(id, name, price);
+}
+
+function createOrder(id: string, userId: string): OrderModel {
+    return new OrderModel(id, userId);
+}
+
+const Factories = {
+    createUser,
+    createProduct,
+    createOrder
+};
+
+const user = Factories.createUser("1", "john");
+const product = Factories.createProduct("1", "Widget", 9.99);
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("UserModel") && output.contains("ProductModel") && output.contains("OrderModel"),
+        "Expected model classes: {}",
+        output
+    );
+
+    // Barrel export object should exist
+    assert!(
+        output.contains("Models"),
+        "Expected Models barrel export: {}",
+        output
+    );
+
+    // Factory functions should exist
+    assert!(
+        output.contains("createUser") && output.contains("createProduct") && output.contains("createOrder"),
+        "Expected factory functions: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("toJSON") && output.contains("addProduct") && output.contains("getTotal"),
+        "Expected model methods: {}",
+        output
+    );
+
+    // Type aliases should be stripped
+    assert!(
+        !output.contains("type User =") && !output.contains("type Product ="),
+        "Expected type aliases to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with re-export variation pattern
+#[test]
+fn test_class_es5_re_export_variation_pattern() {
+    let source = r#"
+// core/base.ts
+abstract class BaseService {
+    protected name: string;
+
+    constructor(name: string) {
+        this.name = name;
+    }
+
+    getName(): string {
+        return this.name;
+    }
+
+    abstract execute(): void;
+}
+
+// core/logger.ts
+class LogService extends BaseService {
+    private logs: string[] = [];
+
+    constructor() {
+        super("LogService");
+    }
+
+    execute(): void {
+        console.log("LogService executing...");
+    }
+
+    log(message: string): void {
+        this.logs.push(message);
+    }
+
+    getLogs(): string[] {
+        return [...this.logs];
+    }
+}
+
+// core/cache.ts
+class CacheService extends BaseService {
+    private cache: Map<string, any> = new Map();
+
+    constructor() {
+        super("CacheService");
+    }
+
+    execute(): void {
+        console.log("CacheService executing...");
+    }
+
+    set(key: string, value: any): void {
+        this.cache.set(key, value);
+    }
+
+    get(key: string): any {
+        return this.cache.get(key);
+    }
+
+    clear(): void {
+        this.cache.clear();
+    }
+}
+
+// core/index.ts re-export pattern
+const CoreServices = {
+    BaseService,
+    LogService,
+    CacheService
+};
+
+// features/auth.ts
+class AuthService extends BaseService {
+    private logService: LogService;
+
+    constructor(logService: LogService) {
+        super("AuthService");
+        this.logService = logService;
+    }
+
+    execute(): void {
+        this.logService.log("AuthService executing...");
+    }
+
+    authenticate(username: string, password: string): boolean {
+        this.logService.log(`Authenticating user: ${username}`);
+        return username.length > 0 && password.length > 0;
+    }
+}
+
+// features/data.ts
+class DataService extends BaseService {
+    private cacheService: CacheService;
+    private logService: LogService;
+
+    constructor(cacheService: CacheService, logService: LogService) {
+        super("DataService");
+        this.cacheService = cacheService;
+        this.logService = logService;
+    }
+
+    execute(): void {
+        this.logService.log("DataService executing...");
+    }
+
+    fetch(key: string): any {
+        const cached = this.cacheService.get(key);
+        if (cached) {
+            this.logService.log(`Cache hit for: ${key}`);
+            return cached;
+        }
+        this.logService.log(`Cache miss for: ${key}`);
+        return null;
+    }
+
+    store(key: string, value: any): void {
+        this.cacheService.set(key, value);
+        this.logService.log(`Stored: ${key}`);
+    }
+}
+
+// features/index.ts re-export pattern
+const FeatureServices = {
+    AuthService,
+    DataService
+};
+
+// main index.ts - aggregate exports
+const AllServices = {
+    ...CoreServices,
+    ...FeatureServices
+};
+
+const logService = new LogService();
+const cacheService = new CacheService();
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Base class should be converted
+    assert!(
+        output.contains("BaseService"),
+        "Expected BaseService class: {}",
+        output
+    );
+
+    // Core services should exist
+    assert!(
+        output.contains("LogService") && output.contains("CacheService"),
+        "Expected core service classes: {}",
+        output
+    );
+
+    // Feature services should exist
+    assert!(
+        output.contains("AuthService") && output.contains("DataService"),
+        "Expected feature service classes: {}",
+        output
+    );
+
+    // Re-export objects should exist
+    assert!(
+        output.contains("CoreServices") && output.contains("FeatureServices") && output.contains("AllServices"),
+        "Expected re-export objects: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("getName") && output.contains("execute"),
+        "Expected BaseService methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("authenticate") && output.contains("fetch") && output.contains("store"),
+        "Expected feature service methods: {}",
+        output
+    );
+}
+
+/// Test ES5 class with combined module patterns
+#[test]
+fn test_class_es5_combined_module_patterns() {
+    let source = r#"
+// Types module
+namespace Types {
+    export interface Entity {
+        id: string;
+        createdAt: Date;
+    }
+
+    export interface Persistable {
+        save(): Promise<void>;
+        load(id: string): Promise<void>;
+    }
+
+    export type EntityId = string | number;
+}
+
+// Base module with revealing pattern
+const BaseModule = (function() {
+    abstract class AbstractEntity implements Types.Entity {
+        id: string;
+        createdAt: Date;
+
+        constructor(id: string) {
+            this.id = id;
+            this.createdAt = new Date();
+        }
+
+        abstract validate(): boolean;
+    }
+
+    class EntityFactory {
+        private static instances: Map<string, AbstractEntity> = new Map();
+
+        static register(id: string, entity: AbstractEntity): void {
+            this.instances.set(id, entity);
+        }
+
+        static get(id: string): AbstractEntity | undefined {
+            return this.instances.get(id);
+        }
+
+        static clear(): void {
+            this.instances.clear();
+        }
+    }
+
+    return {
+        AbstractEntity,
+        EntityFactory
+    };
+})();
+
+// Domain module using namespace
+namespace Domain {
+    export class User extends (BaseModule.AbstractEntity as any) {
+        name: string;
+        email: string;
+
+        constructor(id: string, name: string, email: string) {
+            super(id);
+            this.name = name;
+            this.email = email;
+        }
+
+        validate(): boolean {
+            return this.name.length > 0 && this.email.includes("@");
+        }
+
+        getDisplayName(): string {
+            return `${this.name} <${this.email}>`;
+        }
+    }
+
+    export class Order extends (BaseModule.AbstractEntity as any) {
+        userId: string;
+        total: number;
+        items: string[];
+
+        constructor(id: string, userId: string) {
+            super(id);
+            this.userId = userId;
+            this.total = 0;
+            this.items = [];
+        }
+
+        validate(): boolean {
+            return this.userId.length > 0 && this.items.length > 0;
+        }
+
+        addItem(item: string, price: number): void {
+            this.items.push(item);
+            this.total += price;
+        }
+
+        getItemCount(): number {
+            return this.items.length;
+        }
+    }
+}
+
+// Services module
+namespace Services {
+    export class UserService {
+        private users: Map<string, Domain.User> = new Map();
+
+        create(id: string, name: string, email: string): Domain.User {
+            const user = new Domain.User(id, name, email);
+            if (user.validate()) {
+                this.users.set(id, user);
+                BaseModule.EntityFactory.register(id, user as any);
+            }
+            return user;
+        }
+
+        findById(id: string): Domain.User | undefined {
+            return this.users.get(id);
+        }
+
+        findAll(): Domain.User[] {
+            return Array.from(this.users.values());
+        }
+    }
+
+    export class OrderService {
+        private orders: Map<string, Domain.Order> = new Map();
+
+        create(id: string, userId: string): Domain.Order {
+            const order = new Domain.Order(id, userId);
+            this.orders.set(id, order);
+            return order;
+        }
+
+        findByUserId(userId: string): Domain.Order[] {
+            return Array.from(this.orders.values()).filter(o => o.userId === userId);
+        }
+
+        getOrderTotal(orderId: string): number {
+            const order = this.orders.get(orderId);
+            return order ? order.total : 0;
+        }
+    }
+}
+
+// Application facade
+class Application {
+    private userService: Services.UserService;
+    private orderService: Services.OrderService;
+
+    constructor() {
+        this.userService = new Services.UserService();
+        this.orderService = new Services.OrderService();
+    }
+
+    getUserService(): Services.UserService {
+        return this.userService;
+    }
+
+    getOrderService(): Services.OrderService {
+        return this.orderService;
+    }
+
+    initialize(): void {
+        console.log("Application initialized");
+    }
+}
+
+// Export aggregation
+const Modules = {
+    Types,
+    BaseModule,
+    Domain,
+    Services,
+    Application
+};
+
+const app = new Application();
+app.initialize();
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Namespaces should exist
+    assert!(
+        output.contains("Types") && output.contains("Domain") && output.contains("Services"),
+        "Expected namespaces: {}",
+        output
+    );
+
+    // Revealing module should exist
+    assert!(
+        output.contains("BaseModule"),
+        "Expected BaseModule: {}",
+        output
+    );
+
+    // Domain classes should exist
+    assert!(
+        output.contains("User") && output.contains("Order"),
+        "Expected domain classes: {}",
+        output
+    );
+
+    // Service classes should exist
+    assert!(
+        output.contains("UserService") && output.contains("OrderService"),
+        "Expected service classes: {}",
+        output
+    );
+
+    // Application class should exist
+    assert!(
+        output.contains("Application"),
+        "Expected Application class: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("validate") && output.contains("getDisplayName"),
+        "Expected User methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("create") && output.contains("findById") && output.contains("findAll"),
+        "Expected UserService methods: {}",
+        output
+    );
+
+    // Aggregate export should exist
+    assert!(
+        output.contains("Modules"),
+        "Expected Modules aggregate export: {}",
+        output
+    );
+
+    // Interfaces should be stripped
+    assert!(
+        !output.contains("interface Entity") && !output.contains("interface Persistable"),
+        "Expected interfaces to be stripped: {}",
+        output
+    );
+
+    // Type alias should be stripped
+    assert!(
+        !output.contains("type EntityId"),
+        "Expected type alias to be stripped: {}",
+        output
+    );
+}
