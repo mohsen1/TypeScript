@@ -690,10 +690,34 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 }
             }
 
-            // Type query (typeof) - same symbol refs are equal
+            // Type query (typeof) - resolve to structural types when possible
             (TypeKey::TypeQuery(s_sym), TypeKey::TypeQuery(t_sym)) => {
                 if s_sym == t_sym {
-                    SubtypeResult::True
+                    return SubtypeResult::True;
+                }
+                let s_resolved = self.resolver.resolve_ref(*s_sym, self.interner);
+                let t_resolved = self.resolver.resolve_ref(*t_sym, self.interner);
+                match (s_resolved, t_resolved) {
+                    (Some(s_type), Some(t_type)) => self.check_subtype(s_type, t_type),
+                    (Some(s_type), None) => self.check_subtype(s_type, target),
+                    (None, Some(t_type)) => self.check_subtype(source, t_type),
+                    (None, None) => SubtypeResult::False,
+                }
+            }
+
+            // Source is TypeQuery, target is structural - resolve and check
+            (TypeKey::TypeQuery(s_sym), _) => {
+                if let Some(s_resolved) = self.resolver.resolve_ref(*s_sym, self.interner) {
+                    self.check_subtype(s_resolved, target)
+                } else {
+                    SubtypeResult::False
+                }
+            }
+
+            // Source is structural, target is TypeQuery - resolve and check
+            (_, TypeKey::TypeQuery(t_sym)) => {
+                if let Some(t_resolved) = self.resolver.resolve_ref(*t_sym, self.interner) {
+                    self.check_subtype(source, t_resolved)
                 } else {
                     SubtypeResult::False
                 }
