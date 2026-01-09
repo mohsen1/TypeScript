@@ -58,11 +58,19 @@ Yes
 
 ## Resume Notes
 - Branch: `worker/forge-1`
-- Unit tests after merge with squad/forge: 4918 total, 4852 passed, 65 failed, 1 skipped.
+- Unit tests: 4921 total, 4851 passed, 69 failed, 1 skipped.
 - Merged type parameter scope fix from EM (origin/squad/forge).
 - TS2304 work complete: added utility type handling to reduce false positives.
-- TS2454 basic implementation done:
+- TS2454 implementation done:
   - Fixed `get_type_of_call_expression` to process arguments even when callee is `any`
   - This ensures definite assignment checking for args like `console.log(x)`
-  - Added 4 tests for TS2454 (all passing)
-- Next: Add more TS2454 tests for conditional branches (if/else, loops).
+  - 7 tests passing:
+    1. Variable used before assigned (error)
+    2. Variable assigned before use (no error)
+    3. Variable initialized at declaration (no error)
+    4. Function parameter (no error)
+    5. Assigned in both if/else branches (no error)
+    6. Assigned in only if branch (error)
+    7. Var declaration (no error - only let/const)
+  - Control flow analysis working for conditional branches
+- Next: Run conformance tests to measure impact on 573 affected tests.
