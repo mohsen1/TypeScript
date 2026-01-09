@@ -8125,313 +8125,6 @@ class CustomPlugin extends BasePlugin {
 }
 
 // =============================================================================
-// Const Assertion Tests
-// =============================================================================
-
-#[test]
-fn test_class_es5_const_assertion_object_field() {
-    // const assertion on object literal in field - should be erased
-    let source = r#"
-class Config {
-    settings = { theme: "dark", fontSize: 14 } as const;
-
-    getTheme(): string {
-        return this.settings.theme;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
-    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
-
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
-
-    // Class should emit
-    assert!(
-        output.contains("function Config"),
-        "Expected Config class: {}",
-        output
-    );
-
-    // as const should be erased
-    assert!(
-        !output.contains("as const"),
-        "as const should be erased: {}",
-        output
-    );
-
-    // Field should be present
-    assert!(
-        output.contains("settings"),
-        "Expected settings field: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_const_assertion_array_field() {
-    // const assertion on array literal in field - should be erased
-    let source = r#"
-class Permissions {
-    roles = ["admin", "user", "guest"] as const;
-
-    hasRole(role: string): boolean {
-        return this.roles.includes(role);
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
-    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
-
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
-
-    // Class should emit
-    assert!(
-        output.contains("function Permissions"),
-        "Expected Permissions class: {}",
-        output
-    );
-
-    // as const should be erased
-    assert!(
-        !output.contains("as const"),
-        "as const should be erased: {}",
-        output
-    );
-
-    // Field should be present
-    assert!(
-        output.contains("roles"),
-        "Expected roles field: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_const_assertion_static_field() {
-    // const assertion in static field - should be erased
-    let source = r#"
-class HttpStatus {
-    static OK = 200 as const;
-    static NOT_FOUND = 404 as const;
-    static SERVER_ERROR = 500 as const;
-
-    static isSuccess(code: number): boolean {
-        return code >= 200 && code < 300;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
-    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
-
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
-
-    // Class should emit
-    assert!(
-        output.contains("function HttpStatus") || output.contains("HttpStatus"),
-        "Expected HttpStatus class: {}",
-        output
-    );
-
-    // as const should be erased
-    assert!(
-        !output.contains("as const"),
-        "as const should be erased: {}",
-        output
-    );
-
-    // Static fields should be present
-    assert!(
-        output.contains("OK") || output.contains("200"),
-        "Expected OK field: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_const_assertion_in_method() {
-    // const assertion in method return - should be erased
-    let source = r#"
-class Factory {
-    createConfig() {
-        return { debug: true, level: "info" } as const;
-    }
-
-    createList() {
-        return [1, 2, 3] as const;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
-    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
-
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
-
-    // Class should emit
-    assert!(
-        output.contains("function Factory"),
-        "Expected Factory class: {}",
-        output
-    );
-
-    // as const should be erased
-    assert!(
-        !output.contains("as const"),
-        "as const should be erased: {}",
-        output
-    );
-
-    // Methods should be present
-    assert!(
-        output.contains("createConfig") && output.contains("createList"),
-        "Expected methods: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_const_assertion_in_constructor() {
-    // const assertion in constructor - should be erased
-    let source = r#"
-class State {
-    data: readonly string[];
-
-    constructor() {
-        this.data = ["a", "b", "c"] as const;
-    }
-
-    getData(): readonly string[] {
-        return this.data;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
-    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
-
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
-
-    // Class should emit
-    assert!(
-        output.contains("function State"),
-        "Expected State class: {}",
-        output
-    );
-
-    // as const should be erased
-    assert!(
-        !output.contains("as const"),
-        "as const should be erased: {}",
-        output
-    );
-
-    // Field should be present
-    assert!(
-        output.contains("data"),
-        "Expected data field: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_const_assertion_in_derived_class() {
-    // const assertion in derived class - should be erased
-    let source = r#"
-class BaseStore {
-    name: string = "base";
-}
-
-class ConfigStore extends BaseStore {
-    defaults = { timeout: 5000, retries: 3 } as const;
-
-    getDefaults() {
-        return this.defaults;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
-
-    // Second statement is the ConfigStore class
-    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
-
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(*class_idx);
-
-    // Class should emit
-    assert!(
-        output.contains("function ConfigStore"),
-        "Expected ConfigStore class: {}",
-        output
-    );
-
-    // as const should be erased
-    assert!(
-        !output.contains("as const"),
-        "as const should be erased: {}",
-        output
-    );
-
-    // Should have inheritance
-    assert!(
-        output.contains("__extends") || output.contains("_super"),
-        "Expected inheritance pattern: {}",
-        output
-    );
-
-    // Field should be present
-    assert!(
-        output.contains("defaults"),
-        "Expected defaults field: {}",
-        output
-    );
-}
-
-// =============================================================================
 // Namespace Merging Tests
 // =============================================================================
 
@@ -8775,303 +8468,320 @@ namespace ApiService {
 }
 
 // =============================================================================
-// Async Generator Method Tests
+// Class Expression with Generics Tests
 // =============================================================================
 
 #[test]
-fn test_class_es5_async_generator_method_basic() {
-    // Basic async generator method
+fn test_class_es5_class_expression_generic_basic() {
+    // Basic class expression with generic type parameter
     let source = r#"
-class DataStream {
-    async *fetchItems(): AsyncGenerator<number> {
-        yield 1;
-        yield 2;
-        yield 3;
+const Container = class<T> {
+    private value: T;
+
+    constructor(value: T) {
+        this.value = value;
     }
-}
+
+    getValue(): T {
+        return this.value;
+    }
+};
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
-    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
 
-    // Class should emit
+    let output = printer.get_output().to_string();
+
+    // Variable should be present
     assert!(
-        output.contains("function DataStream"),
-        "Expected DataStream class: {}",
+        output.contains("Container"),
+        "Expected Container variable: {}",
         output
     );
 
-    // Method should be on prototype
+    // Generic type parameter should be erased
     assert!(
-        output.contains("fetchItems"),
-        "Expected fetchItems method: {}",
-        output
-    );
-
-    // Should use __awaiter or __asyncGenerator helper
-    assert!(
-        output.contains("__awaiter") || output.contains("__generator") || output.contains("__asyncGenerator") || output.contains("prototype"),
-        "Expected async/generator helpers or prototype: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_async_generator_with_await() {
-    // Async generator with await inside
-    let source = r#"
-class ApiIterator {
-    async *paginate(url: string): AsyncGenerator<any> {
-        let page = 1;
-        while (page <= 3) {
-            const data = await fetch(url + "?page=" + page);
-            yield data;
-            page++;
-        }
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
-    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
-
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
-
-    // Class should emit
-    assert!(
-        output.contains("function ApiIterator"),
-        "Expected ApiIterator class: {}",
+        !output.contains("<T>"),
+        "Generic type parameter should be erased: {}",
         output
     );
 
     // Method should be present
     assert!(
-        output.contains("paginate"),
-        "Expected paginate method: {}",
+        output.contains("getValue"),
+        "Expected getValue method: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_async_generator_static() {
-    // Static async generator method
+fn test_class_es5_class_expression_generic_multiple_params() {
+    // Class expression with multiple generic type parameters
     let source = r#"
-class NumberGenerator {
-    static async *range(start: number, end: number): AsyncGenerator<number> {
-        for (let i = start; i <= end; i++) {
-            yield i;
-        }
+const Pair = class<K, V> {
+    constructor(public key: K, public value: V) {}
+
+    getKey(): K {
+        return this.key;
     }
 
-    static async *fibonacci(count: number): AsyncGenerator<number> {
-        let a = 0, b = 1;
-        for (let i = 0; i < count; i++) {
-            yield a;
-            const temp = a;
-            a = b;
-            b = temp + b;
-        }
+    getValue(): V {
+        return this.value;
     }
-}
+
+    swap(): Pair<V, K> {
+        return new Pair(this.value, this.key);
+    }
+};
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
-    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
 
-    // Class should emit
+    let output = printer.get_output().to_string();
+
+    // Variable should be present
     assert!(
-        output.contains("function NumberGenerator") || output.contains("NumberGenerator"),
-        "Expected NumberGenerator class: {}",
+        output.contains("Pair"),
+        "Expected Pair variable: {}",
         output
     );
 
-    // Static methods should be on constructor, not prototype
+    // Generic type parameters should be erased
     assert!(
-        output.contains("range") && output.contains("fibonacci"),
-        "Expected static methods: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_async_generator_with_try_catch() {
-    // Async generator with error handling
-    let source = r#"
-class SafeIterator {
-    async *safeIterate(items: string[]): AsyncGenerator<string> {
-        for (const item of items) {
-            try {
-                const result = await this.process(item);
-                yield result;
-            } catch (e) {
-                yield "error";
-            }
-        }
-    }
-
-    async process(item: string): Promise<string> {
-        return item.toUpperCase();
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
-    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
-
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
-
-    // Class should emit
-    assert!(
-        output.contains("function SafeIterator"),
-        "Expected SafeIterator class: {}",
+        !output.contains("<K, V>") && !output.contains("<V, K>"),
+        "Generic type parameters should be erased: {}",
         output
     );
 
     // Methods should be present
     assert!(
-        output.contains("safeIterate") && output.contains("process"),
+        output.contains("getKey") && output.contains("getValue") && output.contains("swap"),
         "Expected methods: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_async_generator_in_derived_class() {
-    // Async generator in derived class
+fn test_class_es5_class_expression_generic_constraint() {
+    // Class expression with generic constraint
     let source = r#"
-class BaseProducer {
-    name: string = "base";
+interface HasLength {
+    length: number;
 }
 
-class EventProducer extends BaseProducer {
-    async *produceEvents(): AsyncGenerator<string> {
-        yield "start";
-        yield "processing";
-        yield "complete";
+const Measurable = class<T extends HasLength> {
+    constructor(private item: T) {}
+
+    getLength(): number {
+        return this.item.length;
     }
 
-    async *produceWithDelay(): AsyncGenerator<number> {
-        for (let i = 0; i < 3; i++) {
-            await new Promise(r => setTimeout(r, 100));
-            yield i;
-        }
+    getItem(): T {
+        return this.item;
     }
-}
+};
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    // Second statement is the EventProducer class
-    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
 
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(*class_idx);
+    let output = printer.get_output().to_string();
 
-    // Class should emit
+    // Variable should be present
     assert!(
-        output.contains("function EventProducer"),
-        "Expected EventProducer class: {}",
+        output.contains("Measurable"),
+        "Expected Measurable variable: {}",
         output
     );
 
-    // Should have inheritance
+    // Generic constraint should be erased
     assert!(
-        output.contains("__extends") || output.contains("_super"),
+        !output.contains("extends HasLength"),
+        "Generic constraint should be erased: {}",
+        output
+    );
+
+    // Interface should be erased
+    assert!(
+        !output.contains("interface"),
+        "Interface should be erased: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("getLength") && output.contains("getItem"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_class_expression_generic_extends() {
+    // Generic class expression extending another class
+    let source = r#"
+class BaseCollection<T> {
+    protected items: T[] = [];
+
+    add(item: T): void {
+        this.items.push(item);
+    }
+}
+
+const SortedCollection = class<T> extends BaseCollection<T> {
+    sort(compareFn: (a: T, b: T) => number): T[] {
+        return this.items.sort(compareFn);
+    }
+
+    first(): T | undefined {
+        return this.items[0];
+    }
+};
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be present
+    assert!(
+        output.contains("BaseCollection") && output.contains("SortedCollection"),
+        "Expected BaseCollection and SortedCollection: {}",
+        output
+    );
+
+    // Generic type parameters should be erased
+    assert!(
+        !output.contains("<T>"),
+        "Generic type parameters should be erased: {}",
+        output
+    );
+
+    // Inheritance should be present
+    assert!(
+        output.contains("__extends") || output.contains("prototype"),
         "Expected inheritance pattern: {}",
         output
     );
 
     // Methods should be present
     assert!(
-        output.contains("produceEvents") && output.contains("produceWithDelay"),
-        "Expected async generator methods: {}",
+        output.contains("sort") && output.contains("first"),
+        "Expected sort and first methods: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_async_generator_with_yield_delegate() {
-    // Async generator with yield* delegation
+fn test_class_es5_class_expression_generic_factory() {
+    // Generic class expression used in factory pattern
     let source = r#"
-class CompositeIterator {
-    async *iterateAll(): AsyncGenerator<number> {
-        yield* this.firstBatch();
-        yield* this.secondBatch();
-    }
+function createRepository<T>() {
+    return class Repository {
+        private data: T[] = [];
 
-    async *firstBatch(): AsyncGenerator<number> {
-        yield 1;
-        yield 2;
-    }
+        save(item: T): void {
+            this.data.push(item);
+        }
 
-    async *secondBatch(): AsyncGenerator<number> {
-        yield 3;
-        yield 4;
-    }
+        findAll(): T[] {
+            return this.data;
+        }
+
+        count(): number {
+            return this.data.length;
+        }
+    };
 }
+
+const UserRepo = createRepository<{ id: number; name: string }>();
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let root_node = parser.arena.get(root).expect("expected source file node");
-    let source_file = parser
-        .arena
-        .get_source_file(root_node)
-        .expect("expected source file data");
-    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut emitter = ClassES5Emitter::new(&parser.arena);
-    let output = emitter.emit_class(class_idx);
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
 
-    // Class should emit
+    let output = printer.get_output().to_string();
+
+    // Factory function should be present
     assert!(
-        output.contains("function CompositeIterator"),
-        "Expected CompositeIterator class: {}",
+        output.contains("createRepository"),
+        "Expected createRepository function: {}",
         output
     );
 
-    // All methods should be present
+    // Class name should be present
     assert!(
-        output.contains("iterateAll") && output.contains("firstBatch") && output.contains("secondBatch"),
-        "Expected all async generator methods: {}",
+        output.contains("Repository"),
+        "Expected Repository class: {}",
+        output
+    );
+
+    // Generic type parameter should be erased
+    assert!(
+        !output.contains("<T>"),
+        "Generic type parameter should be erased: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("save") && output.contains("findAll") && output.contains("count"),
+        "Expected save, findAll, and count methods: {}",
+        output
+    );
+
+    // Variable assignment should be present
+    assert!(
+        output.contains("UserRepo"),
+        "Expected UserRepo variable: {}",
         output
     );
 }
