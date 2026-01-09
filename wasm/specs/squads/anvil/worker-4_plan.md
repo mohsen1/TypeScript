@@ -54,6 +54,7 @@
 ### Checklist
 
 - [x] Re-ran conformance: `node wasm/differential-test/conformance-runner.mjs types/mapped --max=200 -v` (no crash; `recursiveMappedTypes.ts` still missing errors)
+- [x] Re-ran conformance (post-change): `node wasm/differential-test/conformance-runner.mjs types/mapped --max=200` (no crashes; metrics unchanged)
 - [x] Added mapped eval cache + guard in `thin_checker` mapped resolution
 - [x] Added regression test: `test_recursive_mapped_type_list_widget_guard`
 - [x] Tests: `./wasm/test.sh test_recursive_mapped_type_list_widget_guard` (PASS)
