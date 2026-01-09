@@ -44515,3 +44515,590 @@ const cacheManager = new CacheManager();
         output
     );
 }
+
+/// Test BigInt class property
+#[test]
+fn test_class_es5_bigint_class_property() {
+    let source = r#"
+class LargeCounter {
+    private count: bigint;
+    private maxValue: bigint;
+
+    constructor(initialCount: bigint = 0n) {
+        this.count = initialCount;
+        this.maxValue = 9007199254740991n;
+    }
+
+    getCount(): bigint {
+        return this.count;
+    }
+
+    increment(): void {
+        if (this.count < this.maxValue) {
+            this.count = this.count + 1n;
+        }
+    }
+
+    decrement(): void {
+        if (this.count > 0n) {
+            this.count = this.count - 1n;
+        }
+    }
+
+    reset(): void {
+        this.count = 0n;
+    }
+}
+
+class TransactionId {
+    private id: bigint;
+    private timestamp: bigint;
+
+    constructor(id: bigint) {
+        this.id = id;
+        this.timestamp = BigInt(Date.now());
+    }
+
+    getId(): bigint {
+        return this.id;
+    }
+
+    getTimestamp(): bigint {
+        return this.timestamp;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+    let output = printer.get_output().to_string();
+
+    // Should have ES5 class structure
+    assert!(
+        output.contains("LargeCounter") && output.contains("TransactionId"),
+        "Expected class names: {}",
+        output
+    );
+
+    // Should have BigInt literals
+    assert!(
+        output.contains("0n") || output.contains("BigInt"),
+        "Expected BigInt usage: {}",
+        output
+    );
+}
+
+/// Test BigInt arithmetic in methods
+#[test]
+fn test_class_es5_bigint_arithmetic_methods() {
+    let source = r#"
+class BigIntCalculator {
+    private precision: bigint;
+
+    constructor(precision: bigint = 10n) {
+        this.precision = precision;
+    }
+
+    add(a: bigint, b: bigint): bigint {
+        return a + b;
+    }
+
+    subtract(a: bigint, b: bigint): bigint {
+        return a - b;
+    }
+
+    multiply(a: bigint, b: bigint): bigint {
+        return a * b;
+    }
+
+    divide(a: bigint, b: bigint): bigint {
+        if (b === 0n) {
+            throw new Error('Division by zero');
+        }
+        return a / b;
+    }
+
+    modulo(a: bigint, b: bigint): bigint {
+        return a % b;
+    }
+
+    power(base: bigint, exponent: bigint): bigint {
+        return base ** exponent;
+    }
+
+    factorial(n: bigint): bigint {
+        if (n <= 1n) {
+            return 1n;
+        }
+        return n * this.factorial(n - 1n);
+    }
+}
+
+class FibonacciBigInt {
+    private cache: Map<bigint, bigint>;
+
+    constructor() {
+        this.cache = new Map();
+        this.cache.set(0n, 0n);
+        this.cache.set(1n, 1n);
+    }
+
+    calculate(n: bigint): bigint {
+        if (this.cache.has(n)) {
+            return this.cache.get(n)!;
+        }
+        const result = this.calculate(n - 1n) + this.calculate(n - 2n);
+        this.cache.set(n, result);
+        return result;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+    let output = printer.get_output().to_string();
+
+    // Should have ES5 class structure
+    assert!(
+        output.contains("BigIntCalculator") && output.contains("FibonacciBigInt"),
+        "Expected class names: {}",
+        output
+    );
+
+    // Should have arithmetic methods
+    assert!(
+        output.contains("add") && output.contains("multiply") && output.contains("factorial"),
+        "Expected arithmetic methods: {}",
+        output
+    );
+}
+
+/// Test BigInt comparison operations
+#[test]
+fn test_class_es5_bigint_comparison_operations() {
+    let source = r#"
+class BigIntRange {
+    private min: bigint;
+    private max: bigint;
+
+    constructor(min: bigint, max: bigint) {
+        this.min = min;
+        this.max = max;
+    }
+
+    contains(value: bigint): boolean {
+        return value >= this.min && value <= this.max;
+    }
+
+    isBelow(value: bigint): boolean {
+        return value < this.min;
+    }
+
+    isAbove(value: bigint): boolean {
+        return value > this.max;
+    }
+
+    equals(other: BigIntRange): boolean {
+        return this.min === other.min && this.max === other.max;
+    }
+
+    notEquals(other: BigIntRange): boolean {
+        return this.min !== other.min || this.max !== other.max;
+    }
+}
+
+class BigIntComparator {
+    compare(a: bigint, b: bigint): number {
+        if (a < b) return -1;
+        if (a > b) return 1;
+        return 0;
+    }
+
+    max(...values: bigint[]): bigint {
+        return values.reduce((max, val) => val > max ? val : max);
+    }
+
+    min(...values: bigint[]): bigint {
+        return values.reduce((min, val) => val < min ? val : min);
+    }
+
+    clamp(value: bigint, min: bigint, max: bigint): bigint {
+        if (value < min) return min;
+        if (value > max) return max;
+        return value;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+    let output = printer.get_output().to_string();
+
+    // Should have ES5 class structure
+    assert!(
+        output.contains("BigIntRange") && output.contains("BigIntComparator"),
+        "Expected class names: {}",
+        output
+    );
+
+    // Should have comparison methods
+    assert!(
+        output.contains("contains") && output.contains("compare") && output.contains("clamp"),
+        "Expected comparison methods: {}",
+        output
+    );
+}
+
+/// Test BigInt constructor parameter
+#[test]
+fn test_class_es5_bigint_constructor_parameter() {
+    let source = r#"
+class Account {
+    private readonly id: bigint;
+    private balance: bigint;
+    private readonly createdAt: bigint;
+
+    constructor(id: bigint, initialBalance: bigint = 0n) {
+        this.id = id;
+        this.balance = initialBalance;
+        this.createdAt = BigInt(Date.now());
+    }
+
+    getId(): bigint {
+        return this.id;
+    }
+
+    getBalance(): bigint {
+        return this.balance;
+    }
+
+    deposit(amount: bigint): void {
+        if (amount > 0n) {
+            this.balance = this.balance + amount;
+        }
+    }
+
+    withdraw(amount: bigint): boolean {
+        if (amount > 0n && amount <= this.balance) {
+            this.balance = this.balance - amount;
+            return true;
+        }
+        return false;
+    }
+}
+
+class BlockchainAddress {
+    private readonly address: bigint;
+    private readonly checksum: bigint;
+
+    constructor(address: bigint, checksum: bigint) {
+        this.address = address;
+        this.checksum = checksum;
+    }
+
+    getAddress(): bigint {
+        return this.address;
+    }
+
+    verify(): boolean {
+        return this.computeChecksum() === this.checksum;
+    }
+
+    private computeChecksum(): bigint {
+        return this.address % 256n;
+    }
+
+    toHex(): string {
+        return '0x' + this.address.toString(16);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+    let output = printer.get_output().to_string();
+
+    // Should have ES5 class structure
+    assert!(
+        output.contains("Account") && output.contains("BlockchainAddress"),
+        "Expected class names: {}",
+        output
+    );
+
+    // Should have methods with BigInt operations
+    assert!(
+        output.contains("deposit") && output.contains("withdraw") && output.contains("toHex"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+/// Test BigInt static field
+#[test]
+fn test_class_es5_bigint_static_field() {
+    let source = r#"
+class BigIntConstants {
+    static readonly MAX_SAFE_INTEGER: bigint = 9007199254740991n;
+    static readonly MIN_SAFE_INTEGER: bigint = -9007199254740991n;
+    static readonly ZERO: bigint = 0n;
+    static readonly ONE: bigint = 1n;
+    static readonly NEGATIVE_ONE: bigint = -1n;
+
+    static isPositive(value: bigint): boolean {
+        return value > BigIntConstants.ZERO;
+    }
+
+    static isNegative(value: bigint): boolean {
+        return value < BigIntConstants.ZERO;
+    }
+
+    static abs(value: bigint): bigint {
+        return value < BigIntConstants.ZERO ? -value : value;
+    }
+
+    static sign(value: bigint): bigint {
+        if (value > BigIntConstants.ZERO) return BigIntConstants.ONE;
+        if (value < BigIntConstants.ZERO) return BigIntConstants.NEGATIVE_ONE;
+        return BigIntConstants.ZERO;
+    }
+}
+
+class CryptoConstants {
+    static readonly MODULUS: bigint = 2n ** 256n - 1n;
+    static readonly GENERATOR: bigint = 2n;
+    static readonly ORDER: bigint = 2n ** 128n;
+
+    private value: bigint;
+
+    constructor(value: bigint) {
+        this.value = value % CryptoConstants.MODULUS;
+    }
+
+    getValue(): bigint {
+        return this.value;
+    }
+
+    modPow(exponent: bigint): bigint {
+        let result = 1n;
+        let base = this.value;
+        let exp = exponent;
+        while (exp > 0n) {
+            if (exp % 2n === 1n) {
+                result = (result * base) % CryptoConstants.MODULUS;
+            }
+            base = (base * base) % CryptoConstants.MODULUS;
+            exp = exp / 2n;
+        }
+        return result;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+    let output = printer.get_output().to_string();
+
+    // Should have ES5 class structure
+    assert!(
+        output.contains("BigIntConstants") && output.contains("CryptoConstants"),
+        "Expected class names: {}",
+        output
+    );
+
+    // Should have static methods
+    assert!(
+        output.contains("isPositive") && output.contains("abs") && output.contains("modPow"),
+        "Expected static methods: {}",
+        output
+    );
+}
+
+/// Test combined BigInt patterns
+#[test]
+fn test_class_es5_bigint_combined_patterns() {
+    let source = r#"
+interface Currency {
+    code: string;
+    decimals: number;
+}
+
+class Money {
+    private amount: bigint;
+    private currency: Currency;
+
+    constructor(amount: bigint, currency: Currency) {
+        this.amount = amount;
+        this.currency = currency;
+    }
+
+    static fromNumber(value: number, currency: Currency): Money {
+        const multiplier = 10n ** BigInt(currency.decimals);
+        const amount = BigInt(Math.round(value * Number(multiplier)));
+        return new Money(amount, currency);
+    }
+
+    getAmount(): bigint {
+        return this.amount;
+    }
+
+    getCurrency(): Currency {
+        return this.currency;
+    }
+
+    add(other: Money): Money {
+        this.ensureSameCurrency(other);
+        return new Money(this.amount + other.amount, this.currency);
+    }
+
+    subtract(other: Money): Money {
+        this.ensureSameCurrency(other);
+        return new Money(this.amount - other.amount, this.currency);
+    }
+
+    multiply(factor: bigint): Money {
+        return new Money(this.amount * factor, this.currency);
+    }
+
+    divide(divisor: bigint): Money {
+        return new Money(this.amount / divisor, this.currency);
+    }
+
+    isGreaterThan(other: Money): boolean {
+        this.ensureSameCurrency(other);
+        return this.amount > other.amount;
+    }
+
+    isLessThan(other: Money): boolean {
+        this.ensureSameCurrency(other);
+        return this.amount < other.amount;
+    }
+
+    equals(other: Money): boolean {
+        return this.amount === other.amount && this.currency.code === other.currency.code;
+    }
+
+    private ensureSameCurrency(other: Money): void {
+        if (this.currency.code !== other.currency.code) {
+            throw new Error('Currency mismatch');
+        }
+    }
+
+    toNumber(): number {
+        const multiplier = 10n ** BigInt(this.currency.decimals);
+        return Number(this.amount) / Number(multiplier);
+    }
+
+    toString(): string {
+        return `${this.toNumber().toFixed(this.currency.decimals)} ${this.currency.code}`;
+    }
+}
+
+class Ledger {
+    private entries: Map<bigint, Money>;
+    private nextId: bigint;
+
+    constructor() {
+        this.entries = new Map();
+        this.nextId = 1n;
+    }
+
+    addEntry(amount: Money): bigint {
+        const id = this.nextId++;
+        this.entries.set(id, amount);
+        return id;
+    }
+
+    getEntry(id: bigint): Money | undefined {
+        return this.entries.get(id);
+    }
+
+    getTotal(currency: Currency): Money {
+        let total = new Money(0n, currency);
+        for (const entry of this.entries.values()) {
+            if (entry.getCurrency().code === currency.code) {
+                total = total.add(entry);
+            }
+        }
+        return total;
+    }
+
+    getEntryCount(): bigint {
+        return BigInt(this.entries.size);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+    let output = printer.get_output().to_string();
+
+    // Should have ES5 class structure
+    assert!(
+        output.contains("Money") && output.contains("Ledger"),
+        "Expected class names: {}",
+        output
+    );
+
+    // Should have various methods
+    assert!(
+        output.contains("add") && output.contains("subtract") && output.contains("getTotal"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Interface should be stripped
+    assert!(
+        !output.contains("interface Currency"),
+        "Expected interface to be stripped: {}",
+        output
+    );
+
+    // Should have BigInt usage
+    assert!(
+        output.contains("0n") || output.contains("1n") || output.contains("BigInt"),
+        "Expected BigInt usage: {}",
+        output
+    );
+}
