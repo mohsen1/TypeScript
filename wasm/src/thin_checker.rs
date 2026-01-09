@@ -597,12 +597,24 @@ impl<'a> ThinCheckerState<'a> {
 
                 if has_type_args {
                     let is_builtin_array = name == "Array" || name == "ReadonlyArray";
+                    let is_builtin_utility_type = Self::is_builtin_utility_type(name);
                     if !is_builtin_array
+                        && !is_builtin_utility_type
                         && self.lookup_type_parameter(name).is_none()
                         && self.resolve_identifier_symbol(type_name_idx).is_none()
                     {
                         self.error_cannot_find_name_at(name, type_name_idx);
                         return TypeId::ERROR;
+                    }
+                    // For utility types without lib.d.ts, return a permissive type
+                    if is_builtin_utility_type && self.resolve_identifier_symbol(type_name_idx).is_none() {
+                        // Resolve type arguments first to catch errors in them
+                        if let Some(args) = &type_ref.type_arguments {
+                            for &arg_idx in &args.nodes {
+                                let _ = self.get_type_from_type_node(arg_idx);
+                            }
+                        }
+                        return TypeId::UNKNOWN;
                     }
                     if !is_builtin_array {
                         if let Some(sym_id) = self.resolve_identifier_symbol(type_name_idx) {
@@ -10608,6 +10620,39 @@ impl<'a> ThinCheckerState<'a> {
         self.check_interface_extension_compatibility(stmt_idx, &iface);
 
         self.pop_type_parameters(type_param_updates);
+    }
+
+    /// Check if a name is a built-in TypeScript utility type.
+    /// These are types like Partial<T>, Required<T>, etc. from lib.es5.d.ts.
+    /// When lib.d.ts is not loaded, we handle these specially to avoid false TS2304 errors.
+    fn is_builtin_utility_type(name: &str) -> bool {
+        matches!(name,
+            // Mapped utility types
+            "Partial" | "Required" | "Readonly" | "Pick" | "Omit" | "Record"
+            // Conditional utility types
+            | "Exclude" | "Extract" | "NonNullable"
+            // Function utility types
+            | "ReturnType" | "Parameters" | "ConstructorParameters" | "InstanceType"
+            // String manipulation types
+            | "Uppercase" | "Lowercase" | "Capitalize" | "Uncapitalize"
+            // Other utility types
+            | "ThisType" | "ThisParameterType" | "OmitThisParameter"
+            | "Awaited" | "NoInfer"
+            // Promise-related types (commonly used generics)
+            | "Promise" | "PromiseLike"
+            // Iterator types
+            | "Iterable" | "Iterator" | "IterableIterator" | "AsyncIterable" | "AsyncIterator" | "AsyncIterableIterator"
+            // Generator types
+            | "Generator" | "GeneratorFunction" | "AsyncGenerator" | "AsyncGeneratorFunction"
+            // Array-like types (already handled but including for completeness)
+            | "ArrayLike" | "Readonly" | "ReadonlyArray"
+            // Collection types
+            | "Map" | "Set" | "WeakMap" | "WeakSet" | "WeakRef"
+            // TypedArray types
+            | "TypedArray"
+            // Error types
+            | "Error" | "EvalError" | "RangeError" | "ReferenceError" | "SyntaxError" | "TypeError" | "URIError" | "AggregateError"
+        )
     }
 
     /// Check if a node has the `declare` modifier.
