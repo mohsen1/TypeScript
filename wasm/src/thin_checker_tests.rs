@@ -1958,6 +1958,33 @@ fn test_accessor_type_compatibility_2322() {
 }
 
 #[test]
+fn test_accessor_type_compatibility_typeof_structural() {
+    // Getter return type should be assignable to setter param type when using typeof.
+    use crate::thin_parser::ThinParserState;
+    let source = r#"
+var x: { foo: string; }
+class C {
+    get value() { return x; }
+    set value(v: typeof x) { }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count_2322 = codes.iter().filter(|&&code| code == 2322).count();
+    assert_eq!(count_2322, 0, "Did not expect TS2322 for typeof accessor compatibility, got: {:?}", codes);
+}
+
+#[test]
 fn test_abstract_class_through_type_alias_2511() {
     // Error 2511: Cannot create an instance of an abstract class - through type alias
     use crate::thin_parser::ThinParserState;

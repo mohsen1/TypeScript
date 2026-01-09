@@ -1143,7 +1143,17 @@ impl<'a> ThinCheckerState<'a> {
         let is_identifier = self.ctx.arena.get(type_query.expr_name)
             .and_then(|node| self.ctx.arena.get_identifier(node))
             .is_some();
+        let has_type_args = type_query.type_arguments
+            .as_ref()
+            .map_or(false, |args| !args.nodes.is_empty());
+
         let base = if let Some(sym_id) = self.resolve_value_symbol_for_lowering(type_query.expr_name) {
+            if !has_type_args {
+                let resolved = self.get_type_of_symbol(crate::binder::SymbolId(sym_id));
+                if resolved != TypeId::ANY && resolved != TypeId::ERROR {
+                    return resolved;
+                }
+            }
             self.ctx.types.intern(TypeKey::TypeQuery(SymbolRef(sym_id)))
         } else if self.resolve_type_symbol_for_lowering(type_query.expr_name).is_some() {
             let name = name_text.as_deref().unwrap_or("<unknown>");
@@ -9792,6 +9802,19 @@ impl<'a> ThinCheckerState<'a> {
                 self.check_type_for_parameter_properties(sig.type_annotation);
             }
         }
+        // Check property signatures for implicit any (error 7008)
+        else if node.kind == syntax_kind_ext::PROPERTY_SIGNATURE {
+            if let Some(sig) = self.ctx.arena.get_signature(node) {
+                // Property signature without type annotation implicitly has 'any' type
+                if sig.type_annotation.is_none() {
+                    if let Some(member_name) = self.get_property_name(sig.name) {
+                        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages, format_message};
+                        let message = format_message(diagnostic_messages::MEMBER_IMPLICIT_ANY, &[&member_name, "any"]);
+                        self.error_at_node(sig.name, &message, diagnostic_codes::IMPLICIT_ANY_MEMBER);
+                    }
+                }
+            }
+        }
         // Check accessors in type literals/interfaces - cannot have body (error 1183)
         else if node.kind == syntax_kind_ext::GET_ACCESSOR || node.kind == syntax_kind_ext::SET_ACCESSOR {
             if let Some(accessor) = self.ctx.arena.get_accessor(node) {
@@ -11511,6 +11534,17 @@ impl<'a> ThinCheckerState<'a> {
         // Check if initializer references properties declared after this one
         if !prop.initializer.is_none() && !self.has_static_modifier(&prop.modifiers) {
             self.check_property_initialization_order(member_idx, prop.initializer);
+        }
+
+        // Error 7008: Member implicitly has an 'any' type
+        // Report when property has no type annotation and no initializer (can't infer type)
+        if prop.type_annotation.is_none() && prop.initializer.is_none() {
+            // Get the property name for the error message
+            if let Some(member_name) = self.get_property_name(prop.name) {
+                use crate::checker::types::diagnostics::{diagnostic_messages, format_message};
+                let message = format_message(diagnostic_messages::MEMBER_IMPLICIT_ANY, &[&member_name, "any"]);
+                self.error_at_node(prop.name, &message, diagnostic_codes::IMPLICIT_ANY_MEMBER);
+            }
         }
     }
 

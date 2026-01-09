@@ -4,7 +4,7 @@
 Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transforms, cli, lsp).
 
 Status: Active
-Priority: 2
+Priority: 1
 
 ## Current Assignment
 Fix TS2403 false positives ("Subsequent variable declarations must have the same type") from `wasm/specs/squads/anvil/GOALS.md`.
@@ -17,7 +17,9 @@ Focus:
 5. Run conformance before/after and record exact match + extra errors here.
 
 ## Task Queue
-(empty - will receive new tasks from EM after completing current assignment)
+- Investigate TS2355 in async/arrow functions with conditional returns.
+- Check interactions with `never`/`void` return types and `@noImplicitReturns`.
+- Confirm no regression in existing TS2355 or return-path tests.
 
 ## Completed
 - [x] Added ES5 template literal type parity tests (basic, union, Uppercase/Lowercase, Capitalize/Uncapitalize, inference, combined) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` blocked by pre-existing errors in `solver/evaluate_tests.rs` (TemplateLiteralSpan not in scope).

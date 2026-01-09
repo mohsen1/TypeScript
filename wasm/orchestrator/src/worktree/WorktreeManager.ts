@@ -5,7 +5,7 @@
  * them to work on different branches without interference.
  */
 
-import { existsSync, mkdirSync, copyFileSync } from 'node:fs';
+import { existsSync, mkdirSync, copyFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { runCommand, runCommandStrict } from '../utils/index.js';
 import type { OrchestratorConfig, SquadName, WorktreeInfo, SquadConfig } from '../types.js';
@@ -280,6 +280,8 @@ export class WorktreeManager {
         const dst = join(roleDir, 'AGENTS.md');
         if (existsSync(src)) {
           copyFileSync(src, dst);
+          await this.markGeneratedAgentFile(emDir);
+          this.ensureWorktreeIgnores(emDir, ['.notify/*.notify']);
         }
       }
     }
@@ -295,10 +297,49 @@ export class WorktreeManager {
           const dst = join(roleDir, 'AGENTS.md');
           if (existsSync(src)) {
             copyFileSync(src, dst);
+            await this.markGeneratedAgentFile(workerDir);
+            this.ensureWorktreeIgnores(workerDir, ['.notify/*.notify']);
           }
         }
       }
     }
+  }
+
+  private async markGeneratedAgentFile(worktreeDir: string): Promise<void> {
+    const agentPath = join(worktreeDir, '.role', 'AGENTS.md');
+    if (!existsSync(agentPath)) {
+      return;
+    }
+    const result = await runCommand('git update-index --skip-worktree -- .role/AGENTS.md', {
+      cwd: worktreeDir,
+    });
+    if (result.exitCode !== 0) {
+      console.warn(
+        `Failed to mark .role/AGENTS.md skip-worktree in ${worktreeDir}: ${result.stderr || result.stdout}`
+      );
+    }
+  }
+
+  private ensureWorktreeIgnores(worktreeDir: string, patterns: string[]): void {
+    const infoDir = join(worktreeDir, '.git', 'info');
+    mkdirSync(infoDir, { recursive: true });
+    const excludePath = join(infoDir, 'exclude');
+    let existing = '';
+    if (existsSync(excludePath)) {
+      existing = readFileSync(excludePath, 'utf8');
+    }
+    const existingLines = new Set(
+      existing
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0)
+    );
+    const toAdd = patterns.filter((pattern) => !existingLines.has(pattern));
+    if (toAdd.length === 0) {
+      return;
+    }
+    const prefix = existing.length === 0 || existing.endsWith('\n') ? '' : '\n';
+    writeFileSync(excludePath, `${existing}${prefix}${toAdd.join('\n')}\n`, 'utf8');
   }
 
   /**
