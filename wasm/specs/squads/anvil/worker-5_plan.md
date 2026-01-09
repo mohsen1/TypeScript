@@ -13,6 +13,7 @@ Priority: 5
 - [ ] (empty)
 
 ## Completed
+- [x] Added 12 async do-while loop pattern tests (basic, with result, no await, body_contains_await, body_no_await, ignores nested async, with break, with continue, condition await, nested, try/catch, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (496 tests PASS).
 - [x] Added 12 async while loop pattern tests (basic, with result, no await, body_contains_await, body_no_await, ignores nested async, with break, with continue, condition await, nested, try/catch, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (484 tests PASS).
 - [x] Added 12 async for-of loop pattern tests (basic, with result, no await, body_contains_await, body_no_await, ignores nested async, with break, with continue, destructuring, nested, try/catch, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (472 tests PASS).
 - [x] Added 12 async class inheritance pattern tests (basic, super call, override, body_contains_await, body_no_await, ignores nested async, multiple super, try/catch, chain, static, property access, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (460 tests PASS).
