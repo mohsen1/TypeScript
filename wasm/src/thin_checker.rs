@@ -6347,6 +6347,36 @@ impl<'a> ThinCheckerState<'a> {
     /// 3. Instantiating the body with the provided type arguments
     /// 4. Recursively evaluating the result
     fn evaluate_application_type(&mut self, type_id: TypeId) -> TypeId {
+        use crate::solver::TypeKey;
+
+        let Some(TypeKey::Application(_)) = self.ctx.types.lookup(type_id) else {
+            return type_id;
+        };
+
+        if let Some(&cached) = self.ctx.application_eval_cache.get(&type_id) {
+            return cached;
+        }
+
+        if !self.ctx.application_eval_set.insert(type_id) {
+            // Recursion guard for self-referential mapped types.
+            return type_id;
+        }
+
+        if *self.ctx.instantiation_depth.borrow() >= MAX_INSTANTIATION_DEPTH {
+            self.ctx.application_eval_set.remove(&type_id);
+            return type_id;
+        }
+        *self.ctx.instantiation_depth.borrow_mut() += 1;
+
+        let result = self.evaluate_application_type_inner(type_id);
+
+        *self.ctx.instantiation_depth.borrow_mut() -= 1;
+        self.ctx.application_eval_set.remove(&type_id);
+        self.ctx.application_eval_cache.insert(type_id, result);
+        result
+    }
+
+    fn evaluate_application_type_inner(&mut self, type_id: TypeId) -> TypeId {
         use crate::solver::{TypeKey, SymbolRef, instantiate_type, TypeSubstitution};
         use crate::binder::SymbolId;
 
@@ -6393,12 +6423,33 @@ impl<'a> ThinCheckerState<'a> {
     /// This handles cases like `{ [K in keyof Ref(sym)]: Template }` where the Ref
     /// needs to be resolved to get concrete keys.
     fn evaluate_mapped_type_with_resolution(&mut self, type_id: TypeId) -> TypeId {
-        use crate::solver::{TypeKey, MappedType, SymbolRef, PropertyInfo, LiteralValue, instantiate_type, TypeSubstitution};
-        use crate::binder::SymbolId;
+        use crate::solver::TypeKey;
 
         let Some(TypeKey::Mapped(mapped_id)) = self.ctx.types.lookup(type_id) else {
             return type_id;
         };
+
+        if let Some(&cached) = self.ctx.mapped_eval_cache.get(&type_id) {
+            return cached;
+        }
+
+        if !self.ctx.mapped_eval_set.insert(type_id) {
+            return type_id;
+        }
+
+        let result = self.evaluate_mapped_type_with_resolution_inner(type_id, mapped_id);
+
+        self.ctx.mapped_eval_set.remove(&type_id);
+        self.ctx.mapped_eval_cache.insert(type_id, result);
+        result
+    }
+
+    fn evaluate_mapped_type_with_resolution_inner(
+        &mut self,
+        type_id: TypeId,
+        mapped_id: crate::solver::MappedTypeId,
+    ) -> TypeId {
+        use crate::solver::{TypeKey, PropertyInfo, LiteralValue, instantiate_type, TypeSubstitution};
 
         let mapped = self.ctx.types.mapped_type(mapped_id);
 

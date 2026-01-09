@@ -131,6 +131,18 @@ pub struct CheckerContext<'a> {
     /// Cached type environment for resolving Ref types during assignability checks.
     pub type_environment: RefCell<Option<TypeEnvironment>>,
 
+    /// Cache for evaluated application types to avoid repeated expansion.
+    pub application_eval_cache: FxHashMap<TypeId, TypeId>,
+
+    /// Recursion guard for application evaluation.
+    pub application_eval_set: FxHashSet<TypeId>,
+
+    /// Cache for evaluated mapped types with symbol resolution.
+    pub mapped_eval_cache: FxHashMap<TypeId, TypeId>,
+
+    /// Recursion guard for mapped type evaluation with resolution.
+    pub mapped_eval_set: FxHashSet<TypeId>,
+
     /// Symbol dependency graph (symbol -> referenced symbols).
     pub symbol_dependencies: FxHashMap<SymbolId, FxHashSet<SymbolId>>,
 
@@ -216,6 +228,10 @@ impl<'a> CheckerContext<'a> {
             type_parameter_names: FxHashMap::default(),
             relation_cache: RefCell::new(FxHashMap::default()),
             type_environment: RefCell::new(None),
+            application_eval_cache: FxHashMap::default(),
+            application_eval_set: FxHashSet::default(),
+            mapped_eval_cache: FxHashMap::default(),
+            mapped_eval_set: FxHashSet::default(),
             symbol_dependencies: FxHashMap::default(),
             symbol_dependency_stack: Vec::new(),
             diagnostics: Vec::new(),
@@ -256,6 +272,10 @@ impl<'a> CheckerContext<'a> {
             type_parameter_names: cache.type_parameter_names,
             relation_cache: RefCell::new(cache.relation_cache),
             type_environment: RefCell::new(None),
+            application_eval_cache: FxHashMap::default(),
+            application_eval_set: FxHashSet::default(),
+            mapped_eval_cache: FxHashMap::default(),
+            mapped_eval_set: FxHashSet::default(),
             symbol_dependencies: cache.symbol_dependencies,
             symbol_dependency_stack: Vec::new(),
             diagnostics: Vec::new(),
