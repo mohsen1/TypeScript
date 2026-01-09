@@ -4805,6 +4805,51 @@ impl<'a> ThinCheckerState<'a> {
                 }
             }
             Some(TypeKey::Function(_)) => Some(constructor_type),
+            Some(TypeKey::Intersection(members)) => {
+                // For intersection of constructors (mixins), collect construct signatures
+                // and create intersection of return types
+                let members = self.ctx.types.type_list(members);
+                let mut all_construct_sigs = Vec::new();
+                let mut return_types = Vec::new();
+
+                for &member in members.iter() {
+                    if let Some(TypeKey::Callable(shape_id)) = self.ctx.types.lookup(member) {
+                        let shape = self.ctx.types.callable_shape(shape_id);
+                        for sig in &shape.construct_signatures {
+                            all_construct_sigs.push(sig.clone());
+                            return_types.push(sig.return_type);
+                        }
+                    }
+                }
+
+                if all_construct_sigs.is_empty() {
+                    None
+                } else {
+                    // Create new construct signatures with intersected return types
+                    let intersected_return = if return_types.len() == 1 {
+                        return_types[0]
+                    } else {
+                        self.ctx.types.intersection(return_types)
+                    };
+
+                    // Use the first signature's parameters (simplified approach)
+                    // A more complete implementation would merge parameters
+                    let first_sig = &all_construct_sigs[0];
+                    let combined_sig = crate::solver::CallSignature {
+                        type_params: first_sig.type_params.clone(),
+                        params: first_sig.params.clone(),
+                        this_type: first_sig.this_type,
+                        return_type: intersected_return,
+                        type_predicate: None,
+                    };
+
+                    Some(self.ctx.types.callable(CallableShape {
+                        call_signatures: vec![combined_sig],
+                        construct_signatures: Vec::new(),
+                        properties: Vec::new(),
+                    }))
+                }
+            }
             _ => None,
         };
 

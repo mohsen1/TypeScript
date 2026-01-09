@@ -13011,3 +13011,107 @@ let x: keyof Obj = "c";  // Should error - "c" is not in "a" | "b"
     // For now, let's just check the error exists
     eprintln!("Error message: {}", error_msg);
 }
+
+#[test]
+fn test_mixin_intersection_new() {
+    // Tests that new on intersection of constructors returns intersection of instance types
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+declare class C1 {
+    a: number;
+}
+
+declare class M1 {
+    p: number;
+}
+
+declare const Mixed1: typeof M1 & typeof C1;
+
+let x1 = new Mixed1();
+x1.a;  // Should work - from C1
+x1.p;  // Should work - from M1
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Debug: print all diagnostics
+    eprintln!("=== Diagnostics for mixin intersection ===");
+    for d in &checker.ctx.diagnostics {
+        eprintln!("  code={}, msg={}", d.code, d.message_text);
+    }
+
+    // Should NOT have TS2339 errors for properties a and p
+    let ts2339_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2339)
+        .collect();
+
+    assert!(ts2339_errors.is_empty(),
+        "Should not have TS2339 errors for mixin properties, got: {:?}",
+        ts2339_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>());
+}
+
+#[test]
+fn test_mixin_intersection_with_constructors() {
+    // Tests that new on intersection with multiple constructor overloads works
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+declare class C1 {
+    public a: number;
+    protected b: number;
+    private c: number;
+    constructor(s: string);
+    constructor(n: number);
+}
+
+declare class M1 {
+    constructor(...args: any[]);
+    p: number;
+    static p: number;
+}
+
+declare const Mixed1: typeof M1 & typeof C1;
+
+function f1() {
+    let x1 = new Mixed1("hello");
+    x1.a;  // Should work - from C1
+    x1.p;  // Should work - from M1
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Debug: print all diagnostics
+    eprintln!("=== Diagnostics for mixin with constructors ===");
+    for d in &checker.ctx.diagnostics {
+        eprintln!("  code={}, msg={}", d.code, d.message_text);
+    }
+
+    // Should NOT have TS2339 errors for properties a and p
+    let ts2339_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2339)
+        .collect();
+
+    assert!(ts2339_errors.is_empty(),
+        "Should not have TS2339 errors for mixin properties, got: {:?}",
+        ts2339_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>());
+}
