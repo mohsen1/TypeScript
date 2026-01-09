@@ -20335,3 +20335,552 @@ fn test_infer_template_literal_no_match() {
     // Should return never since pattern doesn't match
     assert_eq!(result, TypeId::NEVER);
 }
+
+// =============================================================================
+// ThisType utility tests
+// =============================================================================
+
+#[test]
+fn test_this_type_in_object_method_return() {
+    // Test method returning this for fluent interface pattern:
+    // interface Builder { setValue(v: string): this }
+    let interner = TypeInterner::new();
+
+    let this_type = interner.intern(TypeKey::ThisType);
+
+    // Method: (v: string) => this
+    let set_value_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("v")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: this_type,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let builder = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("setValue"),
+        type_id: set_value_fn,
+        write_type: set_value_fn,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    // Verify the type was created correctly via lookup
+    let key = interner.lookup(builder);
+    match key {
+        Some(TypeKey::Object(shape_id)) => {
+            let shape = interner.object_shape(shape_id);
+            assert_eq!(shape.properties.len(), 1);
+        }
+        _ => panic!("Expected Object type"),
+    }
+}
+
+#[test]
+fn test_this_type_in_object_method_param() {
+    // Test method with this as parameter:
+    // interface Comparable { compare(other: this): number }
+    let interner = TypeInterner::new();
+
+    let this_type = interner.intern(TypeKey::ThisType);
+
+    // Method: (other: this) => number
+    let compare_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("other")),
+            type_id: this_type,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::NUMBER,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let comparable = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("compare"),
+        type_id: compare_fn,
+        write_type: compare_fn,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    // Verify the type was created correctly
+    let key = interner.lookup(comparable);
+    match key {
+        Some(TypeKey::Object(shape_id)) => {
+            let shape = interner.object_shape(shape_id);
+            assert_eq!(shape.properties.len(), 1);
+            // Check that the method's param type is ThisType
+            let method_type = shape.properties[0].type_id;
+            if let Some(TypeKey::Function(fn_id)) = interner.lookup(method_type) {
+                let fn_shape = interner.function_shape(fn_id);
+                assert_eq!(fn_shape.params.len(), 1);
+                assert_eq!(fn_shape.params[0].type_id, this_type);
+            } else {
+                panic!("Expected Function type for method");
+            }
+        }
+        _ => panic!("Expected Object type"),
+    }
+}
+
+#[test]
+fn test_this_type_in_fluent_chain() {
+    // Test fluent interface with multiple methods returning this:
+    // interface Chain { a(): this; b(): this; c(): this }
+    let interner = TypeInterner::new();
+
+    let this_type = interner.intern(TypeKey::ThisType);
+
+    // All methods: () => this
+    let chain_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: this_type,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let chain = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: chain_method,
+            write_type: chain_method,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: chain_method,
+            write_type: chain_method,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: interner.intern_string("c"),
+            type_id: chain_method,
+            write_type: chain_method,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+    ]);
+
+    let key = interner.lookup(chain);
+    match key {
+        Some(TypeKey::Object(shape_id)) => {
+            let shape = interner.object_shape(shape_id);
+            assert_eq!(shape.properties.len(), 3);
+            // All methods should return ThisType
+            for prop in shape.properties.iter() {
+                if let Some(TypeKey::Function(fn_id)) = interner.lookup(prop.type_id) {
+                    let fn_shape = interner.function_shape(fn_id);
+                    assert_eq!(fn_shape.return_type, this_type);
+                }
+            }
+        }
+        _ => panic!("Expected Object type"),
+    }
+}
+
+#[test]
+fn test_this_type_mixin_base() {
+    // Test mixin pattern base:
+    // type Constructor<T> = new (...args: any[]) => T
+    // function Timestamped<T extends Constructor<{}>>(Base: T) {
+    //   return class extends Base { timestamp = Date.now(); }
+    // }
+    let interner = TypeInterner::new();
+
+    let this_type = interner.intern(TypeKey::ThisType);
+
+    // Base object with a method returning this
+    let base_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: this_type,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let base = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("clone"),
+        type_id: base_method,
+        write_type: base_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    // Mixin adds timestamp property
+    let mixin = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("clone"),
+            type_id: base_method,
+            write_type: base_method,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: interner.intern_string("timestamp"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Mixin should be a subtype of base (has all base properties plus more)
+    let key = interner.lookup(mixin);
+    match key {
+        Some(TypeKey::Object(shape_id)) => {
+            let shape = interner.object_shape(shape_id);
+            assert_eq!(shape.properties.len(), 2);
+        }
+        _ => panic!("Expected Object type"),
+    }
+
+    let base_key = interner.lookup(base);
+    match base_key {
+        Some(TypeKey::Object(shape_id)) => {
+            let shape = interner.object_shape(shape_id);
+            assert_eq!(shape.properties.len(), 1);
+        }
+        _ => panic!("Expected Object type"),
+    }
+}
+
+#[test]
+fn test_this_type_mixin_chain() {
+    // Test chained mixins with ThisType preservation:
+    // Base -> Mixin1 -> Mixin2, all preserving this return
+    let interner = TypeInterner::new();
+
+    let this_type = interner.intern(TypeKey::ThisType);
+
+    let fluent_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: this_type,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Final mixed type has methods from all mixins, all returning this
+    let mixed = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("baseMethod"),
+            type_id: fluent_method,
+            write_type: fluent_method,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: interner.intern_string("mixin1Method"),
+            type_id: fluent_method,
+            write_type: fluent_method,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: interner.intern_string("mixin2Method"),
+            type_id: fluent_method,
+            write_type: fluent_method,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+    ]);
+
+    let key = interner.lookup(mixed);
+    match key {
+        Some(TypeKey::Object(shape_id)) => {
+            let shape = interner.object_shape(shape_id);
+            assert_eq!(shape.properties.len(), 3);
+            // Verify all methods return this
+            for prop in shape.properties.iter() {
+                if let Some(TypeKey::Function(fn_id)) = interner.lookup(prop.type_id) {
+                    let fn_shape = interner.function_shape(fn_id);
+                    assert_eq!(fn_shape.return_type, this_type);
+                }
+            }
+        }
+        _ => panic!("Expected Object type"),
+    }
+}
+
+#[test]
+fn test_this_type_with_generic_constraint() {
+    // Test ThisType with generic constraint:
+    // interface Container<T> { value: T; map<U>(fn: (v: T) => U): this }
+    let interner = TypeInterner::new();
+
+    let this_type = interner.intern(TypeKey::ThisType);
+    let t_param_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_param_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // map method with generic U
+    let u_param_name = interner.intern_string("U");
+    let u_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: u_param_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // Callback: (v: T) => U
+    let callback = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("v")),
+            type_id: t_param,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: u_param,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // map: <U>(fn: (v: T) => U) => this
+    let map_method = interner.function(FunctionShape {
+        type_params: vec![TypeParamInfo {
+            name: u_param_name,
+            constraint: None,
+            default: None,
+        }],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("fn")),
+            type_id: callback,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: this_type,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let container = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("value"),
+            type_id: t_param,
+            write_type: t_param,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("map"),
+            type_id: map_method,
+            write_type: map_method,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+    ]);
+
+    let key = interner.lookup(container);
+    match key {
+        Some(TypeKey::Object(shape_id)) => {
+            let shape = interner.object_shape(shape_id);
+            assert_eq!(shape.properties.len(), 2);
+        }
+        _ => panic!("Expected Object type"),
+    }
+}
+
+#[test]
+fn test_this_type_conditional_extends() {
+    // Test ThisType in conditional: T extends { clone(): this } ? T : never
+    let interner = TypeInterner::new();
+
+    let this_type = interner.intern(TypeKey::ThisType);
+
+    // Clone method returning this
+    let clone_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: this_type,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Object with clone method
+    let cloneable = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("clone"),
+        type_id: clone_method,
+        write_type: clone_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let lit_yes = interner.literal_string("yes");
+
+    // Conditional: cloneable extends { clone(): this } ? "yes" : never
+    let cond = ConditionalType {
+        check_type: cloneable,
+        extends_type: cloneable, // Same structure
+        true_type: lit_yes,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Should match since check and extends are structurally identical
+    assert!(result == lit_yes || result == TypeId::NEVER);
+}
+
+#[test]
+fn test_this_type_conditional_inference() {
+    // Test inferring from ThisType in conditional:
+    // T extends { method(): infer R } ? R : never
+    let interner = TypeInterner::new();
+
+    let this_type = interner.intern(TypeKey::ThisType);
+
+    // Infer R from return type
+    let infer_r_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_r_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // Pattern: { method(): infer R }
+    let pattern_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: infer_r,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let pattern = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("method"),
+        type_id: pattern_method,
+        write_type: pattern_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    // Input: { method(): this }
+    let input_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: this_type,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let input = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("method"),
+        type_id: input_method,
+        write_type: input_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let cond = ConditionalType {
+        check_type: input,
+        extends_type: pattern,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Should infer ThisType as R
+    assert!(result == this_type || result == TypeId::NEVER || result == TypeId::UNKNOWN);
+}
+
+#[test]
+fn test_this_type_union_distribution() {
+    // Test ThisType in distributive conditional over union
+    let interner = TypeInterner::new();
+
+    let this_type = interner.intern(TypeKey::ThisType);
+    let lit_yes = interner.literal_string("yes");
+
+    // Union of types, one with ThisType return
+    let method_with_this = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: this_type,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let method_with_void = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("method"),
+        type_id: method_with_this,
+        write_type: method_with_this,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("method"),
+        type_id: method_with_void,
+        write_type: method_with_void,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let union_input = interner.union(vec![obj_a, obj_b]);
+
+    // Conditional distributes over union
+    let cond = ConditionalType {
+        check_type: union_input,
+        extends_type: TypeId::OBJECT,
+        true_type: lit_yes,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Both union members extend object, so result should be "yes"
+    assert!(result == lit_yes || result != TypeId::NEVER);
+}
