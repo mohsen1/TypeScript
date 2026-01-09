@@ -7,12 +7,16 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- [ ] Add async getter/setter tests in `wasm/src/transforms/async_es5_tests.rs`. Run `./wasm/test.sh async_es5_tests`.
+- [ ] Add async ES5 tests for async class inheritance patterns (super method calls, overrides) in `wasm/src/transforms/async_es5_tests.rs`. Run `./wasm/test.sh async_es5_tests`.
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added 12 async error propagation pattern tests (basic, rethrow, wrap, body_contains_await, body_no_await, ignores nested async, finally, await in catch, nested try, custom error, multiple catch, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (448 tests PASS).
+- [x] Added 12 async generator delegation pattern tests (basic, with await, no await, multiple, body_contains_await, body_no_await, ignores nested async, for-await-of, try/catch, mixed yield, await after, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (436 tests PASS).
+- [x] Added 12 async static method tests (with await, no await, factory, body_contains_await, body_no_await, ignores nested async, with params, try/catch, singleton, class access, multiple awaits, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (424 tests PASS).
+- [x] Added 12 async getter/setter tests (basic, with await, no await, both, body_contains_await, body_no_await, ignores nested async, static, try/catch, computed, private, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (412 tests PASS).
 - [x] Added 12 async class method tests (private, with this, multiple returns, body_contains_await, body_no_await, ignores nested async, with super, generic, with finally, static, while loop, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (400 tests PASS).
 - [x] Added 12 async method decorator tests (basic, with await, no await, chained, body_contains_await, body_no_await, ignores nested async, with params, try/catch, static, factory, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (388 tests PASS).
 - [x] Added 12 async function expression tests (basic, with await, no await, named, body_contains_await, body_no_await, ignores nested await, with params, try/catch, in callback, iife, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (376 tests PASS).

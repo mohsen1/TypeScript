@@ -7,12 +7,14 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] Add function declaration ES5 source map tests in `wasm/src/source_map_tests.rs`. Run `./wasm/test.sh source_map`.
+- [ ] Add interface/type alias ES5 source map tests (type erasure, complex types, generic types) in `wasm/src/source_map_tests.rs`. Run `./wasm/test.sh source_map`.
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added class declaration ES5 source map tests (basic class, with methods, static members, getters/setters, inheritance, constructor parameter properties, class expressions, generic, abstract, combined); `./wasm/test.sh source_map` passes.
+- [x] Added function declaration ES5 source map tests (basic, with parameters, default parameters, rest parameters, nested, generator, async, destructuring params, generic, combined); `./wasm/test.sh source_map` passes.
 - [x] Added variable declaration ES5 source map tests (var basic, let/const, multiple declarators, with types, object destructuring, array destructuring, in function, in for loop, complex initializers, combined); `./wasm/test.sh source_map` passes.
 - [x] Added expression statement ES5 source map tests (function call, assignment, increment/decrement, method call, compound assignment, ternary, logical, new, delete/void/typeof, combined); `./wasm/test.sh source_map` passes.
 - [x] Added break/continue statement ES5 source map tests (break basic, continue basic, break while, continue while, break labeled, continue labeled, break switch, break do-while, combined); `./wasm/test.sh source_map` passes.
