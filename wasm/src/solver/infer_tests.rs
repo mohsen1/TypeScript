@@ -17106,3 +17106,936 @@ fn test_awaited_bigint_type() {
         panic!("Expected promise type");
     }
 }
+
+// =============================================================================
+// PARTIAL AND REQUIRED TYPE TESTS
+// =============================================================================
+// Tests for Partial<T> and Required<T> utility types
+
+// -----------------------------------------------------------------------------
+// Basic Partial<T> Tests
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_partial_single_property() {
+    // Partial<{ name: string }> = { name?: string }
+    let interner = TypeInterner::new();
+
+    let name = interner.intern_string("name");
+
+    // Original: { name: string }
+    let original = interner.object(vec![PropertyInfo {
+        name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Partial: { name?: string }
+    let partial = interner.object(vec![PropertyInfo {
+        name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(original) {
+        assert!(!props[0].optional);
+    }
+    if let Some(TypeKey::Object(props)) = interner.lookup(partial) {
+        assert!(props[0].optional);
+    }
+}
+
+#[test]
+fn test_partial_multiple_properties() {
+    // Partial<{ a: string, b: number }> = { a?: string, b?: number }
+    let interner = TypeInterner::new();
+
+    let a = interner.intern_string("a");
+    let b = interner.intern_string("b");
+
+    let partial = interner.object(vec![
+        PropertyInfo {
+            name: a,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: true,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: true,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(partial) {
+        assert_eq!(props.len(), 2);
+        assert!(props[0].optional);
+        assert!(props[1].optional);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_partial_already_optional() {
+    // Partial<{ a?: string }> = { a?: string } (already optional stays optional)
+    let interner = TypeInterner::new();
+
+    let a = interner.intern_string("a");
+
+    let partial = interner.object(vec![PropertyInfo {
+        name: a,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(partial) {
+        assert!(props[0].optional);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_partial_preserves_readonly() {
+    // Partial<{ readonly a: string }> = { readonly a?: string }
+    let interner = TypeInterner::new();
+
+    let a = interner.intern_string("a");
+
+    let partial = interner.object(vec![PropertyInfo {
+        name: a,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: true,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(partial) {
+        assert!(props[0].optional);
+        assert!(props[0].readonly);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_partial_empty_object() {
+    // Partial<{}> = {}
+    let interner = TypeInterner::new();
+
+    let empty = interner.object(vec![]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(empty) {
+        assert_eq!(props.len(), 0);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_partial_with_methods() {
+    // Partial<{ m(): void }> = { m?(): void }
+    let interner = TypeInterner::new();
+
+    let m = interner.intern_string("m");
+    let void_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        this_param: None,
+        params: vec![],
+        rest_param: None,
+        return_type: TypeId::VOID,
+    });
+
+    let partial = interner.object(vec![PropertyInfo {
+        name: m,
+        type_id: void_fn,
+        write_type: void_fn,
+        optional: true,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(partial) {
+        assert!(props[0].optional);
+        assert!(props[0].is_method);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_partial_nested_object() {
+    // Partial<{ nested: { a: string } }> = { nested?: { a: string } }
+    let interner = TypeInterner::new();
+
+    let nested = interner.intern_string("nested");
+    let a = interner.intern_string("a");
+
+    let inner = interner.object(vec![PropertyInfo {
+        name: a,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let partial = interner.object(vec![PropertyInfo {
+        name: nested,
+        type_id: inner,
+        write_type: inner,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(partial) {
+        assert!(props[0].optional);
+        assert_eq!(props[0].type_id, inner);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_partial_with_union_property() {
+    // Partial<{ a: string | number }> = { a?: string | number }
+    let interner = TypeInterner::new();
+
+    let a = interner.intern_string("a");
+    let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    let partial = interner.object(vec![PropertyInfo {
+        name: a,
+        type_id: union,
+        write_type: union,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(partial) {
+        assert!(props[0].optional);
+        assert_eq!(props[0].type_id, union);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Basic Required<T> Tests
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_required_single_property() {
+    // Required<{ name?: string }> = { name: string }
+    let interner = TypeInterner::new();
+
+    let name = interner.intern_string("name");
+
+    // Original: { name?: string }
+    let original = interner.object(vec![PropertyInfo {
+        name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Required: { name: string }
+    let required = interner.object(vec![PropertyInfo {
+        name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(original) {
+        assert!(props[0].optional);
+    }
+    if let Some(TypeKey::Object(props)) = interner.lookup(required) {
+        assert!(!props[0].optional);
+    }
+}
+
+#[test]
+fn test_required_multiple_properties() {
+    // Required<{ a?: string, b?: number }> = { a: string, b: number }
+    let interner = TypeInterner::new();
+
+    let a = interner.intern_string("a");
+    let b = interner.intern_string("b");
+
+    let required = interner.object(vec![
+        PropertyInfo {
+            name: a,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(required) {
+        assert_eq!(props.len(), 2);
+        assert!(!props[0].optional);
+        assert!(!props[1].optional);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_required_already_required() {
+    // Required<{ a: string }> = { a: string } (already required stays required)
+    let interner = TypeInterner::new();
+
+    let a = interner.intern_string("a");
+
+    let required = interner.object(vec![PropertyInfo {
+        name: a,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(required) {
+        assert!(!props[0].optional);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_required_preserves_readonly() {
+    // Required<{ readonly a?: string }> = { readonly a: string }
+    let interner = TypeInterner::new();
+
+    let a = interner.intern_string("a");
+
+    let required = interner.object(vec![PropertyInfo {
+        name: a,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(required) {
+        assert!(!props[0].optional);
+        assert!(props[0].readonly);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_required_with_methods() {
+    // Required<{ m?(): void }> = { m(): void }
+    let interner = TypeInterner::new();
+
+    let m = interner.intern_string("m");
+    let void_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        this_param: None,
+        params: vec![],
+        rest_param: None,
+        return_type: TypeId::VOID,
+    });
+
+    let required = interner.object(vec![PropertyInfo {
+        name: m,
+        type_id: void_fn,
+        write_type: void_fn,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(required) {
+        assert!(!props[0].optional);
+        assert!(props[0].is_method);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Mixed Partial/Required Tests
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_partial_of_required() {
+    // Partial<Required<{ a?: string }>> = { a?: string }
+    let interner = TypeInterner::new();
+
+    let a = interner.intern_string("a");
+
+    // After Required then Partial: { a?: string }
+    let result = interner.object(vec![PropertyInfo {
+        name: a,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(result) {
+        assert!(props[0].optional);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_required_of_partial() {
+    // Required<Partial<{ a: string }>> = { a: string }
+    let interner = TypeInterner::new();
+
+    let a = interner.intern_string("a");
+
+    // After Partial then Required: { a: string }
+    let result = interner.object(vec![PropertyInfo {
+        name: a,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(result) {
+        assert!(!props[0].optional);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_partial_mixed_optional_required() {
+    // Partial<{ a: string, b?: number }> = { a?: string, b?: number }
+    let interner = TypeInterner::new();
+
+    let a = interner.intern_string("a");
+    let b = interner.intern_string("b");
+
+    let partial = interner.object(vec![
+        PropertyInfo {
+            name: a,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: true,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: true,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(partial) {
+        assert!(props[0].optional);
+        assert!(props[1].optional);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_required_mixed_optional_required() {
+    // Required<{ a: string, b?: number }> = { a: string, b: number }
+    let interner = TypeInterner::new();
+
+    let a = interner.intern_string("a");
+    let b = interner.intern_string("b");
+
+    let required = interner.object(vec![
+        PropertyInfo {
+            name: a,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(required) {
+        assert!(!props[0].optional);
+        assert!(!props[1].optional);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Generic Partial/Required Tests
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_partial_generic_inference() {
+    // function partial<T>(obj: T): Partial<T>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    ctx.add_lower_bound(var_t, obj);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, obj);
+}
+
+#[test]
+fn test_required_generic_inference() {
+    // function required<T>(obj: T): Required<T>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    ctx.add_lower_bound(var_t, obj);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, obj);
+}
+
+// -----------------------------------------------------------------------------
+// Complex Property Types
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_partial_array_property() {
+    // Partial<{ items: string[] }> = { items?: string[] }
+    let interner = TypeInterner::new();
+
+    let items = interner.intern_string("items");
+    let string_array = interner.array(TypeId::STRING);
+
+    let partial = interner.object(vec![PropertyInfo {
+        name: items,
+        type_id: string_array,
+        write_type: string_array,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(partial) {
+        assert!(props[0].optional);
+        assert_eq!(props[0].type_id, string_array);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_partial_tuple_property() {
+    // Partial<{ coords: [number, number] }> = { coords?: [number, number] }
+    let interner = TypeInterner::new();
+
+    let coords = interner.intern_string("coords");
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+
+    let partial = interner.object(vec![PropertyInfo {
+        name: coords,
+        type_id: tuple,
+        write_type: tuple,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(partial) {
+        assert!(props[0].optional);
+        assert_eq!(props[0].type_id, tuple);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_partial_function_property() {
+    // Partial<{ handler: (x: string) => void }> = { handler?: ... }
+    let interner = TypeInterner::new();
+
+    let handler = interner.intern_string("handler");
+    let x = interner.intern_string("x");
+
+    let fn_type = interner.function(FunctionShape {
+        type_params: vec![],
+        this_param: None,
+        params: vec![ParamInfo {
+            name: x,
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        rest_param: None,
+        return_type: TypeId::VOID,
+    });
+
+    let partial = interner.object(vec![PropertyInfo {
+        name: handler,
+        type_id: fn_type,
+        write_type: fn_type,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(partial) {
+        assert!(props[0].optional);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_partial_promise_property() {
+    // Partial<{ result: Promise<string> }> = { result?: Promise<string> }
+    let interner = TypeInterner::new();
+
+    let result_name = interner.intern_string("result");
+    let promise_string = interner.promise(TypeId::STRING);
+
+    let partial = interner.object(vec![PropertyInfo {
+        name: result_name,
+        type_id: promise_string,
+        write_type: promise_string,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(partial) {
+        assert!(props[0].optional);
+        assert_eq!(props[0].type_id, promise_string);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_partial_literal_property() {
+    // Partial<{ status: "active" }> = { status?: "active" }
+    let interner = TypeInterner::new();
+
+    let status = interner.intern_string("status");
+    let active = interner.literal_string("active");
+
+    let partial = interner.object(vec![PropertyInfo {
+        name: status,
+        type_id: active,
+        write_type: active,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(partial) {
+        assert!(props[0].optional);
+        assert_eq!(props[0].type_id, active);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_partial_intersection_property() {
+    // Partial<{ data: A & B }> = { data?: A & B }
+    let interner = TypeInterner::new();
+
+    let data = interner.intern_string("data");
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![obj_a, obj_b]);
+
+    let partial = interner.object(vec![PropertyInfo {
+        name: data,
+        type_id: intersection,
+        write_type: intersection,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(partial) {
+        assert!(props[0].optional);
+        assert_eq!(props[0].type_id, intersection);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Large Object Tests
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_partial_many_properties() {
+    // Partial<{ a, b, c, d, e, f, g, h, i, j }> - all optional
+    let interner = TypeInterner::new();
+
+    let props: Vec<PropertyInfo> = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"]
+        .iter()
+        .map(|name| PropertyInfo {
+            name: interner.intern_string(name),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: true,
+            readonly: false,
+            is_method: false,
+        })
+        .collect();
+
+    let partial = interner.object(props);
+
+    if let Some(TypeKey::Object(properties)) = interner.lookup(partial) {
+        assert_eq!(properties.len(), 10);
+        for prop in properties.iter() {
+            assert!(prop.optional);
+        }
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_required_many_properties() {
+    // Required<{ a?, b?, c?, d?, e?, f?, g?, h?, i?, j? }> - all required
+    let interner = TypeInterner::new();
+
+    let props: Vec<PropertyInfo> = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"]
+        .iter()
+        .map(|name| PropertyInfo {
+            name: interner.intern_string(name),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        })
+        .collect();
+
+    let required = interner.object(props);
+
+    if let Some(TypeKey::Object(properties)) = interner.lookup(required) {
+        assert_eq!(properties.len(), 10);
+        for prop in properties.iter() {
+            assert!(!prop.optional);
+        }
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Special Type Properties
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_partial_any_property() {
+    // Partial<{ data: any }> = { data?: any }
+    let interner = TypeInterner::new();
+
+    let data = interner.intern_string("data");
+
+    let partial = interner.object(vec![PropertyInfo {
+        name: data,
+        type_id: TypeId::ANY,
+        write_type: TypeId::ANY,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(partial) {
+        assert!(props[0].optional);
+        assert_eq!(props[0].type_id, TypeId::ANY);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_partial_unknown_property() {
+    // Partial<{ data: unknown }> = { data?: unknown }
+    let interner = TypeInterner::new();
+
+    let data = interner.intern_string("data");
+
+    let partial = interner.object(vec![PropertyInfo {
+        name: data,
+        type_id: TypeId::UNKNOWN,
+        write_type: TypeId::UNKNOWN,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(partial) {
+        assert!(props[0].optional);
+        assert_eq!(props[0].type_id, TypeId::UNKNOWN);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_partial_never_property() {
+    // Partial<{ impossible: never }> = { impossible?: never }
+    let interner = TypeInterner::new();
+
+    let impossible = interner.intern_string("impossible");
+
+    let partial = interner.object(vec![PropertyInfo {
+        name: impossible,
+        type_id: TypeId::NEVER,
+        write_type: TypeId::NEVER,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(partial) {
+        assert!(props[0].optional);
+        assert_eq!(props[0].type_id, TypeId::NEVER);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_partial_void_property() {
+    // Partial<{ callback: void }> = { callback?: void }
+    let interner = TypeInterner::new();
+
+    let callback = interner.intern_string("callback");
+
+    let partial = interner.object(vec![PropertyInfo {
+        name: callback,
+        type_id: TypeId::VOID,
+        write_type: TypeId::VOID,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(partial) {
+        assert!(props[0].optional);
+        assert_eq!(props[0].type_id, TypeId::VOID);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_partial_nullable_property() {
+    // Partial<{ value: string | null }> = { value?: string | null }
+    let interner = TypeInterner::new();
+
+    let value = interner.intern_string("value");
+    let nullable = interner.union(vec![TypeId::STRING, TypeId::NULL]);
+
+    let partial = interner.object(vec![PropertyInfo {
+        name: value,
+        type_id: nullable,
+        write_type: nullable,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(partial) {
+        assert!(props[0].optional);
+        assert_eq!(props[0].type_id, nullable);
+    } else {
+        panic!("Expected object type");
+    }
+}

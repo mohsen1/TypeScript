@@ -22,12 +22,25 @@ Priority: 2
 - [x] Union type tests (type narrowing, union distribution)
 - [x] Spread type tests (tuple spreads, object spreads)
 - [x] Awaited type tests (async/await type unwrapping)
+- [x] Partial type tests (Partial<T>, Required<T>)
 
 ## Task Queue
 - [ ] Implement TypeResolver for TypeEvaluator to resolve Refs inside Mapped/Conditional types
 - [ ] This would enable full evaluation of complex patterns like `{ [K in keyof R]: ExtractAction<R[K]> }[keyof R]`
 
 ## Completed
+- [x] Added 32 partial/required type tests including:
+  - Basic Partial<T>: single/multiple properties, already optional
+  - Partial preserves readonly, empty object, methods
+  - Nested objects, union properties
+  - Basic Required<T>: single/multiple properties, already required
+  - Required preserves readonly, methods
+  - Mixed Partial/Required: composition patterns
+  - Generic inference for Partial/Required
+  - Complex property types: arrays, tuples, functions, promises
+  - Literal, intersection properties
+  - Large objects (10 properties)
+  - Special types: any, unknown, never, void, nullable
 - [x] Added 50 awaited type tests including:
   - Basic Awaited: Promise<string>, Promise<number>, Promise<boolean>
   - Non-promise passthrough: Awaited<string> = string
@@ -262,6 +275,7 @@ Solution options:
 **YES** - Branch reset to squad/forge baseline and new tests added.
 
 Worker 2 branch now contains:
+- 32 partial/required type tests (Partial<T>, Required<T>)
 - 50 awaited type tests (async/await type unwrapping)
 - 45 spread type tests (tuple spreads, object spreads)
 - 40 union type tests (type narrowing, union distribution)
