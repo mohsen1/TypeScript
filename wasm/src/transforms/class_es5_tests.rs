@@ -33811,92 +33811,74 @@ class FunctionAnalyzer<T extends (...args: any[]) => any> {
 }
 
 // ============================================================================
-// MAPPED TYPE PATTERN TESTS
+// ENUM PATTERN TESTS
 // ============================================================================
 
-/// Test ES5 class downleveling with Partial mapped type patterns
+/// Test enum patterns: const enum (inlined values)
 #[test]
-fn test_class_es5_mapped_type_partial() {
+fn test_class_es5_enum_const() {
     let source = r#"
-interface UserConfig {
-    name: string;
-    email: string;
-    age: number;
-    theme: string;
+const enum Direction {
+    Up = 0,
+    Down = 1,
+    Left = 2,
+    Right = 3
 }
 
-class ConfigBuilder<T extends object> {
-    private config: Partial<T> = {};
+const enum HttpStatus {
+    OK = 200,
+    Created = 201,
+    BadRequest = 400,
+    NotFound = 404,
+    InternalError = 500
+}
 
-    set<K extends keyof T>(key: K, value: T[K]): this {
-        this.config[key] = value;
-        return this;
+class DirectionHandler {
+    private direction: number;
+
+    constructor() {
+        this.direction = 0;
     }
 
-    get<K extends keyof T>(key: K): T[K] | undefined {
-        return this.config[key];
+    setDirection(dir: Direction): void {
+        this.direction = dir;
     }
 
-    merge(partial: Partial<T>): this {
-        Object.assign(this.config, partial);
-        return this;
+    getDirection(): number {
+        return this.direction;
     }
 
-    build(): T {
-        return this.config as T;
+    isHorizontal(): boolean {
+        return this.direction === Direction.Left || this.direction === Direction.Right;
     }
 
-    reset(): void {
-        this.config = {};
+    isVertical(): boolean {
+        return this.direction === Direction.Up || this.direction === Direction.Down;
     }
 }
 
-class PartialUpdater<T extends object> {
-    private original: T;
-
-    constructor(original: T) {
-        this.original = original;
+class HttpStatusChecker {
+    isSuccess(status: HttpStatus): boolean {
+        return status >= 200 && status < 300;
     }
 
-    update(changes: Partial<T>): T {
-        return { ...this.original, ...changes };
+    isClientError(status: HttpStatus): boolean {
+        return status >= 400 && status < 500;
     }
 
-    updateField<K extends keyof T>(key: K, value: T[K]): T {
-        return { ...this.original, [key]: value };
+    isServerError(status: HttpStatus): boolean {
+        return status >= 500;
     }
 
-    diff(other: Partial<T>): Partial<T> {
-        const result: Partial<T> = {};
-        for (const key in other) {
-            if (this.original[key] !== other[key]) {
-                result[key] = other[key];
-            }
+    getStatusText(status: HttpStatus): string {
+        switch (status) {
+            case HttpStatus.OK: return "OK";
+            case HttpStatus.Created: return "Created";
+            case HttpStatus.BadRequest: return "Bad Request";
+            case HttpStatus.NotFound: return "Not Found";
+            case HttpStatus.InternalError: return "Internal Server Error";
+            default: return "Unknown";
         }
-        return result;
-    }
-}
-
-class FormState<T extends object> {
-    private values: Partial<T> = {};
-    private touched: Partial<Record<keyof T, boolean>> = {};
-    private errors: Partial<Record<keyof T, string>> = {};
-
-    setValue<K extends keyof T>(key: K, value: T[K]): void {
-        this.values[key] = value;
-        this.touched[key] = true;
-    }
-
-    setError<K extends keyof T>(key: K, error: string): void {
-        this.errors[key] = error;
-    }
-
-    getValues(): Partial<T> {
-        return { ...this.values };
-    }
-
-    isValid(): boolean {
-        return Object.keys(this.errors).length === 0;
     }
 }
 "#;
@@ -33916,104 +33898,94 @@ class FormState<T extends object> {
 
     let output = printer.get_output().to_string();
 
-    // Classes should be converted
+    // Classes should be converted to ES5
     assert!(
-        output.contains("ConfigBuilder") && output.contains("PartialUpdater") && output.contains("FormState"),
-        "Expected Partial mapped type classes: {}",
+        output.contains("function DirectionHandler") && output.contains("function HttpStatusChecker"),
+        "Expected ES5 class constructors: {}",
         output
     );
 
-    // ConfigBuilder methods
+    // Methods should be on prototype
     assert!(
-        output.contains("set") && output.contains("get") && output.contains("merge") && output.contains("build"),
-        "Expected ConfigBuilder methods: {}",
+        output.contains("DirectionHandler.prototype.setDirection") &&
+        output.contains("HttpStatusChecker.prototype.isSuccess"),
+        "Expected methods on prototype: {}",
         output
     );
 
-    // PartialUpdater methods
+    // Direction check methods
     assert!(
-        output.contains("update") && output.contains("updateField") && output.contains("diff"),
-        "Expected PartialUpdater methods: {}",
-        output
-    );
-
-    // FormState methods
-    assert!(
-        output.contains("setValue") && output.contains("setError") && output.contains("getValues") && output.contains("isValid"),
-        "Expected FormState methods: {}",
+        output.contains("isHorizontal") && output.contains("isVertical"),
+        "Expected direction methods: {}",
         output
     );
 }
 
-/// Test ES5 class downleveling with Required mapped type patterns
+/// Test enum patterns: string enum
 #[test]
-fn test_class_es5_mapped_type_required() {
+fn test_class_es5_enum_string() {
     let source = r#"
-interface OptionalConfig {
-    host?: string;
-    port?: number;
-    timeout?: number;
-    retries?: number;
+enum Color {
+    Red = "RED",
+    Green = "GREEN",
+    Blue = "BLUE",
+    Yellow = "YELLOW"
 }
 
-type RequiredConfig = Required<OptionalConfig>;
+enum LogLevel {
+    Debug = "debug",
+    Info = "info",
+    Warning = "warning",
+    Error = "error"
+}
 
-class ConfigValidator<T extends object> {
-    validate(partial: Partial<T>, required: (keyof T)[]): Required<T> | null {
-        for (const key of required) {
-            if (partial[key] === undefined) {
-                return null;
-            }
+class ColorPicker {
+    private currentColor: Color;
+
+    constructor() {
+        this.currentColor = Color.Red;
+    }
+
+    setColor(color: Color): void {
+        this.currentColor = color;
+    }
+
+    getColor(): Color {
+        return this.currentColor;
+    }
+
+    getColorName(): string {
+        return this.currentColor;
+    }
+
+    isPrimary(): boolean {
+        return this.currentColor === Color.Red ||
+               this.currentColor === Color.Green ||
+               this.currentColor === Color.Blue;
+    }
+}
+
+class Logger {
+    private level: LogLevel;
+    private messages: string[] = [];
+
+    constructor(level: LogLevel) {
+        this.level = level;
+    }
+
+    log(level: LogLevel, message: string): void {
+        if (this.shouldLog(level)) {
+            this.messages.push("[" + level + "] " + message);
         }
-        return partial as Required<T>;
     }
 
-    isComplete(partial: Partial<T>, keys: (keyof T)[]): boolean {
-        return keys.every(key => partial[key] !== undefined);
+    private shouldLog(level: LogLevel): boolean {
+        const levels = [LogLevel.Debug, LogLevel.Info, LogLevel.Warning, LogLevel.Error];
+        return levels.indexOf(level) >= levels.indexOf(this.level);
     }
 
-    fillDefaults(partial: Partial<T>, defaults: Required<T>): Required<T> {
-        return { ...defaults, ...partial };
-    }
-}
-
-class RequiredFieldsChecker<T extends object> {
-    private requiredFields: (keyof T)[];
-
-    constructor(requiredFields: (keyof T)[]) {
-        this.requiredFields = requiredFields;
-    }
-
-    check(obj: Partial<T>): boolean {
-        return this.requiredFields.every(field => obj[field] !== undefined);
-    }
-
-    getMissing(obj: Partial<T>): (keyof T)[] {
-        return this.requiredFields.filter(field => obj[field] === undefined);
-    }
-
-    getPresent(obj: Partial<T>): (keyof T)[] {
-        return this.requiredFields.filter(field => obj[field] !== undefined);
-    }
-}
-
-class DefaultsApplier<T extends object> {
-    private defaults: Required<T>;
-
-    constructor(defaults: Required<T>) {
-        this.defaults = defaults;
-    }
-
-    apply(partial: Partial<T>): Required<T> {
-        return { ...this.defaults, ...partial };
-    }
-
-    getDefault<K extends keyof T>(key: K): T[K] {
-        return this.defaults[key];
-    }
-
-    setDefault<K extends keyof T>(key: K, value: T[K]): void {
-        this.defaults[key] = value;
+    getMessages(): string[] {
+        return this.messages.slice();
     }
 }
 "#;
@@ -34035,114 +34007,88 @@ class DefaultsApplier<T extends object> {
 
     // Classes should be converted
     assert!(
-        output.contains("ConfigValidator") && output.contains("RequiredFieldsChecker") && output.contains("DefaultsApplier"),
-        "Expected Required mapped type classes: {}",
+        output.contains("function ColorPicker") && output.contains("function Logger"),
+        "Expected ES5 class constructors: {}",
         output
     );
 
-    // ConfigValidator methods
+    // Enum should be emitted
     assert!(
-        output.contains("validate") && output.contains("isComplete") && output.contains("fillDefaults"),
-        "Expected ConfigValidator methods: {}",
+        output.contains("Color") && output.contains("LogLevel"),
+        "Expected enum declarations: {}",
         output
     );
 
-    // RequiredFieldsChecker methods
+    // Methods preserved
     assert!(
-        output.contains("check") && output.contains("getMissing") && output.contains("getPresent"),
-        "Expected RequiredFieldsChecker methods: {}",
-        output
-    );
-
-    // DefaultsApplier methods
-    assert!(
-        output.contains("apply") && output.contains("getDefault") && output.contains("setDefault"),
-        "Expected DefaultsApplier methods: {}",
+        output.contains("setColor") && output.contains("isPrimary"),
+        "Expected ColorPicker methods: {}",
         output
     );
 }
 
-/// Test ES5 class downleveling with Readonly mapped type patterns
+/// Test enum patterns: numeric enum
 #[test]
-fn test_class_es5_mapped_type_readonly() {
+fn test_class_es5_enum_numeric() {
     let source = r#"
-interface MutableState {
-    count: number;
-    name: string;
-    items: string[];
+enum Priority {
+    Low,
+    Medium,
+    High,
+    Critical
 }
 
-type ImmutableState = Readonly<MutableState>;
-
-class ImmutableWrapper<T extends object> {
-    private readonly data: Readonly<T>;
-
-    constructor(data: T) {
-        this.data = Object.freeze({ ...data });
-    }
-
-    get<K extends keyof T>(key: K): T[K] {
-        return this.data[key];
-    }
-
-    toMutable(): T {
-        return { ...this.data };
-    }
-
-    with<K extends keyof T>(key: K, value: T[K]): ImmutableWrapper<T> {
-        return new ImmutableWrapper({ ...this.data, [key]: value });
-    }
+enum Weekday {
+    Monday = 1,
+    Tuesday,
+    Wednesday,
+    Thursday,
+    Friday,
+    Saturday,
+    Sunday
 }
 
-class ReadonlyCollection<T> {
-    private readonly items: ReadonlyArray<T>;
+class TaskPrioritizer {
+    private priority: Priority;
 
-    constructor(items: T[]) {
-        this.items = Object.freeze([...items]);
+    constructor() {
+        this.priority = Priority.Medium;
     }
 
-    get(index: number): T | undefined {
-        return this.items[index];
+    setPriority(priority: Priority): void {
+        this.priority = priority;
     }
 
-    size(): number {
-        return this.items.length;
+    getPriority(): Priority {
+        return this.priority;
     }
 
-    map<U>(fn: (item: T) => U): ReadonlyCollection<U> {
-        return new ReadonlyCollection(this.items.map(fn));
+    isUrgent(): boolean {
+        return this.priority >= Priority.High;
     }
 
-    filter(predicate: (item: T) => boolean): ReadonlyCollection<T> {
-        return new ReadonlyCollection(this.items.filter(predicate));
-    }
-
-    toArray(): T[] {
-        return [...this.items];
+    compare(other: Priority): number {
+        return this.priority - other;
     }
 }
 
-class FrozenState<T extends object> {
-    private state: Readonly<T>;
+class WeekdayScheduler {
+    private workdays: Set<Weekday> = new Set();
 
-    constructor(initial: T) {
-        this.state = Object.freeze({ ...initial });
+    addWorkday(day: Weekday): void {
+        this.workdays.add(day);
     }
 
-    getState(): Readonly<T> {
-        return this.state;
+    isWorkday(day: Weekday): boolean {
+        return this.workdays.has(day);
     }
 
-    setState(newState: T): void {
-        this.state = Object.freeze({ ...newState });
+    isWeekend(day: Weekday): boolean {
+        return day === Weekday.Saturday || day === Weekday.Sunday;
     }
 
-    updateState(partial: Partial<T>): void {
-        this.state = Object.freeze({ ...this.state, ...partial });
-    }
-
-    getValue<K extends keyof T>(key: K): T[K] {
-        return this.state[key];
+    getWorkdayCount(): number {
+        return this.workdays.size;
     }
 }
 "#;
@@ -34164,29 +34110,446 @@ class FrozenState<T extends object> {
 
     // Classes should be converted
     assert!(
-        output.contains("ImmutableWrapper") && output.contains("ReadonlyCollection") && output.contains("FrozenState"),
-        "Expected Readonly mapped type classes: {}",
+        output.contains("function TaskPrioritizer") && output.contains("function WeekdayScheduler"),
+        "Expected ES5 class constructors: {}",
         output
     );
 
-    // ImmutableWrapper methods
+    // Enum should be emitted
     assert!(
-        output.contains("get") && output.contains("toMutable"),
-        "Expected ImmutableWrapper methods: {}",
+        output.contains("Priority") && output.contains("Weekday"),
+        "Expected enum declarations: {}",
         output
     );
 
-    // ReadonlyCollection methods
+    // Methods preserved
     assert!(
-        output.contains("size") && output.contains("filter") && output.contains("toArray"),
-        "Expected ReadonlyCollection methods: {}",
+        output.contains("isUrgent") && output.contains("isWeekend"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+/// Test enum patterns: computed enum values
+#[test]
+fn test_class_es5_enum_computed() {
+    let source = r#"
+enum FileSize {
+    Kilobyte = 1024,
+    Megabyte = 1024 * 1024,
+    Gigabyte = 1024 * 1024 * 1024
+}
+
+enum Permission {
+    None = 0,
+    Read = 1 << 0,
+    Write = 1 << 1,
+    Execute = 1 << 2,
+    All = Read | Write | Execute
+}
+
+class FileSizeFormatter {
+    format(bytes: number): string {
+        if (bytes >= FileSize.Gigabyte) {
+            return (bytes / FileSize.Gigabyte).toFixed(2) + " GB";
+        } else if (bytes >= FileSize.Megabyte) {
+            return (bytes / FileSize.Megabyte).toFixed(2) + " MB";
+        } else if (bytes >= FileSize.Kilobyte) {
+            return (bytes / FileSize.Kilobyte).toFixed(2) + " KB";
+        }
+        return bytes + " B";
+    }
+
+    parse(size: string): number {
+        const value = parseFloat(size);
+        if (size.includes("GB")) return value * FileSize.Gigabyte;
+        if (size.includes("MB")) return value * FileSize.Megabyte;
+        if (size.includes("KB")) return value * FileSize.Kilobyte;
+        return value;
+    }
+}
+
+class PermissionManager {
+    private permissions: Permission;
+
+    constructor() {
+        this.permissions = Permission.None;
+    }
+
+    grant(permission: Permission): void {
+        this.permissions = this.permissions | permission;
+    }
+
+    revoke(permission: Permission): void {
+        this.permissions = this.permissions & ~permission;
+    }
+
+    has(permission: Permission): boolean {
+        return (this.permissions & permission) === permission;
+    }
+
+    canRead(): boolean {
+        return this.has(Permission.Read);
+    }
+
+    canWrite(): boolean {
+        return this.has(Permission.Write);
+    }
+
+    canExecute(): boolean {
+        return this.has(Permission.Execute);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("function FileSizeFormatter") && output.contains("function PermissionManager"),
+        "Expected ES5 class constructors: {}",
         output
     );
 
-    // FrozenState methods
+    // Enums should be emitted
     assert!(
-        output.contains("getState") && output.contains("setState") && output.contains("updateState"),
-        "Expected FrozenState methods: {}",
+        output.contains("FileSize") && output.contains("Permission"),
+        "Expected enum declarations: {}",
+        output
+    );
+
+    // Methods preserved
+    assert!(
+        output.contains("format") && output.contains("parse"),
+        "Expected FileSizeFormatter methods: {}",
+        output
+    );
+
+    // Permission methods
+    assert!(
+        output.contains("grant") && output.contains("revoke") && output.contains("has"),
+        "Expected PermissionManager methods: {}",
+        output
+    );
+}
+
+/// Test enum patterns: enum as class property type
+#[test]
+fn test_class_es5_enum_class_property() {
+    let source = r#"
+enum Status {
+    Pending = "pending",
+    Active = "active",
+    Completed = "completed",
+    Cancelled = "cancelled"
+}
+
+enum UserRole {
+    Guest,
+    User,
+    Moderator,
+    Admin
+}
+
+class Order {
+    private id: string;
+    private status: Status;
+    private items: string[];
+
+    constructor(id: string) {
+        this.id = id;
+        this.status = Status.Pending;
+        this.items = [];
+    }
+
+    addItem(item: string): void {
+        this.items.push(item);
+    }
+
+    activate(): void {
+        if (this.status === Status.Pending) {
+            this.status = Status.Active;
+        }
+    }
+
+    complete(): void {
+        if (this.status === Status.Active) {
+            this.status = Status.Completed;
+        }
+    }
+
+    cancel(): void {
+        if (this.status !== Status.Completed) {
+            this.status = Status.Cancelled;
+        }
+    }
+
+    getStatus(): Status {
+        return this.status;
+    }
+}
+
+class User {
+    private id: string;
+    private name: string;
+    private role: UserRole;
+
+    constructor(id: string, name: string, role: UserRole = UserRole.User) {
+        this.id = id;
+        this.name = name;
+        this.role = role;
+    }
+
+    promote(): void {
+        if (this.role < UserRole.Admin) {
+            this.role++;
+        }
+    }
+
+    demote(): void {
+        if (this.role > UserRole.Guest) {
+            this.role--;
+        }
+    }
+
+    isAdmin(): boolean {
+        return this.role === UserRole.Admin;
+    }
+
+    hasModeratorAccess(): boolean {
+        return this.role >= UserRole.Moderator;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("function Order") && output.contains("function User"),
+        "Expected ES5 class constructors: {}",
+        output
+    );
+
+    // Enums should be emitted
+    assert!(
+        output.contains("Status") && output.contains("UserRole"),
+        "Expected enum declarations: {}",
+        output
+    );
+
+    // Order methods
+    assert!(
+        output.contains("activate") && output.contains("complete") && output.contains("cancel"),
+        "Expected Order methods: {}",
+        output
+    );
+
+    // User methods
+    assert!(
+        output.contains("promote") && output.contains("demote") && output.contains("isAdmin"),
+        "Expected User methods: {}",
+        output
+    );
+}
+
+/// Test enum patterns: combined enum patterns
+#[test]
+fn test_class_es5_enum_combined_patterns() {
+    let source = r#"
+const enum MessageType {
+    Text = 0,
+    Image = 1,
+    Video = 2,
+    Audio = 3
+}
+
+enum DeliveryStatus {
+    Sent = "sent",
+    Delivered = "delivered",
+    Read = "read",
+    Failed = "failed"
+}
+
+enum Priority {
+    Low = 1,
+    Normal = 2,
+    High = 3,
+    Urgent = 4
+}
+
+class Message {
+    private type: MessageType;
+    private content: string;
+    private status: DeliveryStatus;
+    private priority: Priority;
+
+    constructor(type: MessageType, content: string) {
+        this.type = type;
+        this.content = content;
+        this.status = DeliveryStatus.Sent;
+        this.priority = Priority.Normal;
+    }
+
+    getType(): number {
+        return this.type;
+    }
+
+    isMedia(): boolean {
+        return this.type === MessageType.Image ||
+               this.type === MessageType.Video ||
+               this.type === MessageType.Audio;
+    }
+
+    markDelivered(): void {
+        this.status = DeliveryStatus.Delivered;
+    }
+
+    markRead(): void {
+        this.status = DeliveryStatus.Read;
+    }
+
+    markFailed(): void {
+        this.status = DeliveryStatus.Failed;
+    }
+
+    setPriority(priority: Priority): void {
+        this.priority = priority;
+    }
+
+    isHighPriority(): boolean {
+        return this.priority >= Priority.High;
+    }
+}
+
+class MessageQueue {
+    private messages: Message[] = [];
+
+    add(message: Message): void {
+        this.messages.push(message);
+    }
+
+    getByStatus(status: DeliveryStatus): Message[] {
+        return this.messages.filter(m => {
+            return true;
+        });
+    }
+
+    getHighPriority(): Message[] {
+        return this.messages.filter(m => m.isHighPriority());
+    }
+
+    countByType(type: MessageType): number {
+        return this.messages.filter(m => m.getType() === type).length;
+    }
+
+    clear(): void {
+        this.messages = [];
+    }
+}
+
+class NotificationManager {
+    private queue: MessageQueue;
+
+    constructor() {
+        this.queue = new MessageQueue();
+    }
+
+    sendText(content: string, priority: Priority = Priority.Normal): void {
+        const message = new Message(MessageType.Text, content);
+        message.setPriority(priority);
+        this.queue.add(message);
+    }
+
+    sendImage(url: string): void {
+        this.queue.add(new Message(MessageType.Image, url));
+    }
+
+    sendVideo(url: string): void {
+        this.queue.add(new Message(MessageType.Video, url));
+    }
+
+    getQueue(): MessageQueue {
+        return this.queue;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // All classes should be converted
+    assert!(
+        output.contains("function Message") &&
+        output.contains("function MessageQueue") &&
+        output.contains("function NotificationManager"),
+        "Expected ES5 class constructors: {}",
+        output
+    );
+
+    // Enums should be present
+    assert!(
+        output.contains("DeliveryStatus") && output.contains("Priority"),
+        "Expected enum declarations: {}",
+        output
+    );
+
+    // Message methods
+    assert!(
+        output.contains("isMedia") && output.contains("markDelivered") && output.contains("markRead"),
+        "Expected Message methods: {}",
+        output
+    );
+
+    // MessageQueue methods
+    assert!(
+        output.contains("getByStatus") && output.contains("getHighPriority") && output.contains("countByType"),
+        "Expected MessageQueue methods: {}",
+        output
+    );
+
+    // NotificationManager methods
+    assert!(
+        output.contains("sendText") && output.contains("sendImage") && output.contains("sendVideo"),
+        "Expected NotificationManager methods: {}",
         output
     );
 }
