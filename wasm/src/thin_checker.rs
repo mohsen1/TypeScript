@@ -3893,6 +3893,25 @@ impl<'a> ThinCheckerState<'a> {
 
         // Check for circular reference
         if self.ctx.symbol_resolution_set.contains(&sym_id) {
+            // Emit TS2456 for type aliases with circular references
+            if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
+                if symbol.flags & symbol_flags::TYPE_ALIAS != 0 {
+                    let name = symbol.escaped_name.clone();
+                    let decl_idx = if !symbol.value_declaration.is_none() {
+                        symbol.value_declaration
+                    } else {
+                        symbol.declarations.first().copied().unwrap_or(NodeIndex::NONE)
+                    };
+                    if let Some(node) = self.ctx.arena.get(decl_idx) {
+                        self.error(
+                            node.pos,
+                            node.end - node.pos,
+                            format!("Type alias '{}' circularly references itself.", name),
+                            crate::checker::types::diagnostics::diagnostic_codes::TYPE_ALIAS_CIRCULARLY_REFERENCES_ITSELF,
+                        );
+                    }
+                }
+            }
             return TypeId::ANY;
         }
 
