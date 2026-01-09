@@ -8,7 +8,7 @@ Priority: 1
 Blocked: Awaiting next EM-Anvil assignment.
 
 ## Current Assignment
-- [ ] (awaiting next assignment)
+- [ ] Add ES5 class tests for Object.keys/Object.create patterns in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
 
 ## Task Queue
 - [ ] (empty)
