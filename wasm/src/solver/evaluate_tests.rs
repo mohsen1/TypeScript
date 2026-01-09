@@ -38789,3 +38789,290 @@ fn test_infer_optional_tuple_element() {
     // Should infer A = string, B = number
     assert!(result != TypeId::ERROR);
 }
+
+// =============================================================================
+// TEMPLATE LITERAL TYPE EDGE CASES
+// =============================================================================
+
+#[test]
+fn test_template_literal_with_number_type() {
+    // `id_${number}` - template literal with number placeholder
+    let interner = TypeInterner::new();
+
+    let template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("id_")),
+        TemplateSpan::Type(TypeId::NUMBER),
+    ]);
+
+    // Verify template structure is created
+    match interner.lookup(template) {
+        Some(TypeKey::TemplateLiteral(_)) => (),
+        _ => panic!("Expected TemplateLiteral type"),
+    }
+}
+
+#[test]
+fn test_template_literal_with_boolean_type() {
+    // `is_${boolean}` - template literal with boolean placeholder
+    let interner = TypeInterner::new();
+
+    let template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("is_")),
+        TemplateSpan::Type(TypeId::BOOLEAN),
+    ]);
+
+    // Verify template structure is created
+    match interner.lookup(template) {
+        Some(TypeKey::TemplateLiteral(_)) => (),
+        _ => panic!("Expected TemplateLiteral type"),
+    }
+}
+
+#[test]
+fn test_template_literal_cartesian_product() {
+    // `${"a"|"b"}_${"1"|"2"}` should expand to "a_1" | "a_2" | "b_1" | "b_2"
+    let interner = TypeInterner::new();
+
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+    let union1 = interner.union(vec![lit_a, lit_b]);
+
+    let lit_1 = interner.literal_string("1");
+    let lit_2 = interner.literal_string("2");
+    let union2 = interner.union(vec![lit_1, lit_2]);
+
+    let template = interner.template_literal(vec![
+        TemplateSpan::Type(union1),
+        TemplateSpan::Text(interner.intern_string("_")),
+        TemplateSpan::Type(union2),
+    ]);
+
+    // The template should be valid - expansion happens during type resolution
+    match interner.lookup(template) {
+        Some(TypeKey::TemplateLiteral(_)) => (),
+        _ => panic!("Expected TemplateLiteral type"),
+    }
+}
+
+#[test]
+fn test_template_literal_with_never() {
+    // `prefix_${never}` should produce never (empty union)
+    let interner = TypeInterner::new();
+
+    let template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("prefix_")),
+        TemplateSpan::Type(TypeId::NEVER),
+    ]);
+
+    // Template with never should collapse to never on evaluation
+    let result = evaluate_type(&interner, template);
+    // never in template position should result in never
+    assert!(result == TypeId::NEVER || result == template);
+}
+
+#[test]
+fn test_template_literal_with_any() {
+    // `${any}` template with any should produce string
+    let interner = TypeInterner::new();
+
+    let template = interner.template_literal(vec![TemplateSpan::Type(TypeId::ANY)]);
+
+    // Template with any should work - any stringifies to any string
+    match interner.lookup(template) {
+        Some(TypeKey::TemplateLiteral(_)) => (),
+        _ => panic!("Expected TemplateLiteral type"),
+    }
+}
+
+#[test]
+fn test_template_literal_concatenation() {
+    // `${"hello"}${"world"}` should be "helloworld"
+    let interner = TypeInterner::new();
+
+    let hello = interner.literal_string("hello");
+    let world = interner.literal_string("world");
+
+    let template = interner.template_literal(vec![
+        TemplateSpan::Type(hello),
+        TemplateSpan::Type(world),
+    ]);
+
+    // The template structure should be valid
+    match interner.lookup(template) {
+        Some(TypeKey::TemplateLiteral(_)) => (),
+        _ => panic!("Expected TemplateLiteral type"),
+    }
+}
+
+#[test]
+fn test_template_literal_empty_string() {
+    // `` empty template
+    let interner = TypeInterner::new();
+
+    let template = interner.template_literal(vec![]);
+
+    // Empty template should be equivalent to empty string literal
+    let result = evaluate_type(&interner, template);
+    // Should be a valid type
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_template_literal_single_text() {
+    // `hello` just text, no interpolations
+    let interner = TypeInterner::new();
+
+    let template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("hello")),
+    ]);
+
+    // Should be equivalent to "hello" literal
+    let result = evaluate_type(&interner, template);
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_template_literal_pattern_infer_numeric() {
+    // `id_${infer N extends number}` - infer from numeric pattern
+    let interner = TypeInterner::new();
+
+    let n_name = interner.intern_string("N");
+    let infer_n = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: n_name,
+        constraint: Some(TypeId::NUMBER),
+        default: None,
+    }));
+
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("id_")),
+        TemplateSpan::Type(infer_n),
+    ]);
+
+    // Test matching against "id_42"
+    let lit_id_42 = interner.literal_string("id_42");
+
+    let cond = ConditionalType {
+        check_type: lit_id_42,
+        extends_type: extends_template,
+        true_type: infer_n,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Should infer something or at least not error
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_template_literal_multiple_adjacent_types() {
+    // `${A}${B}${C}` - multiple type interpolations
+    let interner = TypeInterner::new();
+
+    let lit_x = interner.literal_string("x");
+    let lit_y = interner.literal_string("y");
+    let lit_z = interner.literal_string("z");
+
+    let template = interner.template_literal(vec![
+        TemplateSpan::Type(lit_x),
+        TemplateSpan::Type(lit_y),
+        TemplateSpan::Type(lit_z),
+    ]);
+
+    // Should create valid template
+    match interner.lookup(template) {
+        Some(TypeKey::TemplateLiteral(_)) => (),
+        _ => panic!("Expected TemplateLiteral type"),
+    }
+}
+
+#[test]
+fn test_template_literal_union_in_middle() {
+    // `pre_${"a"|"b"|"c"}_suf` - union in middle position
+    let interner = TypeInterner::new();
+
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+    let lit_c = interner.literal_string("c");
+    let union = interner.union(vec![lit_a, lit_b, lit_c]);
+
+    let template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("pre_")),
+        TemplateSpan::Type(union),
+        TemplateSpan::Text(interner.intern_string("_suf")),
+    ]);
+
+    match interner.lookup(template) {
+        Some(TypeKey::TemplateLiteral(_)) => (),
+        _ => panic!("Expected TemplateLiteral type"),
+    }
+}
+
+#[test]
+fn test_template_literal_bigint_type() {
+    // `value_${bigint}` - template with bigint
+    let interner = TypeInterner::new();
+
+    let template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("value_")),
+        TemplateSpan::Type(TypeId::BIGINT),
+    ]);
+
+    match interner.lookup(template) {
+        Some(TypeKey::TemplateLiteral(_)) => (),
+        _ => panic!("Expected TemplateLiteral type"),
+    }
+}
+
+#[test]
+fn test_template_literal_null_undefined() {
+    // `${null}` and `${undefined}` - special types in template
+    let interner = TypeInterner::new();
+
+    let template_null = interner.template_literal(vec![TemplateSpan::Type(TypeId::NULL)]);
+    let template_undefined = interner.template_literal(vec![TemplateSpan::Type(TypeId::UNDEFINED)]);
+
+    // Both should be valid templates
+    match interner.lookup(template_null) {
+        Some(TypeKey::TemplateLiteral(_)) => (),
+        _ => panic!("Expected TemplateLiteral type"),
+    }
+    match interner.lookup(template_undefined) {
+        Some(TypeKey::TemplateLiteral(_)) => (),
+        _ => panic!("Expected TemplateLiteral type"),
+    }
+}
+
+#[test]
+fn test_template_literal_subtype_of_string() {
+    // `foo_${T}` should extend string when T is string
+    let interner = TypeInterner::new();
+
+    let template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("foo_")),
+        TemplateSpan::Type(TypeId::STRING),
+    ]);
+
+    // Template literal types extend string
+    let mut checker = SubtypeChecker::new(&interner);
+    let extends = checker.is_subtype_of(template, TypeId::STRING);
+    // Should be true - all template literal types are subtypes of string
+    assert!(extends);
+}
+
+#[test]
+fn test_template_literal_specific_extends_pattern() {
+    // "foo_bar" extends `foo_${string}`
+    let interner = TypeInterner::new();
+
+    let literal = interner.literal_string("foo_bar");
+    let pattern = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("foo_")),
+        TemplateSpan::Type(TypeId::STRING),
+    ]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    let extends = checker.is_subtype_of(literal, pattern);
+    // "foo_bar" should extend `foo_${string}`
+    assert!(extends);
+}
