@@ -7,10 +7,10 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-(awaiting assignment)
+- [ ] Add ES5 async function patterns parity tests: async arrow, async method, async generator, await expressions. Tests: `./wasm/test.sh emitter_parity`
 
 ## Task Queue
-(empty)
+- [ ] Add ES5 for-of/for-in patterns parity tests: destructuring, iterator protocol
 
 ## Completed
 - [x] Added ES5 generator method patterns parity tests (yield-conditional, yield-argument, delegation-nested, async-promise-all) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (327 tests).
