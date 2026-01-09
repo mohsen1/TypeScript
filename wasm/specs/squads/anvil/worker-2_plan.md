@@ -7,27 +7,13 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-Add ES5 abstract class patterns parity tests
-
-Per GOALS.md Objective 1: ES5 downleveling correctness
-
-Steps:
-1. Add 6 ES5 abstract class parity tests to `wasm/src/thin_emitter/emitter_parity_tests.rs`:
-   - Abstract class with abstract methods
-   - Abstract class with implemented methods
-   - Abstract class with static members
-   - Abstract class inheritance chain
-   - Abstract class with generics
-   - Combined abstract patterns
-2. Run `./wasm/test.sh emitter_parity` to verify all tests pass
-3. Commit with message: `[wasm] emitter: add abstract class parity tests`
-4. Push to `origin/worker/anvil-2`
-5. Update this plan file and push
+(none - awaiting new assignment from EM-Anvil)
 
 ## Task Queue
 (empty)
 
 ## Completed
+- [x] Added ES5 abstract class patterns parity tests (abstract-methods, implemented-methods, static-members, inheritance-chain, generics, combined-patterns) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (407 tests).
 - [x] Added ES5 private class features parity tests (inheritance-chain, static-initialization-order, async-patterns, accessor-computed-values, conditional-expr, combined-generics) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (401 tests).
 - [x] Added ES5 class decorator patterns parity tests (class-private-fields, method-computed-name, accessor-pair, parameter-constructor, inheritance-override, combined-all) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (395 tests).
 - [x] Added ES5 Generator patterns parity tests (basic-yield, yield-star, conditional-return, throw, resource-management, combined) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (389 tests).
