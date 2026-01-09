@@ -46712,823 +46712,1000 @@ const logger = new Logger();
     );
 }
 
-/// Test basic constructor injection
+/// Test ES5 class with revealing module pattern
 #[test]
-fn test_class_es5_di_constructor_injection() {
+fn test_class_es5_revealing_module_pattern() {
     let source = r#"
-interface ILogger {
-    log(message: string): void;
-}
+const CounterModule = (function() {
+    let count = 0;
 
-interface IDatabase {
-    query(sql: string): Promise<unknown[]>;
-}
+    class Counter {
+        private _value: number;
 
-class ConsoleLogger implements ILogger {
-    private prefix: string;
+        constructor(initial: number = 0) {
+            this._value = initial;
+        }
 
-    constructor(prefix: string = '[LOG]') {
-        this.prefix = prefix;
+        increment(): number {
+            this._value++;
+            count++;
+            return this._value;
+        }
+
+        decrement(): number {
+            this._value--;
+            return this._value;
+        }
+
+        getValue(): number {
+            return this._value;
+        }
     }
 
-    log(message: string): void {
-        console.log(`${this.prefix} ${message}`);
-    }
-}
-
-class PostgresDatabase implements IDatabase {
-    private connectionString: string;
-
-    constructor(connectionString: string) {
-        this.connectionString = connectionString;
+    function createCounter(initial?: number): Counter {
+        return new Counter(initial);
     }
 
-    async query(sql: string): Promise<unknown[]> {
-        console.log(`Executing: ${sql}`);
-        return [];
-    }
-}
-
-class UserService {
-    private logger: ILogger;
-    private database: IDatabase;
-
-    constructor(logger: ILogger, database: IDatabase) {
-        this.logger = logger;
-        this.database = database;
+    function getTotalOperations(): number {
+        return count;
     }
 
-    async getUser(id: string): Promise<unknown> {
-        this.logger.log(`Fetching user ${id}`);
-        const results = await this.database.query(`SELECT * FROM users WHERE id = '${id}'`);
-        return results[0];
+    return {
+        Counter,
+        createCounter,
+        getTotalOperations
+    };
+})();
+
+const LoggerModule = (function() {
+    const logs: string[] = [];
+
+    class Logger {
+        private prefix: string;
+
+        constructor(prefix: string = "") {
+            this.prefix = prefix;
+        }
+
+        log(message: string): void {
+            const entry = this.prefix ? `[${this.prefix}] ${message}` : message;
+            logs.push(entry);
+            console.log(entry);
+        }
+
+        warn(message: string): void {
+            this.log(`WARN: ${message}`);
+        }
+
+        error(message: string): void {
+            this.log(`ERROR: ${message}`);
+        }
     }
 
-    async createUser(name: string): Promise<void> {
-        this.logger.log(`Creating user ${name}`);
-        await this.database.query(`INSERT INTO users (name) VALUES ('${name}')`);
-    }
-}
-
-class Application {
-    private userService: UserService;
-
-    constructor(userService: UserService) {
-        this.userService = userService;
+    function getLogs(): string[] {
+        return [...logs];
     }
 
-    async run(): Promise<void> {
-        await this.userService.createUser('John');
-        await this.userService.getUser('1');
+    function clearLogs(): void {
+        logs.length = 0;
     }
-}
+
+    return {
+        Logger,
+        getLogs,
+        clearLogs
+    };
+})();
+
+const counter = CounterModule.createCounter(10);
+const logger = new LoggerModule.Logger("App");
 "#;
-
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
+
     let mut options = PrinterOptions::default();
     options.target = ScriptTarget::ES5;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
+
     let output = printer.get_output().to_string();
 
-    // Should have ES5 class structure
+    // Module names should exist
     assert!(
-        output.contains("ConsoleLogger") && output.contains("PostgresDatabase") &&
-        output.contains("UserService") && output.contains("Application"),
-        "Expected class names: {}",
+        output.contains("CounterModule") && output.contains("LoggerModule"),
+        "Expected module names: {}",
         output
     );
 
-    // Should have constructor injection methods
+    // Classes should be converted
     assert!(
-        output.contains("getUser") && output.contains("createUser"),
-        "Expected service methods: {}",
+        output.contains("Counter") && output.contains("Logger"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("increment") && output.contains("decrement") && output.contains("getValue"),
+        "Expected Counter methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("log") && output.contains("warn") && output.contains("error"),
+        "Expected Logger methods: {}",
+        output
+    );
+
+    // Module functions should exist
+    assert!(
+        output.contains("createCounter") && output.contains("getTotalOperations"),
+        "Expected CounterModule functions: {}",
+        output
+    );
+
+    assert!(
+        output.contains("getLogs") && output.contains("clearLogs"),
+        "Expected LoggerModule functions: {}",
         output
     );
 }
 
-/// Test property injection
+/// Test ES5 class with namespace module pattern
 #[test]
-fn test_class_es5_di_property_injection() {
+fn test_class_es5_namespace_module_pattern() {
     let source = r#"
-interface IService {
-    execute(): void;
+namespace DataAccess {
+    export interface Repository<T> {
+        findAll(): T[];
+        findById(id: string): T | undefined;
+        save(entity: T): void;
+        delete(id: string): boolean;
+    }
+
+    export class BaseEntity {
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+
+        constructor(id: string) {
+            this.id = id;
+            this.createdAt = new Date();
+            this.updatedAt = new Date();
+        }
+
+        touch(): void {
+            this.updatedAt = new Date();
+        }
+    }
+
+    export class InMemoryRepository<T extends BaseEntity> implements Repository<T> {
+        protected entities: Map<string, T> = new Map();
+
+        findAll(): T[] {
+            return Array.from(this.entities.values());
+        }
+
+        findById(id: string): T | undefined {
+            return this.entities.get(id);
+        }
+
+        save(entity: T): void {
+            entity.touch();
+            this.entities.set(entity.id, entity);
+        }
+
+        delete(id: string): boolean {
+            return this.entities.delete(id);
+        }
+    }
 }
 
-class PropertyInjectable {
-    public service!: IService;
-    public config!: { apiUrl: string; timeout: number };
+namespace Services {
+    export class UserService {
+        private repo: DataAccess.Repository<DataAccess.BaseEntity>;
 
-    private initialized: boolean = false;
-
-    initialize(): void {
-        if (!this.service || !this.config) {
-            throw new Error('Dependencies not injected');
+        constructor(repo: DataAccess.Repository<DataAccess.BaseEntity>) {
+            this.repo = repo;
         }
-        this.initialized = true;
-    }
 
-    run(): void {
-        if (!this.initialized) {
-            this.initialize();
+        getAllUsers(): DataAccess.BaseEntity[] {
+            return this.repo.findAll();
         }
-        this.service.execute();
-    }
 
-    isInitialized(): boolean {
-        return this.initialized;
+        getUserById(id: string): DataAccess.BaseEntity | undefined {
+            return this.repo.findById(id);
+        }
     }
 }
 
-class ApiService implements IService {
-    private baseUrl: string;
-
-    constructor(baseUrl: string) {
-        this.baseUrl = baseUrl;
-    }
-
-    execute(): void {
-        console.log(`Calling API at ${this.baseUrl}`);
-    }
-
-    getBaseUrl(): string {
-        return this.baseUrl;
-    }
-}
-
-class Injector {
-    private bindings: Map<string, () => unknown>;
-
-    constructor() {
-        this.bindings = new Map();
-    }
-
-    bind<T>(token: string, factory: () => T): void {
-        this.bindings.set(token, factory);
-    }
-
-    resolve<T>(token: string): T {
-        const factory = this.bindings.get(token);
-        if (!factory) {
-            throw new Error(`No binding for ${token}`);
-        }
-        return factory() as T;
-    }
-
-    injectProperties<T extends object>(target: T, propertyMap: Record<string, string>): T {
-        for (const [property, token] of Object.entries(propertyMap)) {
-            (target as any)[property] = this.resolve(token);
-        }
-        return target;
-    }
-}
+const repo = new DataAccess.InMemoryRepository<DataAccess.BaseEntity>();
+const service = new Services.UserService(repo);
 "#;
-
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
+
     let mut options = PrinterOptions::default();
     options.target = ScriptTarget::ES5;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
+
     let output = printer.get_output().to_string();
 
-    // Should have ES5 class structure
+    // Namespaces should exist
     assert!(
-        output.contains("PropertyInjectable") && output.contains("ApiService") &&
-        output.contains("Injector"),
-        "Expected class names: {}",
+        output.contains("DataAccess") && output.contains("Services"),
+        "Expected namespaces: {}",
         output
     );
 
-    // Should have injection methods
+    // Classes should be converted
     assert!(
-        output.contains("bind") && output.contains("resolve") && output.contains("injectProperties"),
-        "Expected injection methods: {}",
+        output.contains("BaseEntity") && output.contains("InMemoryRepository") && output.contains("UserService"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("findAll") && output.contains("findById") && output.contains("save"),
+        "Expected Repository methods: {}",
+        output
+    );
+
+    // Interface should be stripped
+    assert!(
+        !output.contains("interface Repository"),
+        "Expected interface to be stripped: {}",
         output
     );
 }
 
-/// Test factory pattern injection
+/// Test ES5 class with import/export class patterns
 #[test]
-fn test_class_es5_di_factory_pattern() {
+fn test_class_es5_import_export_class_pattern() {
     let source = r#"
-interface IProduct {
-    getName(): string;
-    getPrice(): number;
+export interface Serializable {
+    serialize(): string;
+    deserialize(data: string): void;
 }
 
-interface IProductFactory {
-    create(name: string, price: number): IProduct;
+export abstract class Model implements Serializable {
+    abstract id: string;
+
+    abstract serialize(): string;
+    abstract deserialize(data: string): void;
+
+    clone(): this {
+        const data = this.serialize();
+        const clone = Object.create(Object.getPrototypeOf(this));
+        clone.deserialize(data);
+        return clone;
+    }
 }
 
-class Product implements IProduct {
-    private name: string;
-    private price: number;
+export class User extends Model {
+    id: string;
+    name: string;
+    email: string;
 
-    constructor(name: string, price: number) {
+    constructor(id: string, name: string, email: string) {
+        super();
+        this.id = id;
+        this.name = name;
+        this.email = email;
+    }
+
+    serialize(): string {
+        return JSON.stringify({ id: this.id, name: this.name, email: this.email });
+    }
+
+    deserialize(data: string): void {
+        const obj = JSON.parse(data);
+        this.id = obj.id;
+        this.name = obj.name;
+        this.email = obj.email;
+    }
+}
+
+export class Product extends Model {
+    id: string;
+    title: string;
+    price: number;
+
+    constructor(id: string, title: string, price: number) {
+        super();
+        this.id = id;
+        this.title = title;
+        this.price = price;
+    }
+
+    serialize(): string {
+        return JSON.stringify({ id: this.id, title: this.title, price: this.price });
+    }
+
+    deserialize(data: string): void {
+        const obj = JSON.parse(data);
+        this.id = obj.id;
+        this.title = obj.title;
+        this.price = obj.price;
+    }
+}
+
+export default class DefaultExportClass {
+    value: string;
+
+    constructor(value: string) {
+        this.value = value;
+    }
+
+    getValue(): string {
+        return this.value;
+    }
+}
+
+const user = new User("1", "John", "john@example.com");
+const product = new Product("1", "Widget", 9.99);
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Model") && output.contains("User") && output.contains("Product"),
+        "Expected classes: {}",
+        output
+    );
+
+    assert!(
+        output.contains("DefaultExportClass"),
+        "Expected default export class: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("serialize") && output.contains("deserialize") && output.contains("clone"),
+        "Expected Model methods: {}",
+        output
+    );
+
+    // Interface should be stripped
+    assert!(
+        !output.contains("interface Serializable"),
+        "Expected interface to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with barrel export variation pattern
+#[test]
+fn test_class_es5_barrel_export_variation_pattern() {
+    let source = r#"
+// models/user.ts style
+class UserModel {
+    id: string;
+    username: string;
+
+    constructor(id: string, username: string) {
+        this.id = id;
+        this.username = username;
+    }
+
+    toJSON(): object {
+        return { id: this.id, username: this.username };
+    }
+}
+
+// models/product.ts style
+class ProductModel {
+    id: string;
+    name: string;
+    price: number;
+
+    constructor(id: string, name: string, price: number) {
+        this.id = id;
         this.name = name;
         this.price = price;
+    }
+
+    toJSON(): object {
+        return { id: this.id, name: this.name, price: this.price };
+    }
+}
+
+// models/order.ts style
+class OrderModel {
+    id: string;
+    userId: string;
+    products: ProductModel[];
+
+    constructor(id: string, userId: string, products: ProductModel[] = []) {
+        this.id = id;
+        this.userId = userId;
+        this.products = products;
+    }
+
+    addProduct(product: ProductModel): void {
+        this.products.push(product);
+    }
+
+    getTotal(): number {
+        return this.products.reduce((sum, p) => sum + p.price, 0);
+    }
+
+    toJSON(): object {
+        return {
+            id: this.id,
+            userId: this.userId,
+            products: this.products.map(p => p.toJSON())
+        };
+    }
+}
+
+// models/index.ts barrel export style
+const Models = {
+    User: UserModel,
+    Product: ProductModel,
+    Order: OrderModel
+};
+
+// Export types for convenience
+type User = UserModel;
+type Product = ProductModel;
+type Order = OrderModel;
+
+// Factory functions
+function createUser(id: string, username: string): UserModel {
+    return new UserModel(id, username);
+}
+
+function createProduct(id: string, name: string, price: number): ProductModel {
+    return new ProductModel(id, name, price);
+}
+
+function createOrder(id: string, userId: string): OrderModel {
+    return new OrderModel(id, userId);
+}
+
+const Factories = {
+    createUser,
+    createProduct,
+    createOrder
+};
+
+const user = Factories.createUser("1", "john");
+const product = Factories.createProduct("1", "Widget", 9.99);
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("UserModel") && output.contains("ProductModel") && output.contains("OrderModel"),
+        "Expected model classes: {}",
+        output
+    );
+
+    // Barrel export object should exist
+    assert!(
+        output.contains("Models"),
+        "Expected Models barrel export: {}",
+        output
+    );
+
+    // Factory functions should exist
+    assert!(
+        output.contains("createUser") && output.contains("createProduct") && output.contains("createOrder"),
+        "Expected factory functions: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("toJSON") && output.contains("addProduct") && output.contains("getTotal"),
+        "Expected model methods: {}",
+        output
+    );
+
+    // Type aliases should be stripped
+    assert!(
+        !output.contains("type User =") && !output.contains("type Product ="),
+        "Expected type aliases to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with re-export variation pattern
+#[test]
+fn test_class_es5_re_export_variation_pattern() {
+    let source = r#"
+// core/base.ts
+abstract class BaseService {
+    protected name: string;
+
+    constructor(name: string) {
+        this.name = name;
     }
 
     getName(): string {
         return this.name;
     }
 
-    getPrice(): number {
-        return this.price;
-    }
+    abstract execute(): void;
 }
 
-class ProductFactory implements IProductFactory {
-    private createdCount: number;
+// core/logger.ts
+class LogService extends BaseService {
+    private logs: string[] = [];
 
     constructor() {
-        this.createdCount = 0;
+        super("LogService");
     }
 
-    create(name: string, price: number): IProduct {
-        this.createdCount++;
-        return new Product(name, price);
+    execute(): void {
+        console.log("LogService executing...");
     }
 
-    getCreatedCount(): number {
-        return this.createdCount;
-    }
-}
-
-class ShoppingCart {
-    private items: IProduct[];
-    private productFactory: IProductFactory;
-
-    constructor(productFactory: IProductFactory) {
-        this.items = [];
-        this.productFactory = productFactory;
+    log(message: string): void {
+        this.logs.push(message);
     }
 
-    addItem(name: string, price: number): void {
-        const product = this.productFactory.create(name, price);
-        this.items.push(product);
-    }
-
-    getTotal(): number {
-        return this.items.reduce((sum, item) => sum + item.getPrice(), 0);
-    }
-
-    getItemCount(): number {
-        return this.items.length;
-    }
-
-    getItems(): IProduct[] {
-        return [...this.items];
+    getLogs(): string[] {
+        return [...this.logs];
     }
 }
 
-class FactoryContainer {
-    private factories: Map<string, () => unknown>;
+// core/cache.ts
+class CacheService extends BaseService {
+    private cache: Map<string, any> = new Map();
 
     constructor() {
-        this.factories = new Map();
+        super("CacheService");
     }
 
-    registerFactory<T>(key: string, factory: () => T): void {
-        this.factories.set(key, factory);
+    execute(): void {
+        console.log("CacheService executing...");
     }
 
-    getFactory<T>(key: string): () => T {
-        const factory = this.factories.get(key);
-        if (!factory) {
-            throw new Error(`Factory ${key} not registered`);
-        }
-        return factory as () => T;
+    set(key: string, value: any): void {
+        this.cache.set(key, value);
     }
 
-    create<T>(key: string): T {
-        return this.getFactory<T>(key)();
-    }
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-    let output = printer.get_output().to_string();
-
-    // Should have ES5 class structure
-    assert!(
-        output.contains("Product") && output.contains("ProductFactory") &&
-        output.contains("ShoppingCart") && output.contains("FactoryContainer"),
-        "Expected class names: {}",
-        output
-    );
-
-    // Should have factory methods
-    assert!(
-        output.contains("create") && output.contains("registerFactory") && output.contains("getFactory"),
-        "Expected factory methods: {}",
-        output
-    );
-}
-
-/// Test singleton pattern
-#[test]
-fn test_class_es5_di_singleton_pattern() {
-    let source = r#"
-class ConfigurationManager {
-    private static instance: ConfigurationManager | null = null;
-    private config: Map<string, unknown>;
-
-    private constructor() {
-        this.config = new Map();
+    get(key: string): any {
+        return this.cache.get(key);
     }
 
-    static getInstance(): ConfigurationManager {
-        if (!ConfigurationManager.instance) {
-            ConfigurationManager.instance = new ConfigurationManager();
-        }
-        return ConfigurationManager.instance;
-    }
-
-    static resetInstance(): void {
-        ConfigurationManager.instance = null;
-    }
-
-    set<T>(key: string, value: T): void {
-        this.config.set(key, value);
-    }
-
-    get<T>(key: string): T | undefined {
-        return this.config.get(key) as T | undefined;
-    }
-
-    has(key: string): boolean {
-        return this.config.has(key);
-    }
-
-    getAll(): Record<string, unknown> {
-        const result: Record<string, unknown> = {};
-        this.config.forEach((value, key) => {
-            result[key] = value;
-        });
-        return result;
+    clear(): void {
+        this.cache.clear();
     }
 }
 
-class ConnectionPool {
-    private static instance: ConnectionPool | null = null;
-    private connections: string[];
-    private maxConnections: number;
+// core/index.ts re-export pattern
+const CoreServices = {
+    BaseService,
+    LogService,
+    CacheService
+};
 
-    private constructor(maxConnections: number) {
-        this.connections = [];
-        this.maxConnections = maxConnections;
+// features/auth.ts
+class AuthService extends BaseService {
+    private logService: LogService;
+
+    constructor(logService: LogService) {
+        super("AuthService");
+        this.logService = logService;
     }
 
-    static getInstance(maxConnections: number = 10): ConnectionPool {
-        if (!ConnectionPool.instance) {
-            ConnectionPool.instance = new ConnectionPool(maxConnections);
-        }
-        return ConnectionPool.instance;
+    execute(): void {
+        this.logService.log("AuthService executing...");
     }
 
-    acquire(): string | null {
-        if (this.connections.length < this.maxConnections) {
-            const connection = `conn_${Date.now()}`;
-            this.connections.push(connection);
-            return connection;
+    authenticate(username: string, password: string): boolean {
+        this.logService.log(`Authenticating user: ${username}`);
+        return username.length > 0 && password.length > 0;
+    }
+}
+
+// features/data.ts
+class DataService extends BaseService {
+    private cacheService: CacheService;
+    private logService: LogService;
+
+    constructor(cacheService: CacheService, logService: LogService) {
+        super("DataService");
+        this.cacheService = cacheService;
+        this.logService = logService;
+    }
+
+    execute(): void {
+        this.logService.log("DataService executing...");
+    }
+
+    fetch(key: string): any {
+        const cached = this.cacheService.get(key);
+        if (cached) {
+            this.logService.log(`Cache hit for: ${key}`);
+            return cached;
         }
+        this.logService.log(`Cache miss for: ${key}`);
         return null;
     }
 
-    release(connection: string): void {
-        const index = this.connections.indexOf(connection);
-        if (index !== -1) {
-            this.connections.splice(index, 1);
-        }
-    }
-
-    getActiveCount(): number {
-        return this.connections.length;
-    }
-
-    getMaxConnections(): number {
-        return this.maxConnections;
+    store(key: string, value: any): void {
+        this.cacheService.set(key, value);
+        this.logService.log(`Stored: ${key}`);
     }
 }
 
-class SingletonConsumer {
-    private config: ConfigurationManager;
-    private pool: ConnectionPool;
-
-    constructor() {
-        this.config = ConfigurationManager.getInstance();
-        this.pool = ConnectionPool.getInstance();
-    }
-
-    useConfig(key: string): unknown | undefined {
-        return this.config.get(key);
-    }
-
-    useConnection(): string | null {
-        return this.pool.acquire();
-    }
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-    let output = printer.get_output().to_string();
-
-    // Should have ES5 class structure
-    assert!(
-        output.contains("ConfigurationManager") && output.contains("ConnectionPool") &&
-        output.contains("SingletonConsumer"),
-        "Expected class names: {}",
-        output
-    );
-
-    // Should have singleton methods
-    assert!(
-        output.contains("getInstance") && output.contains("resetInstance"),
-        "Expected singleton methods: {}",
-        output
-    );
-}
-
-/// Test scoped injection
-#[test]
-fn test_class_es5_di_scoped_injection() {
-    let source = r#"
-type Scope = 'singleton' | 'transient' | 'scoped';
-
-interface ServiceDescriptor<T> {
-    factory: () => T;
-    scope: Scope;
-}
-
-class ScopedContainer {
-    private descriptors: Map<string, ServiceDescriptor<unknown>>;
-    private singletons: Map<string, unknown>;
-    private scopedInstances: Map<string, Map<string, unknown>>;
-    private currentScope: string | null;
-
-    constructor() {
-        this.descriptors = new Map();
-        this.singletons = new Map();
-        this.scopedInstances = new Map();
-        this.currentScope = null;
-    }
-
-    register<T>(token: string, factory: () => T, scope: Scope = 'transient'): void {
-        this.descriptors.set(token, { factory, scope });
-    }
-
-    resolve<T>(token: string): T {
-        const descriptor = this.descriptors.get(token);
-        if (!descriptor) {
-            throw new Error(`No registration for ${token}`);
-        }
-
-        switch (descriptor.scope) {
-            case 'singleton':
-                if (!this.singletons.has(token)) {
-                    this.singletons.set(token, descriptor.factory());
-                }
-                return this.singletons.get(token) as T;
-
-            case 'scoped':
-                if (!this.currentScope) {
-                    throw new Error('No active scope');
-                }
-                const scopeMap = this.scopedInstances.get(this.currentScope)!;
-                if (!scopeMap.has(token)) {
-                    scopeMap.set(token, descriptor.factory());
-                }
-                return scopeMap.get(token) as T;
-
-            case 'transient':
-            default:
-                return descriptor.factory() as T;
-        }
-    }
-
-    beginScope(scopeId: string): void {
-        this.currentScope = scopeId;
-        this.scopedInstances.set(scopeId, new Map());
-    }
-
-    endScope(scopeId: string): void {
-        this.scopedInstances.delete(scopeId);
-        if (this.currentScope === scopeId) {
-            this.currentScope = null;
-        }
-    }
-
-    getCurrentScope(): string | null {
-        return this.currentScope;
-    }
-}
-
-class RequestContext {
-    private id: string;
-    private data: Map<string, unknown>;
-
-    constructor(id: string) {
-        this.id = id;
-        this.data = new Map();
-    }
-
-    getId(): string {
-        return this.id;
-    }
-
-    set(key: string, value: unknown): void {
-        this.data.set(key, value);
-    }
-
-    get<T>(key: string): T | undefined {
-        return this.data.get(key) as T | undefined;
-    }
-}
-
-class ScopedService {
-    private context: RequestContext;
-    private counter: number;
-
-    constructor(context: RequestContext) {
-        this.context = context;
-        this.counter = 0;
-    }
-
-    process(): void {
-        this.counter++;
-        console.log(`Processing in context ${this.context.getId()}, count: ${this.counter}`);
-    }
-
-    getCounter(): number {
-        return this.counter;
-    }
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-    let output = printer.get_output().to_string();
-
-    // Should have ES5 class structure
-    assert!(
-        output.contains("ScopedContainer") && output.contains("RequestContext") &&
-        output.contains("ScopedService"),
-        "Expected class names: {}",
-        output
-    );
-
-    // Should have scope methods
-    assert!(
-        output.contains("beginScope") && output.contains("endScope") && output.contains("resolve"),
-        "Expected scope methods: {}",
-        output
-    );
-}
-
-/// Test combined DI patterns
-#[test]
-fn test_class_es5_di_combined_patterns() {
-    let source = r#"
-interface IRepository<T> {
-    find(id: string): Promise<T | null>;
-    save(entity: T): Promise<void>;
-}
-
-interface IUnitOfWork {
-    begin(): void;
-    commit(): Promise<void>;
-    rollback(): void;
-}
-
-class DIContainer {
-    private services: Map<symbol, { factory: () => unknown; singleton: boolean; instance?: unknown }>;
-
-    constructor() {
-        this.services = new Map();
-    }
-
-    registerSingleton<T>(token: symbol, factory: () => T): void {
-        this.services.set(token, { factory, singleton: true });
-    }
-
-    registerTransient<T>(token: symbol, factory: () => T): void {
-        this.services.set(token, { factory, singleton: false });
-    }
-
-    resolve<T>(token: symbol): T {
-        const registration = this.services.get(token);
-        if (!registration) {
-            throw new Error(`Service not registered: ${token.toString()}`);
-        }
-
-        if (registration.singleton) {
-            if (!registration.instance) {
-                registration.instance = registration.factory();
-            }
-            return registration.instance as T;
-        }
-
-        return registration.factory() as T;
-    }
-
-    createScope(): DIContainer {
-        const scope = new DIContainer();
-        this.services.forEach((value, key) => {
-            if (value.singleton) {
-                scope.services.set(key, { ...value });
-            } else {
-                scope.services.set(key, { factory: value.factory, singleton: false });
-            }
-        });
-        return scope;
-    }
-}
-
-const TOKENS = {
-    Logger: Symbol('Logger'),
-    Database: Symbol('Database'),
-    UserRepository: Symbol('UserRepository'),
-    UnitOfWork: Symbol('UnitOfWork')
+// features/index.ts re-export pattern
+const FeatureServices = {
+    AuthService,
+    DataService
 };
 
-class Logger {
-    private name: string;
+// main index.ts - aggregate exports
+const AllServices = {
+    ...CoreServices,
+    ...FeatureServices
+};
 
-    constructor(name: string) {
-        this.name = name;
-    }
-
-    info(message: string): void {
-        console.log(`[${this.name}] INFO: ${message}`);
-    }
-
-    error(message: string): void {
-        console.error(`[${this.name}] ERROR: ${message}`);
-    }
-}
-
-class Database {
-    private connectionString: string;
-    private connected: boolean;
-
-    constructor(connectionString: string) {
-        this.connectionString = connectionString;
-        this.connected = false;
-    }
-
-    connect(): void {
-        this.connected = true;
-    }
-
-    disconnect(): void {
-        this.connected = false;
-    }
-
-    isConnected(): boolean {
-        return this.connected;
-    }
-
-    async execute(query: string): Promise<unknown[]> {
-        if (!this.connected) {
-            throw new Error('Not connected');
-        }
-        return [];
-    }
-}
-
-interface User {
-    id: string;
-    name: string;
-    email: string;
-}
-
-class UserRepository implements IRepository<User> {
-    private database: Database;
-    private logger: Logger;
-
-    constructor(database: Database, logger: Logger) {
-        this.database = database;
-        this.logger = logger;
-    }
-
-    async find(id: string): Promise<User | null> {
-        this.logger.info(`Finding user ${id}`);
-        const results = await this.database.execute(`SELECT * FROM users WHERE id = '${id}'`);
-        return results[0] as User | null;
-    }
-
-    async save(entity: User): Promise<void> {
-        this.logger.info(`Saving user ${entity.id}`);
-        await this.database.execute(`INSERT INTO users VALUES ('${entity.id}', '${entity.name}', '${entity.email}')`);
-    }
-}
-
-class ApplicationBootstrap {
-    private container: DIContainer;
-
-    constructor() {
-        this.container = new DIContainer();
-        this.configure();
-    }
-
-    private configure(): void {
-        this.container.registerSingleton(TOKENS.Logger, () => new Logger('App'));
-        this.container.registerSingleton(TOKENS.Database, () => {
-            const db = new Database('postgres://localhost/mydb');
-            db.connect();
-            return db;
-        });
-        this.container.registerTransient(TOKENS.UserRepository, () => {
-            const db = this.container.resolve<Database>(TOKENS.Database);
-            const logger = this.container.resolve<Logger>(TOKENS.Logger);
-            return new UserRepository(db, logger);
-        });
-    }
-
-    getContainer(): DIContainer {
-        return this.container;
-    }
-
-    async run(): Promise<void> {
-        const userRepo = this.container.resolve<UserRepository>(TOKENS.UserRepository);
-        await userRepo.save({ id: '1', name: 'John', email: 'john@example.com' });
-        const user = await userRepo.find('1');
-        console.log('Found user:', user);
-    }
-}
+const logService = new LogService();
+const cacheService = new CacheService();
 "#;
-
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
+
     let mut options = PrinterOptions::default();
     options.target = ScriptTarget::ES5;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
+
     let output = printer.get_output().to_string();
 
-    // Should have ES5 class structure
+    // Base class should be converted
     assert!(
-        output.contains("DIContainer") && output.contains("Logger") &&
-        output.contains("Database") && output.contains("UserRepository") &&
-        output.contains("ApplicationBootstrap"),
-        "Expected class names: {}",
+        output.contains("BaseService"),
+        "Expected BaseService class: {}",
         output
     );
 
-    // Should have DI methods
+    // Core services should exist
     assert!(
-        output.contains("registerSingleton") && output.contains("registerTransient") &&
-        output.contains("resolve") && output.contains("createScope"),
-        "Expected DI methods: {}",
+        output.contains("LogService") && output.contains("CacheService"),
+        "Expected core service classes: {}",
+        output
+    );
+
+    // Feature services should exist
+    assert!(
+        output.contains("AuthService") && output.contains("DataService"),
+        "Expected feature service classes: {}",
+        output
+    );
+
+    // Re-export objects should exist
+    assert!(
+        output.contains("CoreServices") && output.contains("FeatureServices") && output.contains("AllServices"),
+        "Expected re-export objects: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("getName") && output.contains("execute"),
+        "Expected BaseService methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("authenticate") && output.contains("fetch") && output.contains("store"),
+        "Expected feature service methods: {}",
+        output
+    );
+}
+
+/// Test ES5 class with combined module patterns
+#[test]
+fn test_class_es5_combined_module_patterns() {
+    let source = r#"
+// Types module
+namespace Types {
+    export interface Entity {
+        id: string;
+        createdAt: Date;
+    }
+
+    export interface Persistable {
+        save(): Promise<void>;
+        load(id: string): Promise<void>;
+    }
+
+    export type EntityId = string | number;
+}
+
+// Base module with revealing pattern
+const BaseModule = (function() {
+    abstract class AbstractEntity implements Types.Entity {
+        id: string;
+        createdAt: Date;
+
+        constructor(id: string) {
+            this.id = id;
+            this.createdAt = new Date();
+        }
+
+        abstract validate(): boolean;
+    }
+
+    class EntityFactory {
+        private static instances: Map<string, AbstractEntity> = new Map();
+
+        static register(id: string, entity: AbstractEntity): void {
+            this.instances.set(id, entity);
+        }
+
+        static get(id: string): AbstractEntity | undefined {
+            return this.instances.get(id);
+        }
+
+        static clear(): void {
+            this.instances.clear();
+        }
+    }
+
+    return {
+        AbstractEntity,
+        EntityFactory
+    };
+})();
+
+// Domain module using namespace
+namespace Domain {
+    export class User extends (BaseModule.AbstractEntity as any) {
+        name: string;
+        email: string;
+
+        constructor(id: string, name: string, email: string) {
+            super(id);
+            this.name = name;
+            this.email = email;
+        }
+
+        validate(): boolean {
+            return this.name.length > 0 && this.email.includes("@");
+        }
+
+        getDisplayName(): string {
+            return `${this.name} <${this.email}>`;
+        }
+    }
+
+    export class Order extends (BaseModule.AbstractEntity as any) {
+        userId: string;
+        total: number;
+        items: string[];
+
+        constructor(id: string, userId: string) {
+            super(id);
+            this.userId = userId;
+            this.total = 0;
+            this.items = [];
+        }
+
+        validate(): boolean {
+            return this.userId.length > 0 && this.items.length > 0;
+        }
+
+        addItem(item: string, price: number): void {
+            this.items.push(item);
+            this.total += price;
+        }
+
+        getItemCount(): number {
+            return this.items.length;
+        }
+    }
+}
+
+// Services module
+namespace Services {
+    export class UserService {
+        private users: Map<string, Domain.User> = new Map();
+
+        create(id: string, name: string, email: string): Domain.User {
+            const user = new Domain.User(id, name, email);
+            if (user.validate()) {
+                this.users.set(id, user);
+                BaseModule.EntityFactory.register(id, user as any);
+            }
+            return user;
+        }
+
+        findById(id: string): Domain.User | undefined {
+            return this.users.get(id);
+        }
+
+        findAll(): Domain.User[] {
+            return Array.from(this.users.values());
+        }
+    }
+
+    export class OrderService {
+        private orders: Map<string, Domain.Order> = new Map();
+
+        create(id: string, userId: string): Domain.Order {
+            const order = new Domain.Order(id, userId);
+            this.orders.set(id, order);
+            return order;
+        }
+
+        findByUserId(userId: string): Domain.Order[] {
+            return Array.from(this.orders.values()).filter(o => o.userId === userId);
+        }
+
+        getOrderTotal(orderId: string): number {
+            const order = this.orders.get(orderId);
+            return order ? order.total : 0;
+        }
+    }
+}
+
+// Application facade
+class Application {
+    private userService: Services.UserService;
+    private orderService: Services.OrderService;
+
+    constructor() {
+        this.userService = new Services.UserService();
+        this.orderService = new Services.OrderService();
+    }
+
+    getUserService(): Services.UserService {
+        return this.userService;
+    }
+
+    getOrderService(): Services.OrderService {
+        return this.orderService;
+    }
+
+    initialize(): void {
+        console.log("Application initialized");
+    }
+}
+
+// Export aggregation
+const Modules = {
+    Types,
+    BaseModule,
+    Domain,
+    Services,
+    Application
+};
+
+const app = new Application();
+app.initialize();
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Namespaces should exist
+    assert!(
+        output.contains("Types") && output.contains("Domain") && output.contains("Services"),
+        "Expected namespaces: {}",
+        output
+    );
+
+    // Revealing module should exist
+    assert!(
+        output.contains("BaseModule"),
+        "Expected BaseModule: {}",
+        output
+    );
+
+    // Domain classes should exist
+    assert!(
+        output.contains("User") && output.contains("Order"),
+        "Expected domain classes: {}",
+        output
+    );
+
+    // Service classes should exist
+    assert!(
+        output.contains("UserService") && output.contains("OrderService"),
+        "Expected service classes: {}",
+        output
+    );
+
+    // Application class should exist
+    assert!(
+        output.contains("Application"),
+        "Expected Application class: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("validate") && output.contains("getDisplayName"),
+        "Expected User methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("create") && output.contains("findById") && output.contains("findAll"),
+        "Expected UserService methods: {}",
+        output
+    );
+
+    // Aggregate export should exist
+    assert!(
+        output.contains("Modules"),
+        "Expected Modules aggregate export: {}",
         output
     );
 
     // Interfaces should be stripped
     assert!(
-        !output.contains("interface IRepository") && !output.contains("interface IUnitOfWork"),
+        !output.contains("interface Entity") && !output.contains("interface Persistable"),
         "Expected interfaces to be stripped: {}",
         output
     );
 
     // Type alias should be stripped
     assert!(
-        !output.contains("interface User {"),
-        "Expected interface to be stripped: {}",
+        !output.contains("type EntityId"),
+        "Expected type alias to be stripped: {}",
         output
     );
 }
