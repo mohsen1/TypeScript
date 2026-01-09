@@ -6,27 +6,13 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-Add ES5 class tests for static block initialization ordering
-
-Per GOALS.md Objective 1: ES5 downleveling correctness
-
-Steps:
-1. Add 6 ES5 class tests for static block initialization to `wasm/src/transforms/class_es5_tests.rs`:
-   - Static block basic initialization
-   - Static block with private field access
-   - Multiple static blocks ordering
-   - Static block with super reference
-   - Static block with computed properties
-   - Combined static block patterns
-2. Run `./wasm/test.sh class_es5_tests` to verify all tests pass
-3. Commit with message: `[wasm] transforms: add static block initialization ES5 class tests`
-4. Push to `origin/worker/anvil-1`
-5. Update this plan file and push
+(none - awaiting new assignment from EM-Anvil)
 
 ## Task Queue
-(empty - will receive new tasks from EM after completing current assignment)
+(empty)
 
 ## Completed
+- [x] Added ES5 tests for static block initialization (6 tests): basic init, private field access, multiple blocks ordering, super reference, computed properties, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 488 pass).
 - [x] Added ES5 tests for super() ordering edge cases (6 tests): field initializers before/after, parameter properties, private fields, try/catch ordering, conditional fields, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 476 pass).
 - [x] Added ES5 tests for triple-slash directive patterns (6 tests): reference path, reference types, amd-module, reference lib, multiple directives, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 473 pass).
 - [x] Added ES5 tests for export assignment patterns (6 tests): basic export =, export = with namespace, import = require, export = with interface, export = function, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 470 pass).
