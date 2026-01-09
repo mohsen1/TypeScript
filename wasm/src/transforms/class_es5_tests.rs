@@ -35826,75 +35826,107 @@ class CapitalizedApiRouter extends ApiRouter<CapitalizedEndpoint> {
     );
 }
 
-// ============================================================================
-// DECLARATION MERGING PATTERN TESTS
-// ============================================================================
+// =============================================================================
+// INFER KEYWORD PATTERN TESTS - array element, function return, promise unwrap
+// =============================================================================
 
-/// Test interface merging with class implementation
 #[test]
-fn test_class_es5_declaration_merging_interface() {
+fn test_class_es5_infer_keyword_array_element() {
     let source = r#"
-interface Animal {
-    name: string;
-    age: number;
-}
+// Infer array element type pattern
+type ArrayElement<T> = T extends (infer U)[] ? U : never;
+type FirstElement<T extends unknown[]> = T extends [infer F, ...unknown[]] ? F : never;
+type LastElement<T extends unknown[]> = T extends [...unknown[], infer L] ? L : never;
 
-interface Animal {
-    species: string;
-    makeSound(): void;
-}
+class ArrayProcessor<T extends unknown[]> {
+    private items: T;
 
-interface Animal {
-    weight?: number;
-    isWild: boolean;
-}
-
-class Dog implements Animal {
-    name: string;
-    age: number;
-    species: string;
-    isWild: boolean;
-    weight?: number;
-
-    constructor(name: string, age: number) {
-        this.name = name;
-        this.age = age;
-        this.species = "Canis familiaris";
-        this.isWild = false;
+    constructor(items: T) {
+        this.items = items;
     }
 
-    makeSound(): void {
-        console.log("Woof!");
+    getFirst(): FirstElement<T> {
+        return this.items[0] as FirstElement<T>;
     }
 
-    setWeight(w: number): void {
-        this.weight = w;
+    getLast(): LastElement<T> {
+        return this.items[this.items.length - 1] as LastElement<T>;
     }
 
-    getInfo(): string {
-        return this.name + " (" + this.species + ")";
+    getAll(): T {
+        return this.items;
+    }
+
+    getLength(): number {
+        return this.items.length;
     }
 }
 
-class Cat implements Animal {
-    name: string;
-    age: number;
-    species: string;
-    isWild: boolean;
-
-    constructor(name: string, age: number, isWild: boolean = false) {
-        this.name = name;
-        this.age = age;
-        this.species = "Felis catus";
-        this.isWild = isWild;
+class NumberArrayProcessor extends ArrayProcessor<number[]> {
+    sum(): number {
+        return this.getAll().reduce((a, b) => a + b, 0);
     }
 
-    makeSound(): void {
-        console.log("Meow!");
+    average(): number {
+        const all = this.getAll();
+        return all.length > 0 ? this.sum() / all.length : 0;
     }
 
-    getInfo(): string {
-        return this.name + " - " + (this.isWild ? "Wild" : "Domestic");
+    max(): number {
+        return Math.max(...this.getAll());
+    }
+
+    min(): number {
+        return Math.min(...this.getAll());
+    }
+}
+
+class StringArrayProcessor extends ArrayProcessor<string[]> {
+    join(separator: string): string {
+        return this.getAll().join(separator);
+    }
+
+    toUpperCase(): string[] {
+        return this.getAll().map(s => s.toUpperCase());
+    }
+
+    toLowerCase(): string[] {
+        return this.getAll().map(s => s.toLowerCase());
+    }
+
+    filter(predicate: (s: string) => boolean): string[] {
+        return this.getAll().filter(predicate);
+    }
+}
+
+type Flatten<T> = T extends (infer U)[] ? Flatten<U> : T;
+
+class DeepArrayFlattener<T> {
+    private data: T;
+
+    constructor(data: T) {
+        this.data = data;
+    }
+
+    getData(): T {
+        return this.data;
+    }
+
+    isArray(): boolean {
+        return Array.isArray(this.data);
+    }
+
+    flatten(): Flatten<T>[] {
+        const result: Flatten<T>[] = [];
+        const flattenHelper = (arr: unknown): void => {
+            if (Array.isArray(arr)) {
+                arr.forEach(item => flattenHelper(item));
+            } else {
+                result.push(arr as Flatten<T>);
+            }
+        };
+        flattenHelper(this.data);
+        return result;
     }
 }
 "#;
@@ -35914,70 +35946,173 @@ class Cat implements Animal {
 
     let output = printer.get_output().to_string();
 
-    // Classes should be ES5 constructors
+    // Classes should be converted
     assert!(
-        output.contains("function Dog") && output.contains("function Cat"),
-        "Expected ES5 Dog and Cat classes: {}",
+        output.contains("ArrayProcessor") && output.contains("NumberArrayProcessor") && output.contains("StringArrayProcessor"),
+        "Expected infer array element type classes: {}",
         output
     );
 
-    // Methods should exist
+    // ArrayProcessor methods
     assert!(
-        output.contains("makeSound") && output.contains("getInfo"),
-        "Expected class methods: {}",
+        output.contains("getFirst") && output.contains("getLast") && output.contains("getAll"),
+        "Expected ArrayProcessor methods: {}",
         output
     );
 
-    // Interfaces should be stripped
+    // NumberArrayProcessor methods
     assert!(
-        !output.contains("interface Animal"),
-        "Expected interfaces to be stripped: {}",
+        output.contains("sum") && output.contains("average") && output.contains("max") && output.contains("min"),
+        "Expected NumberArrayProcessor methods: {}",
+        output
+    );
+
+    // StringArrayProcessor methods
+    assert!(
+        output.contains("join") && output.contains("toUpperCase") && output.contains("toLowerCase"),
+        "Expected StringArrayProcessor methods: {}",
+        output
+    );
+
+    // DeepArrayFlattener class
+    assert!(
+        output.contains("DeepArrayFlattener") && output.contains("flatten") && output.contains("isArray"),
+        "Expected DeepArrayFlattener class: {}",
+        output
+    );
+
+    // Type aliases should be stripped
+    assert!(
+        !output.contains("type ArrayElement") && !output.contains("type FirstElement") && !output.contains("type Flatten"),
+        "Expected type aliases to be stripped: {}",
         output
     );
 }
 
-/// Test namespace merging with function
 #[test]
-fn test_class_es5_declaration_merging_function_namespace() {
+fn test_class_es5_infer_keyword_function_return() {
     let source = r#"
-function greet(name: string): string {
-    return "Hello, " + name + "!";
+// Infer function return type pattern
+type ReturnType<T> = T extends (...args: unknown[]) => infer R ? R : never;
+type Parameters<T> = T extends (...args: infer P) => unknown ? P : never;
+type ConstructorParameters<T> = T extends new (...args: infer P) => unknown ? P : never;
+
+class FunctionWrapper<F extends (...args: unknown[]) => unknown> {
+    private fn: F;
+
+    constructor(fn: F) {
+        this.fn = fn;
+    }
+
+    call(...args: Parameters<F>): ReturnType<F> {
+        return this.fn(...args) as ReturnType<F>;
+    }
+
+    bind<T>(thisArg: T): FunctionWrapper<F> {
+        return new FunctionWrapper(this.fn.bind(thisArg) as F);
+    }
+
+    getFunction(): F {
+        return this.fn;
+    }
 }
 
-namespace greet {
-    export const defaultGreeting = "Hello";
-    export const version = "1.0.0";
+class MemoizedFunction<F extends (...args: unknown[]) => unknown> {
+    private fn: F;
+    private cache: Map<string, ReturnType<F>> = new Map();
 
-    export function formal(name: string): string {
-        return "Good day, " + name + ".";
+    constructor(fn: F) {
+        this.fn = fn;
     }
 
-    export function casual(name: string): string {
-        return "Hey " + name + "!";
+    call(...args: Parameters<F>): ReturnType<F> {
+        const key = JSON.stringify(args);
+        if (this.cache.has(key)) {
+            return this.cache.get(key)!;
+        }
+        const result = this.fn(...args) as ReturnType<F>;
+        this.cache.set(key, result);
+        return result;
+    }
+
+    clearCache(): void {
+        this.cache.clear();
+    }
+
+    getCacheSize(): number {
+        return this.cache.size;
+    }
+
+    hasCache(args: Parameters<F>): boolean {
+        return this.cache.has(JSON.stringify(args));
     }
 }
 
-class Greeter {
-    private prefix: string;
+class DebouncedFunction<F extends (...args: unknown[]) => unknown> {
+    private fn: F;
+    private delay: number;
+    private timeoutId: ReturnType<typeof setTimeout> | null = null;
 
-    constructor(prefix: string = greet.defaultGreeting) {
-        this.prefix = prefix;
+    constructor(fn: F, delay: number) {
+        this.fn = fn;
+        this.delay = delay;
     }
 
-    greet(name: string): string {
-        return this.prefix + ", " + name + "!";
+    call(...args: Parameters<F>): void {
+        if (this.timeoutId !== null) {
+            clearTimeout(this.timeoutId);
+        }
+        this.timeoutId = setTimeout(() => {
+            this.fn(...args);
+            this.timeoutId = null;
+        }, this.delay);
     }
 
-    greetFormal(name: string): string {
-        return greet.formal(name);
+    cancel(): void {
+        if (this.timeoutId !== null) {
+            clearTimeout(this.timeoutId);
+            this.timeoutId = null;
+        }
     }
 
-    greetCasual(name: string): string {
-        return greet.casual(name);
+    isPending(): boolean {
+        return this.timeoutId !== null;
     }
 
-    getVersion(): string {
-        return greet.version;
+    getDelay(): number {
+        return this.delay;
+    }
+}
+
+class ThrottledFunction<F extends (...args: unknown[]) => unknown> {
+    private fn: F;
+    private limit: number;
+    private lastCall: number = 0;
+
+    constructor(fn: F, limit: number) {
+        this.fn = fn;
+        this.limit = limit;
+    }
+
+    call(...args: Parameters<F>): ReturnType<F> | undefined {
+        const now = Date.now();
+        if (now - this.lastCall >= this.limit) {
+            this.lastCall = now;
+            return this.fn(...args) as ReturnType<F>;
+        }
+        return undefined;
+    }
+
+    reset(): void {
+        this.lastCall = 0;
+    }
+
+    getLimit(): number {
+        return this.limit;
+    }
+
+    getTimeSinceLastCall(): number {
+        return Date.now() - this.lastCall;
     }
 }
 "#;
@@ -35997,548 +36132,199 @@ class Greeter {
 
     let output = printer.get_output().to_string();
 
-    // Greeter class should be ES5 constructor
+    // Classes should be converted
     assert!(
-        output.contains("function Greeter"),
-        "Expected ES5 Greeter class: {}",
+        output.contains("FunctionWrapper") && output.contains("MemoizedFunction"),
+        "Expected infer function return type classes: {}",
         output
     );
 
-    // Greeter methods should exist
+    // FunctionWrapper methods
     assert!(
-        output.contains("greetFormal") && output.contains("greetCasual") && output.contains("getVersion"),
-        "Expected Greeter methods: {}",
+        output.contains("call") && output.contains("bind") && output.contains("getFunction"),
+        "Expected FunctionWrapper methods: {}",
         output
     );
 
-    // greet function and namespace should exist
+    // MemoizedFunction methods
     assert!(
-        output.contains("greet"),
-        "Expected greet function/namespace: {}",
+        output.contains("clearCache") && output.contains("getCacheSize") && output.contains("hasCache"),
+        "Expected MemoizedFunction methods: {}",
+        output
+    );
+
+    // DebouncedFunction class
+    assert!(
+        output.contains("DebouncedFunction") && output.contains("cancel") && output.contains("isPending"),
+        "Expected DebouncedFunction class: {}",
+        output
+    );
+
+    // ThrottledFunction class
+    assert!(
+        output.contains("ThrottledFunction") && output.contains("reset") && output.contains("getLimit"),
+        "Expected ThrottledFunction class: {}",
+        output
+    );
+
+    // Type aliases should be stripped
+    assert!(
+        !output.contains("type ReturnType") && !output.contains("type Parameters") && !output.contains("type ConstructorParameters"),
+        "Expected type aliases to be stripped: {}",
         output
     );
 }
 
-/// Test class merging with namespace (static-like members)
 #[test]
-fn test_class_es5_declaration_merging_class_namespace() {
+fn test_class_es5_infer_keyword_promise_unwrap() {
     let source = r#"
-class Color {
-    constructor(public r: number, public g: number, public b: number) {}
+// Infer promise unwrap type pattern
+type Awaited<T> = T extends Promise<infer U> ? Awaited<U> : T;
+type PromiseType<T> = T extends Promise<infer U> ? U : never;
+type UnwrapPromise<T> = T extends Promise<infer U> ? U : T;
 
-    toHex(): string {
-        const toHexPart = (n: number) => n.toString(16).padStart(2, '0');
-        return '#' + toHexPart(this.r) + toHexPart(this.g) + toHexPart(this.b);
+class AsyncWrapper<T> {
+    private promise: Promise<T>;
+
+    constructor(promise: Promise<T>) {
+        this.promise = promise;
     }
 
-    toRgb(): string {
-        return "rgb(" + this.r + ", " + this.g + ", " + this.b + ")";
+    then<U>(callback: (value: T) => U | Promise<U>): AsyncWrapper<U> {
+        return new AsyncWrapper(this.promise.then(callback));
     }
 
-    blend(other: Color, ratio: number = 0.5): Color {
-        return new Color(
-            Math.round(this.r * (1 - ratio) + other.r * ratio),
-            Math.round(this.g * (1 - ratio) + other.g * ratio),
-            Math.round(this.b * (1 - ratio) + other.b * ratio)
-        );
-    }
-}
-
-namespace Color {
-    export const RED = new Color(255, 0, 0);
-    export const GREEN = new Color(0, 255, 0);
-    export const BLUE = new Color(0, 0, 255);
-    export const WHITE = new Color(255, 255, 255);
-    export const BLACK = new Color(0, 0, 0);
-
-    export function fromHex(hex: string): Color {
-        const r = parseInt(hex.slice(1, 3), 16);
-        const g = parseInt(hex.slice(3, 5), 16);
-        const b = parseInt(hex.slice(5, 7), 16);
-        return new Color(r, g, b);
+    catch<U>(callback: (error: unknown) => U | Promise<U>): AsyncWrapper<T | U> {
+        return new AsyncWrapper(this.promise.catch(callback));
     }
 
-    export function random(): Color {
-        return new Color(
-            Math.floor(Math.random() * 256),
-            Math.floor(Math.random() * 256),
-            Math.floor(Math.random() * 256)
-        );
+    finally(callback: () => void): AsyncWrapper<T> {
+        return new AsyncWrapper(this.promise.finally(callback));
+    }
+
+    getPromise(): Promise<T> {
+        return this.promise;
     }
 }
 
-class ColorPalette {
-    private colors: Color[] = [];
+class AsyncResult<T> {
+    private valuePromise: Promise<T>;
 
-    addColor(color: Color): void {
-        this.colors.push(color);
+    constructor(valuePromise: Promise<T>) {
+        this.valuePromise = valuePromise;
     }
 
-    addPrimaries(): void {
-        this.colors.push(Color.RED);
-        this.colors.push(Color.GREEN);
-        this.colors.push(Color.BLUE);
+    async getValue(): Promise<T> {
+        return this.valuePromise;
     }
 
-    addFromHex(hex: string): void {
-        this.colors.push(Color.fromHex(hex));
+    async map<U>(fn: (value: T) => U): Promise<U> {
+        const value = await this.valuePromise;
+        return fn(value);
     }
 
-    addRandom(): void {
-        this.colors.push(Color.random());
+    async flatMap<U>(fn: (value: T) => Promise<U>): Promise<U> {
+        const value = await this.valuePromise;
+        return fn(value);
     }
 
-    getColors(): Color[] {
-        return [...this.colors];
+    async filter(predicate: (value: T) => boolean): Promise<T | null> {
+        const value = await this.valuePromise;
+        return predicate(value) ? value : null;
     }
 }
-"#;
 
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
+class PromiseQueue<T> {
+    private queue: Promise<T>[] = [];
 
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Color class should be ES5 constructor
-    assert!(
-        output.contains("function Color"),
-        "Expected ES5 Color class: {}",
-        output
-    );
-
-    // ColorPalette class should be ES5 constructor
-    assert!(
-        output.contains("function ColorPalette"),
-        "Expected ES5 ColorPalette class: {}",
-        output
-    );
-
-    // Color methods should exist
-    assert!(
-        output.contains("toHex") && output.contains("toRgb") && output.contains("blend"),
-        "Expected Color methods: {}",
-        output
-    );
-
-    // ColorPalette methods should exist
-    assert!(
-        output.contains("addColor") && output.contains("addPrimaries") && output.contains("addFromHex"),
-        "Expected ColorPalette methods: {}",
-        output
-    );
-}
-
-/// Test enum merging with namespace
-#[test]
-fn test_class_es5_declaration_merging_enum_namespace() {
-    let source = r#"
-enum Status {
-    Pending = 0,
-    Active = 1,
-    Completed = 2,
-    Failed = 3
-}
-
-namespace Status {
-    export function isTerminal(status: Status): boolean {
-        return status === Status.Completed || status === Status.Failed;
+    add(promise: Promise<T>): void {
+        this.queue.push(promise);
     }
 
-    export function isPending(status: Status): boolean {
-        return status === Status.Pending;
+    async all(): Promise<T[]> {
+        return Promise.all(this.queue);
     }
 
-    export function toString(status: Status): string {
-        switch (status) {
-            case Status.Pending: return "Pending";
-            case Status.Active: return "Active";
-            case Status.Completed: return "Completed";
-            case Status.Failed: return "Failed";
-            default: return "Unknown";
+    async race(): Promise<T> {
+        return Promise.race(this.queue);
+    }
+
+    async allSettled(): Promise<PromiseSettledResult<T>[]> {
+        return Promise.allSettled(this.queue);
+    }
+
+    clear(): void {
+        this.queue = [];
+    }
+
+    getCount(): number {
+        return this.queue.length;
+    }
+}
+
+class RetryablePromise<T> {
+    private factory: () => Promise<T>;
+    private maxRetries: number;
+    private delay: number;
+
+    constructor(factory: () => Promise<T>, maxRetries: number, delay: number) {
+        this.factory = factory;
+        this.maxRetries = maxRetries;
+        this.delay = delay;
+    }
+
+    async execute(): Promise<T> {
+        let lastError: unknown;
+        for (let i = 0; i <= this.maxRetries; i++) {
+            try {
+                return await this.factory();
+            } catch (error) {
+                lastError = error;
+                if (i < this.maxRetries) {
+                    await this.sleep(this.delay);
+                }
+            }
         }
+        throw lastError;
     }
 
-    export const DEFAULT = Status.Pending;
-}
-
-class Task {
-    private status: Status;
-    private name: string;
-
-    constructor(name: string) {
-        this.name = name;
-        this.status = Status.DEFAULT;
+    private sleep(ms: number): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    start(): void {
-        if (this.status === Status.Pending) {
-            this.status = Status.Active;
-        }
+    getMaxRetries(): number {
+        return this.maxRetries;
     }
 
-    complete(): void {
-        if (this.status === Status.Active) {
-            this.status = Status.Completed;
-        }
-    }
-
-    fail(): void {
-        this.status = Status.Failed;
-    }
-
-    isFinished(): boolean {
-        return Status.isTerminal(this.status);
-    }
-
-    getStatusString(): string {
-        return Status.toString(this.status);
-    }
-
-    getName(): string {
-        return this.name;
+    getDelay(): number {
+        return this.delay;
     }
 }
 
-class TaskManager {
-    private tasks: Task[] = [];
+class TimeoutPromise<T> {
+    private promise: Promise<T>;
+    private timeout: number;
 
-    addTask(name: string): Task {
-        const task = new Task(name);
-        this.tasks.push(task);
-        return task;
+    constructor(promise: Promise<T>, timeout: number) {
+        this.promise = promise;
+        this.timeout = timeout;
     }
 
-    getActiveTasks(): Task[] {
-        return this.tasks.filter(t => !t.isFinished());
-    }
-
-    getCompletedTasks(): Task[] {
-        return this.tasks.filter(t => t.isFinished());
-    }
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Task class should be ES5 constructor
-    assert!(
-        output.contains("function Task"),
-        "Expected ES5 Task class: {}",
-        output
-    );
-
-    // TaskManager class should be ES5 constructor
-    assert!(
-        output.contains("function TaskManager"),
-        "Expected ES5 TaskManager class: {}",
-        output
-    );
-
-    // Task methods should exist
-    assert!(
-        output.contains("start") && output.contains("complete") && output.contains("fail"),
-        "Expected Task methods: {}",
-        output
-    );
-
-    // Status enum should exist
-    assert!(
-        output.contains("Status"),
-        "Expected Status enum: {}",
-        output
-    );
-}
-
-/// Test multiple interface merging for extension
-#[test]
-fn test_class_es5_declaration_merging_interface_extension() {
-    let source = r#"
-interface Serializable {
-    serialize(): string;
-}
-
-interface Serializable {
-    deserialize(data: string): void;
-}
-
-interface Comparable<T> {
-    compareTo(other: T): number;
-}
-
-interface Comparable<T> {
-    equals(other: T): boolean;
-}
-
-class Person implements Serializable, Comparable<Person> {
-    constructor(
-        public firstName: string,
-        public lastName: string,
-        public age: number
-    ) {}
-
-    serialize(): string {
-        return JSON.stringify({
-            firstName: this.firstName,
-            lastName: this.lastName,
-            age: this.age
-        });
-    }
-
-    deserialize(data: string): void {
-        const obj = JSON.parse(data);
-        this.firstName = obj.firstName;
-        this.lastName = obj.lastName;
-        this.age = obj.age;
-    }
-
-    compareTo(other: Person): number {
-        if (this.lastName !== other.lastName) {
-            return this.lastName.localeCompare(other.lastName);
-        }
-        return this.firstName.localeCompare(other.firstName);
-    }
-
-    equals(other: Person): boolean {
-        return this.firstName === other.firstName &&
-               this.lastName === other.lastName &&
-               this.age === other.age;
-    }
-
-    getFullName(): string {
-        return this.firstName + " " + this.lastName;
-    }
-}
-
-class Employee extends Person {
-    constructor(
-        firstName: string,
-        lastName: string,
-        age: number,
-        public employeeId: string,
-        public department: string
-    ) {
-        super(firstName, lastName, age);
-    }
-
-    serialize(): string {
-        return JSON.stringify({
-            firstName: this.firstName,
-            lastName: this.lastName,
-            age: this.age,
-            employeeId: this.employeeId,
-            department: this.department
-        });
-    }
-
-    deserialize(data: string): void {
-        const obj = JSON.parse(data);
-        this.firstName = obj.firstName;
-        this.lastName = obj.lastName;
-        this.age = obj.age;
-        this.employeeId = obj.employeeId;
-        this.department = obj.department;
-    }
-
-    getEmployeeInfo(): string {
-        return this.getFullName() + " (" + this.employeeId + ")";
-    }
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Person class should be ES5 constructor
-    assert!(
-        output.contains("function Person"),
-        "Expected ES5 Person class: {}",
-        output
-    );
-
-    // Employee class should be ES5 constructor
-    assert!(
-        output.contains("function Employee"),
-        "Expected ES5 Employee class: {}",
-        output
-    );
-
-    // Merged interface methods should exist
-    assert!(
-        output.contains("serialize") && output.contains("deserialize"),
-        "Expected Serializable methods: {}",
-        output
-    );
-
-    assert!(
-        output.contains("compareTo") && output.contains("equals"),
-        "Expected Comparable methods: {}",
-        output
-    );
-
-    // __extends helper for inheritance
-    assert!(
-        output.contains("__extends") || output.contains("_super"),
-        "Expected inheritance pattern: {}",
-        output
-    );
-}
-
-/// Test combined declaration merging patterns
-#[test]
-fn test_class_es5_declaration_merging_combined() {
-    let source = r#"
-// Interface merging
-interface Config {
-    host: string;
-    port: number;
-}
-
-interface Config {
-    timeout: number;
-    retries: number;
-}
-
-// Function with namespace
-function createLogger(name: string): Logger {
-    return new Logger(name);
-}
-
-namespace createLogger {
-    export const defaultLevel = "info";
-    export function withTimestamp(name: string): Logger {
-        const logger = new Logger(name);
-        logger.enableTimestamp();
-        return logger;
-    }
-}
-
-// Class with namespace
-class Logger {
-    private name: string;
-    private level: string;
-    private timestampEnabled: boolean = false;
-
-    constructor(name: string) {
-        this.name = name;
-        this.level = createLogger.defaultLevel;
-    }
-
-    setLevel(level: string): void {
-        this.level = level;
-    }
-
-    enableTimestamp(): void {
-        this.timestampEnabled = true;
-    }
-
-    log(message: string): void {
-        const prefix = this.timestampEnabled ? new Date().toISOString() + " " : "";
-        console.log(prefix + "[" + this.name + "] " + message);
-    }
-
-    info(message: string): void {
-        this.log("[INFO] " + message);
-    }
-
-    error(message: string): void {
-        this.log("[ERROR] " + message);
-    }
-}
-
-namespace Logger {
-    export const VERSION = "2.0.0";
-    export function create(name: string): Logger {
-        return new Logger(name);
-    }
-}
-
-// Enum with namespace
-enum LogLevel {
-    DEBUG = 0,
-    INFO = 1,
-    WARN = 2,
-    ERROR = 3
-}
-
-namespace LogLevel {
-    export function fromString(level: string): LogLevel {
-        switch (level.toLowerCase()) {
-            case "debug": return LogLevel.DEBUG;
-            case "info": return LogLevel.INFO;
-            case "warn": return LogLevel.WARN;
-            case "error": return LogLevel.ERROR;
-            default: return LogLevel.INFO;
-        }
-    }
-}
-
-class Application {
-    private config: Config;
-    private logger: Logger;
-
-    constructor(config: Config) {
-        this.config = config;
-        this.logger = createLogger.withTimestamp("App");
-    }
-
-    getHost(): string {
-        return this.config.host;
-    }
-
-    getPort(): number {
-        return this.config.port;
+    async execute(): Promise<T> {
+        return Promise.race([
+            this.promise,
+            new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error("Timeout")), this.timeout)
+            )
+        ]);
     }
 
     getTimeout(): number {
-        return this.config.timeout;
+        return this.timeout;
     }
 
-    log(message: string): void {
-        this.logger.info(message);
-    }
-
-    getLoggerVersion(): string {
-        return Logger.VERSION;
-    }
-
-    setLogLevel(levelStr: string): void {
-        const level = LogLevel.fromString(levelStr);
-        this.logger.setLevel(levelStr);
+    getPromise(): Promise<T> {
+        return this.promise;
     }
 }
 "#;
@@ -36558,45 +36344,52 @@ class Application {
 
     let output = printer.get_output().to_string();
 
-    // Logger class should be ES5 constructor
+    // Classes should be converted
     assert!(
-        output.contains("function Logger"),
-        "Expected ES5 Logger class: {}",
+        output.contains("AsyncWrapper") && output.contains("AsyncResult") && output.contains("PromiseQueue"),
+        "Expected infer promise unwrap type classes: {}",
         output
     );
 
-    // Application class should be ES5 constructor
+    // AsyncWrapper methods
     assert!(
-        output.contains("function Application"),
-        "Expected ES5 Application class: {}",
+        output.contains("then") && output.contains("catch") && output.contains("finally"),
+        "Expected AsyncWrapper methods: {}",
         output
     );
 
-    // Logger methods
+    // AsyncResult methods
     assert!(
-        output.contains("setLevel") && output.contains("enableTimestamp") && output.contains(".log"),
-        "Expected Logger methods: {}",
+        output.contains("getValue") && output.contains("map") && output.contains("flatMap"),
+        "Expected AsyncResult methods: {}",
         output
     );
 
-    // Application methods
+    // PromiseQueue methods
     assert!(
-        output.contains("getHost") && output.contains("getPort") && output.contains("getTimeout"),
-        "Expected Application methods: {}",
+        output.contains("all") && output.contains("race") && output.contains("allSettled"),
+        "Expected PromiseQueue methods: {}",
         output
     );
 
-    // createLogger function should exist
+    // RetryablePromise class
     assert!(
-        output.contains("createLogger"),
-        "Expected createLogger function: {}",
+        output.contains("RetryablePromise") && output.contains("execute") && output.contains("getMaxRetries"),
+        "Expected RetryablePromise class: {}",
         output
     );
 
-    // LogLevel enum should exist
+    // TimeoutPromise class
     assert!(
-        output.contains("LogLevel"),
-        "Expected LogLevel enum: {}",
+        output.contains("TimeoutPromise") && output.contains("getTimeout"),
+        "Expected TimeoutPromise class: {}",
+        output
+    );
+
+    // Type aliases should be stripped
+    assert!(
+        !output.contains("type Awaited") && !output.contains("type PromiseType") && !output.contains("type UnwrapPromise"),
+        "Expected type aliases to be stripped: {}",
         output
     );
 }
