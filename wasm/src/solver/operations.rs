@@ -21,6 +21,7 @@
 use crate::interner::Atom;
 use crate::solver::types::*;
 use crate::solver::{
+    apparent_object_member_kind,
     apparent_primitive_member_kind,
     ApparentMemberKind,
     QueryDatabase,
@@ -1512,9 +1513,8 @@ impl<'a> PropertyAccessEvaluator<'a> {
                         from_index_signature: false,
                     };
                 }
-                let apparent = self.resolve_apparent_property(IntrinsicKind::Object, obj_type, prop_name, prop_atom);
-                if let PropertyAccessResult::Success { .. } = apparent {
-                    return apparent;
+                if let Some(result) = self.resolve_object_member(prop_name, prop_atom) {
+                    return result;
                 }
                 PropertyAccessResult::PropertyNotFound {
                     type_id: obj_type,
@@ -1534,9 +1534,8 @@ impl<'a> PropertyAccessEvaluator<'a> {
                     };
                 }
 
-                let apparent = self.resolve_apparent_property(IntrinsicKind::Object, obj_type, prop_name, prop_atom);
-                if let PropertyAccessResult::Success { .. } = apparent {
-                    return apparent;
+                if let Some(result) = self.resolve_object_member(prop_name, prop_atom) {
+                    return result;
                 }
 
                 // Check string index signature (THIS is the case for error 4111)
@@ -1655,19 +1654,66 @@ impl<'a> PropertyAccessEvaluator<'a> {
 
             TypeKey::Intersection(members) => {
                 let members = self.interner.type_list(members);
-                // Property access on intersection: check each member
                 let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
+                let mut results = Vec::new();
+                let mut any_from_index = false;
+                let mut nullable_causes = Vec::new();
+                let mut saw_unknown = false;
+
                 for &member in members.iter() {
-                    if let PropertyAccessResult::Success { type_id, from_index_signature } =
-                        self.resolve_property_access_inner(member, prop_name, Some(prop_atom))
-                    {
-                        return PropertyAccessResult::Success { type_id, from_index_signature };
+                    match self.resolve_property_access_inner(member, prop_name, Some(prop_atom)) {
+                        PropertyAccessResult::Success { type_id, from_index_signature } => {
+                            results.push(type_id);
+                            if from_index_signature {
+                                any_from_index = true;
+                            }
+                        }
+                        PropertyAccessResult::PossiblyNullOrUndefined { property_type, cause } => {
+                            if let Some(t) = property_type {
+                                results.push(t);
+                            }
+                            nullable_causes.push(cause);
+                        }
+                        PropertyAccessResult::IsUnknown => {
+                            saw_unknown = true;
+                        }
+                        PropertyAccessResult::PropertyNotFound { .. } => {}
                     }
                 }
 
-                PropertyAccessResult::PropertyNotFound {
-                    type_id: obj_type,
-                    property_name: prop_atom,
+                if results.is_empty() {
+                    if !nullable_causes.is_empty() {
+                        let cause = if nullable_causes.len() == 1 {
+                            nullable_causes[0]
+                        } else {
+                            self.interner.union(nullable_causes)
+                        };
+                        return PropertyAccessResult::PossiblyNullOrUndefined {
+                            property_type: None,
+                            cause,
+                        };
+                    }
+                    if saw_unknown {
+                        return PropertyAccessResult::IsUnknown;
+                    }
+                    return PropertyAccessResult::PropertyNotFound {
+                        type_id: obj_type,
+                        property_name: prop_atom,
+                    };
+                }
+
+                let mut type_id = if results.len() == 1 {
+                    results[0]
+                } else {
+                    self.interner.intersection(results)
+                };
+                if any_from_index && self.no_unchecked_indexed_access {
+                    type_id = self.add_undefined_if_unchecked(type_id);
+                }
+
+                PropertyAccessResult::Success {
+                    type_id,
+                    from_index_signature: any_from_index,
                 }
             }
 
@@ -1733,7 +1779,11 @@ impl<'a> PropertyAccessEvaluator<'a> {
 
             TypeKey::Intrinsic(IntrinsicKind::Object) => {
                 let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
-                self.resolve_apparent_property(IntrinsicKind::Object, obj_type, prop_name, prop_atom)
+                self.resolve_object_member(prop_name, prop_atom)
+                    .unwrap_or(PropertyAccessResult::PropertyNotFound {
+                        type_id: obj_type,
+                        property_name: prop_atom,
+                    })
             }
 
             TypeKey::Array(_) => {
@@ -1853,6 +1903,17 @@ impl<'a> PropertyAccessEvaluator<'a> {
                 type_id: owner_type,
                 property_name: prop_atom,
             },
+        }
+    }
+
+    fn resolve_object_member(&self, prop_name: &str, _prop_atom: Atom) -> Option<PropertyAccessResult> {
+        match apparent_object_member_kind(prop_name) {
+            Some(ApparentMemberKind::Value(type_id)) => Some(PropertyAccessResult::Success {
+                type_id,
+                from_index_signature: false,
+            }),
+            Some(ApparentMemberKind::Method(return_type)) => Some(self.method_result(return_type)),
+            None => None,
         }
     }
 
@@ -2316,10 +2377,15 @@ impl<'a> PropertyAccessEvaluator<'a> {
                 type_id: self.any_args_function(TypeId::ANY),
                 from_index_signature: false,
             },
-            _ => PropertyAccessResult::PropertyNotFound {
-                type_id: func_type,
-                property_name: prop_atom,
-            },
+            _ => {
+                if let Some(result) = self.resolve_object_member(prop_name, prop_atom) {
+                    return result;
+                }
+                PropertyAccessResult::PropertyNotFound {
+                    type_id: func_type,
+                    property_name: prop_atom,
+                }
+            }
         }
     }
 }

@@ -2159,6 +2159,9 @@ impl<'a> ThinCheckerState<'a> {
                     number_index: derived_shape.number_index.clone().or_else(|| base_shape.number_index.clone()),
                 })
             }
+            (_, Some(TypeKey::Intersection(_))) | (Some(TypeKey::Intersection(_)), _) => {
+                self.ctx.types.intersection2(derived, base)
+            }
             _ => derived,
         }
     }
@@ -4070,6 +4073,26 @@ impl<'a> ThinCheckerState<'a> {
         TypeId::ANY
     }
 
+    fn apply_this_substitution_to_call_return(
+        &mut self,
+        return_type: TypeId,
+        callee_idx: NodeIndex,
+    ) -> TypeId {
+        if let Some(receiver_type) = self.get_call_receiver_type(callee_idx) {
+            return self.substitute_this_type(return_type, receiver_type);
+        }
+        return_type
+    }
+
+    fn get_call_receiver_type(&mut self, callee_idx: NodeIndex) -> Option<TypeId> {
+        let node = self.ctx.arena.get(callee_idx)?;
+        let access = self.ctx.arena.get_access_expr(node)?;
+        let receiver_type = self.get_type_of_node(access.expression);
+        let receiver_type = self.evaluate_application_type(receiver_type);
+        let receiver_type = self.resolve_type_for_property_access(receiver_type);
+        Some(receiver_type)
+    }
+
     /// Get type of call expression.
     fn get_type_of_call_expression(&mut self, idx: NodeIndex) -> TypeId {
         use crate::solver::{CallEvaluator, CallResult, CompatChecker, TypeKey};
@@ -4108,7 +4131,7 @@ impl<'a> ThinCheckerState<'a> {
         // Overload candidates need signature-specific contextual typing.
         if let Some(signatures) = overload_signatures.as_deref() {
             if let Some(return_type) = self.resolve_overloaded_call_with_signatures(args, signatures) {
-                return return_type;
+                return self.apply_this_substitution_to_call_return(return_type, call.expression);
             }
         }
 
@@ -4126,7 +4149,9 @@ impl<'a> ThinCheckerState<'a> {
         let result = evaluator.resolve_call(callee_type, &arg_types);
 
         match result {
-            CallResult::Success(return_type) => return_type,
+            CallResult::Success(return_type) => {
+                self.apply_this_substitution_to_call_return(return_type, call.expression)
+            }
 
             CallResult::NotCallable { .. } => {
                 self.error_not_callable_at(callee_type, call.expression);
@@ -6099,9 +6124,9 @@ impl<'a> ThinCheckerState<'a> {
             return body_type;
         }
 
-        // Recursively evaluate the type arguments first
+        // Resolve type arguments so distributive conditionals can see unions.
         let evaluated_args: Vec<TypeId> = app.args.iter()
-            .map(|&arg| self.evaluate_application_type(arg))
+            .map(|&arg| self.evaluate_type_with_env(arg))
             .collect();
 
         // Create substitution and instantiate
@@ -6112,7 +6137,10 @@ impl<'a> ThinCheckerState<'a> {
         let result = self.evaluate_application_type(instantiated);
 
         // If the result is a Mapped type, try to evaluate it with symbol resolution
-        self.evaluate_mapped_type_with_resolution(result)
+        let result = self.evaluate_mapped_type_with_resolution(result);
+
+        // Evaluate meta-types (conditional, index access, keyof) with symbol resolution
+        self.evaluate_type_with_env(result)
     }
 
     /// Evaluate a mapped type with symbol resolution.
@@ -6211,8 +6239,37 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    fn evaluate_type_with_env(&mut self, type_id: TypeId) -> TypeId {
+        use crate::solver::TypeEvaluator;
+
+        self.ensure_application_symbols_resolved(type_id);
+
+        let env = self.ctx.type_env.borrow();
+        let mut evaluator = TypeEvaluator::with_resolver(self.ctx.types, &*env);
+        evaluator.evaluate(type_id)
+    }
+
+    fn resolve_global_interface_type(&mut self, name: &str) -> Option<TypeId> {
+        if let Some(sym_id) = self.ctx.binder.file_locals.get(name) {
+            return Some(self.type_reference_symbol_type(sym_id));
+        }
+        self.resolve_lib_type_by_name(name)
+    }
+
+    fn apply_function_interface_for_property_access(&mut self, type_id: TypeId) -> TypeId {
+        let Some(function_type) = self.resolve_global_interface_type("Function") else {
+            return type_id;
+        };
+        if function_type == TypeId::ANY || function_type == TypeId::ERROR || function_type == TypeId::UNKNOWN {
+            return type_id;
+        }
+        self.ctx.types.intersection2(type_id, function_type)
+    }
+
     fn resolve_type_for_property_access(&mut self, type_id: TypeId) -> TypeId {
         use rustc_hash::FxHashSet;
+
+        self.ensure_application_symbols_resolved(type_id);
 
         let mut visited = FxHashSet::default();
         self.resolve_type_for_property_access_inner(type_id, &mut visited)
@@ -6270,6 +6327,17 @@ impl<'a> ThinCheckerState<'a> {
                     type_id
                 }
             }
+            TypeKey::Conditional(_)
+            | TypeKey::Mapped(_)
+            | TypeKey::IndexAccess(_, _)
+            | TypeKey::KeyOf(_) => {
+                let evaluated = self.evaluate_type_with_env(type_id);
+                if evaluated == type_id {
+                    type_id
+                } else {
+                    self.resolve_type_for_property_access_inner(evaluated, visited)
+                }
+            }
             TypeKey::Union(members_id) => {
                 let members = self.ctx.types.type_list(members_id);
                 let resolved_members: Vec<TypeId> = members
@@ -6289,8 +6357,584 @@ impl<'a> ThinCheckerState<'a> {
             TypeKey::ReadonlyType(inner) => {
                 self.resolve_type_for_property_access_inner(inner, visited)
             }
+            TypeKey::TypeParameter(info) | TypeKey::Infer(info) => {
+                if let Some(constraint) = info.constraint {
+                    self.resolve_type_for_property_access_inner(constraint, visited)
+                } else {
+                    type_id
+                }
+            }
+            TypeKey::Function(_) | TypeKey::Callable(_) => {
+                let expanded = self.apply_function_interface_for_property_access(type_id);
+                if expanded == type_id {
+                    type_id
+                } else {
+                    self.resolve_type_for_property_access_inner(expanded, visited)
+                }
+            }
             _ => type_id,
         }
+    }
+
+    fn substitute_this_type(&mut self, type_id: TypeId, this_type: TypeId) -> TypeId {
+        use rustc_hash::FxHashMap;
+
+        let mut cache = FxHashMap::default();
+        self.substitute_this_type_inner(type_id, this_type, &mut cache)
+    }
+
+    fn substitute_this_type_inner(
+        &mut self,
+        type_id: TypeId,
+        this_type: TypeId,
+        cache: &mut rustc_hash::FxHashMap<TypeId, TypeId>,
+    ) -> TypeId {
+        use crate::solver::{
+            CallSignature, CallableShape, ConditionalType, FunctionShape, IndexSignature, MappedType,
+            ObjectShape, ParamInfo, PropertyInfo, TemplateSpan, TupleElement, TypeKey, TypeParamInfo,
+            TypePredicate,
+        };
+
+        if type_id == this_type {
+            return type_id;
+        }
+
+        if let Some(&cached) = cache.get(&type_id) {
+            return cached;
+        }
+
+        let Some(key) = self.ctx.types.lookup(type_id) else {
+            return type_id;
+        };
+
+        cache.insert(type_id, type_id);
+
+        let result = match key {
+            TypeKey::ThisType => this_type,
+            TypeKey::Union(members_id) => {
+                let members = self.ctx.types.type_list(members_id);
+                let mut changed = false;
+                let new_members: Vec<TypeId> = members
+                    .iter()
+                    .map(|&member| {
+                        let new_member = self.substitute_this_type_inner(member, this_type, cache);
+                        if new_member != member {
+                            changed = true;
+                        }
+                        new_member
+                    })
+                    .collect();
+                if changed {
+                    self.ctx.types.union(new_members)
+                } else {
+                    type_id
+                }
+            }
+            TypeKey::Intersection(members_id) => {
+                let members = self.ctx.types.type_list(members_id);
+                let mut changed = false;
+                let new_members: Vec<TypeId> = members
+                    .iter()
+                    .map(|&member| {
+                        let new_member = self.substitute_this_type_inner(member, this_type, cache);
+                        if new_member != member {
+                            changed = true;
+                        }
+                        new_member
+                    })
+                    .collect();
+                if changed {
+                    self.ctx.types.intersection(new_members)
+                } else {
+                    type_id
+                }
+            }
+            TypeKey::Array(elem) => {
+                let new_elem = self.substitute_this_type_inner(elem, this_type, cache);
+                if new_elem == elem {
+                    type_id
+                } else {
+                    self.ctx.types.array(new_elem)
+                }
+            }
+            TypeKey::Tuple(elems_id) => {
+                let elems = self.ctx.types.tuple_list(elems_id);
+                let mut changed = false;
+                let new_elems: Vec<TupleElement> = elems
+                    .iter()
+                    .map(|elem| {
+                        let new_type = self.substitute_this_type_inner(elem.type_id, this_type, cache);
+                        if new_type != elem.type_id {
+                            changed = true;
+                        }
+                        TupleElement {
+                            type_id: new_type,
+                            name: elem.name,
+                            optional: elem.optional,
+                            rest: elem.rest,
+                        }
+                    })
+                    .collect();
+                if changed {
+                    self.ctx.types.tuple(new_elems)
+                } else {
+                    type_id
+                }
+            }
+            TypeKey::Object(shape_id) => {
+                let shape = self.ctx.types.object_shape(shape_id);
+                let mut changed = false;
+                let props: Vec<PropertyInfo> = shape
+                    .properties
+                    .iter()
+                    .map(|prop| {
+                        let new_type = self.substitute_this_type_inner(prop.type_id, this_type, cache);
+                        let new_write =
+                            self.substitute_this_type_inner(prop.write_type, this_type, cache);
+                        if new_type != prop.type_id || new_write != prop.write_type {
+                            changed = true;
+                        }
+                        PropertyInfo {
+                            name: prop.name,
+                            type_id: new_type,
+                            write_type: new_write,
+                            optional: prop.optional,
+                            readonly: prop.readonly,
+                            is_method: prop.is_method,
+                        }
+                    })
+                    .collect();
+                if changed {
+                    self.ctx.types.object(props)
+                } else {
+                    type_id
+                }
+            }
+            TypeKey::ObjectWithIndex(shape_id) => {
+                let shape = self.ctx.types.object_shape(shape_id);
+                let mut changed = false;
+                let props: Vec<PropertyInfo> = shape
+                    .properties
+                    .iter()
+                    .map(|prop| {
+                        let new_type = self.substitute_this_type_inner(prop.type_id, this_type, cache);
+                        let new_write =
+                            self.substitute_this_type_inner(prop.write_type, this_type, cache);
+                        if new_type != prop.type_id || new_write != prop.write_type {
+                            changed = true;
+                        }
+                        PropertyInfo {
+                            name: prop.name,
+                            type_id: new_type,
+                            write_type: new_write,
+                            optional: prop.optional,
+                            readonly: prop.readonly,
+                            is_method: prop.is_method,
+                        }
+                    })
+                    .collect();
+                let string_index = shape.string_index.as_ref().map(|idx| {
+                    let new_key = self.substitute_this_type_inner(idx.key_type, this_type, cache);
+                    let new_value =
+                        self.substitute_this_type_inner(idx.value_type, this_type, cache);
+                    if new_key != idx.key_type || new_value != idx.value_type {
+                        changed = true;
+                    }
+                    IndexSignature {
+                        key_type: new_key,
+                        value_type: new_value,
+                        readonly: idx.readonly,
+                    }
+                });
+                let number_index = shape.number_index.as_ref().map(|idx| {
+                    let new_key = self.substitute_this_type_inner(idx.key_type, this_type, cache);
+                    let new_value =
+                        self.substitute_this_type_inner(idx.value_type, this_type, cache);
+                    if new_key != idx.key_type || new_value != idx.value_type {
+                        changed = true;
+                    }
+                    IndexSignature {
+                        key_type: new_key,
+                        value_type: new_value,
+                        readonly: idx.readonly,
+                    }
+                });
+                if changed {
+                    self.ctx.types.object_with_index(ObjectShape {
+                        properties: props,
+                        string_index,
+                        number_index,
+                    })
+                } else {
+                    type_id
+                }
+            }
+            TypeKey::Function(shape_id) => {
+                let shape = self.ctx.types.function_shape(shape_id);
+                let mut changed = false;
+                let params: Vec<ParamInfo> = shape
+                    .params
+                    .iter()
+                    .map(|param| {
+                        let new_type =
+                            self.substitute_this_type_inner(param.type_id, this_type, cache);
+                        if new_type != param.type_id {
+                            changed = true;
+                        }
+                        ParamInfo {
+                            name: param.name,
+                            type_id: new_type,
+                            optional: param.optional,
+                            rest: param.rest,
+                        }
+                    })
+                    .collect();
+                let this_param = shape.this_type.map(|this_param| {
+                    let new_type =
+                        self.substitute_this_type_inner(this_param, this_type, cache);
+                    if new_type != this_param {
+                        changed = true;
+                    }
+                    new_type
+                });
+                let return_type =
+                    self.substitute_this_type_inner(shape.return_type, this_type, cache);
+                if return_type != shape.return_type {
+                    changed = true;
+                }
+                let type_predicate = shape.type_predicate.as_ref().map(|pred| {
+                    let new_pred_type = pred.type_id.map(|pred_type| {
+                        let new_type =
+                            self.substitute_this_type_inner(pred_type, this_type, cache);
+                        if new_type != pred_type {
+                            changed = true;
+                        }
+                        new_type
+                    });
+                    if new_pred_type != pred.type_id {
+                        changed = true;
+                    }
+                    TypePredicate {
+                        asserts: pred.asserts,
+                        target: pred.target.clone(),
+                        type_id: new_pred_type,
+                    }
+                });
+                if changed {
+                    self.ctx.types.function(FunctionShape {
+                        type_params: shape.type_params.clone(),
+                        params,
+                        this_type: this_param,
+                        return_type,
+                        type_predicate,
+                        is_constructor: shape.is_constructor,
+                    })
+                } else {
+                    type_id
+                }
+            }
+            TypeKey::Callable(shape_id) => {
+                let shape = self.ctx.types.callable_shape(shape_id);
+                let mut changed = false;
+                let mut map_signature = |sig: &CallSignature,
+                                     this_type: TypeId,
+                                     cache: &mut rustc_hash::FxHashMap<TypeId, TypeId>,
+                                     ctx: &mut ThinCheckerState|
+                 -> CallSignature {
+                    let mut local_changed = false;
+                    let params: Vec<ParamInfo> = sig
+                        .params
+                        .iter()
+                        .map(|param| {
+                            let new_type =
+                                ctx.substitute_this_type_inner(param.type_id, this_type, cache);
+                            if new_type != param.type_id {
+                                local_changed = true;
+                            }
+                            ParamInfo {
+                                name: param.name,
+                                type_id: new_type,
+                                optional: param.optional,
+                                rest: param.rest,
+                            }
+                        })
+                        .collect();
+                    let this_param = sig.this_type.map(|this_param| {
+                        let new_type =
+                            ctx.substitute_this_type_inner(this_param, this_type, cache);
+                        if new_type != this_param {
+                            local_changed = true;
+                        }
+                        new_type
+                    });
+                    let return_type =
+                        ctx.substitute_this_type_inner(sig.return_type, this_type, cache);
+                    if return_type != sig.return_type {
+                        local_changed = true;
+                    }
+                    let type_predicate = sig.type_predicate.as_ref().map(|pred| {
+                        let new_pred_type = pred.type_id.map(|pred_type| {
+                            let new_type =
+                                ctx.substitute_this_type_inner(pred_type, this_type, cache);
+                            if new_type != pred_type {
+                                local_changed = true;
+                            }
+                            new_type
+                        });
+                        if new_pred_type != pred.type_id {
+                            local_changed = true;
+                        }
+                        TypePredicate {
+                            asserts: pred.asserts,
+                            target: pred.target.clone(),
+                            type_id: new_pred_type,
+                        }
+                    });
+                    if local_changed {
+                        changed = true;
+                    }
+                    CallSignature {
+                        type_params: sig.type_params.clone(),
+                        params,
+                        this_type: this_param,
+                        return_type,
+                        type_predicate,
+                    }
+                };
+                let call_signatures: Vec<CallSignature> = shape
+                    .call_signatures
+                    .iter()
+                    .map(|sig| map_signature(sig, this_type, cache, self))
+                    .collect();
+                let construct_signatures: Vec<CallSignature> = shape
+                    .construct_signatures
+                    .iter()
+                    .map(|sig| map_signature(sig, this_type, cache, self))
+                    .collect();
+                let properties: Vec<PropertyInfo> = shape
+                    .properties
+                    .iter()
+                    .map(|prop| {
+                        let new_type = self.substitute_this_type_inner(prop.type_id, this_type, cache);
+                        let new_write =
+                            self.substitute_this_type_inner(prop.write_type, this_type, cache);
+                        if new_type != prop.type_id || new_write != prop.write_type {
+                            changed = true;
+                        }
+                        PropertyInfo {
+                            name: prop.name,
+                            type_id: new_type,
+                            write_type: new_write,
+                            optional: prop.optional,
+                            readonly: prop.readonly,
+                            is_method: prop.is_method,
+                        }
+                    })
+                    .collect();
+                if changed {
+                    self.ctx.types.callable(CallableShape {
+                        call_signatures,
+                        construct_signatures,
+                        properties,
+                    })
+                } else {
+                    type_id
+                }
+            }
+            TypeKey::Conditional(cond_id) => {
+                let cond = self.ctx.types.conditional_type(cond_id);
+                let mut changed = false;
+                let check_type =
+                    self.substitute_this_type_inner(cond.check_type, this_type, cache);
+                if check_type != cond.check_type {
+                    changed = true;
+                }
+                let extends_type =
+                    self.substitute_this_type_inner(cond.extends_type, this_type, cache);
+                if extends_type != cond.extends_type {
+                    changed = true;
+                }
+                let true_type =
+                    self.substitute_this_type_inner(cond.true_type, this_type, cache);
+                if true_type != cond.true_type {
+                    changed = true;
+                }
+                let false_type =
+                    self.substitute_this_type_inner(cond.false_type, this_type, cache);
+                if false_type != cond.false_type {
+                    changed = true;
+                }
+                if changed {
+                    self.ctx.types.conditional(ConditionalType {
+                        check_type,
+                        extends_type,
+                        true_type,
+                        false_type,
+                        is_distributive: cond.is_distributive,
+                    })
+                } else {
+                    type_id
+                }
+            }
+            TypeKey::Mapped(mapped_id) => {
+                let mapped = self.ctx.types.mapped_type(mapped_id);
+                let mut changed = false;
+                let type_param = TypeParamInfo {
+                    name: mapped.type_param.name,
+                    constraint: mapped
+                        .type_param
+                        .constraint
+                        .map(|constraint| self.substitute_this_type_inner(constraint, this_type, cache)),
+                    default: mapped
+                        .type_param
+                        .default
+                        .map(|default| self.substitute_this_type_inner(default, this_type, cache)),
+                };
+                if type_param.constraint != mapped.type_param.constraint
+                    || type_param.default != mapped.type_param.default
+                {
+                    changed = true;
+                }
+                let constraint =
+                    self.substitute_this_type_inner(mapped.constraint, this_type, cache);
+                if constraint != mapped.constraint {
+                    changed = true;
+                }
+                let name_type = mapped
+                    .name_type
+                    .map(|name_type| self.substitute_this_type_inner(name_type, this_type, cache));
+                if name_type != mapped.name_type {
+                    changed = true;
+                }
+                let template =
+                    self.substitute_this_type_inner(mapped.template, this_type, cache);
+                if template != mapped.template {
+                    changed = true;
+                }
+                if changed {
+                    self.ctx.types.mapped(MappedType {
+                        type_param,
+                        constraint,
+                        name_type,
+                        template,
+                        readonly_modifier: mapped.readonly_modifier,
+                        optional_modifier: mapped.optional_modifier,
+                    })
+                } else {
+                    type_id
+                }
+            }
+            TypeKey::IndexAccess(obj, idx) => {
+                let new_obj = self.substitute_this_type_inner(obj, this_type, cache);
+                let new_idx = self.substitute_this_type_inner(idx, this_type, cache);
+                if new_obj == obj && new_idx == idx {
+                    type_id
+                } else {
+                    self.ctx.types.intern(TypeKey::IndexAccess(new_obj, new_idx))
+                }
+            }
+            TypeKey::KeyOf(inner) => {
+                let new_inner = self.substitute_this_type_inner(inner, this_type, cache);
+                if new_inner == inner {
+                    type_id
+                } else {
+                    self.ctx.types.intern(TypeKey::KeyOf(new_inner))
+                }
+            }
+            TypeKey::ReadonlyType(inner) => {
+                let new_inner = self.substitute_this_type_inner(inner, this_type, cache);
+                if new_inner == inner {
+                    type_id
+                } else {
+                    self.ctx.types.intern(TypeKey::ReadonlyType(new_inner))
+                }
+            }
+            TypeKey::TemplateLiteral(template_id) => {
+                let spans = self.ctx.types.template_list(template_id);
+                let mut changed = false;
+                let new_spans: Vec<TemplateSpan> = spans
+                    .iter()
+                    .map(|span| match span {
+                        TemplateSpan::Text(text) => TemplateSpan::Text(*text),
+                        TemplateSpan::Type(span_type) => {
+                            let new_type =
+                                self.substitute_this_type_inner(*span_type, this_type, cache);
+                            if new_type != *span_type {
+                                changed = true;
+                            }
+                            TemplateSpan::Type(new_type)
+                        }
+                    })
+                    .collect();
+                if changed {
+                    self.ctx.types.template_literal(new_spans)
+                } else {
+                    type_id
+                }
+            }
+            TypeKey::Application(app_id) => {
+                let app = self.ctx.types.type_application(app_id);
+                let mut changed = false;
+                let base = self.substitute_this_type_inner(app.base, this_type, cache);
+                if base != app.base {
+                    changed = true;
+                }
+                let args: Vec<TypeId> = app
+                    .args
+                    .iter()
+                    .map(|&arg| {
+                        let new_arg = self.substitute_this_type_inner(arg, this_type, cache);
+                        if new_arg != arg {
+                            changed = true;
+                        }
+                        new_arg
+                    })
+                    .collect();
+                if changed {
+                    self.ctx.types.application(base, args)
+                } else {
+                    type_id
+                }
+            }
+            TypeKey::TypeParameter(info) => {
+                let constraint = info
+                    .constraint
+                    .map(|constraint| self.substitute_this_type_inner(constraint, this_type, cache));
+                let default = info
+                    .default
+                    .map(|default| self.substitute_this_type_inner(default, this_type, cache));
+                if constraint == info.constraint && default == info.default {
+                    type_id
+                } else {
+                    self.ctx.types.intern(TypeKey::TypeParameter(TypeParamInfo {
+                        name: info.name,
+                        constraint,
+                        default,
+                    }))
+                }
+            }
+            TypeKey::Infer(info) => {
+                let constraint = info
+                    .constraint
+                    .map(|constraint| self.substitute_this_type_inner(constraint, this_type, cache));
+                let default = info
+                    .default
+                    .map(|default| self.substitute_this_type_inner(default, this_type, cache));
+                if constraint == info.constraint && default == info.default {
+                    type_id
+                } else {
+                    self.ctx.types.intern(TypeKey::Infer(TypeParamInfo {
+                        name: info.name,
+                        constraint,
+                        default,
+                    }))
+                }
+            }
+            _ => type_id,
+        };
+
+        cache.insert(type_id, result);
+        result
     }
 
     /// Get keyof a type - extract the keys of an object type.
