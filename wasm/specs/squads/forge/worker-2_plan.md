@@ -14,12 +14,25 @@ Priority: 2
 - [x] Variadic tuple type tests
 - [x] Rest parameter inference tests
 - [x] Type guard tests (is, asserts, narrowing)
+- [x] Discriminated union tests (type narrowing, exhaustiveness)
 
 ## Task Queue
 - [ ] Implement TypeResolver for TypeEvaluator to resolve Refs inside Mapped/Conditional types
 - [ ] This would enable full evaluation of complex patterns like `{ [K in keyof R]: ExtractAction<R[K]> }[keyof R]`
 
 ## Completed
+- [x] Added 22 discriminated union tests including:
+  - String, number, boolean literal discriminants
+  - Multiple discriminant properties
+  - Three+ variant unions (Shape: circle, square, rectangle)
+  - Exhaustiveness checking and never narrowing
+  - Nested discriminated unions
+  - Common properties across variants
+  - null/undefined variants
+  - Redux action, AST node, API response patterns
+  - Form validation, state machine patterns
+  - Option/Result type patterns
+  - Readonly discriminants, methods in variants
 - [x] Added 26 type guard tests including:
   - Basic 'x is T' and 'asserts x is T' predicates
   - 'this is T' class method predicates
@@ -127,6 +140,7 @@ Worker 2 branch now contains:
 - 28 variadic tuple type tests
 - 26 rest parameter inference tests
 - 26 type guard tests (is, asserts, narrowing)
+- 22 discriminated union tests (type narrowing, exhaustiveness)
 - No modifications to evaluate.rs or other core files
 - Pure test additions that can be safely merged
 

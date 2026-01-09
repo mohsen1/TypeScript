@@ -6,12 +6,16 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-Add ES5 class tests for enum patterns: const enum, string enum, computed. Tests: `./wasm/test.sh class_es5_tests`
+Add ES5 class tests for export assignment patterns: export =, import = require. Tests: `./wasm/test.sh class_es5_tests`
 
 ## Task Queue
-- [ ] Add ES5 class tests for namespace patterns: merged, exported, nested
+- [ ] Add ES5 class tests for triple-slash directive patterns: reference, amd-module
 
 ## Completed
+- [x] Added ES5 tests for ambient module patterns (6 tests): basic declare module, global augmentation, module namespace, module with class, wildcard modules, combined ambient patterns. Ran `./wasm/test.sh class_es5_tests` (all 467 pass).
+- [x] Added ES5 tests for declaration merging patterns (6 tests): interface merging, function-namespace merging, class-namespace merging, enum-namespace merging, interface extension, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 461 pass).
+- [x] Added ES5 tests for namespace patterns (6 tests): merged namespace, exported namespace, nested namespace, repository pattern, utilities namespace, combined namespace patterns. Ran `./wasm/test.sh class_es5_tests` (all 452 pass).
+- [x] Added ES5 tests for enum patterns (6 tests): const enum, string enum, numeric enum, computed enum values, enum class properties, combined enum patterns. Ran `./wasm/test.sh class_es5_tests` (all 446 pass).
 - [x] Added ES5 tests for module augmentation patterns (6 tests): basic declare module, interface augmentation, global augmentation, namespace augmentation, class augmentation, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 446 pass).
 - [x] Added ES5 tests for function overload patterns (6 tests): basic method, constructor, generic method, static method, return types, combined overload patterns. Ran `./wasm/test.sh class_es5_tests` (all 443 pass).
 - [x] Added ES5 tests for utility type patterns (6 tests): Awaited, NonNullable, ReturnType, Parameters, InstanceType, combined utility patterns. Ran `./wasm/test.sh class_es5_tests` (all 440 pass).
