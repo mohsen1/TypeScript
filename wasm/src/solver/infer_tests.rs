@@ -5768,3 +5768,179 @@ fn test_generic_multiple_params_with_defaults() {
     // U has lower bound, resolves to boolean
     assert_eq!(results[1], (u_name, TypeId::BOOLEAN));
 }
+
+// =============================================================================
+// Generic Constraint Propagation Tests
+// =============================================================================
+
+#[test]
+fn test_constraint_propagation_upper_to_lower() {
+    // Test: Upper bound on one param propagates to lower bound check
+    // <T extends string> called with T = "hello"
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Upper bound: T extends string
+    ctx.add_upper_bound(var_t, TypeId::STRING);
+    // Lower bound from argument: "hello"
+    let hello = interner.literal_string("hello");
+    ctx.add_lower_bound(var_t, hello);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    // Lower bound satisfies upper bound, resolves to literal
+    assert_eq!(result, hello);
+}
+
+#[test]
+fn test_constraint_propagation_through_unification() {
+    // Test: Unifying two vars propagates constraints from both
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    // T has lower bound string
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+    // U has lower bound number
+    ctx.add_lower_bound(var_u, TypeId::NUMBER);
+
+    // Unify T and U
+    ctx.unify_vars(var_t, var_u).unwrap();
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    // Unified vars get union of both lower bounds
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_constraint_propagation_transitive_upper_bounds() {
+    // Test: T extends string with lower bound "hello"
+    // Lower bound must satisfy upper bound constraint
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Upper bound: T extends string
+    ctx.add_upper_bound(var_t, TypeId::STRING);
+
+    // Add lower bound to T (literal satisfies string upper bound)
+    let hello = interner.literal_string("hello");
+    ctx.add_lower_bound(var_t, hello);
+
+    let result_t = ctx.resolve_with_constraints(var_t).unwrap();
+
+    // T resolves to its lower bound (literal "hello")
+    assert_eq!(result_t, hello);
+}
+
+#[test]
+fn test_constraint_propagation_multiple_upper_bounds() {
+    // Test: T extends A & B (multiple upper bounds create intersection)
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Multiple upper bounds
+    ctx.add_upper_bound(var_t, TypeId::STRING);
+    ctx.add_upper_bound(var_t, TypeId::NUMBER);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    // Multiple upper bounds create intersection
+    let expected = interner.intersection(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_constraint_propagation_lower_bounds_union() {
+    // Test: Multiple lower bounds create union
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Multiple lower bounds from different call sites
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+    ctx.add_lower_bound(var_t, TypeId::NUMBER);
+    ctx.add_lower_bound(var_t, TypeId::BOOLEAN);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    // Multiple lower bounds create union
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::BOOLEAN]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_constraint_propagation_with_never_lower_bound() {
+    // Test: never as lower bound doesn't contribute to union
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Lower bounds including never
+    ctx.add_lower_bound(var_t, TypeId::NEVER);
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    // never is filtered out, only string remains
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_constraint_propagation_any_lower_with_concrete() {
+    // Test: any as lower bound with concrete type
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Lower bounds: any and string
+    ctx.add_lower_bound(var_t, TypeId::ANY);
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+    // Upper bound constrains
+    ctx.add_upper_bound(var_t, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    // With upper bound, any is filtered from lower bounds
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_constraint_propagation_object_properties() {
+    // Test: Object type constraint propagation
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Create object type with property
+    let prop_name = interner.intern_string("x");
+    let obj_type = interner.object(vec![PropertyInfo {
+        name: prop_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    ctx.add_lower_bound(var_t, obj_type);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, obj_type);
+}
