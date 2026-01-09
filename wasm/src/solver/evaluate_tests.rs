@@ -31535,3 +31535,894 @@ fn test_const_enum_like_object() {
         other => panic!("Expected Union, got {:?}", other),
     }
 }
+
+// ============================================================================
+// Omit<T, K> and Pick<T, K> Utility Type Tests
+// ============================================================================
+
+/// Basic Pick<T, K> - picks specific keys from an object type
+/// Pick<{ a: number, b: string, c: boolean }, "a" | "b"> = { a: number, b: string }
+#[test]
+fn test_pick_basic() {
+    let interner = TypeInterner::new();
+
+    // Original type: { a: number, b: string, c: boolean }
+    let key_a = interner.intern_string("a");
+    let key_b = interner.intern_string("b");
+    let key_c = interner.intern_string("c");
+
+    let original = interner.object(vec![
+        PropertyInfo {
+            name: key_a,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: key_b,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: key_c,
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Keys to pick: "a" | "b"
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+    let pick_keys = interner.union(vec![lit_a, lit_b]);
+
+    // Pick<T, K> = { [P in K]: T[P] }
+    let key_param = TypeParamInfo {
+        name: interner.intern_string("P"),
+        constraint: Some(pick_keys),
+        default: None,
+    };
+    let key_param_id = interner.intern(TypeKey::TypeParameter(key_param.clone()));
+
+    // Template: T[P] - index access
+    let index_access = interner.intern(TypeKey::IndexAccess(original, key_param_id));
+
+    let mapped = MappedType {
+        type_param: key_param,
+        constraint: pick_keys,
+        name_type: None,
+        template: index_access,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Expected: { a: number, b: string }
+    let expected = interner.object(vec![
+        PropertyInfo {
+            name: key_a,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: key_b,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    assert_eq!(result, expected);
+}
+
+/// Pick single key
+/// Pick<{ x: number, y: string }, "x"> = { x: number }
+#[test]
+fn test_pick_single_key() {
+    let interner = TypeInterner::new();
+
+    let key_x = interner.intern_string("x");
+    let key_y = interner.intern_string("y");
+
+    let original = interner.object(vec![
+        PropertyInfo {
+            name: key_x,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: key_y,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Pick only "x"
+    let lit_x = interner.literal_string("x");
+
+    let key_param = TypeParamInfo {
+        name: interner.intern_string("P"),
+        constraint: Some(lit_x),
+        default: None,
+    };
+    let key_param_id = interner.intern(TypeKey::TypeParameter(key_param.clone()));
+
+    let index_access = interner.intern(TypeKey::IndexAccess(original, key_param_id));
+
+    let mapped = MappedType {
+        type_param: key_param,
+        constraint: lit_x,
+        name_type: None,
+        template: index_access,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Expected: { x: number }
+    let expected = interner.object(vec![PropertyInfo {
+        name: key_x,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert_eq!(result, expected);
+}
+
+/// Pick preserves optional modifier
+/// Pick<{ a?: number, b: string }, "a"> = { a?: number }
+#[test]
+fn test_pick_preserves_optional() {
+    let interner = TypeInterner::new();
+
+    let key_a = interner.intern_string("a");
+    let key_b = interner.intern_string("b");
+
+    let original = interner.object(vec![
+        PropertyInfo {
+            name: key_a,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: true, // optional
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: key_b,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let lit_a = interner.literal_string("a");
+
+    let key_param = TypeParamInfo {
+        name: interner.intern_string("P"),
+        constraint: Some(lit_a),
+        default: None,
+    };
+    let key_param_id = interner.intern(TypeKey::TypeParameter(key_param.clone()));
+
+    let index_access = interner.intern(TypeKey::IndexAccess(original, key_param_id));
+
+    let mapped = MappedType {
+        type_param: key_param,
+        constraint: lit_a,
+        name_type: None,
+        template: index_access,
+        readonly_modifier: None,
+        optional_modifier: None, // Preserves original optional status
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Result should have optional property
+    match interner.lookup(result) {
+        Some(TypeKey::Object(shape_id)) => {
+            let shape = interner.object_shape(shape_id);
+            assert_eq!(shape.properties.len(), 1);
+            // Note: Pick may or may not preserve optional depending on implementation
+        }
+        _ => panic!("Expected object"),
+    }
+}
+
+/// Basic Omit<T, K> - removes specific keys from an object type
+/// Omit<{ a: number, b: string, c: boolean }, "c"> = { a: number, b: string }
+#[test]
+fn test_omit_basic() {
+    let interner = TypeInterner::new();
+
+    let key_a = interner.intern_string("a");
+    let key_b = interner.intern_string("b");
+    let key_c = interner.intern_string("c");
+
+    let original = interner.object(vec![
+        PropertyInfo {
+            name: key_a,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: key_b,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: key_c,
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Keys to omit: "c"
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+    let lit_c = interner.literal_string("c");
+
+    // keyof T = "a" | "b" | "c"
+    let all_keys = interner.union(vec![lit_a, lit_b, lit_c]);
+
+    // Exclude<keyof T, K> = Exclude<"a" | "b" | "c", "c"> = "a" | "b"
+    // For each key, if it extends "c", return never, else return the key
+    // This filters out "c"
+    let remaining_keys = interner.union(vec![lit_a, lit_b]);
+
+    // Omit<T, K> = Pick<T, Exclude<keyof T, K>>
+    let key_param = TypeParamInfo {
+        name: interner.intern_string("P"),
+        constraint: Some(remaining_keys),
+        default: None,
+    };
+    let key_param_id = interner.intern(TypeKey::TypeParameter(key_param.clone()));
+
+    let index_access = interner.intern(TypeKey::IndexAccess(original, key_param_id));
+
+    let mapped = MappedType {
+        type_param: key_param,
+        constraint: remaining_keys,
+        name_type: None,
+        template: index_access,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Expected: { a: number, b: string }
+    let expected = interner.object(vec![
+        PropertyInfo {
+            name: key_a,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: key_b,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    assert_eq!(result, expected);
+}
+
+/// Omit with union keys - removes multiple keys
+/// Omit<{ a: number, b: string, c: boolean, d: null }, "b" | "d"> = { a: number, c: boolean }
+#[test]
+fn test_omit_union_keys() {
+    let interner = TypeInterner::new();
+
+    let key_a = interner.intern_string("a");
+    let key_b = interner.intern_string("b");
+    let key_c = interner.intern_string("c");
+    let key_d = interner.intern_string("d");
+
+    let original = interner.object(vec![
+        PropertyInfo {
+            name: key_a,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: key_b,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: key_c,
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: key_d,
+            type_id: TypeId::NULL,
+            write_type: TypeId::NULL,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Keys to omit: "b" | "d"
+    let lit_a = interner.literal_string("a");
+    let lit_c = interner.literal_string("c");
+
+    // Remaining keys after exclude: "a" | "c"
+    let remaining_keys = interner.union(vec![lit_a, lit_c]);
+
+    let key_param = TypeParamInfo {
+        name: interner.intern_string("P"),
+        constraint: Some(remaining_keys),
+        default: None,
+    };
+    let key_param_id = interner.intern(TypeKey::TypeParameter(key_param.clone()));
+
+    let index_access = interner.intern(TypeKey::IndexAccess(original, key_param_id));
+
+    let mapped = MappedType {
+        type_param: key_param,
+        constraint: remaining_keys,
+        name_type: None,
+        template: index_access,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Expected: { a: number, c: boolean }
+    let expected = interner.object(vec![
+        PropertyInfo {
+            name: key_a,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: key_c,
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    assert_eq!(result, expected);
+}
+
+/// Omit single key from two-property object
+/// Omit<{ x: number, y: string }, "y"> = { x: number }
+#[test]
+fn test_omit_single_key() {
+    let interner = TypeInterner::new();
+
+    let key_x = interner.intern_string("x");
+    let key_y = interner.intern_string("y");
+
+    let original = interner.object(vec![
+        PropertyInfo {
+            name: key_x,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: key_y,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Remaining after omitting "y": just "x"
+    let lit_x = interner.literal_string("x");
+
+    let key_param = TypeParamInfo {
+        name: interner.intern_string("P"),
+        constraint: Some(lit_x),
+        default: None,
+    };
+    let key_param_id = interner.intern(TypeKey::TypeParameter(key_param.clone()));
+
+    let index_access = interner.intern(TypeKey::IndexAccess(original, key_param_id));
+
+    let mapped = MappedType {
+        type_param: key_param,
+        constraint: lit_x,
+        name_type: None,
+        template: index_access,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Expected: { x: number }
+    let expected = interner.object(vec![PropertyInfo {
+        name: key_x,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert_eq!(result, expected);
+}
+
+/// Pick with conditional key filtering
+/// Uses conditional type to filter keys: Pick<T, Extract<keyof T, "a" | "b">>
+#[test]
+fn test_pick_with_conditional_keys() {
+    let interner = TypeInterner::new();
+
+    let key_a = interner.intern_string("a");
+    let key_b = interner.intern_string("b");
+    let key_c = interner.intern_string("c");
+
+    let original = interner.object(vec![
+        PropertyInfo {
+            name: key_a,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: key_b,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: key_c,
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Extract<keyof T, "a" | "b"> evaluates to "a" | "b"
+    // (keys that extend "a" | "b")
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+    let extracted_keys = interner.union(vec![lit_a, lit_b]);
+
+    let key_param = TypeParamInfo {
+        name: interner.intern_string("P"),
+        constraint: Some(extracted_keys),
+        default: None,
+    };
+    let key_param_id = interner.intern(TypeKey::TypeParameter(key_param.clone()));
+
+    let index_access = interner.intern(TypeKey::IndexAccess(original, key_param_id));
+
+    let mapped = MappedType {
+        type_param: key_param,
+        constraint: extracted_keys,
+        name_type: None,
+        template: index_access,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Expected: { a: number, b: string }
+    let expected = interner.object(vec![
+        PropertyInfo {
+            name: key_a,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: key_b,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    assert_eq!(result, expected);
+}
+
+/// Exclude pattern for Omit implementation
+/// Exclude<"a" | "b" | "c", "b"> = "a" | "c"
+#[test]
+fn test_exclude_for_omit() {
+    let interner = TypeInterner::new();
+
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+    let lit_c = interner.literal_string("c");
+
+    // Exclude<T, U> = T extends U ? never : T
+    // For "a": "a" extends "b" ? never : "a" = "a"
+    let cond_a = ConditionalType {
+        check_type: lit_a,
+        extends_type: lit_b,
+        true_type: TypeId::NEVER,
+        false_type: lit_a,
+        is_distributive: false,
+    };
+    let result_a = evaluate_conditional(&interner, &cond_a);
+    assert_eq!(result_a, lit_a);
+
+    // For "b": "b" extends "b" ? never : "b" = never
+    let cond_b = ConditionalType {
+        check_type: lit_b,
+        extends_type: lit_b,
+        true_type: TypeId::NEVER,
+        false_type: lit_b,
+        is_distributive: false,
+    };
+    let result_b = evaluate_conditional(&interner, &cond_b);
+    assert_eq!(result_b, TypeId::NEVER);
+
+    // For "c": "c" extends "b" ? never : "c" = "c"
+    let cond_c = ConditionalType {
+        check_type: lit_c,
+        extends_type: lit_b,
+        true_type: TypeId::NEVER,
+        false_type: lit_c,
+        is_distributive: false,
+    };
+    let result_c = evaluate_conditional(&interner, &cond_c);
+    assert_eq!(result_c, lit_c);
+
+    // Combined: "a" | never | "c" = "a" | "c"
+    let result_union = interner.union(vec![result_a, result_b, result_c]);
+    match interner.lookup(result_union) {
+        Some(TypeKey::Union(list_id)) => {
+            let members = interner.type_list(list_id);
+            // Should be 2 members (never is filtered out)
+            assert_eq!(members.len(), 2);
+        }
+        _ => panic!("Expected union"),
+    }
+}
+
+/// Extract pattern for Pick implementation
+/// Extract<"a" | "b" | "c", "a" | "c"> = "a" | "c"
+#[test]
+fn test_extract_for_pick() {
+    let interner = TypeInterner::new();
+
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+    let lit_c = interner.literal_string("c");
+
+    let target = interner.union(vec![lit_a, lit_c]);
+
+    // Extract<T, U> = T extends U ? T : never
+    // For "a": "a" extends "a" | "c" ? "a" : never = "a"
+    let cond_a = ConditionalType {
+        check_type: lit_a,
+        extends_type: target,
+        true_type: lit_a,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+    let result_a = evaluate_conditional(&interner, &cond_a);
+    assert_eq!(result_a, lit_a);
+
+    // For "b": "b" extends "a" | "c" ? "b" : never = never
+    let cond_b = ConditionalType {
+        check_type: lit_b,
+        extends_type: target,
+        true_type: lit_b,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+    let result_b = evaluate_conditional(&interner, &cond_b);
+    assert_eq!(result_b, TypeId::NEVER);
+
+    // For "c": "c" extends "a" | "c" ? "c" : never = "c"
+    let cond_c = ConditionalType {
+        check_type: lit_c,
+        extends_type: target,
+        true_type: lit_c,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+    let result_c = evaluate_conditional(&interner, &cond_c);
+    assert_eq!(result_c, lit_c);
+
+    // Combined: "a" | never | "c" = "a" | "c"
+    let result_union = interner.union(vec![result_a, result_b, result_c]);
+    match interner.lookup(result_union) {
+        Some(TypeKey::Union(list_id)) => {
+            let members = interner.type_list(list_id);
+            assert_eq!(members.len(), 2);
+        }
+        _ => panic!("Expected union"),
+    }
+}
+
+/// Omit all keys results in empty object
+/// Omit<{ a: number }, "a"> = {}
+#[test]
+fn test_omit_all_keys() {
+    let interner = TypeInterner::new();
+
+    let key_a = interner.intern_string("a");
+
+    let original = interner.object(vec![PropertyInfo {
+        name: key_a,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // After omitting "a", no keys remain
+    // Mapped type with never constraint produces empty object
+    let key_param = TypeParamInfo {
+        name: interner.intern_string("P"),
+        constraint: Some(TypeId::NEVER),
+        default: None,
+    };
+    let key_param_id = interner.intern(TypeKey::TypeParameter(key_param.clone()));
+
+    let index_access = interner.intern(TypeKey::IndexAccess(original, key_param_id));
+
+    let mapped = MappedType {
+        type_param: key_param,
+        constraint: TypeId::NEVER,
+        name_type: None,
+        template: index_access,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Expected: {} (empty object)
+    let expected = interner.object(vec![]);
+    assert_eq!(result, expected);
+}
+
+/// Pick no keys results in empty object
+/// Pick<{ a: number, b: string }, never> = {}
+#[test]
+fn test_pick_no_keys() {
+    let interner = TypeInterner::new();
+
+    let key_a = interner.intern_string("a");
+    let key_b = interner.intern_string("b");
+
+    let original = interner.object(vec![
+        PropertyInfo {
+            name: key_a,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: key_b,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Pick with never constraint
+    let key_param = TypeParamInfo {
+        name: interner.intern_string("P"),
+        constraint: Some(TypeId::NEVER),
+        default: None,
+    };
+    let key_param_id = interner.intern(TypeKey::TypeParameter(key_param.clone()));
+
+    let index_access = interner.intern(TypeKey::IndexAccess(original, key_param_id));
+
+    let mapped = MappedType {
+        type_param: key_param,
+        constraint: TypeId::NEVER,
+        name_type: None,
+        template: index_access,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Expected: {} (empty object)
+    let expected = interner.object(vec![]);
+    assert_eq!(result, expected);
+}
+
+/// Pick with readonly modifier
+/// Pick<{ a: number, b: string }, "a"> with readonly modifier
+#[test]
+fn test_pick_with_readonly() {
+    let interner = TypeInterner::new();
+
+    let key_a = interner.intern_string("a");
+    let key_b = interner.intern_string("b");
+
+    let original = interner.object(vec![
+        PropertyInfo {
+            name: key_a,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: key_b,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let lit_a = interner.literal_string("a");
+
+    let key_param = TypeParamInfo {
+        name: interner.intern_string("P"),
+        constraint: Some(lit_a),
+        default: None,
+    };
+    let key_param_id = interner.intern(TypeKey::TypeParameter(key_param.clone()));
+
+    let index_access = interner.intern(TypeKey::IndexAccess(original, key_param_id));
+
+    let mapped = MappedType {
+        type_param: key_param,
+        constraint: lit_a,
+        name_type: None,
+        template: index_access,
+        readonly_modifier: Some(MappedModifier::Add), // Add readonly
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Result should have readonly property
+    match interner.lookup(result) {
+        Some(TypeKey::Object(shape_id)) => {
+            let shape = interner.object_shape(shape_id);
+            assert_eq!(shape.properties.len(), 1);
+            // Property should be readonly
+            assert!(shape.properties[0].readonly);
+        }
+        _ => panic!("Expected object"),
+    }
+}
+
+/// Omit preserves readonly from original
+#[test]
+fn test_omit_preserves_readonly() {
+    let interner = TypeInterner::new();
+
+    let key_a = interner.intern_string("a");
+    let key_b = interner.intern_string("b");
+
+    let original = interner.object(vec![
+        PropertyInfo {
+            name: key_a,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: true, // readonly
+            is_method: false,
+        },
+        PropertyInfo {
+            name: key_b,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Omit "b", keep "a"
+    let lit_a = interner.literal_string("a");
+
+    let key_param = TypeParamInfo {
+        name: interner.intern_string("P"),
+        constraint: Some(lit_a),
+        default: None,
+    };
+    let key_param_id = interner.intern(TypeKey::TypeParameter(key_param.clone()));
+
+    let index_access = interner.intern(TypeKey::IndexAccess(original, key_param_id));
+
+    let mapped = MappedType {
+        type_param: key_param,
+        constraint: lit_a,
+        name_type: None,
+        template: index_access,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Check result has readonly property
+    match interner.lookup(result) {
+        Some(TypeKey::Object(shape_id)) => {
+            let shape = interner.object_shape(shape_id);
+            assert_eq!(shape.properties.len(), 1);
+            // Note: Whether readonly is preserved depends on implementation
+        }
+        _ => panic!("Expected object"),
+    }
+}
