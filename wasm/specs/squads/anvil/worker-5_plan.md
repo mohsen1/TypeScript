@@ -7,7 +7,9 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-(Completed - awaiting new assignment)
+- Continue TS2355 false positives (return analysis).
+- Run a TS2355 scan, pick 2-3 failing samples, and trace return analysis in `wasm/src/thin_checker.rs` + `wasm/src/checker/control_flow.rs`.
+- Implement fix + regression test, then report delta from a targeted conformance run.
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)

@@ -1,5 +1,11 @@
 # Anvil Worker 4 - Mapped Type Recursion Guard
 
+## Current Assignment (2026-01-10)
+
+- Reduce TS2769 overload matching false positives.
+- Start with `variadicTuples1.ts` plus two more samples; trace call resolution in `wasm/src/thin_checker.rs` and `wasm/src/solver/`.
+- Implement fix + regression test, then report delta from a targeted conformance run.
+
 ## Operation Conformance Assignment
 
 **Mission**: Fix stack overflow in `types/mapped/recursiveMappedTypes.ts`.

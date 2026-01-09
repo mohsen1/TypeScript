@@ -6,8 +6,9 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-- Idle; last completed task: TS2304 false positives fix (committed/pushed; Ready for Merge: Yes).
-- Awaiting next task from EM-Anvil.
+- Reduce TS2304 false positives (scope resolution).
+- Collect 3-5 failing samples via conformance or `find-ts2304`, then trace namespace/module augmentation and global ambient registration.
+- Focus on `wasm/src/thin_binder.rs` and `wasm/src/thin_checker.rs`, propose fix + regression test, and report delta from a targeted conformance run.
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)

@@ -7,11 +7,9 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-**COMPLETED**: Fixed TS2403 false positives.
-
-Changed var redeclaration check from TypeId equality to bi-directional assignability. TypeScript's "same type" semantics requires mutual assignability, not identical TypeIds. TS2403 no longer appears in top 10 extra errors.
-
-(Awaiting next assignment from EM-Anvil)
+- Parser bugs: reduce TS1005/TS1109/TS1068/TS1128 false positives.
+- Collect 3 failing samples, identify the parse path in `wasm/src/parser` or `wasm/src/thin_parser.rs`, then implement fix + regression test.
+- Run a targeted conformance scan for the error codes and report the delta.
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
