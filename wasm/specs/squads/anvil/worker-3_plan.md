@@ -7,12 +7,13 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] Add ES5 source map tests for decorator composition patterns: chained, factory, metadata. Tests: `./wasm/test.sh source_map`
+(none)
 
 ## Task Queue
 (empty)
 
 ## Completed
+- [x] Added decorator composition ES5 source map tests (chained, factory, metadata, method params, accessor, multiple targets, conditional, generic, inheritance, comprehensive); 797 tests pass.
 - [x] Added class static block ES5 source map tests (basic, multiple, init order, private access, super access, static field init, computed props, async patterns, error handling, comprehensive); 787 tests pass.
 - [x] Added template literal ES5 source map tests (basic, expression, nested, tagged, multiline, function call, method chain, conditional, complex expressions, comprehensive); 777 tests pass.
 - [x] Added arrow function ES5 source map tests (expression body, block body, this binding, rest params, default params, destructuring params, class property, higher order, callbacks, comprehensive); 767 tests pass.
