@@ -28226,3 +28226,589 @@ class DataProcessor<T extends object, U extends object> implements Processor<T, 
         output
     );
 }
+
+/// Test: discriminated union types
+/// Verifies that classes using discriminated union types transform correctly to ES5
+#[test]
+fn test_class_es5_discriminated_union_types() {
+    let source = r#"
+type Circle = { kind: "circle"; radius: number };
+type Square = { kind: "square"; side: number };
+type Rectangle = { kind: "rectangle"; width: number; height: number };
+type Shape = Circle | Square | Rectangle;
+
+class ShapeCalculator {
+    calculateArea(shape: Shape): number {
+        switch (shape.kind) {
+            case "circle":
+                return Math.PI * shape.radius * shape.radius;
+            case "square":
+                return shape.side * shape.side;
+            case "rectangle":
+                return shape.width * shape.height;
+        }
+    }
+
+    describeShape(shape: Shape): string {
+        if (shape.kind === "circle") {
+            return "Circle with radius " + shape.radius;
+        } else if (shape.kind === "square") {
+            return "Square with side " + shape.side;
+        } else {
+            return "Rectangle " + shape.width + "x" + shape.height;
+        }
+    }
+}
+
+type Success = { status: "success"; data: string };
+type Failure = { status: "failure"; error: string };
+type Result = Success | Failure;
+
+class ResultHandler {
+    handle(result: Result): string {
+        if (result.status === "success") {
+            return result.data;
+        } else {
+            return "Error: " + result.error;
+        }
+    }
+
+    isSuccess(result: Result): boolean {
+        return result.status === "success";
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function ShapeCalculator"),
+        "Expected ShapeCalculator function: {}",
+        output
+    );
+    assert!(
+        output.contains("ShapeCalculator.prototype.calculateArea") && output.contains("switch"),
+        "Expected calculateArea with switch: {}",
+        output
+    );
+    assert!(
+        output.contains("ShapeCalculator.prototype.describeShape"),
+        "Expected describeShape method: {}",
+        output
+    );
+    assert!(
+        output.contains("function ResultHandler"),
+        "Expected ResultHandler function: {}",
+        output
+    );
+    assert!(
+        output.contains("ResultHandler.prototype.handle") && output.contains("ResultHandler.prototype.isSuccess"),
+        "Expected handle and isSuccess methods: {}",
+        output
+    );
+}
+
+/// Test: type narrowing with type guards
+/// Verifies that classes using type narrowing patterns transform correctly to ES5
+#[test]
+fn test_class_es5_type_narrowing() {
+    let source = r#"
+class TypeChecker {
+    processValue(value: string | number): string {
+        if (typeof value === "string") {
+            return value.toUpperCase();
+        } else {
+            return value.toString();
+        }
+    }
+
+    processArray(arr: string[] | string): string[] {
+        if (Array.isArray(arr)) {
+            return arr;
+        } else {
+            return [arr];
+        }
+    }
+
+    processNullable(value: string | null): string {
+        if (value === null) {
+            return "default";
+        }
+        return value;
+    }
+}
+
+class InstanceChecker {
+    private items: Array<Date | string>;
+
+    constructor() {
+        this.items = [];
+    }
+
+    add(item: Date | string): void {
+        this.items.push(item);
+    }
+
+    formatItem(item: Date | string): string {
+        if (item instanceof Date) {
+            return item.toISOString();
+        }
+        return item;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function TypeChecker"),
+        "Expected TypeChecker function: {}",
+        output
+    );
+    assert!(
+        output.contains("TypeChecker.prototype.processValue") && output.contains("typeof"),
+        "Expected processValue with typeof: {}",
+        output
+    );
+    assert!(
+        output.contains("TypeChecker.prototype.processArray") && output.contains("Array.isArray"),
+        "Expected processArray with Array.isArray: {}",
+        output
+    );
+    assert!(
+        output.contains("TypeChecker.prototype.processNullable"),
+        "Expected processNullable method: {}",
+        output
+    );
+    assert!(
+        output.contains("function InstanceChecker"),
+        "Expected InstanceChecker function: {}",
+        output
+    );
+    assert!(
+        output.contains("InstanceChecker.prototype.formatItem") && output.contains("instanceof"),
+        "Expected formatItem with instanceof: {}",
+        output
+    );
+}
+
+/// Test: string literal unions
+/// Verifies that classes using string literal union types transform correctly to ES5
+#[test]
+fn test_class_es5_string_literal_unions() {
+    let source = r#"
+type Direction = "north" | "south" | "east" | "west";
+type LogLevel = "debug" | "info" | "warn" | "error";
+
+class Navigator {
+    private direction: Direction;
+
+    constructor() {
+        this.direction = "north";
+    }
+
+    move(dir: Direction): void {
+        this.direction = dir;
+    }
+
+    getOpposite(dir: Direction): Direction {
+        if (dir === "north") return "south";
+        if (dir === "south") return "north";
+        if (dir === "east") return "west";
+        return "east";
+    }
+
+    getCurrent(): Direction {
+        return this.direction;
+    }
+}
+
+class Logger {
+    private level: LogLevel;
+
+    constructor(level: LogLevel) {
+        this.level = level;
+    }
+
+    log(level: LogLevel, message: string): void {
+        console.log("[" + level + "] " + message);
+    }
+
+    shouldLog(level: LogLevel): boolean {
+        var levels = ["debug", "info", "warn", "error"];
+        return levels.indexOf(level) >= levels.indexOf(this.level);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function Navigator"),
+        "Expected Navigator function: {}",
+        output
+    );
+    assert!(
+        output.contains("Navigator.prototype.move") && output.contains("Navigator.prototype.getOpposite"),
+        "Expected move and getOpposite methods: {}",
+        output
+    );
+    assert!(
+        output.contains("Navigator.prototype.getCurrent"),
+        "Expected getCurrent method: {}",
+        output
+    );
+    assert!(
+        output.contains("function Logger"),
+        "Expected Logger function: {}",
+        output
+    );
+    assert!(
+        output.contains("Logger.prototype.log") && output.contains("Logger.prototype.shouldLog"),
+        "Expected log and shouldLog methods: {}",
+        output
+    );
+}
+
+/// Test: number literal unions
+/// Verifies that classes using number literal union types transform correctly to ES5
+#[test]
+fn test_class_es5_number_literal_unions() {
+    let source = r#"
+type DiceValue = 1 | 2 | 3 | 4 | 5 | 6;
+type HttpStatus = 200 | 201 | 400 | 404 | 500;
+
+class Dice {
+    private lastRoll: DiceValue;
+
+    constructor() {
+        this.lastRoll = 1;
+    }
+
+    roll(): DiceValue {
+        var value = Math.floor(Math.random() * 6) + 1;
+        this.lastRoll = value as DiceValue;
+        return this.lastRoll;
+    }
+
+    getLastRoll(): DiceValue {
+        return this.lastRoll;
+    }
+
+    isMax(value: DiceValue): boolean {
+        return value === 6;
+    }
+}
+
+class HttpResponse {
+    private status: HttpStatus;
+    private body: string;
+
+    constructor(status: HttpStatus, body: string) {
+        this.status = status;
+        this.body = body;
+    }
+
+    isSuccess(): boolean {
+        return this.status === 200 || this.status === 201;
+    }
+
+    isError(): boolean {
+        return this.status >= 400;
+    }
+
+    getStatus(): HttpStatus {
+        return this.status;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function Dice"),
+        "Expected Dice function: {}",
+        output
+    );
+    assert!(
+        output.contains("Dice.prototype.roll") && output.contains("Dice.prototype.getLastRoll"),
+        "Expected roll and getLastRoll methods: {}",
+        output
+    );
+    assert!(
+        output.contains("Dice.prototype.isMax"),
+        "Expected isMax method: {}",
+        output
+    );
+    assert!(
+        output.contains("function HttpResponse"),
+        "Expected HttpResponse function: {}",
+        output
+    );
+    assert!(
+        output.contains("HttpResponse.prototype.isSuccess") && output.contains("HttpResponse.prototype.isError"),
+        "Expected isSuccess and isError methods: {}",
+        output
+    );
+    assert!(
+        output.contains("HttpResponse.prototype.getStatus"),
+        "Expected getStatus method: {}",
+        output
+    );
+}
+
+/// Test: union with null and undefined
+/// Verifies that classes using nullable union types transform correctly to ES5
+#[test]
+fn test_class_es5_nullable_unions() {
+    let source = r#"
+class OptionalHandler {
+    private value: string | null;
+    private data: number | undefined;
+
+    constructor() {
+        this.value = null;
+        this.data = undefined;
+    }
+
+    setValue(val: string | null): void {
+        this.value = val;
+    }
+
+    getValue(): string | null {
+        return this.value;
+    }
+
+    getValueOrDefault(def: string): string {
+        if (this.value === null) {
+            return def;
+        }
+        return this.value;
+    }
+
+    setData(d: number | undefined): void {
+        this.data = d;
+    }
+
+    hasData(): boolean {
+        return this.data !== undefined;
+    }
+}
+
+class NullableProcessor {
+    process(input: string | null | undefined): string {
+        if (input === null) {
+            return "null input";
+        }
+        if (input === undefined) {
+            return "undefined input";
+        }
+        return input;
+    }
+
+    coalesce(a: string | null, b: string | undefined, def: string): string {
+        if (a !== null) return a;
+        if (b !== undefined) return b;
+        return def;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function OptionalHandler"),
+        "Expected OptionalHandler function: {}",
+        output
+    );
+    assert!(
+        output.contains("this.value = null") && output.contains("this.data = undefined"),
+        "Expected constructor with null/undefined: {}",
+        output
+    );
+    assert!(
+        output.contains("OptionalHandler.prototype.setValue") && output.contains("OptionalHandler.prototype.getValue"),
+        "Expected setValue and getValue methods: {}",
+        output
+    );
+    assert!(
+        output.contains("OptionalHandler.prototype.getValueOrDefault") && output.contains("OptionalHandler.prototype.hasData"),
+        "Expected getValueOrDefault and hasData methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function NullableProcessor"),
+        "Expected NullableProcessor function: {}",
+        output
+    );
+    assert!(
+        output.contains("NullableProcessor.prototype.process") && output.contains("NullableProcessor.prototype.coalesce"),
+        "Expected process and coalesce methods: {}",
+        output
+    );
+}
+
+/// Test: combined union patterns
+/// Verifies that classes using combined union type patterns transform correctly to ES5
+#[test]
+fn test_class_es5_combined_union_patterns() {
+    let source = r#"
+type Action =
+    | { type: "add"; value: number }
+    | { type: "remove"; index: number }
+    | { type: "clear" };
+
+type State = { items: number[]; count: number };
+
+class Reducer {
+    reduce(state: State, action: Action): State {
+        switch (action.type) {
+            case "add":
+                return { items: state.items.concat([action.value]), count: state.count + 1 };
+            case "remove":
+                var newItems = state.items.slice();
+                newItems.splice(action.index, 1);
+                return { items: newItems, count: state.count - 1 };
+            case "clear":
+                return { items: [], count: 0 };
+        }
+    }
+
+    getActionType(action: Action): string {
+        return action.type;
+    }
+}
+
+type Primitive = string | number | boolean;
+type Container = { value: Primitive };
+
+class PrimitiveHandler {
+    wrap(value: Primitive): Container {
+        return { value: value };
+    }
+
+    unwrap(container: Container): Primitive {
+        return container.value;
+    }
+
+    stringify(value: Primitive): string {
+        if (typeof value === "string") {
+            return value;
+        } else if (typeof value === "number") {
+            return value.toString();
+        } else {
+            return value ? "true" : "false";
+        }
+    }
+
+    getType(value: Primitive): string {
+        return typeof value;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function Reducer"),
+        "Expected Reducer function: {}",
+        output
+    );
+    assert!(
+        output.contains("Reducer.prototype.reduce") && output.contains("switch"),
+        "Expected reduce with switch: {}",
+        output
+    );
+    assert!(
+        output.contains("Reducer.prototype.getActionType"),
+        "Expected getActionType method: {}",
+        output
+    );
+    assert!(
+        output.contains("function PrimitiveHandler"),
+        "Expected PrimitiveHandler function: {}",
+        output
+    );
+    assert!(
+        output.contains("PrimitiveHandler.prototype.wrap") && output.contains("PrimitiveHandler.prototype.unwrap"),
+        "Expected wrap and unwrap methods: {}",
+        output
+    );
+    assert!(
+        output.contains("PrimitiveHandler.prototype.stringify") && output.contains("PrimitiveHandler.prototype.getType"),
+        "Expected stringify and getType methods: {}",
+        output
+    );
+}
