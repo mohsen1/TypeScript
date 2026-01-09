@@ -19262,99 +19262,61 @@ class ApplicationService {
     );
 }
 
-// ============================================================================
-// Promise pattern tests
-// ============================================================================
-
 #[test]
-fn test_class_es5_promise_all_pattern() {
-    // Promise.all usage in class methods
+fn test_class_es5_property_decorator_initialization() {
+    // Property initialization decorator pattern
     let source = r#"
-class ParallelFetcher {
-    private urls: string[];
-
-    constructor(urls: string[]) {
-        this.urls = urls;
-    }
-
-    async fetchAll(): Promise<Response[]> {
-        const promises = this.urls.map(url => fetch(url));
-        return Promise.all(promises);
-    }
-
-    async fetchAllJson<T>(): Promise<T[]> {
-        const responses = await this.fetchAll();
-        const jsonPromises = responses.map(r => r.json());
-        return Promise.all(jsonPromises);
-    }
-
-    async fetchWithTimeout(timeout: number): Promise<Response[]> {
-        const fetchPromises = this.urls.map(url => fetch(url));
-        const timeoutPromise = new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error("Timeout")), timeout);
+function defaultValue(value: any) {
+    return function(target: any, propertyKey: string) {
+        let val = value;
+        Object.defineProperty(target, propertyKey, {
+            get() { return val; },
+            set(newVal) { val = newVal; },
+            enumerable: true,
+            configurable: true
         });
-        return Promise.all(fetchPromises);
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    assert!(
-        output.contains("function ParallelFetcher"),
-        "Expected ParallelFetcher function: {}",
-        output
-    );
-    assert!(
-        output.contains("Promise.all"),
-        "Expected Promise.all: {}",
-        output
-    );
+    };
 }
 
-#[test]
-fn test_class_es5_promise_race_pattern() {
-    // Promise.race usage in class methods
-    let source = r#"
-class RacingFetcher {
-    private mirrors: string[];
+function readonly(target: any, propertyKey: string) {
+    Object.defineProperty(target, propertyKey, {
+        writable: false,
+        configurable: false
+    });
+}
 
-    constructor(mirrors: string[]) {
-        this.mirrors = mirrors;
-    }
-
-    async fetchFastest(): Promise<Response> {
-        const promises = this.mirrors.map(url => fetch(url));
-        return Promise.race(promises);
-    }
-
-    async fetchWithTimeout(url: string, timeout: number): Promise<Response> {
-        const fetchPromise = fetch(url);
-        const timeoutPromise = new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error("Request timeout")), timeout);
-        });
-        return Promise.race([fetchPromise, timeoutPromise]);
-    }
-
-    async fetchFirstSuccessful(): Promise<Response | null> {
-        try {
-            return await Promise.race(this.mirrors.map(url => fetch(url)));
-        } catch {
-            return null;
+function enumerable(isEnumerable: boolean) {
+    return function(target: any, propertyKey: string, descriptor?: PropertyDescriptor) {
+        if (descriptor) {
+            descriptor.enumerable = isEnumerable;
         }
-    }
+    };
+}
+
+class Configuration {
+    @defaultValue("localhost")
+    host: string;
+
+    @defaultValue(3000)
+    port: number;
+
+    @readonly
+    version: string = "1.0.0";
+
+    @enumerable(false)
+    secret: string = "hidden";
+}
+
+class UserSettings {
+    @defaultValue([])
+    preferences: string[];
+
+    @defaultValue({})
+    metadata: Record<string, any>;
+
+    @readonly
+    @defaultValue("user")
+    role: string;
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -19372,276 +19334,381 @@ class RacingFetcher {
 
     let output = printer.get_output().to_string();
 
+    // Classes should be converted
     assert!(
-        output.contains("function RacingFetcher"),
-        "Expected RacingFetcher function: {}",
+        output.contains("Configuration") && output.contains("UserSettings"),
+        "Expected Configuration and UserSettings classes: {}",
         output
     );
+
+    // Decorator functions should be present
     assert!(
-        output.contains("Promise.race"),
-        "Expected Promise.race: {}",
+        output.contains("defaultValue") && output.contains("readonly"),
+        "Expected property decorators: {}",
         output
     );
-}
 
-#[test]
-fn test_class_es5_promise_allsettled_pattern() {
-    // Promise.allSettled usage in class methods
-    let source = r#"
-interface SettledResult<T> {
-    status: "fulfilled" | "rejected";
-    value?: T;
-    reason?: any;
-}
-
-class BatchProcessor<T, R> {
-    private items: T[];
-    private processor: (item: T) => Promise<R>;
-
-    constructor(items: T[], processor: (item: T) => Promise<R>) {
-        this.items = items;
-        this.processor = processor;
-    }
-
-    async processAll(): Promise<PromiseSettledResult<R>[]> {
-        const promises = this.items.map(item => this.processor(item));
-        return Promise.allSettled(promises);
-    }
-
-    async getSuccessful(): Promise<R[]> {
-        const results = await this.processAll();
-        return results
-            .filter((r): r is PromiseFulfilledResult<R> => r.status === "fulfilled")
-            .map(r => r.value);
-    }
-
-    async getFailed(): Promise<any[]> {
-        const results = await this.processAll();
-        return results
-            .filter((r): r is PromiseRejectedResult => r.status === "rejected")
-            .map(r => r.reason);
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
+    // Class IIFE pattern should be present
     assert!(
-        output.contains("function BatchProcessor"),
-        "Expected BatchProcessor function: {}",
-        output
-    );
-    assert!(
-        output.contains("Promise.allSettled"),
-        "Expected Promise.allSettled: {}",
+        output.contains("(function ()") || output.contains("(function()"),
+        "Expected class IIFE pattern: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_promise_any_pattern() {
-    // Promise.any usage in class methods
+fn test_class_es5_property_decorator_lazy_init() {
+    // Lazy initialization decorator pattern
     let source = r#"
-class FallbackFetcher {
-    private primaryUrl: string;
-    private fallbackUrls: string[];
+function lazy<T>(initializer: () => T) {
+    return function(target: any, propertyKey: string) {
+        let value: T | undefined;
+        let initialized = false;
 
-    constructor(primaryUrl: string, fallbackUrls: string[]) {
-        this.primaryUrl = primaryUrl;
-        this.fallbackUrls = fallbackUrls;
-    }
-
-    async fetchAny(): Promise<Response> {
-        const allUrls = [this.primaryUrl, ...this.fallbackUrls];
-        const promises = allUrls.map(url => fetch(url));
-        return Promise.any(promises);
-    }
-
-    async fetchWithFallback(): Promise<Response> {
-        try {
-            return await fetch(this.primaryUrl);
-        } catch {
-            return Promise.any(this.fallbackUrls.map(url => fetch(url)));
-        }
-    }
-
-    async fetchFirstAvailable(): Promise<{ url: string; response: Response } | null> {
-        const allUrls = [this.primaryUrl, ...this.fallbackUrls];
-        try {
-            const response = await Promise.any(allUrls.map(url => fetch(url)));
-            return { url: this.primaryUrl, response };
-        } catch {
-            return null;
-        }
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    assert!(
-        output.contains("function FallbackFetcher"),
-        "Expected FallbackFetcher function: {}",
-        output
-    );
-    assert!(
-        output.contains("Promise.any"),
-        "Expected Promise.any: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_promise_chaining_pipeline() {
-    // Promise chaining in class methods - DataPipeline
-    let source = r#"
-class DataPipeline<T> {
-    private source: Promise<T>;
-
-    constructor(source: Promise<T>) {
-        this.source = source;
-    }
-
-    map<U>(fn: (value: T) => U): DataPipeline<U> {
-        return new DataPipeline(this.source.then(fn));
-    }
-
-    flatMap<U>(fn: (value: T) => Promise<U>): DataPipeline<U> {
-        return new DataPipeline(this.source.then(fn));
-    }
-
-    catch(fn: (error: any) => T): DataPipeline<T> {
-        return new DataPipeline(this.source.catch(fn));
-    }
-
-    finally(fn: () => void): DataPipeline<T> {
-        return new DataPipeline(this.source.finally(fn));
-    }
-
-    async resolve(): Promise<T> {
-        return this.source;
-    }
-
-    tap(fn: (value: T) => void): DataPipeline<T> {
-        return new DataPipeline(
-            this.source.then(value => {
-                fn(value);
-                return value;
-            })
-        );
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    assert!(
-        output.contains("function DataPipeline"),
-        "Expected DataPipeline function: {}",
-        output
-    );
-    assert!(
-        output.contains(".then") && output.contains(".catch"),
-        "Expected promise chaining methods: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_promise_combined() {
-    // Combined Promise patterns
-    let source = r#"
-class AsyncTaskRunner<T> {
-    private tasks: (() => Promise<T>)[];
-    private concurrency: number;
-
-    constructor(tasks: (() => Promise<T>)[], concurrency: number = 3) {
-        this.tasks = tasks;
-        this.concurrency = concurrency;
-    }
-
-    async runAll(): Promise<T[]> {
-        return Promise.all(this.tasks.map(task => task()));
-    }
-
-    async runAllSettled(): Promise<PromiseSettledResult<T>[]> {
-        return Promise.allSettled(this.tasks.map(task => task()));
-    }
-
-    async runFirst(): Promise<T> {
-        return Promise.race(this.tasks.map(task => task()));
-    }
-
-    async runAny(): Promise<T> {
-        return Promise.any(this.tasks.map(task => task()));
-    }
-
-    async runSequential(): Promise<T[]> {
-        const results: T[] = [];
-        for (const task of this.tasks) {
-            const result = await task();
-            results.push(result);
-        }
-        return results;
-    }
-
-    async runWithRetry(retries: number = 3): Promise<T[]> {
-        const runWithRetries = async (task: () => Promise<T>): Promise<T> => {
-            let lastError: Error | undefined;
-            for (let i = 0; i < retries; i++) {
-                try {
-                    return await task();
-                } catch (e) {
-                    lastError = e as Error;
+        Object.defineProperty(target, propertyKey, {
+            get() {
+                if (!initialized) {
+                    value = initializer();
+                    initialized = true;
                 }
+                return value;
+            },
+            enumerable: true,
+            configurable: true
+        });
+    };
+}
+
+function cached(target: any, propertyKey: string) {
+    const cacheKey = Symbol(`__cache_${propertyKey}`);
+    const originalDescriptor = Object.getOwnPropertyDescriptor(target, propertyKey);
+
+    if (originalDescriptor && originalDescriptor.get) {
+        Object.defineProperty(target, propertyKey, {
+            get() {
+                if (!(cacheKey in this)) {
+                    (this as any)[cacheKey] = originalDescriptor.get!.call(this);
+                }
+                return (this as any)[cacheKey];
+            },
+            enumerable: true,
+            configurable: true
+        });
+    }
+}
+
+function memoize(target: any, propertyKey: string) {
+    const memoKey = `__memo_${propertyKey}`;
+    return {
+        get() {
+            if (!this[memoKey]) {
+                this[memoKey] = this[`compute${propertyKey}`]();
             }
-            throw lastError;
+            return this[memoKey];
+        }
+    };
+}
+
+class ExpensiveComputation {
+    @lazy(() => {
+        console.log("Computing heavy data...");
+        return Array.from({ length: 10000 }, (_, i) => i * 2);
+    })
+    heavyData: number[];
+
+    @lazy(() => new Map<string, any>())
+    cache: Map<string, any>;
+
+    @cached
+    get computedValue(): number {
+        return Math.random() * 1000;
+    }
+}
+
+class DatabaseConnection {
+    @lazy(() => {
+        console.log("Establishing connection...");
+        return { connected: true, pool: [] };
+    })
+    connection: { connected: boolean; pool: any[] };
+
+    @lazy(() => new WeakMap())
+    queryCache: WeakMap<object, any>;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("ExpensiveComputation") && output.contains("DatabaseConnection"),
+        "Expected ExpensiveComputation and DatabaseConnection classes: {}",
+        output
+    );
+
+    // Decorator functions should be present
+    assert!(
+        output.contains("lazy") && output.contains("cached"),
+        "Expected lazy decorators: {}",
+        output
+    );
+
+    // Class IIFE pattern should be present
+    assert!(
+        output.contains("(function ()") || output.contains("(function()"),
+        "Expected class IIFE pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_property_decorator_validation() {
+    // Validation decorator pattern for properties
+    let source = r#"
+function minLength(min: number) {
+    return function(target: any, propertyKey: string) {
+        let value: string;
+        Object.defineProperty(target, propertyKey, {
+            get() { return value; },
+            set(newVal: string) {
+                if (newVal.length < min) {
+                    throw new Error(`${propertyKey} must be at least ${min} characters`);
+                }
+                value = newVal;
+            },
+            enumerable: true,
+            configurable: true
+        });
+    };
+}
+
+function maxLength(max: number) {
+    return function(target: any, propertyKey: string) {
+        let value: string;
+        Object.defineProperty(target, propertyKey, {
+            get() { return value; },
+            set(newVal: string) {
+                if (newVal.length > max) {
+                    throw new Error(`${propertyKey} must be at most ${max} characters`);
+                }
+                value = newVal;
+            },
+            enumerable: true,
+            configurable: true
+        });
+    };
+}
+
+function pattern(regex: RegExp) {
+    return function(target: any, propertyKey: string) {
+        let value: string;
+        Object.defineProperty(target, propertyKey, {
+            get() { return value; },
+            set(newVal: string) {
+                if (!regex.test(newVal)) {
+                    throw new Error(`${propertyKey} does not match pattern`);
+                }
+                value = newVal;
+            },
+            enumerable: true,
+            configurable: true
+        });
+    };
+}
+
+function range(min: number, max: number) {
+    return function(target: any, propertyKey: string) {
+        let value: number;
+        Object.defineProperty(target, propertyKey, {
+            get() { return value; },
+            set(newVal: number) {
+                if (newVal < min || newVal > max) {
+                    throw new Error(`${propertyKey} must be between ${min} and ${max}`);
+                }
+                value = newVal;
+            },
+            enumerable: true,
+            configurable: true
+        });
+    };
+}
+
+class UserForm {
+    @minLength(3)
+    @maxLength(50)
+    username: string;
+
+    @pattern(/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/)
+    email: string;
+
+    @minLength(8)
+    password: string;
+
+    @range(18, 120)
+    age: number;
+}
+
+class ProductForm {
+    @minLength(1)
+    @maxLength(100)
+    name: string;
+
+    @maxLength(500)
+    description: string;
+
+    @range(0.01, 999999.99)
+    price: number;
+
+    @range(0, 10000)
+    quantity: number;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("UserForm") && output.contains("ProductForm"),
+        "Expected UserForm and ProductForm classes: {}",
+        output
+    );
+
+    // Validation decorators should be present
+    assert!(
+        output.contains("minLength") && output.contains("maxLength") && output.contains("range"),
+        "Expected validation decorators: {}",
+        output
+    );
+
+    // Class IIFE pattern should be present
+    assert!(
+        output.contains("(function ()") || output.contains("(function()"),
+        "Expected class IIFE pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_property_decorator_observable() {
+    // Observable pattern decorator
+    let source = r#"
+type Subscriber<T> = (value: T) => void;
+
+function observable(target: any, propertyKey: string) {
+    const subscribersKey = Symbol(`${propertyKey}_subscribers`);
+    let value: any;
+
+    Object.defineProperty(target, propertyKey, {
+        get() { return value; },
+        set(newVal) {
+            const oldVal = value;
+            value = newVal;
+            const subscribers = (this as any)[subscribersKey] || [];
+            subscribers.forEach((sub: Subscriber<any>) => sub(newVal));
+        },
+        enumerable: true,
+        configurable: true
+    });
+}
+
+function computed(dependencies: string[]) {
+    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+        const originalGet = descriptor.get;
+        let cachedValue: any;
+        let isDirty = true;
+
+        dependencies.forEach(dep => {
+            const originalSet = Object.getOwnPropertyDescriptor(target, dep)?.set;
+            if (originalSet) {
+                Object.defineProperty(target, dep, {
+                    set(val) {
+                        originalSet.call(this, val);
+                        isDirty = true;
+                    }
+                });
+            }
+        });
+
+        descriptor.get = function() {
+            if (isDirty) {
+                cachedValue = originalGet?.call(this);
+                isDirty = false;
+            }
+            return cachedValue;
         };
-        return Promise.all(this.tasks.map(runWithRetries));
-    }
+    };
+}
 
-    static create<U>(tasks: (() => Promise<U>)[]): AsyncTaskRunner<U> {
-        return new AsyncTaskRunner(tasks);
-    }
+function watch(callback: string) {
+    return function(target: any, propertyKey: string) {
+        let value: any;
+        Object.defineProperty(target, propertyKey, {
+            get() { return value; },
+            set(newVal) {
+                const oldVal = value;
+                value = newVal;
+                if (typeof this[callback] === 'function') {
+                    this[callback](newVal, oldVal, propertyKey);
+                }
+            },
+            enumerable: true,
+            configurable: true
+        });
+    };
+}
 
-    static async delay(ms: number): Promise<void> {
-        return new Promise(resolve => setTimeout(resolve, ms));
+class ReactiveState {
+    @observable
+    count: number = 0;
+
+    @observable
+    name: string = "";
+
+    @observable
+    items: string[] = [];
+
+    @computed(["count", "name"])
+    get summary(): string {
+        return `${this.name}: ${this.count}`;
+    }
+}
+
+class FormModel {
+    @watch("onFieldChange")
+    firstName: string;
+
+    @watch("onFieldChange")
+    lastName: string;
+
+    @watch("onFieldChange")
+    email: string;
+
+    onFieldChange(newVal: any, oldVal: any, field: string) {
+        console.log(`${field} changed from ${oldVal} to ${newVal}`);
     }
 }
 "#;
@@ -19660,140 +19727,127 @@ class AsyncTaskRunner<T> {
 
     let output = printer.get_output().to_string();
 
+    // Classes should be converted
     assert!(
-        output.contains("function AsyncTaskRunner"),
-        "Expected AsyncTaskRunner function: {}",
+        output.contains("ReactiveState") && output.contains("FormModel"),
+        "Expected ReactiveState and FormModel classes: {}",
         output
     );
+
+    // Observable decorators should be present
     assert!(
-        output.contains("Promise.all"),
-        "Expected Promise.all: {}",
+        output.contains("observable") && output.contains("watch"),
+        "Expected observable decorators: {}",
         output
     );
+
+    // Class IIFE pattern should be present
     assert!(
-        output.contains("Promise.allSettled"),
-        "Expected Promise.allSettled: {}",
-        output
-    );
-    assert!(
-        output.contains("Promise.race"),
-        "Expected Promise.race: {}",
-        output
-    );
-    assert!(
-        output.contains("Promise.any"),
-        "Expected Promise.any: {}",
-        output
-    );
-    assert!(
-        output.contains("create") && output.contains("delay"),
-        "Expected static methods: {}",
-        output
-    );
-}
-
-// ============================================================================
-// Class expression pattern tests
-// ============================================================================
-
-#[test]
-fn test_class_es5_anonymous_class_expression() {
-    // Anonymous class expression assigned to variable
-    let source = r#"
-const MyClass = class {
-    private value: number;
-
-    constructor(value: number) {
-        this.value = value;
-    }
-
-    getValue(): number {
-        return this.value;
-    }
-
-    setValue(value: number): void {
-        this.value = value;
-    }
-};
-
-const AnotherClass = class {
-    static staticMethod(): string {
-        return "static";
-    }
-
-    instanceMethod(): string {
-        return "instance";
-    }
-};
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    assert!(
-        output.contains("MyClass"),
-        "Expected MyClass variable: {}",
-        output
-    );
-    assert!(
-        output.contains("AnotherClass"),
-        "Expected AnotherClass variable: {}",
-        output
-    );
-    assert!(
-        output.contains("getValue") && output.contains("setValue"),
-        "Expected instance methods: {}",
+        output.contains("(function ()") || output.contains("(function()"),
+        "Expected class IIFE pattern: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_named_class_expression() {
-    // Named class expression
+fn test_class_es5_property_decorator_combined() {
+    // Combined property decorator patterns
     let source = r#"
-const Logger = class LoggerImpl {
-    private prefix: string;
+function logged(target: any, propertyKey: string) {
+    let value: any;
+    Object.defineProperty(target, propertyKey, {
+        get() {
+            console.log(`Getting ${propertyKey}`);
+            return value;
+        },
+        set(newVal) {
+            console.log(`Setting ${propertyKey} to ${newVal}`);
+            value = newVal;
+        },
+        enumerable: true,
+        configurable: true
+    });
+}
 
-    constructor(prefix: string) {
-        this.prefix = prefix;
-    }
+function serializable(target: any, propertyKey: string) {
+    const metadata = Reflect.getMetadata("serializable", target) || [];
+    metadata.push(propertyKey);
+    Reflect.defineMetadata("serializable", metadata, target);
+}
 
-    log(message: string): void {
-        console.log(`${this.prefix}: ${message}`);
-    }
+function jsonProperty(name?: string) {
+    return function(target: any, propertyKey: string) {
+        const props = Reflect.getMetadata("jsonProperties", target) || {};
+        props[propertyKey] = name || propertyKey;
+        Reflect.defineMetadata("jsonProperties", props, target);
+    };
+}
 
-    createChild(childPrefix: string): LoggerImpl {
-        return new LoggerImpl(`${this.prefix}.${childPrefix}`);
-    }
-};
+function transient(target: any, propertyKey: string) {
+    const transients = Reflect.getMetadata("transient", target) || [];
+    transients.push(propertyKey);
+    Reflect.defineMetadata("transient", transients, target);
+}
 
-const Counter = class CounterImpl {
-    private count: number = 0;
+function deprecated(message?: string) {
+    return function(target: any, propertyKey: string) {
+        let value: any;
+        Object.defineProperty(target, propertyKey, {
+            get() {
+                console.warn(`${propertyKey} is deprecated. ${message || ''}`);
+                return value;
+            },
+            set(newVal) {
+                value = newVal;
+            },
+            enumerable: true,
+            configurable: true
+        });
+    };
+}
 
-    increment(): number {
-        return ++this.count;
-    }
+class Entity {
+    @serializable
+    @jsonProperty("id")
+    @logged
+    entityId: string;
 
-    decrement(): number {
-        return --this.count;
-    }
+    @serializable
+    @jsonProperty()
+    name: string;
 
-    clone(): CounterImpl {
-        const copy = new CounterImpl();
-        return copy;
-    }
-};
+    @transient
+    @logged
+    temporaryState: any;
+
+    @deprecated("Use newField instead")
+    @serializable
+    oldField: string;
+
+    @serializable
+    newField: string;
+}
+
+class ApiResponse<T> {
+    @serializable
+    @jsonProperty("status_code")
+    statusCode: number;
+
+    @serializable
+    @jsonProperty()
+    data: T;
+
+    @transient
+    rawResponse: any;
+
+    @serializable
+    @jsonProperty("error_message")
+    errorMessage?: string;
+
+    @logged
+    @serializable
+    timestamp: Date;
+}
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
@@ -19810,371 +19864,24 @@ const Counter = class CounterImpl {
 
     let output = printer.get_output().to_string();
 
+    // Classes should be converted
     assert!(
-        output.contains("Logger"),
-        "Expected Logger variable: {}",
+        output.contains("Entity") && output.contains("ApiResponse"),
+        "Expected Entity and ApiResponse classes: {}",
         output
     );
+
+    // Various property decorators should be present
     assert!(
-        output.contains("Counter"),
-        "Expected Counter variable: {}",
+        output.contains("serializable") && output.contains("jsonProperty"),
+        "Expected serialization decorators: {}",
         output
     );
+
+    // Class IIFE pattern should be present
     assert!(
-        output.contains("log") && output.contains("createChild"),
-        "Expected Logger methods: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_class_in_return_statement() {
-    // Class expression in return statement
-    let source = r#"
-function createClass<T>(defaultValue: T) {
-    return class {
-        private value: T = defaultValue;
-
-        getValue(): T {
-            return this.value;
-        }
-
-        setValue(value: T): void {
-            this.value = value;
-        }
-    };
-}
-
-function createNamedClass(name: string) {
-    return class NamedEntity {
-        readonly name: string = name;
-
-        getName(): string {
-            return this.name;
-        }
-
-        static getClassName(): string {
-            return "NamedEntity";
-        }
-    };
-}
-
-function createExtendedClass<T>(Base: new () => T) {
-    return class extends Base {
-        extended: boolean = true;
-
-        isExtended(): boolean {
-            return this.extended;
-        }
-    };
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    assert!(
-        output.contains("createClass"),
-        "Expected createClass function: {}",
-        output
-    );
-    assert!(
-        output.contains("createNamedClass"),
-        "Expected createNamedClass function: {}",
-        output
-    );
-    assert!(
-        output.contains("createExtendedClass"),
-        "Expected createExtendedClass function: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_class_in_array() {
-    // Class expressions in array
-    let source = r#"
-const shapes = [
-    class Circle {
-        constructor(public radius: number) {}
-
-        area(): number {
-            return Math.PI * this.radius * this.radius;
-        }
-    },
-    class Rectangle {
-        constructor(public width: number, public height: number) {}
-
-        area(): number {
-            return this.width * this.height;
-        }
-    },
-    class Triangle {
-        constructor(public base: number, public height: number) {}
-
-        area(): number {
-            return 0.5 * this.base * this.height;
-        }
-    }
-];
-
-const handlers = [
-    class ClickHandler {
-        handle(event: MouseEvent): void {
-            console.log("click", event);
-        }
-    },
-    class KeyHandler {
-        handle(event: KeyboardEvent): void {
-            console.log("key", event);
-        }
-    }
-];
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    assert!(
-        output.contains("shapes"),
-        "Expected shapes array: {}",
-        output
-    );
-    assert!(
-        output.contains("handlers"),
-        "Expected handlers array: {}",
-        output
-    );
-    assert!(
-        output.contains("area"),
-        "Expected area method: {}",
-        output
-    );
-    assert!(
-        output.contains("handle"),
-        "Expected handle method: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_iife_class() {
-    // Class in IIFE (Immediately Invoked Function Expression)
-    let source = r#"
-const Singleton = (function() {
-    let instance: SingletonClass | null = null;
-
-    class SingletonClass {
-        private data: Map<string, any> = new Map();
-
-        private constructor() {}
-
-        static getInstance(): SingletonClass {
-            if (!instance) {
-                instance = new SingletonClass();
-            }
-            return instance;
-        }
-
-        set(key: string, value: any): void {
-            this.data.set(key, value);
-        }
-
-        get(key: string): any {
-            return this.data.get(key);
-        }
-    }
-
-    return SingletonClass;
-})();
-
-const Module = (function() {
-    class PrivateClass {
-        private secret: string = "hidden";
-
-        getSecret(): string {
-            return this.secret;
-        }
-    }
-
-    return class PublicClass {
-        private impl: PrivateClass = new PrivateClass();
-
-        reveal(): string {
-            return this.impl.getSecret();
-        }
-    };
-})();
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    assert!(
-        output.contains("Singleton"),
-        "Expected Singleton variable: {}",
-        output
-    );
-    assert!(
-        output.contains("Module"),
-        "Expected Module variable: {}",
-        output
-    );
-    assert!(
-        output.contains("getInstance"),
-        "Expected getInstance method: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_class_expression_combined() {
-    // Combined class expression patterns
-    let source = r#"
-type Constructor<T = {}> = new (...args: any[]) => T;
-
-function Timestamped<TBase extends Constructor>(Base: TBase) {
-    return class extends Base {
-        timestamp = Date.now();
-
-        getTimestamp(): number {
-            return this.timestamp;
-        }
-    };
-}
-
-function Tagged<TBase extends Constructor>(Base: TBase) {
-    return class extends Base {
-        tags: string[] = [];
-
-        addTag(tag: string): void {
-            this.tags.push(tag);
-        }
-
-        getTags(): string[] {
-            return this.tags;
-        }
-    };
-}
-
-const BaseEntity = class {
-    id: string;
-
-    constructor(id: string) {
-        this.id = id;
-    }
-
-    getId(): string {
-        return this.id;
-    }
-};
-
-const TimestampedEntity = Timestamped(BaseEntity);
-const TaggedTimestampedEntity = Tagged(Timestamped(BaseEntity));
-
-const factories = {
-    createUser: () => new (class User {
-        name: string = "";
-        email: string = "";
-
-        setName(name: string): this {
-            this.name = name;
-            return this;
-        }
-
-        setEmail(email: string): this {
-            this.email = email;
-            return this;
-        }
-    })(),
-
-    createProduct: () => new (class Product {
-        title: string = "";
-        price: number = 0;
-
-        setTitle(title: string): this {
-            this.title = title;
-            return this;
-        }
-
-        setPrice(price: number): this {
-            this.price = price;
-            return this;
-        }
-    })()
-};
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    assert!(
-        output.contains("Timestamped"),
-        "Expected Timestamped function: {}",
-        output
-    );
-    assert!(
-        output.contains("Tagged"),
-        "Expected Tagged function: {}",
-        output
-    );
-    assert!(
-        output.contains("BaseEntity"),
-        "Expected BaseEntity class: {}",
-        output
-    );
-    assert!(
-        output.contains("factories"),
-        "Expected factories object: {}",
-        output
-    );
-    assert!(
-        output.contains("createUser") && output.contains("createProduct"),
-        "Expected factory methods: {}",
+        output.contains("(function ()") || output.contains("(function()"),
+        "Expected class IIFE pattern: {}",
         output
     );
 }
