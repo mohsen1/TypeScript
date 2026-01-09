@@ -6,10 +6,10 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-None - awaiting task from EM-Anvil
+Add ES5 class tests for ambient module patterns: declare module, global augmentation. Tests: `./wasm/test.sh class_es5_tests`
 
 ## Task Queue
-- [ ] Add ES5 class tests for ambient module patterns: declare module, global augmentation
+- [ ] Add ES5 class tests for export assignment patterns: export =, import = require
 
 ## Completed
 - [x] Added ES5 tests for declaration merging patterns (6 tests): interface merging, function-namespace merging, class-namespace merging, enum-namespace merging, interface extension, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 461 pass).
