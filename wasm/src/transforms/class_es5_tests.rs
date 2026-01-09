@@ -33809,3 +33809,384 @@ class FunctionAnalyzer<T extends (...args: any[]) => any> {
         output
     );
 }
+
+// ============================================================================
+// MAPPED TYPE PATTERN TESTS
+// ============================================================================
+
+/// Test ES5 class downleveling with Partial mapped type patterns
+#[test]
+fn test_class_es5_mapped_type_partial() {
+    let source = r#"
+interface UserConfig {
+    name: string;
+    email: string;
+    age: number;
+    theme: string;
+}
+
+class ConfigBuilder<T extends object> {
+    private config: Partial<T> = {};
+
+    set<K extends keyof T>(key: K, value: T[K]): this {
+        this.config[key] = value;
+        return this;
+    }
+
+    get<K extends keyof T>(key: K): T[K] | undefined {
+        return this.config[key];
+    }
+
+    merge(partial: Partial<T>): this {
+        Object.assign(this.config, partial);
+        return this;
+    }
+
+    build(): T {
+        return this.config as T;
+    }
+
+    reset(): void {
+        this.config = {};
+    }
+}
+
+class PartialUpdater<T extends object> {
+    private original: T;
+
+    constructor(original: T) {
+        this.original = original;
+    }
+
+    update(changes: Partial<T>): T {
+        return { ...this.original, ...changes };
+    }
+
+    updateField<K extends keyof T>(key: K, value: T[K]): T {
+        return { ...this.original, [key]: value };
+    }
+
+    diff(other: Partial<T>): Partial<T> {
+        const result: Partial<T> = {};
+        for (const key in other) {
+            if (this.original[key] !== other[key]) {
+                result[key] = other[key];
+            }
+        }
+        return result;
+    }
+}
+
+class FormState<T extends object> {
+    private values: Partial<T> = {};
+    private touched: Partial<Record<keyof T, boolean>> = {};
+    private errors: Partial<Record<keyof T, string>> = {};
+
+    setValue<K extends keyof T>(key: K, value: T[K]): void {
+        this.values[key] = value;
+        this.touched[key] = true;
+    }
+
+    setError<K extends keyof T>(key: K, error: string): void {
+        this.errors[key] = error;
+    }
+
+    getValues(): Partial<T> {
+        return { ...this.values };
+    }
+
+    isValid(): boolean {
+        return Object.keys(this.errors).length === 0;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("ConfigBuilder") && output.contains("PartialUpdater") && output.contains("FormState"),
+        "Expected Partial mapped type classes: {}",
+        output
+    );
+
+    // ConfigBuilder methods
+    assert!(
+        output.contains("set") && output.contains("get") && output.contains("merge") && output.contains("build"),
+        "Expected ConfigBuilder methods: {}",
+        output
+    );
+
+    // PartialUpdater methods
+    assert!(
+        output.contains("update") && output.contains("updateField") && output.contains("diff"),
+        "Expected PartialUpdater methods: {}",
+        output
+    );
+
+    // FormState methods
+    assert!(
+        output.contains("setValue") && output.contains("setError") && output.contains("getValues") && output.contains("isValid"),
+        "Expected FormState methods: {}",
+        output
+    );
+}
+
+/// Test ES5 class downleveling with Required mapped type patterns
+#[test]
+fn test_class_es5_mapped_type_required() {
+    let source = r#"
+interface OptionalConfig {
+    host?: string;
+    port?: number;
+    timeout?: number;
+    retries?: number;
+}
+
+type RequiredConfig = Required<OptionalConfig>;
+
+class ConfigValidator<T extends object> {
+    validate(partial: Partial<T>, required: (keyof T)[]): Required<T> | null {
+        for (const key of required) {
+            if (partial[key] === undefined) {
+                return null;
+            }
+        }
+        return partial as Required<T>;
+    }
+
+    isComplete(partial: Partial<T>, keys: (keyof T)[]): boolean {
+        return keys.every(key => partial[key] !== undefined);
+    }
+
+    fillDefaults(partial: Partial<T>, defaults: Required<T>): Required<T> {
+        return { ...defaults, ...partial };
+    }
+}
+
+class RequiredFieldsChecker<T extends object> {
+    private requiredFields: (keyof T)[];
+
+    constructor(requiredFields: (keyof T)[]) {
+        this.requiredFields = requiredFields;
+    }
+
+    check(obj: Partial<T>): boolean {
+        return this.requiredFields.every(field => obj[field] !== undefined);
+    }
+
+    getMissing(obj: Partial<T>): (keyof T)[] {
+        return this.requiredFields.filter(field => obj[field] === undefined);
+    }
+
+    getPresent(obj: Partial<T>): (keyof T)[] {
+        return this.requiredFields.filter(field => obj[field] !== undefined);
+    }
+}
+
+class DefaultsApplier<T extends object> {
+    private defaults: Required<T>;
+
+    constructor(defaults: Required<T>) {
+        this.defaults = defaults;
+    }
+
+    apply(partial: Partial<T>): Required<T> {
+        return { ...this.defaults, ...partial };
+    }
+
+    getDefault<K extends keyof T>(key: K): T[K] {
+        return this.defaults[key];
+    }
+
+    setDefault<K extends keyof T>(key: K, value: T[K]): void {
+        this.defaults[key] = value;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("ConfigValidator") && output.contains("RequiredFieldsChecker") && output.contains("DefaultsApplier"),
+        "Expected Required mapped type classes: {}",
+        output
+    );
+
+    // ConfigValidator methods
+    assert!(
+        output.contains("validate") && output.contains("isComplete") && output.contains("fillDefaults"),
+        "Expected ConfigValidator methods: {}",
+        output
+    );
+
+    // RequiredFieldsChecker methods
+    assert!(
+        output.contains("check") && output.contains("getMissing") && output.contains("getPresent"),
+        "Expected RequiredFieldsChecker methods: {}",
+        output
+    );
+
+    // DefaultsApplier methods
+    assert!(
+        output.contains("apply") && output.contains("getDefault") && output.contains("setDefault"),
+        "Expected DefaultsApplier methods: {}",
+        output
+    );
+}
+
+/// Test ES5 class downleveling with Readonly mapped type patterns
+#[test]
+fn test_class_es5_mapped_type_readonly() {
+    let source = r#"
+interface MutableState {
+    count: number;
+    name: string;
+    items: string[];
+}
+
+type ImmutableState = Readonly<MutableState>;
+
+class ImmutableWrapper<T extends object> {
+    private readonly data: Readonly<T>;
+
+    constructor(data: T) {
+        this.data = Object.freeze({ ...data });
+    }
+
+    get<K extends keyof T>(key: K): T[K] {
+        return this.data[key];
+    }
+
+    toMutable(): T {
+        return { ...this.data };
+    }
+
+    with<K extends keyof T>(key: K, value: T[K]): ImmutableWrapper<T> {
+        return new ImmutableWrapper({ ...this.data, [key]: value });
+    }
+}
+
+class ReadonlyCollection<T> {
+    private readonly items: ReadonlyArray<T>;
+
+    constructor(items: T[]) {
+        this.items = Object.freeze([...items]);
+    }
+
+    get(index: number): T | undefined {
+        return this.items[index];
+    }
+
+    size(): number {
+        return this.items.length;
+    }
+
+    map<U>(fn: (item: T) => U): ReadonlyCollection<U> {
+        return new ReadonlyCollection(this.items.map(fn));
+    }
+
+    filter(predicate: (item: T) => boolean): ReadonlyCollection<T> {
+        return new ReadonlyCollection(this.items.filter(predicate));
+    }
+
+    toArray(): T[] {
+        return [...this.items];
+    }
+}
+
+class FrozenState<T extends object> {
+    private state: Readonly<T>;
+
+    constructor(initial: T) {
+        this.state = Object.freeze({ ...initial });
+    }
+
+    getState(): Readonly<T> {
+        return this.state;
+    }
+
+    setState(newState: T): void {
+        this.state = Object.freeze({ ...newState });
+    }
+
+    updateState(partial: Partial<T>): void {
+        this.state = Object.freeze({ ...this.state, ...partial });
+    }
+
+    getValue<K extends keyof T>(key: K): T[K] {
+        return this.state[key];
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("ImmutableWrapper") && output.contains("ReadonlyCollection") && output.contains("FrozenState"),
+        "Expected Readonly mapped type classes: {}",
+        output
+    );
+
+    // ImmutableWrapper methods
+    assert!(
+        output.contains("get") && output.contains("toMutable"),
+        "Expected ImmutableWrapper methods: {}",
+        output
+    );
+
+    // ReadonlyCollection methods
+    assert!(
+        output.contains("size") && output.contains("filter") && output.contains("toArray"),
+        "Expected ReadonlyCollection methods: {}",
+        output
+    );
+
+    // FrozenState methods
+    assert!(
+        output.contains("getState") && output.contains("setState") && output.contains("updateState"),
+        "Expected FrozenState methods: {}",
+        output
+    );
+}
