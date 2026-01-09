@@ -45102,3 +45102,835 @@ class Ledger {
         output
     );
 }
+
+/// Test basic error boundary with try/catch
+#[test]
+fn test_class_es5_error_boundary_try_catch() {
+    let source = r#"
+interface ErrorInfo {
+    message: string;
+    stack?: string;
+    timestamp: Date;
+}
+
+class ErrorBoundary {
+    private errors: ErrorInfo[];
+    private maxErrors: number;
+
+    constructor(maxErrors: number = 10) {
+        this.errors = [];
+        this.maxErrors = maxErrors;
+    }
+
+    execute<T>(fn: () => T): T | null {
+        try {
+            return fn();
+        } catch (error) {
+            this.captureError(error as Error);
+            return null;
+        }
+    }
+
+    executeWithFallback<T>(fn: () => T, fallback: T): T {
+        try {
+            return fn();
+        } catch (error) {
+            this.captureError(error as Error);
+            return fallback;
+        }
+    }
+
+    private captureError(error: Error): void {
+        const errorInfo: ErrorInfo = {
+            message: error.message,
+            stack: error.stack,
+            timestamp: new Date()
+        };
+        this.errors.push(errorInfo);
+        if (this.errors.length > this.maxErrors) {
+            this.errors.shift();
+        }
+    }
+
+    getErrors(): ErrorInfo[] {
+        return [...this.errors];
+    }
+
+    clearErrors(): void {
+        this.errors = [];
+    }
+}
+
+class SafeCalculator {
+    private boundary: ErrorBoundary;
+
+    constructor() {
+        this.boundary = new ErrorBoundary();
+    }
+
+    divide(a: number, b: number): number | null {
+        return this.boundary.execute(() => {
+            if (b === 0) {
+                throw new Error('Division by zero');
+            }
+            return a / b;
+        });
+    }
+
+    getLastErrors(): ErrorInfo[] {
+        return this.boundary.getErrors();
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+    let output = printer.get_output().to_string();
+
+    // Should have ES5 class structure
+    assert!(
+        output.contains("ErrorBoundary") && output.contains("SafeCalculator"),
+        "Expected class names: {}",
+        output
+    );
+
+    // Should have error handling methods
+    assert!(
+        output.contains("execute") && output.contains("captureError"),
+        "Expected error handling methods: {}",
+        output
+    );
+}
+
+/// Test error boundary with componentDidCatch pattern
+#[test]
+fn test_class_es5_error_boundary_component_did_catch() {
+    let source = r#"
+interface ComponentState {
+    hasError: boolean;
+    error: Error | null;
+}
+
+abstract class Component<P, S> {
+    protected props: P;
+    protected state: S;
+
+    constructor(props: P) {
+        this.props = props;
+        this.state = this.getInitialState();
+    }
+
+    abstract getInitialState(): S;
+    abstract render(): string;
+
+    setState(newState: Partial<S>): void {
+        this.state = { ...this.state, ...newState };
+    }
+}
+
+class ErrorBoundaryComponent extends Component<{}, ComponentState> {
+    private children: Component<any, any>[];
+
+    constructor(props: {}) {
+        super(props);
+        this.children = [];
+    }
+
+    getInitialState(): ComponentState {
+        return { hasError: false, error: null };
+    }
+
+    static getDerivedStateFromError(error: Error): Partial<ComponentState> {
+        return { hasError: true, error };
+    }
+
+    componentDidCatch(error: Error, errorInfo: { componentStack: string }): void {
+        console.error('Error caught:', error);
+        console.error('Component stack:', errorInfo.componentStack);
+        this.logErrorToService(error, errorInfo);
+    }
+
+    private logErrorToService(error: Error, errorInfo: { componentStack: string }): void {
+        // Log to error reporting service
+    }
+
+    addChild(child: Component<any, any>): void {
+        this.children.push(child);
+    }
+
+    render(): string {
+        if (this.state.hasError) {
+            return '<div>Something went wrong</div>';
+        }
+        return this.children.map(c => c.render()).join('');
+    }
+}
+
+class ChildComponent extends Component<{ name: string }, {}> {
+    getInitialState(): {} {
+        return {};
+    }
+
+    render(): string {
+        return `<span>${this.props.name}</span>`;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+    let output = printer.get_output().to_string();
+
+    // Should have ES5 class structure
+    assert!(
+        output.contains("ErrorBoundaryComponent") && output.contains("ChildComponent"),
+        "Expected class names: {}",
+        output
+    );
+
+    // Should have lifecycle methods
+    assert!(
+        output.contains("componentDidCatch") && output.contains("render"),
+        "Expected lifecycle methods: {}",
+        output
+    );
+}
+
+/// Test error boundary with getDerivedStateFromError
+#[test]
+fn test_class_es5_error_boundary_derived_state() {
+    let source = r#"
+interface AppState {
+    error: Error | null;
+    errorCode: string | null;
+    isRecoverable: boolean;
+}
+
+class StatefulErrorBoundary {
+    private state: AppState;
+    private errorHandlers: Map<string, (error: Error) => void>;
+
+    constructor() {
+        this.state = {
+            error: null,
+            errorCode: null,
+            isRecoverable: true
+        };
+        this.errorHandlers = new Map();
+    }
+
+    static getDerivedStateFromError(error: Error): Partial<AppState> {
+        const errorCode = StatefulErrorBoundary.categorizeError(error);
+        const isRecoverable = !errorCode.startsWith('FATAL');
+        return {
+            error,
+            errorCode,
+            isRecoverable
+        };
+    }
+
+    private static categorizeError(error: Error): string {
+        if (error.message.includes('network')) {
+            return 'NETWORK_ERROR';
+        }
+        if (error.message.includes('permission')) {
+            return 'PERMISSION_ERROR';
+        }
+        if (error.message.includes('fatal')) {
+            return 'FATAL_ERROR';
+        }
+        return 'UNKNOWN_ERROR';
+    }
+
+    handleError(error: Error): void {
+        const derivedState = StatefulErrorBoundary.getDerivedStateFromError(error);
+        this.state = { ...this.state, ...derivedState };
+
+        const handler = this.errorHandlers.get(this.state.errorCode!);
+        if (handler) {
+            handler(error);
+        }
+    }
+
+    registerHandler(errorCode: string, handler: (error: Error) => void): void {
+        this.errorHandlers.set(errorCode, handler);
+    }
+
+    recover(): boolean {
+        if (this.state.isRecoverable) {
+            this.state = {
+                error: null,
+                errorCode: null,
+                isRecoverable: true
+            };
+            return true;
+        }
+        return false;
+    }
+
+    getState(): AppState {
+        return { ...this.state };
+    }
+}
+
+class ApplicationController {
+    private errorBoundary: StatefulErrorBoundary;
+
+    constructor() {
+        this.errorBoundary = new StatefulErrorBoundary();
+        this.setupHandlers();
+    }
+
+    private setupHandlers(): void {
+        this.errorBoundary.registerHandler('NETWORK_ERROR', (error) => {
+            console.log('Retrying network request...');
+        });
+        this.errorBoundary.registerHandler('PERMISSION_ERROR', (error) => {
+            console.log('Requesting permissions...');
+        });
+    }
+
+    executeAction(action: () => void): void {
+        try {
+            action();
+        } catch (error) {
+            this.errorBoundary.handleError(error as Error);
+        }
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+    let output = printer.get_output().to_string();
+
+    // Should have ES5 class structure
+    assert!(
+        output.contains("StatefulErrorBoundary") && output.contains("ApplicationController"),
+        "Expected class names: {}",
+        output
+    );
+
+    // Should have static method
+    assert!(
+        output.contains("getDerivedStateFromError") && output.contains("categorizeError"),
+        "Expected static methods: {}",
+        output
+    );
+}
+
+/// Test nested error boundaries
+#[test]
+fn test_class_es5_error_boundary_nested() {
+    let source = r#"
+interface BoundaryConfig {
+    name: string;
+    fallback: string;
+    propagate: boolean;
+}
+
+class NestedErrorBoundary {
+    private config: BoundaryConfig;
+    private parent: NestedErrorBoundary | null;
+    private children: NestedErrorBoundary[];
+    private hasError: boolean;
+
+    constructor(config: BoundaryConfig, parent: NestedErrorBoundary | null = null) {
+        this.config = config;
+        this.parent = parent;
+        this.children = [];
+        this.hasError = false;
+
+        if (parent) {
+            parent.addChild(this);
+        }
+    }
+
+    private addChild(child: NestedErrorBoundary): void {
+        this.children.push(child);
+    }
+
+    wrap<T>(fn: () => T): T | string {
+        try {
+            return fn();
+        } catch (error) {
+            return this.handleError(error as Error);
+        }
+    }
+
+    private handleError(error: Error): string {
+        this.hasError = true;
+        console.error(`[${this.config.name}] Error:`, error.message);
+
+        if (this.config.propagate && this.parent) {
+            throw error;
+        }
+
+        return this.config.fallback;
+    }
+
+    reset(): void {
+        this.hasError = false;
+        this.children.forEach(child => child.reset());
+    }
+
+    getErrorState(): boolean {
+        return this.hasError || this.children.some(child => child.getErrorState());
+    }
+
+    getName(): string {
+        return this.config.name;
+    }
+}
+
+class ApplicationBoundaries {
+    private root: NestedErrorBoundary;
+    private componentBoundary: NestedErrorBoundary;
+    private serviceBoundary: NestedErrorBoundary;
+
+    constructor() {
+        this.root = new NestedErrorBoundary({
+            name: 'root',
+            fallback: 'Application error',
+            propagate: false
+        });
+
+        this.componentBoundary = new NestedErrorBoundary({
+            name: 'components',
+            fallback: 'Component error',
+            propagate: true
+        }, this.root);
+
+        this.serviceBoundary = new NestedErrorBoundary({
+            name: 'services',
+            fallback: 'Service error',
+            propagate: false
+        }, this.root);
+    }
+
+    executeComponent<T>(fn: () => T): T | string {
+        return this.componentBoundary.wrap(fn);
+    }
+
+    executeService<T>(fn: () => T): T | string {
+        return this.serviceBoundary.wrap(fn);
+    }
+
+    hasAnyError(): boolean {
+        return this.root.getErrorState();
+    }
+
+    resetAll(): void {
+        this.root.reset();
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+    let output = printer.get_output().to_string();
+
+    // Should have ES5 class structure
+    assert!(
+        output.contains("NestedErrorBoundary") && output.contains("ApplicationBoundaries"),
+        "Expected class names: {}",
+        output
+    );
+
+    // Should have nesting methods
+    assert!(
+        output.contains("wrap") && output.contains("addChild") && output.contains("getErrorState"),
+        "Expected nesting methods: {}",
+        output
+    );
+}
+
+/// Test error boundary with async error handling
+#[test]
+fn test_class_es5_error_boundary_async() {
+    let source = r#"
+interface AsyncResult<T> {
+    success: boolean;
+    data?: T;
+    error?: Error;
+}
+
+class AsyncErrorBoundary {
+    private pendingOperations: Map<string, Promise<any>>;
+    private errors: Error[];
+
+    constructor() {
+        this.pendingOperations = new Map();
+        this.errors = [];
+    }
+
+    async execute<T>(id: string, fn: () => Promise<T>): Promise<AsyncResult<T>> {
+        try {
+            const promise = fn();
+            this.pendingOperations.set(id, promise);
+            const data = await promise;
+            this.pendingOperations.delete(id);
+            return { success: true, data };
+        } catch (error) {
+            this.pendingOperations.delete(id);
+            this.errors.push(error as Error);
+            return { success: false, error: error as Error };
+        }
+    }
+
+    async executeWithRetry<T>(
+        id: string,
+        fn: () => Promise<T>,
+        maxRetries: number = 3
+    ): Promise<AsyncResult<T>> {
+        let lastError: Error | undefined;
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+            try {
+                const data = await fn();
+                return { success: true, data };
+            } catch (error) {
+                lastError = error as Error;
+                await this.delay(Math.pow(2, attempt) * 100);
+            }
+        }
+        this.errors.push(lastError!);
+        return { success: false, error: lastError };
+    }
+
+    private delay(ms: number): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    getErrors(): Error[] {
+        return [...this.errors];
+    }
+
+    hasPendingOperations(): boolean {
+        return this.pendingOperations.size > 0;
+    }
+
+    async waitForAll(): Promise<void> {
+        await Promise.allSettled(Array.from(this.pendingOperations.values()));
+    }
+}
+
+class DataFetcher {
+    private boundary: AsyncErrorBoundary;
+    private baseUrl: string;
+
+    constructor(baseUrl: string) {
+        this.boundary = new AsyncErrorBoundary();
+        this.baseUrl = baseUrl;
+    }
+
+    async fetchData<T>(endpoint: string): Promise<T | null> {
+        const result = await this.boundary.execute(endpoint, async () => {
+            const response = await fetch(`${this.baseUrl}${endpoint}`);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            return response.json() as Promise<T>;
+        });
+        return result.success ? result.data! : null;
+    }
+
+    async fetchWithRetry<T>(endpoint: string): Promise<T | null> {
+        const result = await this.boundary.executeWithRetry(endpoint, async () => {
+            const response = await fetch(`${this.baseUrl}${endpoint}`);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            return response.json() as Promise<T>;
+        });
+        return result.success ? result.data! : null;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+    let output = printer.get_output().to_string();
+
+    // Should have ES5 class structure
+    assert!(
+        output.contains("AsyncErrorBoundary") && output.contains("DataFetcher"),
+        "Expected class names: {}",
+        output
+    );
+
+    // Should have async methods
+    assert!(
+        output.contains("execute") && output.contains("executeWithRetry"),
+        "Expected async methods: {}",
+        output
+    );
+}
+
+/// Test combined error boundary patterns
+#[test]
+fn test_class_es5_error_boundary_combined() {
+    let source = r#"
+type ErrorSeverity = 'low' | 'medium' | 'high' | 'critical';
+
+interface ErrorReport {
+    id: string;
+    error: Error;
+    severity: ErrorSeverity;
+    context: Record<string, unknown>;
+    timestamp: Date;
+    handled: boolean;
+}
+
+class ErrorReportingService {
+    private reports: ErrorReport[];
+    private listeners: Set<(report: ErrorReport) => void>;
+
+    constructor() {
+        this.reports = [];
+        this.listeners = new Set();
+    }
+
+    report(error: Error, severity: ErrorSeverity, context: Record<string, unknown> = {}): string {
+        const report: ErrorReport = {
+            id: this.generateId(),
+            error,
+            severity,
+            context,
+            timestamp: new Date(),
+            handled: false
+        };
+        this.reports.push(report);
+        this.notifyListeners(report);
+        return report.id;
+    }
+
+    private generateId(): string {
+        return Math.random().toString(36).substring(2, 15);
+    }
+
+    private notifyListeners(report: ErrorReport): void {
+        this.listeners.forEach(listener => listener(report));
+    }
+
+    subscribe(listener: (report: ErrorReport) => void): () => void {
+        this.listeners.add(listener);
+        return () => this.listeners.delete(listener);
+    }
+
+    markHandled(id: string): boolean {
+        const report = this.reports.find(r => r.id === id);
+        if (report) {
+            report.handled = true;
+            return true;
+        }
+        return false;
+    }
+
+    getUnhandledReports(): ErrorReport[] {
+        return this.reports.filter(r => !r.handled);
+    }
+
+    getCriticalReports(): ErrorReport[] {
+        return this.reports.filter(r => r.severity === 'critical');
+    }
+}
+
+class ComprehensiveErrorBoundary {
+    private reportingService: ErrorReportingService;
+    private recoveryStrategies: Map<string, () => void>;
+    private isRecovering: boolean;
+
+    constructor(reportingService: ErrorReportingService) {
+        this.reportingService = reportingService;
+        this.recoveryStrategies = new Map();
+        this.isRecovering = false;
+    }
+
+    registerRecoveryStrategy(errorType: string, strategy: () => void): void {
+        this.recoveryStrategies.set(errorType, strategy);
+    }
+
+    execute<T>(fn: () => T, context: Record<string, unknown> = {}): T | null {
+        try {
+            return fn();
+        } catch (error) {
+            return this.handleSyncError(error as Error, context);
+        }
+    }
+
+    async executeAsync<T>(fn: () => Promise<T>, context: Record<string, unknown> = {}): Promise<T | null> {
+        try {
+            return await fn();
+        } catch (error) {
+            return this.handleAsyncError(error as Error, context);
+        }
+    }
+
+    private handleSyncError(error: Error, context: Record<string, unknown>): null {
+        const severity = this.determineSeverity(error);
+        const reportId = this.reportingService.report(error, severity, context);
+        this.attemptRecovery(error.name, reportId);
+        return null;
+    }
+
+    private handleAsyncError(error: Error, context: Record<string, unknown>): null {
+        const severity = this.determineSeverity(error);
+        const reportId = this.reportingService.report(error, severity, { ...context, async: true });
+        this.attemptRecovery(error.name, reportId);
+        return null;
+    }
+
+    private determineSeverity(error: Error): ErrorSeverity {
+        if (error.name === 'TypeError' || error.name === 'ReferenceError') {
+            return 'critical';
+        }
+        if (error.message.includes('timeout')) {
+            return 'medium';
+        }
+        if (error.message.includes('network')) {
+            return 'high';
+        }
+        return 'low';
+    }
+
+    private attemptRecovery(errorType: string, reportId: string): void {
+        if (this.isRecovering) return;
+
+        const strategy = this.recoveryStrategies.get(errorType);
+        if (strategy) {
+            this.isRecovering = true;
+            try {
+                strategy();
+                this.reportingService.markHandled(reportId);
+            } finally {
+                this.isRecovering = false;
+            }
+        }
+    }
+}
+
+class ApplicationWithErrorHandling {
+    private boundary: ComprehensiveErrorBoundary;
+    private reportingService: ErrorReportingService;
+
+    constructor() {
+        this.reportingService = new ErrorReportingService();
+        this.boundary = new ComprehensiveErrorBoundary(this.reportingService);
+        this.setupRecoveryStrategies();
+        this.setupErrorListeners();
+    }
+
+    private setupRecoveryStrategies(): void {
+        this.boundary.registerRecoveryStrategy('NetworkError', () => {
+            console.log('Attempting network reconnection...');
+        });
+        this.boundary.registerRecoveryStrategy('TimeoutError', () => {
+            console.log('Retrying operation...');
+        });
+    }
+
+    private setupErrorListeners(): void {
+        this.reportingService.subscribe((report) => {
+            if (report.severity === 'critical') {
+                console.error('Critical error detected:', report.error.message);
+            }
+        });
+    }
+
+    run<T>(operation: () => T): T | null {
+        return this.boundary.execute(operation, { source: 'application' });
+    }
+
+    async runAsync<T>(operation: () => Promise<T>): Promise<T | null> {
+        return this.boundary.executeAsync(operation, { source: 'application' });
+    }
+
+    getErrorSummary(): { total: number; unhandled: number; critical: number } {
+        return {
+            total: this.reportingService.getUnhandledReports().length +
+                   this.reportingService.getCriticalReports().length,
+            unhandled: this.reportingService.getUnhandledReports().length,
+            critical: this.reportingService.getCriticalReports().length
+        };
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+    let output = printer.get_output().to_string();
+
+    // Should have ES5 class structure
+    assert!(
+        output.contains("ErrorReportingService") &&
+        output.contains("ComprehensiveErrorBoundary") &&
+        output.contains("ApplicationWithErrorHandling"),
+        "Expected class names: {}",
+        output
+    );
+
+    // Should have combined methods
+    assert!(
+        output.contains("execute") &&
+        output.contains("report") &&
+        output.contains("attemptRecovery"),
+        "Expected combined methods: {}",
+        output
+    );
+
+    // Type alias should be stripped
+    assert!(
+        !output.contains("type ErrorSeverity"),
+        "Expected type alias to be stripped: {}",
+        output
+    );
+
+    // Interface should be stripped
+    assert!(
+        !output.contains("interface ErrorReport"),
+        "Expected interface to be stripped: {}",
+        output
+    );
+}
