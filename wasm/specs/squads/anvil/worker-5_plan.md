@@ -7,13 +7,14 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-Add async ES5 tests for async resource pool patterns: acquire, release, drain, resize. Tests: `./wasm/test.sh async_es5_tests`
+None - awaiting new task
 
 ## Task Queue
 - [ ] Add async ES5 tests for async transaction patterns: begin, commit, rollback, savepoint
 
 
 ## Completed
+- [x] Added 12 async resource pool pattern tests (acquire, release, drain, resize, create, destroy, validate, evict, warmup, health_check, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (952 tests PASS).
 - [x] Added 12 async pub/sub pattern tests (subscribe, publish, unsubscribe, filter, broadcast, receive, acknowledge, replay, partition, fanout, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (940 tests PASS).
 - [x] Added 12 async state machine pattern tests (transition, guard, action, enter, exit, effect, dispatch, subscribe, history, restore, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (928 tests PASS).
 - [x] Added 12 async stream pattern tests (readable, writable, transform, pipe, reader, writer, tee, cancel, close, consume, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (916 tests PASS).

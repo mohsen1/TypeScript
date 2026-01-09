@@ -12864,3 +12864,104 @@ fn test_async_pubsub_ignores_nested_async() {
     );
     assert!(!result, "Should not detect await inside nested async pub/sub handler");
 }
+
+// ============================================================================
+// ASYNC RESOURCE POOL PATTERN TESTS
+// Tests for resource pool patterns: acquire, release, drain, resize
+// ============================================================================
+
+#[test]
+fn test_async_respool_acquire() {
+    let result = async_error_propagation_contains_await(
+        "async function acquire() { return await pool.acquire(); }",
+    );
+    assert!(result, "Should detect await in resource pool acquire");
+}
+
+#[test]
+fn test_async_respool_release() {
+    let result = async_error_propagation_contains_await(
+        "async function release(resource) { await pool.release(resource); }",
+    );
+    assert!(result, "Should detect await in resource pool release");
+}
+
+#[test]
+fn test_async_respool_drain() {
+    let result = async_error_propagation_contains_await(
+        "async function drain() { await pool.drain(); }",
+    );
+    assert!(result, "Should detect await in resource pool drain");
+}
+
+#[test]
+fn test_async_respool_resize() {
+    let result = async_error_propagation_contains_await(
+        "async function resize(size) { await pool.resize(size); }",
+    );
+    assert!(result, "Should detect await in resource pool resize");
+}
+
+#[test]
+fn test_async_respool_create() {
+    let result = async_error_propagation_contains_await(
+        "async function create() { return await factory.create(); }",
+    );
+    assert!(result, "Should detect await in resource pool create");
+}
+
+#[test]
+fn test_async_respool_destroy() {
+    let result = async_error_propagation_contains_await(
+        "async function destroy(resource) { await resource.destroy(); }",
+    );
+    assert!(result, "Should detect await in resource pool destroy");
+}
+
+#[test]
+fn test_async_respool_validate() {
+    let result = async_error_propagation_contains_await(
+        "async function validate(resource) { return await resource.validate(); }",
+    );
+    assert!(result, "Should detect await in resource pool validate");
+}
+
+#[test]
+fn test_async_respool_evict() {
+    let result = async_error_propagation_contains_await(
+        "async function evict(predicate) { await pool.evict(predicate); }",
+    );
+    assert!(result, "Should detect await in resource pool evict");
+}
+
+#[test]
+fn test_async_respool_warmup() {
+    let result = async_error_propagation_contains_await(
+        "async function warmup(count) { await pool.warmup(count); }",
+    );
+    assert!(result, "Should detect await in resource pool warmup");
+}
+
+#[test]
+fn test_async_respool_health_check() {
+    let result = async_error_propagation_contains_await(
+        "async function healthCheck() { return await pool.healthCheck(); }",
+    );
+    assert!(result, "Should detect await in resource pool health check");
+}
+
+#[test]
+fn test_async_respool_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function syncPool() { return pool.available(); }",
+    );
+    assert!(!result, "Should not detect await when resource pool is sync");
+}
+
+#[test]
+fn test_async_respool_ignores_nested_async() {
+    let result = async_error_propagation_contains_await(
+        "async function outer() { const factory = async () => await createResource(); }",
+    );
+    assert!(!result, "Should not detect await inside nested async resource pool factory");
+}
