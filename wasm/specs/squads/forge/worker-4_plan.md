@@ -7,11 +7,12 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [x] Fix `test_namespace_value_member_access` and related namespace member access tests - DONE (tests were passing, fixed blocking compilation error in subtype_tests.rs)
+- [x] Circular constraints in extends clauses - DONE (added 11 F-bounded polymorphism tests)
 
 ## Task Queue
-- [x] Fix `test_nested_namespace_member_resolution` if still failing - DONE (already passing)
+- [x] Fix `test_namespace_value_member_access` - DONE (tests were passing after fixing compilation error)
 - [x] Add coverage for namespace type member access patterns - DONE (added 5 tests)
+- [x] Add circular constraints in extends clauses tests - DONE (added 11 tests)
 
 ## Completed
 - [x] Fixed method type parameter scope in check_method_declaration
@@ -23,9 +24,11 @@ Priority: 4
 - [x] Fixed namespace value/type member access tests (all passing)
 - [x] Fixed compilation error in subtype_tests.rs (object_shape_with_index -> object_with_index)
 - [x] Added 5 namespace type member access pattern tests
+- [x] Added 11 circular constraints in extends clauses tests (F-bounded polymorphism)
+- [x] Added 10 additional circular constraint edge cases (polymorphic this, promise, event emitter, fluent interface, recursive JSON, linked list, state machine, visitor, expression tree, repository patterns)
 
 ## Ready for Merge
-Yes - all namespace tests passing, added coverage for namespace type member access patterns
+Yes - 21+ circular constraint tests, namespace tests all passing
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize solver correctness
