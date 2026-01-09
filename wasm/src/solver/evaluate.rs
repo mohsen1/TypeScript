@@ -282,12 +282,17 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             if let Some(type_params) = type_params {
                 // Resolve the base type to get the body
                 if let Some(resolved) = resolved {
+                    // Pre-expand type arguments that are TypeQuery or Application
+                    let expanded_args: Vec<TypeId> = app.args.iter().map(|&arg| {
+                        self.try_expand_type_arg(arg)
+                    }).collect();
+
                     // Instantiate the resolved type with the type arguments
                     let instantiated = instantiate_generic(
                         self.interner,
                         resolved,
                         &type_params,
-                        &app.args,
+                        &expanded_args,
                     );
                     // Recursively evaluate the result
                     return self.evaluate(instantiated);
@@ -296,11 +301,16 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 // Fallback: try to extract type params from the resolved type's properties
                 let extracted_params = self.extract_type_params_from_type(resolved);
                 if !extracted_params.is_empty() && extracted_params.len() == app.args.len() {
+                    // Pre-expand type arguments
+                    let expanded_args: Vec<TypeId> = app.args.iter().map(|&arg| {
+                        self.try_expand_type_arg(arg)
+                    }).collect();
+
                     let instantiated = instantiate_generic(
                         self.interner,
                         resolved,
                         &extracted_params,
-                        &app.args,
+                        &expanded_args,
                     );
                     return self.evaluate(instantiated);
                 }
@@ -392,6 +402,26 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 }
             }
             _ => {}
+        }
+    }
+
+    /// Try to expand a type argument that may be a TypeQuery or Application.
+    /// Returns the expanded type, or the original if it can't be expanded.
+    /// This ensures type arguments are resolved before instantiation.
+    fn try_expand_type_arg(&self, arg: TypeId) -> TypeId {
+        let Some(key) = self.interner.lookup(arg) else {
+            return arg;
+        };
+        match key {
+            TypeKey::TypeQuery(sym_ref) => {
+                // Resolve the TypeQuery to get the actual type
+                self.resolver.resolve_ref(sym_ref, self.interner).unwrap_or(arg)
+            }
+            TypeKey::Application(app_id) => {
+                // Recursively evaluate the nested Application
+                self.evaluate_application(app_id)
+            }
+            _ => arg,
         }
     }
 
