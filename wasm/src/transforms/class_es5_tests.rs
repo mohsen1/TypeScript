@@ -13151,3 +13151,373 @@ class CustomPattern {
         output
     );
 }
+
+// ============================================================================
+// Object.getOwnPropertyDescriptor pattern tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_get_own_property_descriptor_basic() {
+    // Basic Object.getOwnPropertyDescriptor usage
+    let source = r#"
+class PropertyInspector {
+    inspect(obj: object, key: string): PropertyDescriptor | undefined {
+        return Object.getOwnPropertyDescriptor(obj, key);
+    }
+
+    isWritable(obj: object, key: string): boolean {
+        const desc = Object.getOwnPropertyDescriptor(obj, key);
+        return desc ? desc.writable === true : false;
+    }
+
+    isEnumerable(obj: object, key: string): boolean {
+        const desc = Object.getOwnPropertyDescriptor(obj, key);
+        return desc ? desc.enumerable === true : false;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("PropertyInspector"),
+        "Expected PropertyInspector class: {}",
+        output
+    );
+
+    // Object.getOwnPropertyDescriptor should be present
+    assert!(
+        output.contains("Object.getOwnPropertyDescriptor"),
+        "Expected Object.getOwnPropertyDescriptor: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("inspect") && output.contains("isWritable"),
+        "Expected inspect, isWritable methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_get_own_property_descriptor_with_define() {
+    // Object.getOwnPropertyDescriptor with Object.defineProperty
+    let source = r#"
+class PropertyCopier {
+    copyProperty(source: object, target: object, key: string): void {
+        const desc = Object.getOwnPropertyDescriptor(source, key);
+        if (desc) {
+            Object.defineProperty(target, key, desc);
+        }
+    }
+
+    copyAllProperties(source: object, target: object): void {
+        for (const key of Object.keys(source)) {
+            const desc = Object.getOwnPropertyDescriptor(source, key);
+            if (desc) {
+                Object.defineProperty(target, key, desc);
+            }
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("PropertyCopier"),
+        "Expected PropertyCopier class: {}",
+        output
+    );
+
+    // Object methods should be present
+    assert!(
+        output.contains("Object.getOwnPropertyDescriptor") && output.contains("Object.defineProperty"),
+        "Expected Object.getOwnPropertyDescriptor and Object.defineProperty: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("copyProperty") && output.contains("copyAllProperties"),
+        "Expected copyProperty, copyAllProperties methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_get_own_property_descriptors() {
+    // Object.getOwnPropertyDescriptors usage
+    let source = r#"
+class ObjectCloner {
+    shallowClone<T extends object>(obj: T): T {
+        const descriptors = Object.getOwnPropertyDescriptors(obj);
+        return Object.create(Object.getPrototypeOf(obj), descriptors);
+    }
+
+    getDescriptors(obj: object): PropertyDescriptorMap {
+        return Object.getOwnPropertyDescriptors(obj);
+    }
+
+    hasAccessor(obj: object, key: string): boolean {
+        const descriptors = Object.getOwnPropertyDescriptors(obj);
+        const desc = descriptors[key];
+        return desc ? ('get' in desc || 'set' in desc) : false;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("ObjectCloner"),
+        "Expected ObjectCloner class: {}",
+        output
+    );
+
+    // Object.getOwnPropertyDescriptors should be present
+    assert!(
+        output.contains("Object.getOwnPropertyDescriptors"),
+        "Expected Object.getOwnPropertyDescriptors: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("shallowClone") && output.contains("getDescriptors"),
+        "Expected shallowClone, getDescriptors methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_property_descriptor_static() {
+    // Static methods using property descriptors
+    let source = r#"
+class PropertyUtils {
+    static freeze<T extends object>(obj: T): Readonly<T> {
+        return Object.freeze(obj);
+    }
+
+    static seal<T extends object>(obj: T): T {
+        return Object.seal(obj);
+    }
+
+    static getDescriptor(obj: object, key: string): PropertyDescriptor | undefined {
+        return Object.getOwnPropertyDescriptor(obj, key);
+    }
+
+    static defineReadonly(obj: object, key: string, value: unknown): void {
+        Object.defineProperty(obj, key, {
+            value,
+            writable: false,
+            enumerable: true,
+            configurable: false
+        });
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("PropertyUtils"),
+        "Expected PropertyUtils class: {}",
+        output
+    );
+
+    // Object methods should be present
+    assert!(
+        output.contains("Object.getOwnPropertyDescriptor") || output.contains("Object.defineProperty"),
+        "Expected Object property methods: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("freeze") && output.contains("seal"),
+        "Expected freeze, seal methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_property_descriptor_in_constructor() {
+    // Property descriptors used in constructor
+    let source = r#"
+class ImmutableConfig {
+    constructor(config: Record<string, unknown>) {
+        for (const [key, value] of Object.entries(config)) {
+            Object.defineProperty(this, key, {
+                value,
+                writable: false,
+                enumerable: true,
+                configurable: false
+            });
+        }
+    }
+
+    getDescriptor(key: string): PropertyDescriptor | undefined {
+        return Object.getOwnPropertyDescriptor(this, key);
+    }
+
+    isConfigurable(key: string): boolean {
+        const desc = Object.getOwnPropertyDescriptor(this, key);
+        return desc ? desc.configurable === true : false;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("ImmutableConfig"),
+        "Expected ImmutableConfig class: {}",
+        output
+    );
+
+    // Object.getOwnPropertyDescriptor should be present
+    assert!(
+        output.contains("Object.getOwnPropertyDescriptor"),
+        "Expected Object.getOwnPropertyDescriptor: {}",
+        output
+    );
+
+    // Constructor should be present
+    assert!(
+        output.contains("function ImmutableConfig"),
+        "Expected ImmutableConfig constructor: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_property_descriptor_mixin() {
+    // Property descriptors for mixin pattern
+    let source = r#"
+class MixinHelper {
+    static applyMixin(target: object, source: object): void {
+        const descriptors = Object.getOwnPropertyDescriptors(source);
+        for (const key of Object.keys(descriptors)) {
+            if (key !== 'constructor') {
+                Object.defineProperty(target, key, descriptors[key]);
+            }
+        }
+    }
+
+    static copyAccessors(target: object, source: object): void {
+        for (const key of Object.keys(source)) {
+            const desc = Object.getOwnPropertyDescriptor(source, key);
+            if (desc && (desc.get || desc.set)) {
+                Object.defineProperty(target, key, desc);
+            }
+        }
+    }
+
+    static hasOwnProperty(obj: object, key: string): boolean {
+        return Object.getOwnPropertyDescriptor(obj, key) !== undefined;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("MixinHelper"),
+        "Expected MixinHelper class: {}",
+        output
+    );
+
+    // Object property descriptor methods should be present
+    assert!(
+        output.contains("Object.getOwnPropertyDescriptor") || output.contains("Object.getOwnPropertyDescriptors"),
+        "Expected Object property descriptor methods: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("applyMixin") && output.contains("copyAccessors"),
+        "Expected applyMixin, copyAccessors methods: {}",
+        output
+    );
+}
