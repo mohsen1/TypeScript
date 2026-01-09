@@ -7,10 +7,10 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-None - awaiting assignment from EM-Anvil.
+- [ ] Add ES5 class tests for private method patterns: static private, async private, generator private, private accessors. Tests: `./wasm/test.sh class_es5_tests`
 
 ## Task Queue
-- [ ] Add ES5 class tests for private method patterns: static private, async private, generator private
+- [ ] Add ES5 class tests for using declarations patterns: sync using, async using, dispose patterns
 
 ## Completed
 - [x] Add ES5 class tests for class field initializer patterns. Tests: `./wasm/test.sh class_es5_tests`

@@ -7,10 +7,10 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-None - awaiting next task
+- [ ] Add async ES5 tests for async resource management patterns: using declarations, async dispose, Symbol.dispose. Tests: `./wasm/test.sh async_es5_tests`
 
 ## Task Queue
-- [ ] Add async ES5 tests for async resource management patterns: using declarations, async dispose
+- [ ] Add async ES5 tests for async context patterns: AsyncLocalStorage simulation, context propagation
 
 ## Completed
 - [x] Added 12 async module pattern tests (dynamic import, dynamic import call, conditional import, top-level simulation, module init, lazy load, parallel imports, module factory, export async, import-then-use, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (628 tests PASS).
