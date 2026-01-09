@@ -37062,54 +37062,93 @@ class JSONPathQuery {
     );
 }
 
-// ============================================================================
-// EXPORT ASSIGNMENT PATTERN TESTS
-// ============================================================================
+// =============================================================================
+// VARIADIC TUPLE PATTERN TESTS - spread, labeled, optional
+// =============================================================================
 
-/// Test basic export = class pattern
 #[test]
-fn test_class_es5_export_assignment_basic() {
+fn test_class_es5_variadic_tuple_spread() {
     let source = r#"
-class Calculator {
-    private value: number = 0;
+// Variadic tuple spread pattern
+type Prepend<T, U extends unknown[]> = [T, ...U];
+type Append<T extends unknown[], U> = [...T, U];
+type Concat<T extends unknown[], U extends unknown[]> = [...T, ...U];
 
-    constructor(initial: number = 0) {
-        this.value = initial;
+class TupleBuilder<T extends unknown[]> {
+    private items: T;
+
+    constructor(...items: T) {
+        this.items = items;
     }
 
-    add(n: number): Calculator {
-        this.value += n;
-        return this;
+    getItems(): T {
+        return this.items;
     }
 
-    subtract(n: number): Calculator {
-        this.value -= n;
-        return this;
+    prepend<U>(item: U): TupleBuilder<[U, ...T]> {
+        return new TupleBuilder(item, ...this.items) as TupleBuilder<[U, ...T]>;
     }
 
-    multiply(n: number): Calculator {
-        this.value *= n;
-        return this;
+    append<U>(item: U): TupleBuilder<[...T, U]> {
+        return new TupleBuilder(...this.items, item) as TupleBuilder<[...T, U]>;
     }
 
-    divide(n: number): Calculator {
-        if (n !== 0) {
-            this.value /= n;
-        }
-        return this;
+    concat<U extends unknown[]>(other: TupleBuilder<U>): TupleBuilder<[...T, ...U]> {
+        return new TupleBuilder(...this.items, ...other.getItems()) as TupleBuilder<[...T, ...U]>;
     }
 
-    getValue(): number {
-        return this.value;
-    }
-
-    reset(): Calculator {
-        this.value = 0;
-        return this;
+    getLength(): number {
+        return this.items.length;
     }
 }
 
-export = Calculator;
+class SpreadOperations<T extends unknown[]> {
+    private data: T;
+
+    constructor(data: T) {
+        this.data = data;
+    }
+
+    getData(): T {
+        return this.data;
+    }
+
+    first(): T[0] {
+        return this.data[0];
+    }
+
+    rest(): T extends [unknown, ...infer R] ? R : never {
+        return this.data.slice(1) as T extends [unknown, ...infer R] ? R : never;
+    }
+
+    last(): T extends [...unknown[], infer L] ? L : never {
+        return this.data[this.data.length - 1] as T extends [...unknown[], infer L] ? L : never;
+    }
+
+    init(): T extends [...infer I, unknown] ? I : never {
+        return this.data.slice(0, -1) as T extends [...infer I, unknown] ? I : never;
+    }
+}
+
+class FunctionComposer {
+    compose<A, B, C>(f: (a: A) => B, g: (b: B) => C): (a: A) => C {
+        return (a: A) => g(f(a));
+    }
+
+    pipe<T extends unknown[], R>(
+        ...fns: [...{ [K in keyof T]: (arg: K extends 0 ? T[0] : unknown) => unknown }, (arg: unknown) => R]
+    ): (arg: T[0]) => R {
+        return (arg: T[0]) => fns.reduce((acc, fn) => (fn as Function)(acc), arg) as R;
+    }
+
+    identity<T>(value: T): T {
+        return value;
+    }
+
+    constant<T>(value: T): () => T {
+        return () => value;
+    }
+}
 "#;
 
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -37127,70 +37166,153 @@ export = Calculator;
 
     let output = printer.get_output().to_string();
 
-    // Calculator class should be ES5 constructor
+    // Classes should be converted
     assert!(
-        output.contains("function Calculator"),
-        "Expected ES5 Calculator class: {}",
+        output.contains("TupleBuilder") && output.contains("SpreadOperations") && output.contains("FunctionComposer"),
+        "Expected variadic tuple spread classes: {}",
         output
     );
 
-    // Methods should exist
+    // TupleBuilder methods
     assert!(
-        output.contains("add") && output.contains("subtract") && output.contains("multiply"),
-        "Expected Calculator methods: {}",
+        output.contains("getItems") && output.contains("prepend") && output.contains("append") && output.contains("concat"),
+        "Expected TupleBuilder methods: {}",
         output
     );
 
-    // Export assignment should be present
+    // SpreadOperations methods
     assert!(
-        output.contains("module.exports") || output.contains("export"),
-        "Expected export assignment: {}",
+        output.contains("first") && output.contains("rest") && output.contains("last") && output.contains("init"),
+        "Expected SpreadOperations methods: {}",
+        output
+    );
+
+    // FunctionComposer methods
+    assert!(
+        output.contains("compose") && output.contains("pipe") && output.contains("identity"),
+        "Expected FunctionComposer methods: {}",
+        output
+    );
+
+    // Type aliases should be stripped
+    assert!(
+        !output.contains("type Prepend") && !output.contains("type Append") && !output.contains("type Concat"),
+        "Expected type aliases to be stripped: {}",
         output
     );
 }
 
-/// Test export = with namespace augmentation
 #[test]
-fn test_class_es5_export_assignment_namespace() {
+fn test_class_es5_variadic_tuple_labeled() {
     let source = r#"
-class Logger {
-    private name: string;
-    private level: number;
+// Variadic tuple labeled pattern
+type Point2D = [x: number, y: number];
+type Point3D = [x: number, y: number, z: number];
+type RGB = [red: number, green: number, blue: number];
+type RGBA = [red: number, green: number, blue: number, alpha: number];
 
-    constructor(name: string) {
-        this.name = name;
-        this.level = Logger.INFO;
+class Point2DHandler {
+    private point: Point2D;
+
+    constructor(x: number, y: number) {
+        this.point = [x, y];
     }
 
-    log(message: string): void {
-        console.log("[" + this.name + "] " + message);
+    getX(): number {
+        return this.point[0];
     }
 
-    setLevel(level: number): void {
-        this.level = level;
+    getY(): number {
+        return this.point[1];
     }
 
-    getLevel(): number {
-        return this.level;
+    getPoint(): Point2D {
+        return this.point;
     }
 
-    getName(): string {
-        return this.name;
+    distanceFromOrigin(): number {
+        return Math.sqrt(this.point[0] ** 2 + this.point[1] ** 2);
     }
-}
 
-namespace Logger {
-    export const DEBUG = 0;
-    export const INFO = 1;
-    export const WARN = 2;
-    export const ERROR = 3;
-
-    export function create(name: string): Logger {
-        return new Logger(name);
+    add(other: Point2D): Point2DHandler {
+        return new Point2DHandler(this.point[0] + other[0], this.point[1] + other[1]);
     }
 }
 
-export = Logger;
+class Point3DHandler {
+    private point: Point3D;
+
+    constructor(x: number, y: number, z: number) {
+        this.point = [x, y, z];
+    }
+
+    getX(): number {
+        return this.point[0];
+    }
+
+    getY(): number {
+        return this.point[1];
+    }
+
+    getZ(): number {
+        return this.point[2];
+    }
+
+    getPoint(): Point3D {
+        return this.point;
+    }
+
+    distanceFromOrigin(): number {
+        return Math.sqrt(this.point[0] ** 2 + this.point[1] ** 2 + this.point[2] ** 2);
+    }
+
+    toPoint2D(): Point2DHandler {
+        return new Point2DHandler(this.point[0], this.point[1]);
+    }
+}
+
+class ColorHandler {
+    private color: RGB | RGBA;
+
+    constructor(red: number, green: number, blue: number, alpha?: number) {
+        if (alpha !== undefined) {
+            this.color = [red, green, blue, alpha];
+        } else {
+            this.color = [red, green, blue];
+        }
+    }
+
+    getRed(): number {
+        return this.color[0];
+    }
+
+    getGreen(): number {
+        return this.color[1];
+    }
+
+    getBlue(): number {
+        return this.color[2];
+    }
+
+    getAlpha(): number | undefined {
+        return this.color.length === 4 ? this.color[3] : undefined;
+    }
+
+    hasAlpha(): boolean {
+        return this.color.length === 4;
+    }
+
+    toHexString(): string {
+        const r = this.color[0].toString(16).padStart(2, "0");
+        const g = this.color[1].toString(16).padStart(2, "0");
+        const b = this.color[2].toString(16).padStart(2, "0");
+        return r + g + b;
+    }
+
+    toRGBString(): string {
+        return "rgb(" + this.color[0] + ", " + this.color[1] + ", " + this.color[2] + ")";
+    }
+}
 "#;
 
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -37208,93 +37330,160 @@ export = Logger;
 
     let output = printer.get_output().to_string();
 
-    // Logger class should be ES5 constructor
+    // Classes should be converted
     assert!(
-        output.contains("function Logger"),
-        "Expected ES5 Logger class: {}",
+        output.contains("Point2DHandler") && output.contains("Point3DHandler") && output.contains("ColorHandler"),
+        "Expected variadic tuple labeled classes: {}",
         output
     );
 
-    // Methods should exist
+    // Point2DHandler methods
     assert!(
-        output.contains(".log") && output.contains("setLevel") && output.contains("getLevel"),
-        "Expected Logger methods: {}",
+        output.contains("getX") && output.contains("getY") && output.contains("distanceFromOrigin") && output.contains("add"),
+        "Expected Point2DHandler methods: {}",
         output
     );
 
-    // Namespace constants should be present
+    // Point3DHandler methods
     assert!(
-        output.contains("DEBUG") && output.contains("INFO") && output.contains("WARN"),
-        "Expected Logger namespace constants: {}",
+        output.contains("getZ") && output.contains("toPoint2D"),
+        "Expected Point3DHandler methods: {}",
+        output
+    );
+
+    // ColorHandler methods
+    assert!(
+        output.contains("getRed") && output.contains("getGreen") && output.contains("getBlue") && output.contains("getAlpha"),
+        "Expected ColorHandler methods: {}",
+        output
+    );
+
+    // Type aliases should be stripped
+    assert!(
+        !output.contains("type Point2D") && !output.contains("type Point3D") && !output.contains("type RGB"),
+        "Expected type aliases to be stripped: {}",
         output
     );
 }
 
-/// Test import = require pattern with class usage
 #[test]
-fn test_class_es5_import_require_pattern() {
+fn test_class_es5_variadic_tuple_optional() {
     let source = r#"
-import events = require("events");
+// Variadic tuple optional pattern
+type OptionalTail<T, U?, V?> = [T, U?, V?];
+type ConfigTuple = [host: string, port?: number, secure?: boolean];
+type CallbackTuple = [success: () => void, error?: (err: Error) => void, complete?: () => void];
 
-class EventManager {
-    private handlers: Map<string, Function[]> = new Map();
+class ConfigManager {
+    private config: ConfigTuple;
 
-    on(event: string, handler: Function): void {
-        if (!this.handlers.has(event)) {
-            this.handlers.set(event, []);
-        }
-        this.handlers.get(event)!.push(handler);
+    constructor(host: string, port?: number, secure?: boolean) {
+        this.config = [host, port, secure];
     }
 
-    off(event: string, handler: Function): void {
-        const handlers = this.handlers.get(event);
-        if (handlers) {
-            const index = handlers.indexOf(handler);
-            if (index !== -1) {
-                handlers.splice(index, 1);
+    getHost(): string {
+        return this.config[0];
+    }
+
+    getPort(): number | undefined {
+        return this.config[1];
+    }
+
+    getSecure(): boolean | undefined {
+        return this.config[2];
+    }
+
+    getPortOrDefault(defaultPort: number): number {
+        return this.config[1] ?? defaultPort;
+    }
+
+    isSecure(): boolean {
+        return this.config[2] ?? false;
+    }
+
+    getUrl(): string {
+        const protocol = this.isSecure() ? "https" : "http";
+        const port = this.getPort();
+        if (port) {
+            return protocol + "://" + this.getHost() + ":" + port;
+        }
+        return protocol + "://" + this.getHost();
+    }
+}
+
+class CallbackManager {
+    private callbacks: CallbackTuple;
+
+    constructor(success: () => void, error?: (err: Error) => void, complete?: () => void) {
+        this.callbacks = [success, error, complete];
+    }
+
+    getSuccess(): () => void {
+        return this.callbacks[0];
+    }
+
+    getError(): ((err: Error) => void) | undefined {
+        return this.callbacks[1];
+    }
+
+    getComplete(): (() => void) | undefined {
+        return this.callbacks[2];
+    }
+
+    execute(): void {
+        try {
+            this.callbacks[0]();
+        } catch (err) {
+            if (this.callbacks[1]) {
+                this.callbacks[1](err as Error);
+            }
+        } finally {
+            if (this.callbacks[2]) {
+                this.callbacks[2]();
             }
         }
     }
 
-    emit(event: string, ...args: any[]): void {
-        const handlers = this.handlers.get(event);
-        if (handlers) {
-            handlers.forEach(h => h(...args));
-        }
+    hasErrorHandler(): boolean {
+        return this.callbacks[1] !== undefined;
     }
 
-    once(event: string, handler: Function): void {
-        const wrapper = (...args: any[]) => {
-            this.off(event, wrapper);
-            handler(...args);
-        };
-        this.on(event, wrapper);
-    }
-
-    removeAllListeners(event?: string): void {
-        if (event) {
-            this.handlers.delete(event);
-        } else {
-            this.handlers.clear();
-        }
+    hasCompleteHandler(): boolean {
+        return this.callbacks[2] !== undefined;
     }
 }
 
-class NotificationCenter extends EventManager {
-    notify(type: string, data: any): void {
-        this.emit(type, data);
+class OptionalArgsHandler<T extends unknown[]> {
+    private args: T;
+
+    constructor(...args: T) {
+        this.args = args;
     }
 
-    subscribe(type: string, callback: (data: any) => void): void {
-        this.on(type, callback);
+    getArgs(): T {
+        return this.args;
     }
 
-    unsubscribe(type: string, callback: (data: any) => void): void {
-        this.off(type, callback);
+    getArg<K extends keyof T>(index: K): T[K] {
+        return this.args[index];
+    }
+
+    hasArg(index: number): boolean {
+        return index < this.args.length && this.args[index] !== undefined;
+    }
+
+    getArgCount(): number {
+        return this.args.filter(arg => arg !== undefined).length;
+    }
+
+    getTotalSlots(): number {
+        return this.args.length;
+    }
+
+    mapArgs<U>(fn: (arg: T[number]) => U): U[] {
+        return this.args.map(fn);
     }
 }
-
-export = NotificationCenter;
 "#;
 
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -37312,421 +37501,38 @@ export = NotificationCenter;
 
     let output = printer.get_output().to_string();
 
-    // EventManager class should be ES5 constructor
+    // Classes should be converted
     assert!(
-        output.contains("function EventManager"),
-        "Expected ES5 EventManager class: {}",
+        output.contains("ConfigManager") && output.contains("CallbackManager") && output.contains("OptionalArgsHandler"),
+        "Expected variadic tuple optional classes: {}",
         output
     );
 
-    // NotificationCenter class should be ES5 constructor
+    // ConfigManager methods
     assert!(
-        output.contains("function NotificationCenter"),
-        "Expected ES5 NotificationCenter class: {}",
+        output.contains("getHost") && output.contains("getPort") && output.contains("getSecure") && output.contains("getUrl"),
+        "Expected ConfigManager methods: {}",
         output
     );
 
-    // EventManager methods
+    // CallbackManager methods
     assert!(
-        output.contains(".on") && output.contains(".off") && output.contains(".emit"),
-        "Expected EventManager methods: {}",
+        output.contains("getSuccess") && output.contains("getError") && output.contains("execute"),
+        "Expected CallbackManager methods: {}",
         output
     );
 
-    // NotificationCenter methods
+    // OptionalArgsHandler methods
     assert!(
-        output.contains("notify") && output.contains("subscribe") && output.contains("unsubscribe"),
-        "Expected NotificationCenter methods: {}",
+        output.contains("getArgs") && output.contains("getArg") && output.contains("hasArg") && output.contains("getArgCount"),
+        "Expected OptionalArgsHandler methods: {}",
         output
     );
 
-    // Inheritance should be present
+    // Type aliases should be stripped
     assert!(
-        output.contains("__extends") || output.contains("_super"),
-        "Expected inheritance pattern: {}",
-        output
-    );
-}
-
-/// Test export = with interface implementation
-#[test]
-fn test_class_es5_export_assignment_interface() {
-    let source = r#"
-interface Serializable {
-    serialize(): string;
-    deserialize(data: string): void;
-}
-
-interface Cloneable<T> {
-    clone(): T;
-}
-
-class DataModel implements Serializable, Cloneable<DataModel> {
-    private id: string;
-    private data: Record<string, any>;
-    private createdAt: Date;
-
-    constructor(id: string, data: Record<string, any> = {}) {
-        this.id = id;
-        this.data = data;
-        this.createdAt = new Date();
-    }
-
-    getId(): string {
-        return this.id;
-    }
-
-    getData(): Record<string, any> {
-        return { ...this.data };
-    }
-
-    setData(key: string, value: any): void {
-        this.data[key] = value;
-    }
-
-    serialize(): string {
-        return JSON.stringify({
-            id: this.id,
-            data: this.data,
-            createdAt: this.createdAt.toISOString()
-        });
-    }
-
-    deserialize(json: string): void {
-        const parsed = JSON.parse(json);
-        this.id = parsed.id;
-        this.data = parsed.data;
-        this.createdAt = new Date(parsed.createdAt);
-    }
-
-    clone(): DataModel {
-        const cloned = new DataModel(this.id, { ...this.data });
-        return cloned;
-    }
-
-    getCreatedAt(): Date {
-        return this.createdAt;
-    }
-}
-
-export = DataModel;
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // DataModel class should be ES5 constructor
-    assert!(
-        output.contains("function DataModel"),
-        "Expected ES5 DataModel class: {}",
-        output
-    );
-
-    // Methods should exist
-    assert!(
-        output.contains("getId") && output.contains("getData") && output.contains("setData"),
-        "Expected DataModel methods: {}",
-        output
-    );
-
-    // Interface methods
-    assert!(
-        output.contains("serialize") && output.contains("deserialize") && output.contains("clone"),
-        "Expected Serializable/Cloneable methods: {}",
-        output
-    );
-
-    // Interfaces should be stripped
-    assert!(
-        !output.contains("interface Serializable") && !output.contains("interface Cloneable"),
-        "Expected interfaces to be stripped: {}",
-        output
-    );
-}
-
-/// Test export = function with class inside
-#[test]
-fn test_class_es5_export_assignment_function() {
-    let source = r#"
-function createService(config: { name: string; timeout: number }): Service {
-    return new Service(config.name, config.timeout);
-}
-
-class Service {
-    private name: string;
-    private timeout: number;
-    private isRunning: boolean = false;
-
-    constructor(name: string, timeout: number) {
-        this.name = name;
-        this.timeout = timeout;
-    }
-
-    start(): void {
-        this.isRunning = true;
-    }
-
-    stop(): void {
-        this.isRunning = false;
-    }
-
-    isActive(): boolean {
-        return this.isRunning;
-    }
-
-    getName(): string {
-        return this.name;
-    }
-
-    getTimeout(): number {
-        return this.timeout;
-    }
-
-    setTimeout(timeout: number): void {
-        this.timeout = timeout;
-    }
-}
-
-namespace createService {
-    export const DEFAULT_TIMEOUT = 5000;
-
-    export function withDefaults(name: string): Service {
-        return new Service(name, DEFAULT_TIMEOUT);
-    }
-
-    export class ServiceError extends Error {
-        constructor(message: string) {
-            super(message);
-            this.name = "ServiceError";
-        }
-    }
-}
-
-export = createService;
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Service class should be ES5 constructor
-    assert!(
-        output.contains("function Service"),
-        "Expected ES5 Service class: {}",
-        output
-    );
-
-    // createService function should exist
-    assert!(
-        output.contains("createService"),
-        "Expected createService function: {}",
-        output
-    );
-
-    // Service methods
-    assert!(
-        output.contains("start") && output.contains("stop") && output.contains("isActive"),
-        "Expected Service methods: {}",
-        output
-    );
-
-    // Namespace members
-    assert!(
-        output.contains("DEFAULT_TIMEOUT") && output.contains("withDefaults"),
-        "Expected namespace members: {}",
-        output
-    );
-}
-
-/// Test combined export assignment patterns
-#[test]
-fn test_class_es5_export_assignment_combined() {
-    let source = r#"
-import path = require("path");
-
-interface StorageOptions {
-    basePath: string;
-    maxSize: number;
-}
-
-interface StorageItem<T> {
-    key: string;
-    value: T;
-    expires?: number;
-}
-
-class Storage<T> {
-    private options: StorageOptions;
-    private items: Map<string, StorageItem<T>> = new Map();
-
-    constructor(options: StorageOptions) {
-        this.options = options;
-    }
-
-    set(key: string, value: T, ttl?: number): void {
-        const item: StorageItem<T> = {
-            key,
-            value,
-            expires: ttl ? Date.now() + ttl : undefined
-        };
-        this.items.set(key, item);
-    }
-
-    get(key: string): T | undefined {
-        const item = this.items.get(key);
-        if (!item) return undefined;
-        if (item.expires && Date.now() > item.expires) {
-            this.items.delete(key);
-            return undefined;
-        }
-        return item.value;
-    }
-
-    has(key: string): boolean {
-        return this.get(key) !== undefined;
-    }
-
-    delete(key: string): boolean {
-        return this.items.delete(key);
-    }
-
-    clear(): void {
-        this.items.clear();
-    }
-
-    keys(): string[] {
-        return Array.from(this.items.keys());
-    }
-
-    size(): number {
-        return this.items.size;
-    }
-
-    getOptions(): StorageOptions {
-        return { ...this.options };
-    }
-}
-
-namespace Storage {
-    export const VERSION = "1.0.0";
-
-    export function create<T>(basePath: string, maxSize: number = 1000): Storage<T> {
-        return new Storage<T>({ basePath, maxSize });
-    }
-
-    export function createInMemory<T>(): Storage<T> {
-        return new Storage<T>({ basePath: "", maxSize: Infinity });
-    }
-
-    export class StorageError extends Error {
-        constructor(message: string, public code: string) {
-            super(message);
-            this.name = "StorageError";
-        }
-    }
-}
-
-class PersistentStorage<T> extends Storage<T> {
-    private filePath: string;
-
-    constructor(options: StorageOptions, fileName: string) {
-        super(options);
-        this.filePath = options.basePath + "/" + fileName;
-    }
-
-    getFilePath(): string {
-        return this.filePath;
-    }
-
-    async save(): Promise<void> {
-        // Would save to file
-    }
-
-    async load(): Promise<void> {
-        // Would load from file
-    }
-}
-
-export = Storage;
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Storage class should be ES5 constructor
-    assert!(
-        output.contains("function Storage"),
-        "Expected ES5 Storage class: {}",
-        output
-    );
-
-    // PersistentStorage class should be ES5 constructor
-    assert!(
-        output.contains("function PersistentStorage"),
-        "Expected ES5 PersistentStorage class: {}",
-        output
-    );
-
-    // Storage methods
-    assert!(
-        output.contains(".set") && output.contains(".get") && output.contains(".has"),
-        "Expected Storage methods: {}",
-        output
-    );
-
-    // PersistentStorage methods
-    assert!(
-        output.contains("getFilePath") && output.contains("save") && output.contains("load"),
-        "Expected PersistentStorage methods: {}",
-        output
-    );
-
-    // Namespace members
-    assert!(
-        output.contains("VERSION") && output.contains("create") && output.contains("createInMemory"),
-        "Expected Storage namespace members: {}",
-        output
-    );
-
-    // Inheritance should be present
-    assert!(
-        output.contains("__extends") || output.contains("_super"),
-        "Expected inheritance pattern: {}",
+        !output.contains("type OptionalTail") && !output.contains("type ConfigTuple") && !output.contains("type CallbackTuple"),
+        "Expected type aliases to be stripped: {}",
         output
     );
 }
