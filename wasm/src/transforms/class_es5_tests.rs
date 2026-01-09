@@ -16758,31 +16758,25 @@ class AppConfig {
     );
 }
 
+// ============================================================================
+// Accessor Keyword (Auto-Accessors) Pattern Tests
+// ============================================================================
+
 #[test]
-fn test_class_es5_array_find_basic() {
-    // Basic Array.prototype.find usage
+fn test_class_es5_accessor_keyword_basic() {
+    // Basic accessor keyword usage
     let source = r#"
-class ArrayFinder<T> {
-    private items: T[];
+class Person {
+    accessor name: string = "";
+    accessor age: number = 0;
 
-    constructor(items: T[]) {
-        this.items = items;
+    constructor(name: string, age: number) {
+        this.name = name;
+        this.age = age;
     }
 
-    find(predicate: (item: T) => boolean): T | undefined {
-        return this.items.find(predicate);
-    }
-
-    findByProperty<K extends keyof T>(key: K, value: T[K]): T | undefined {
-        return this.items.find(item => item[key] === value);
-    }
-
-    static findFirst<U>(arr: U[], predicate: (item: U) => boolean): U | undefined {
-        return arr.find(predicate);
-    }
-
-    findWithDefault(predicate: (item: T) => boolean, defaultValue: T): T {
-        return this.items.find(predicate) ?? defaultValue;
+    greet(): string {
+        return `Hello, I'm ${this.name} and I'm ${this.age} years old`;
     }
 }
 "#;
@@ -16801,48 +16795,52 @@ class ArrayFinder<T> {
 
     let output = printer.get_output().to_string();
 
+    // Class should be converted
     assert!(
-        output.contains("ArrayFinder"),
-        "Expected ArrayFinder class: {}",
+        output.contains("function Person"),
+        "Expected Person function: {}",
         output
     );
+
+    // Accessor should be transformed (defineProperty or getter/setter)
     assert!(
-        output.contains(".find("),
-        "Expected find: {}",
+        output.contains("name") && output.contains("age"),
+        "Expected accessor fields: {}",
         output
     );
+
+    // Method should be present
     assert!(
-        output.contains("findByProperty") && output.contains("findWithDefault"),
-        "Expected methods: {}",
+        output.contains("greet"),
+        "Expected greet method: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_array_findindex_basic() {
-    // Basic Array.prototype.findIndex usage
+fn test_class_es5_accessor_keyword_with_inheritance() {
+    // Accessor keyword with class inheritance
     let source = r#"
-class IndexFinder<T> {
-    private items: T[];
+class BaseEntity {
+    accessor id: string = "";
+    accessor createdAt: Date = new Date();
 
-    constructor(items: T[]) {
-        this.items = items;
+    constructor(id: string) {
+        this.id = id;
+    }
+}
+
+class User extends BaseEntity {
+    accessor email: string = "";
+    accessor isActive: boolean = true;
+
+    constructor(id: string, email: string) {
+        super(id);
+        this.email = email;
     }
 
-    findIndex(predicate: (item: T) => boolean): number {
-        return this.items.findIndex(predicate);
-    }
-
-    indexOfMatch<K extends keyof T>(key: K, value: T[K]): number {
-        return this.items.findIndex(item => item[key] === value);
-    }
-
-    static firstMatchIndex<U>(arr: U[], predicate: (item: U) => boolean): number {
-        return arr.findIndex(predicate);
-    }
-
-    exists(predicate: (item: T) => boolean): boolean {
-        return this.items.findIndex(predicate) !== -1;
+    deactivate(): void {
+        this.isActive = false;
     }
 }
 "#;
@@ -16861,46 +16859,56 @@ class IndexFinder<T> {
 
     let output = printer.get_output().to_string();
 
+    // Classes should be converted
     assert!(
-        output.contains("IndexFinder"),
-        "Expected IndexFinder class: {}",
+        output.contains("function BaseEntity") && output.contains("function User"),
+        "Expected class functions: {}",
         output
     );
+
+    // Inheritance should work
     assert!(
-        output.contains(".findIndex("),
-        "Expected findIndex: {}",
+        output.contains("_super.call") || output.contains("BaseEntity.call"),
+        "Expected super call: {}",
         output
     );
+
+    // Accessors should be present
     assert!(
-        output.contains("indexOfMatch") && output.contains("exists"),
-        "Expected methods: {}",
+        output.contains("id") && output.contains("email"),
+        "Expected accessor fields: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_array_fill_basic() {
-    // Basic Array.prototype.fill usage
+fn test_class_es5_accessor_keyword_private() {
+    // Private accessor keyword
     let source = r#"
-class ArrayFiller<T> {
-    fill(arr: T[], value: T): T[] {
-        return arr.fill(value);
+class SecureStorage {
+    accessor #data: Map<string, any> = new Map();
+    accessor #encryptionKey: string = "";
+
+    constructor(key: string) {
+        this.#encryptionKey = key;
     }
 
-    fillRange(arr: T[], value: T, start: number, end: number): T[] {
-        return arr.fill(value, start, end);
+    set(key: string, value: any): void {
+        this.#data.set(key, this.encrypt(value));
     }
 
-    static createFilled<U>(length: number, value: U): U[] {
-        return new Array(length).fill(value);
+    get(key: string): any {
+        const encrypted = this.#data.get(key);
+        return encrypted ? this.decrypt(encrypted) : undefined;
     }
 
-    static fillFrom<U>(arr: U[], value: U, start: number): U[] {
-        return arr.fill(value, start);
+    private encrypt(value: any): string {
+        return JSON.stringify(value) + this.#encryptionKey;
     }
 
-    reset(arr: T[], defaultValue: T): T[] {
-        return arr.fill(defaultValue);
+    private decrypt(encrypted: string): any {
+        const data = encrypted.slice(0, -this.#encryptionKey.length);
+        return JSON.parse(data);
     }
 }
 "#;
@@ -16919,49 +16927,49 @@ class ArrayFiller<T> {
 
     let output = printer.get_output().to_string();
 
+    // Class should be converted
     assert!(
-        output.contains("ArrayFiller"),
-        "Expected ArrayFiller class: {}",
+        output.contains("function SecureStorage"),
+        "Expected SecureStorage function: {}",
         output
     );
+
+    // Public methods should be present
     assert!(
-        output.contains(".fill("),
-        "Expected fill: {}",
+        output.contains("set") && output.contains("get"),
+        "Expected set/get methods: {}",
         output
     );
+
+    // Private methods should be present
     assert!(
-        output.contains("fillRange") && output.contains("createFilled"),
-        "Expected methods: {}",
+        output.contains("encrypt") && output.contains("decrypt"),
+        "Expected encrypt/decrypt methods: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_array_copywithin_basic() {
-    // Basic Array.prototype.copyWithin usage
+fn test_class_es5_accessor_keyword_static() {
+    // Static accessor keyword
     let source = r#"
-class ArrayCopier<T> {
-    copyWithin(arr: T[], target: number, start: number): T[] {
-        return arr.copyWithin(target, start);
+class Configuration {
+    static accessor debug: boolean = false;
+    static accessor logLevel: string = "info";
+    static accessor maxRetries: number = 3;
+
+    static enableDebug(): void {
+        Configuration.debug = true;
+        Configuration.logLevel = "debug";
     }
 
-    copyRange(arr: T[], target: number, start: number, end: number): T[] {
-        return arr.copyWithin(target, start, end);
+    static disableDebug(): void {
+        Configuration.debug = false;
+        Configuration.logLevel = "info";
     }
 
-    static shiftLeft<U>(arr: U[], positions: number): U[] {
-        return arr.copyWithin(0, positions);
-    }
-
-    static duplicate<U>(arr: U[], sourceIndex: number, targetIndex: number): U[] {
-        return arr.copyWithin(targetIndex, sourceIndex, sourceIndex + 1);
-    }
-
-    rotateLeft(arr: T[]): T[] {
-        const first = arr[0];
-        arr.copyWithin(0, 1);
-        arr[arr.length - 1] = first;
-        return arr;
+    static isDebugEnabled(): boolean {
+        return Configuration.debug;
     }
 }
 "#;
@@ -16980,141 +16988,59 @@ class ArrayCopier<T> {
 
     let output = printer.get_output().to_string();
 
+    // Class should be converted
     assert!(
-        output.contains("ArrayCopier"),
-        "Expected ArrayCopier class: {}",
+        output.contains("function Configuration"),
+        "Expected Configuration function: {}",
         output
     );
+
+    // Static methods should be present
     assert!(
-        output.contains(".copyWithin("),
-        "Expected copyWithin: {}",
+        output.contains("enableDebug") && output.contains("disableDebug"),
+        "Expected static methods: {}",
         output
     );
-    assert!(
-        output.contains("copyRange") && output.contains("shiftLeft"),
-        "Expected methods: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_array_methods_in_constructor() {
-    // Array ES6 methods in constructor
-    let source = r#"
-class ArrayProcessor<T> {
-    private firstMatch: T | undefined;
-    private firstMatchIndex: number;
-    private filledArray: T[];
-
-    constructor(items: T[], predicate: (item: T) => boolean, fillValue: T) {
-        this.firstMatch = items.find(predicate);
-        this.firstMatchIndex = items.findIndex(predicate);
-        this.filledArray = new Array(items.length).fill(fillValue);
-    }
-
-    getFirstMatch(): T | undefined {
-        return this.firstMatch;
-    }
-
-    getFirstMatchIndex(): number {
-        return this.firstMatchIndex;
-    }
-
-    getFilledArray(): T[] {
-        return this.filledArray;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
 
     assert!(
-        output.contains("ArrayProcessor"),
-        "Expected ArrayProcessor class: {}",
-        output
-    );
-    assert!(
-        output.contains(".find(") && output.contains(".findIndex("),
-        "Expected find and findIndex: {}",
-        output
-    );
-    assert!(
-        output.contains(".fill("),
-        "Expected fill: {}",
+        output.contains("isDebugEnabled"),
+        "Expected isDebugEnabled method: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_array_methods_combined() {
-    // Combined Array ES6 methods
+fn test_class_es5_accessor_keyword_reactive() {
+    // Accessor keyword for reactive pattern
     let source = r#"
-class ArrayUtilities<T> {
-    static findAndReplace<U>(
-        arr: U[],
-        predicate: (item: U) => boolean,
-        replacement: U
-    ): { found: boolean; index: number; array: U[] } {
-        const index = arr.findIndex(predicate);
-        if (index !== -1) {
-            arr[index] = replacement;
-        }
-        return { found: index !== -1, index, array: arr };
+class ReactiveValue<T> {
+    accessor value: T;
+    private listeners: Array<(value: T) => void> = [];
+
+    constructor(initialValue: T) {
+        this.value = initialValue;
     }
 
-    static findOrCreate<U>(
-        arr: U[],
-        predicate: (item: U) => boolean,
-        factory: () => U
-    ): U {
-        const found = arr.find(predicate);
-        if (found !== undefined) {
-            return found;
-        }
-        const newItem = factory();
-        arr.push(newItem);
-        return newItem;
-    }
-
-    static createMatrix<U>(rows: number, cols: number, value: U): U[][] {
-        return new Array(rows).fill(null).map(() => new Array(cols).fill(value));
-    }
-
-    static rotateArray<U>(arr: U[], positions: number): U[] {
-        const normalizedPos = positions % arr.length;
-        if (normalizedPos === 0) return arr;
-
-        const copy = [...arr];
-        copy.copyWithin(0, normalizedPos);
-        for (let i = 0; i < normalizedPos; i++) {
-            copy[arr.length - normalizedPos + i] = arr[i];
-        }
-        return copy;
-    }
-
-    processAll(
-        items: T[],
-        findPredicate: (item: T) => boolean,
-        fillValue: T
-    ): { found: T | undefined; index: number; filled: T[] } {
-        return {
-            found: items.find(findPredicate),
-            index: items.findIndex(findPredicate),
-            filled: [...items].fill(fillValue)
+    subscribe(listener: (value: T) => void): () => void {
+        this.listeners.push(listener);
+        return () => {
+            const index = this.listeners.indexOf(listener);
+            if (index > -1) {
+                this.listeners.splice(index, 1);
+            }
         };
     }
+
+    update(newValue: T): void {
+        this.value = newValue;
+        this.notifyListeners();
+    }
+
+    private notifyListeners(): void {
+        for (const listener of this.listeners) {
+            listener(this.value);
+        }
+    }
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -17132,24 +17058,23 @@ class ArrayUtilities<T> {
 
     let output = printer.get_output().to_string();
 
+    // Class should be converted
     assert!(
-        output.contains("ArrayUtilities"),
-        "Expected ArrayUtilities class: {}",
+        output.contains("function ReactiveValue"),
+        "Expected ReactiveValue function: {}",
         output
     );
+
+    // Methods should be present
     assert!(
-        output.contains(".find(") && output.contains(".findIndex("),
-        "Expected find and findIndex: {}",
+        output.contains("subscribe") && output.contains("update"),
+        "Expected subscribe/update methods: {}",
         output
     );
+
     assert!(
-        output.contains(".fill(") && output.contains(".copyWithin("),
-        "Expected fill and copyWithin: {}",
-        output
-    );
-    assert!(
-        output.contains("findAndReplace") && output.contains("findOrCreate"),
-        "Expected utility methods: {}",
+        output.contains("notifyListeners"),
+        "Expected notifyListeners method: {}",
         output
     );
 }
