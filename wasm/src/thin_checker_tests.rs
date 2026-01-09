@@ -13331,3 +13331,206 @@ interface MyError extends Error {
         ts2304_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
     );
 }
+
+// =============================================================================
+// TS2339 Inheritance Traversal Tests
+// =============================================================================
+
+#[test]
+fn test_class_inheritance_property_access() {
+    use crate::thin_parser::ThinParserState;
+
+    // Tests that accessing inherited instance properties doesn't produce TS2339
+    let source = r#"
+class Base {
+    baseProp: number = 1;
+}
+class Derived extends Base {
+    method() { return this.baseProp; }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2339),
+        "Should not emit TS2339 for inherited class property, got errors: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_interface_extension_property_access_ts2339() {
+    use crate::thin_parser::ThinParserState;
+
+    // Tests that accessing properties from extended interface doesn't produce TS2339
+    let source = r#"
+interface A { a: string; }
+interface B extends A { b: number; }
+function f(obj: B) {
+    return obj.a;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2339),
+        "Should not emit TS2339 for extended interface property, got errors: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_multi_level_inheritance_ts2339() {
+    use crate::thin_parser::ThinParserState;
+
+    // Tests that multi-level class inheritance properly resolves properties
+    let source = r#"
+class A {
+    a: number = 1;
+}
+class B extends A {
+    b: number = 2;
+}
+class C extends B {
+    m() { return this.a + this.b; }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2339),
+        "Should not emit TS2339 for multi-level inherited properties, got errors: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_implements_clause_resolution_ts2339() {
+    use crate::thin_parser::ThinParserState;
+
+    // Tests that accessing interface properties via typed parameter works
+    // Note: 'implements' itself doesn't contribute to 'this' type lookup,
+    // but a parameter typed as the interface should resolve properties
+    let source = r#"
+interface I { x: number; }
+class C implements I { x: number = 0; }
+function f(i: I) { return i.x; }
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2339),
+        "Should not emit TS2339 for interface property access, got errors: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_multi_level_interface_extension_ts2339() {
+    use crate::thin_parser::ThinParserState;
+
+    // Tests that multi-level interface extension properly resolves properties
+    let source = r#"
+interface A { a: string; }
+interface B extends A { b: number; }
+interface C extends B { c: boolean; }
+function f(obj: C) {
+    return obj.a + obj.b + obj.c;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2339),
+        "Should not emit TS2339 for multi-level interface extension, got errors: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_inherited_method_call_ts2339() {
+    use crate::thin_parser::ThinParserState;
+
+    // Tests that calling inherited methods doesn't produce TS2339
+    let source = r#"
+class Base {
+    baseMethod(): number { return 42; }
+}
+class Derived extends Base {
+    derivedMethod() { return this.baseMethod(); }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2339),
+        "Should not emit TS2339 for inherited method call, got errors: {:?}",
+        checker.ctx.diagnostics
+    );
+}
