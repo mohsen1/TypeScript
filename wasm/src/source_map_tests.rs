@@ -64276,3 +64276,2542 @@ const result = mapper.map({ x: 1 }, (s) => ({ y: s.x * 2 }));"#;
         "expected mappings to reference source file"
     );
 }
+
+// =============================================================================
+// ES5 SOURCE MAP TESTS: CONDITIONAL TYPE EXPRESSIONS
+// =============================================================================
+
+/// Test source map generation for conditional types with infer keyword in ES5 output.
+/// Validates that infer patterns generate proper source mappings.
+#[test]
+fn test_source_map_conditional_type_infer_es5() {
+    let source = r#"// Infer return type
+type ReturnType<T> = T extends (...args: any[]) => infer R ? R : never;
+
+// Infer parameter types
+type Parameters<T> = T extends (...args: infer P) => any ? P : never;
+
+// Infer array element type
+type ElementType<T> = T extends (infer E)[] ? E : never;
+
+// Infer promise resolved type
+type Awaited<T> = T extends Promise<infer U> ? Awaited<U> : T;
+
+// Function using inferred types
+function getReturnType<T extends (...args: any[]) => any>(
+    fn: T
+): ReturnType<T> | undefined {
+    try {
+        return fn() as ReturnType<T>;
+    } catch {
+        return undefined;
+    }
+}
+
+function callWithArgs<T extends (...args: any[]) => any>(
+    fn: T,
+    ...args: Parameters<T>
+): ReturnType<T> {
+    return fn(...args);
+}
+
+const add = (a: number, b: number) => a + b;
+const result = callWithArgs(add, 1, 2);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("getReturnType"),
+        "expected getReturnType function in output. output: {output}"
+    );
+    assert!(
+        output.contains("callWithArgs"),
+        "expected callWithArgs function in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for conditional type with infer"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+/// Test source map generation for distributive conditional types in ES5 output.
+/// Validates that distributive conditional patterns generate proper source mappings.
+#[test]
+fn test_source_map_conditional_type_distributive_es5() {
+    let source = r#"// Distributive conditional type
+type ToArray<T> = T extends any ? T[] : never;
+
+// Non-nullable extraction
+type NonNullable<T> = T extends null | undefined ? never : T;
+
+// Extract types from union
+type Extract<T, U> = T extends U ? T : never;
+
+// Exclude types from union
+type Exclude<T, U> = T extends U ? never : T;
+
+// Practical usage
+type StringOrNumber = string | number | null | undefined;
+type NonNullStringOrNumber = NonNullable<StringOrNumber>;
+type OnlyStrings = Extract<StringOrNumber, string>;
+type NoStrings = Exclude<StringOrNumber, string>;
+
+function filterNonNull<T>(items: (T | null | undefined)[]): NonNullable<T>[] {
+    return items.filter((item): item is NonNullable<T> => item != null);
+}
+
+function extractStrings(items: (string | number)[]): string[] {
+    return items.filter((item): item is string => typeof item === "string");
+}
+
+const mixed = [1, "hello", null, 2, "world", undefined];
+const nonNull = filterNonNull(mixed);
+const strings = extractStrings([1, "a", 2, "b"]);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("filterNonNull"),
+        "expected filterNonNull function in output. output: {output}"
+    );
+    assert!(
+        output.contains("extractStrings"),
+        "expected extractStrings function in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for distributive conditional type"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+/// Test source map generation for nested conditional types in ES5 output.
+/// Validates that deeply nested conditional patterns generate proper source mappings.
+#[test]
+fn test_source_map_conditional_type_nested_es5() {
+    let source = r#"// Nested conditional types
+type DeepReadonly<T> = T extends (infer U)[]
+    ? ReadonlyArray<DeepReadonly<U>>
+    : T extends object
+    ? { readonly [K in keyof T]: DeepReadonly<T[K]> }
+    : T;
+
+// Type classification
+type TypeName<T> = T extends string
+    ? "string"
+    : T extends number
+    ? "number"
+    : T extends boolean
+    ? "boolean"
+    : T extends undefined
+    ? "undefined"
+    : T extends Function
+    ? "function"
+    : "object";
+
+// Flatten nested arrays
+type Flatten<T> = T extends Array<infer U>
+    ? U extends Array<any>
+        ? Flatten<U>
+        : U
+    : T;
+
+function getTypeName<T>(value: T): TypeName<T> {
+    return typeof value as TypeName<T>;
+}
+
+function flatten<T>(arr: T[][]): Flatten<T[][]>[] {
+    return arr.reduce((acc, val) => acc.concat(val), [] as Flatten<T[][]>[]);
+}
+
+const typeName = getTypeName("hello");
+const flat = flatten([[1, 2], [3, 4]]);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("getTypeName"),
+        "expected getTypeName function in output. output: {output}"
+    );
+    assert!(
+        output.contains("flatten"),
+        "expected flatten function in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for nested conditional types"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+/// Test source map generation for conditional types in function returns in ES5 output.
+/// Validates that conditional return types generate proper source mappings.
+#[test]
+fn test_source_map_conditional_type_function_return_es5() {
+    let source = r#"// Conditional return based on input type
+type StringOrNumberResult<T> = T extends string ? string[] : number[];
+
+function process<T extends string | number>(
+    input: T
+): StringOrNumberResult<T> {
+    if (typeof input === "string") {
+        return input.split("") as StringOrNumberResult<T>;
+    }
+    return [input] as StringOrNumberResult<T>;
+}
+
+// Conditional async return
+type AsyncResult<T> = T extends Promise<infer U> ? U : Promise<T>;
+
+async function ensureAsync<T>(value: T): Promise<AsyncResult<T>> {
+    if (value instanceof Promise) {
+        return value as unknown as AsyncResult<T>;
+    }
+    return value as AsyncResult<T>;
+}
+
+// Method overload simulation with conditional
+type MethodResult<T, K extends keyof T> = T[K] extends (...args: any[]) => infer R
+    ? R
+    : T[K];
+
+function invoke<T extends object, K extends keyof T>(
+    obj: T,
+    key: K
+): MethodResult<T, K> {
+    const prop = obj[key];
+    if (typeof prop === "function") {
+        return (prop as Function).call(obj) as MethodResult<T, K>;
+    }
+    return prop as MethodResult<T, K>;
+}
+
+const strResult = process("hello");
+const numResult = process(42);
+const asyncVal = ensureAsync(123);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("process"),
+        "expected process function in output. output: {output}"
+    );
+    assert!(
+        output.contains("ensureAsync"),
+        "expected ensureAsync function in output. output: {output}"
+    );
+    assert!(
+        output.contains("invoke"),
+        "expected invoke function in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for conditional function return types"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+/// Test source map generation for conditional types with unions in ES5 output.
+/// Validates that union conditional patterns generate proper source mappings.
+#[test]
+fn test_source_map_conditional_type_union_es5() {
+    let source = r#"// Union in conditional check
+type IsUnion<T, U = T> = T extends U
+    ? [U] extends [T]
+        ? false
+        : true
+    : never;
+
+// Conditional with union result
+type Result<T, E> = T extends Error ? { ok: false; error: E } : { ok: true; value: T };
+
+// Union narrowing conditional
+type UnwrapPromise<T> = T extends Promise<infer U>
+    ? U
+    : T extends PromiseLike<infer U>
+    ? U
+    : T;
+
+// Handler type based on event
+type EventHandler<T> = T extends "click"
+    ? (e: MouseEvent) => void
+    : T extends "keypress"
+    ? (e: KeyboardEvent) => void
+    : T extends "submit"
+    ? (e: Event) => void
+    : never;
+
+function createHandler<T extends "click" | "keypress" | "submit">(
+    eventType: T,
+    handler: EventHandler<T>
+): void {
+    document.addEventListener(eventType, handler as EventListener);
+}
+
+function wrapResult<T>(value: T): Result<T, Error> {
+    if (value instanceof Error) {
+        return { ok: false, error: value } as Result<T, Error>;
+    }
+    return { ok: true, value } as Result<T, Error>;
+}
+
+const wrapped = wrapResult(42);
+const errorWrapped = wrapResult(new Error("oops"));"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("createHandler"),
+        "expected createHandler function in output. output: {output}"
+    );
+    assert!(
+        output.contains("wrapResult"),
+        "expected wrapResult function in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for conditional type with union"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+/// Comprehensive test combining multiple conditional type expression patterns.
+/// Tests infer, distributive, nested, and union conditional types together.
+#[test]
+fn test_source_map_conditional_type_es5_comprehensive() {
+    let source = r#"// Complex conditional type utility library
+
+// Extract constructor parameters
+type ConstructorParameters<T> = T extends new (...args: infer P) => any ? P : never;
+
+// Instance type from constructor
+type InstanceType<T> = T extends new (...args: any[]) => infer R ? R : never;
+
+// Readonly deep with conditional
+type DeepPartial<T> = T extends object
+    ? { [P in keyof T]?: DeepPartial<T[P]> }
+    : T;
+
+// Property types extraction
+type PropertyType<T, K> = K extends keyof T ? T[K] : never;
+
+// Function property keys
+type FunctionKeys<T> = {
+    [K in keyof T]: T[K] extends Function ? K : never;
+}[keyof T];
+
+// Non-function property keys
+type DataKeys<T> = {
+    [K in keyof T]: T[K] extends Function ? never : K;
+}[keyof T];
+
+// Class using conditional types
+class TypedRegistry<T extends object> {
+    private items: Map<string, T> = new Map();
+
+    register(id: string, item: T): void {
+        this.items.set(id, item);
+    }
+
+    get<K extends keyof T>(id: string, key: K): PropertyType<T, K> | undefined {
+        const item = this.items.get(id);
+        if (item) {
+            return item[key] as PropertyType<T, K>;
+        }
+        return undefined;
+    }
+
+    update(id: string, partial: DeepPartial<T>): boolean {
+        const item = this.items.get(id);
+        if (item) {
+            Object.assign(item, partial);
+            return true;
+        }
+        return false;
+    }
+
+    callMethod<K extends FunctionKeys<T>>(
+        id: string,
+        method: K,
+        ...args: T[K] extends (...args: infer P) => any ? P : never[]
+    ): T[K] extends (...args: any[]) => infer R ? R : undefined {
+        const item = this.items.get(id);
+        if (item && typeof item[method] === "function") {
+            return (item[method] as Function).apply(item, args);
+        }
+        return undefined as any;
+    }
+}
+
+// Factory with conditional return
+function createInstance<T extends new (...args: any[]) => any>(
+    ctor: T,
+    ...args: ConstructorParameters<T>
+): InstanceType<T> {
+    return new ctor(...args);
+}
+
+interface User {
+    name: string;
+    age: number;
+    greet(): string;
+}
+
+const registry = new TypedRegistry<User>();
+registry.register("user1", { name: "Alice", age: 30, greet: () => "Hello" });
+const userName = registry.get("user1", "name");
+registry.update("user1", { age: 31 });"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("TypedRegistry"),
+        "expected TypedRegistry class in output. output: {output}"
+    );
+    assert!(
+        output.contains("register"),
+        "expected register method in output. output: {output}"
+    );
+    assert!(
+        output.contains("update"),
+        "expected update method in output. output: {output}"
+    );
+    assert!(
+        output.contains("callMethod"),
+        "expected callMethod method in output. output: {output}"
+    );
+    assert!(
+        output.contains("createInstance"),
+        "expected createInstance function in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for comprehensive conditional types"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+// =============================================================================
+// ES5 SOURCE MAP TESTS: IMPORT/EXPORT ALIASES
+// =============================================================================
+
+/// Test source map generation for named imports with aliases in ES5 output.
+/// Validates that `import { foo as bar }` generates proper source mappings.
+#[test]
+fn test_source_map_import_named_alias_es5() {
+    let source = r#"// Named import with alias
+import { useState as useStateHook } from "react";
+import { Component as ReactComponent, createElement as h } from "react";
+import { map as arrayMap, filter as arrayFilter, reduce as arrayReduce } from "lodash";
+
+// Using aliased imports
+function MyComponent() {
+    const [count, setCount] = useStateHook(0);
+    return h("div", null, count);
+}
+
+const numbers = [1, 2, 3, 4, 5];
+const doubled = arrayMap(numbers, (n: number) => n * 2);
+const evens = arrayFilter(numbers, (n: number) => n % 2 === 0);
+const sum = arrayReduce(numbers, (acc: number, n: number) => acc + n, 0);
+
+console.log(doubled, evens, sum);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("MyComponent"),
+        "expected MyComponent function in output. output: {output}"
+    );
+    assert!(
+        output.contains("doubled"),
+        "expected doubled variable in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for named import aliases"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+/// Test source map generation for named exports with aliases in ES5 output.
+/// Validates that `export { foo as bar }` generates proper source mappings.
+#[test]
+fn test_source_map_export_named_alias_es5() {
+    let source = r#"// Internal implementations
+function internalAdd(a: number, b: number): number {
+    return a + b;
+}
+
+function internalSubtract(a: number, b: number): number {
+    return a - b;
+}
+
+const internalPI = 3.14159;
+const internalE = 2.71828;
+
+class InternalCalculator {
+    add(a: number, b: number): number {
+        return internalAdd(a, b);
+    }
+
+    subtract(a: number, b: number): number {
+        return internalSubtract(a, b);
+    }
+}
+
+// Export with aliases
+export { internalAdd as add };
+export { internalSubtract as subtract };
+export { internalPI as PI, internalE as E };
+export { InternalCalculator as Calculator };
+
+// Also export with different alias
+export { internalAdd as sum, internalSubtract as difference };"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("internalAdd"),
+        "expected internalAdd function in output. output: {output}"
+    );
+    assert!(
+        output.contains("InternalCalculator"),
+        "expected InternalCalculator class in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for named export aliases"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+/// Test source map generation for re-exports with aliases in ES5 output.
+/// Validates that `export { foo as bar } from "module"` generates proper source mappings.
+#[test]
+fn test_source_map_reexport_alias_es5() {
+    let source = r#"// Re-export with aliases from other modules
+export { useState as useStateHook } from "react";
+export { Component as ReactComponent } from "react";
+export { map as lodashMap, filter as lodashFilter } from "lodash";
+
+// Re-export default as named
+export { default as axios } from "axios";
+export { default as express } from "express";
+
+// Mixed re-exports with and without aliases
+export { readFile as readFileAsync, writeFile as writeFileAsync } from "fs/promises";
+
+// Re-export everything with namespace alias handled separately
+// export * as utils from "./utils";
+
+// Local function that uses re-exports conceptually
+function useLibraries(): void {
+    console.log("Libraries configured");
+}
+
+export { useLibraries };"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("useLibraries"),
+        "expected useLibraries function in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for re-export aliases"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+/// Test source map generation for default import aliases in ES5 output.
+/// Validates that `import MyAlias from "module"` generates proper source mappings.
+#[test]
+fn test_source_map_import_default_alias_es5() {
+    let source = r#"// Default imports (which are essentially aliases for the default export)
+import React from "react";
+import Express from "express";
+import Lodash from "lodash";
+
+// Using default imports
+const app = Express();
+const element = React.createElement("div", null, "Hello");
+const sorted = Lodash.sortBy([3, 1, 2]);
+
+// Default import with named imports
+import Axios, { AxiosResponse, AxiosError } from "axios";
+
+async function fetchData(): Promise<AxiosResponse> {
+    try {
+        return await Axios.get("/api/data");
+    } catch (error) {
+        throw error as AxiosError;
+    }
+}
+
+// Re-assigning default imports
+const MyReact = React;
+const MyExpress = Express;
+
+console.log(app, element, sorted);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("fetchData"),
+        "expected fetchData function in output. output: {output}"
+    );
+    assert!(
+        output.contains("MyReact"),
+        "expected MyReact variable in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for default import aliases"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+/// Test source map generation for namespace import aliases in ES5 output.
+/// Validates that `import * as ns from "module"` generates proper source mappings.
+#[test]
+fn test_source_map_import_namespace_alias_es5() {
+    let source = r#"// Namespace imports
+import * as React from "react";
+import * as ReactDOM from "react-dom";
+import * as Lodash from "lodash";
+import * as Utils from "./utils";
+
+// Using namespace imports
+const element = React.createElement("div", { className: "container" }, "Hello");
+const root = ReactDOM.createRoot(document.getElementById("root")!);
+
+// Destructuring from namespace
+const { map, filter, reduce } = Lodash;
+const { formatDate, parseDate } = Utils;
+
+// Using destructured values
+const doubled = map([1, 2, 3], (n: number) => n * 2);
+const evens = filter([1, 2, 3, 4], (n: number) => n % 2 === 0);
+
+// Aliasing namespace members
+const lodashMap = Lodash.map;
+const lodashFilter = Lodash.filter;
+
+function renderApp(): void {
+    root.render(element);
+}
+
+console.log(doubled, evens);
+renderApp();"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("renderApp"),
+        "expected renderApp function in output. output: {output}"
+    );
+    assert!(
+        output.contains("doubled"),
+        "expected doubled variable in output. output: {output}"
+    );
+    assert!(
+        output.contains("lodashMap"),
+        "expected lodashMap variable in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for namespace import aliases"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+/// Comprehensive test combining multiple import/export alias patterns.
+/// Tests named, default, namespace imports and exports with various alias combinations.
+#[test]
+fn test_source_map_import_export_alias_es5_comprehensive() {
+    let source = r#"// Comprehensive import/export alias patterns
+
+// Namespace imports
+import * as path from "path";
+import * as fs from "fs";
+
+// Default imports
+import express from "express";
+import cors from "cors";
+
+// Named imports with aliases
+import { readFile as readFileAsync, writeFile as writeFileAsync } from "fs/promises";
+import { join as joinPath, resolve as resolvePath, dirname as getDirname } from "path";
+
+// Mixed default and named with aliases
+import axios, { AxiosInstance as HttpClient, AxiosResponse as HttpResponse } from "axios";
+
+// Internal implementations
+class ApiClient {
+    private client: HttpClient;
+    private basePath: string;
+
+    constructor(baseUrl: string) {
+        this.client = axios.create({ baseURL: baseUrl });
+        this.basePath = resolvePath(getDirname(""), "api");
+    }
+
+    async get<T>(endpoint: string): Promise<HttpResponse<T>> {
+        const fullPath = joinPath(this.basePath, endpoint);
+        console.log(`Fetching from: ${fullPath}`);
+        return this.client.get(endpoint);
+    }
+
+    async loadConfig(configPath: string): Promise<string> {
+        const absolutePath = path.resolve(configPath);
+        const content = await readFileAsync(absolutePath, "utf-8");
+        return content;
+    }
+
+    async saveConfig(configPath: string, data: string): Promise<void> {
+        const absolutePath = path.resolve(configPath);
+        await writeFileAsync(absolutePath, data, "utf-8");
+    }
+}
+
+// Create app with middleware
+const app = express();
+app.use(cors());
+
+// Export with aliases
+export { ApiClient as Client };
+export { app as application };
+
+// Re-export with aliases
+export { readFileAsync as readFile, writeFileAsync as writeFile };
+export { joinPath, resolvePath, getDirname };
+
+// Export default with alias pattern
+const defaultClient = new ApiClient("https://api.example.com");
+export { defaultClient as default };"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("ApiClient"),
+        "expected ApiClient class in output. output: {output}"
+    );
+    assert!(
+        output.contains("loadConfig"),
+        "expected loadConfig method in output. output: {output}"
+    );
+    assert!(
+        output.contains("saveConfig"),
+        "expected saveConfig method in output. output: {output}"
+    );
+    assert!(
+        output.contains("defaultClient"),
+        "expected defaultClient variable in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for comprehensive import/export aliases"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+// =============================================================================
+// ES5 SOURCE MAP TESTS: MAPPED TYPE EXPRESSIONS
+// =============================================================================
+
+/// Test source map generation for Partial<T> mapped type in ES5 output.
+/// Validates that Partial utility type generates proper source mappings.
+#[test]
+fn test_source_map_mapped_type_partial_es5() {
+    let source = r#"// Custom Partial implementation
+type MyPartial<T> = {
+    [P in keyof T]?: T[P];
+};
+
+interface User {
+    id: number;
+    name: string;
+    email: string;
+    age: number;
+}
+
+// Function using Partial
+function updateUser(user: User, updates: Partial<User>): User {
+    return { ...user, ...updates };
+}
+
+function patchUser(user: User, patch: MyPartial<User>): User {
+    return { ...user, ...patch };
+}
+
+// Creating partial objects
+const fullUser: User = { id: 1, name: "Alice", email: "alice@example.com", age: 30 };
+const partialUpdate: Partial<User> = { name: "Alicia" };
+const updatedUser = updateUser(fullUser, partialUpdate);
+
+// Nested partial
+type DeepPartial<T> = {
+    [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
+};
+
+interface Config {
+    database: { host: string; port: number };
+    cache: { enabled: boolean; ttl: number };
+}
+
+function mergeConfig(base: Config, override: DeepPartial<Config>): Config {
+    return { ...base, ...override } as Config;
+}
+
+console.log(updatedUser);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("updateUser"),
+        "expected updateUser function in output. output: {output}"
+    );
+    assert!(
+        output.contains("patchUser"),
+        "expected patchUser function in output. output: {output}"
+    );
+    assert!(
+        output.contains("mergeConfig"),
+        "expected mergeConfig function in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for Partial mapped type"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+/// Test source map generation for Required<T> mapped type in ES5 output.
+/// Validates that Required utility type generates proper source mappings.
+#[test]
+fn test_source_map_mapped_type_required_es5() {
+    let source = r#"// Custom Required implementation
+type MyRequired<T> = {
+    [P in keyof T]-?: T[P];
+};
+
+interface PartialUser {
+    id?: number;
+    name?: string;
+    email?: string;
+}
+
+// Function requiring all properties
+function createUser(data: Required<PartialUser>): PartialUser {
+    return {
+        id: data.id,
+        name: data.name,
+        email: data.email
+    };
+}
+
+function validateUser(data: MyRequired<PartialUser>): boolean {
+    return data.id > 0 && data.name.length > 0 && data.email.includes("@");
+}
+
+// Builder pattern with Required
+class UserBuilder {
+    private data: Partial<PartialUser> = {};
+
+    setId(id: number): this {
+        this.data.id = id;
+        return this;
+    }
+
+    setName(name: string): this {
+        this.data.name = name;
+        return this;
+    }
+
+    setEmail(email: string): this {
+        this.data.email = email;
+        return this;
+    }
+
+    build(): Required<PartialUser> {
+        if (!this.data.id || !this.data.name || !this.data.email) {
+            throw new Error("All fields required");
+        }
+        return this.data as Required<PartialUser>;
+    }
+}
+
+const builder = new UserBuilder();
+const user = builder.setId(1).setName("Bob").setEmail("bob@example.com").build();
+console.log(validateUser(user));"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("createUser"),
+        "expected createUser function in output. output: {output}"
+    );
+    assert!(
+        output.contains("validateUser"),
+        "expected validateUser function in output. output: {output}"
+    );
+    assert!(
+        output.contains("UserBuilder"),
+        "expected UserBuilder class in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for Required mapped type"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+/// Test source map generation for Readonly<T> mapped type in ES5 output.
+/// Validates that Readonly utility type generates proper source mappings.
+#[test]
+fn test_source_map_mapped_type_readonly_es5() {
+    let source = r#"// Custom Readonly implementation
+type MyReadonly<T> = {
+    readonly [P in keyof T]: T[P];
+};
+
+interface MutableState {
+    count: number;
+    items: string[];
+    lastUpdated: Date;
+}
+
+// Frozen state pattern
+function freezeState<T extends object>(state: T): Readonly<T> {
+    return Object.freeze({ ...state });
+}
+
+function getImmutableState(state: MutableState): MyReadonly<MutableState> {
+    return state;
+}
+
+// Deep readonly
+type DeepReadonly<T> = {
+    readonly [P in keyof T]: T[P] extends object ? DeepReadonly<T[P]> : T[P];
+};
+
+interface AppState {
+    user: { name: string; settings: { theme: string } };
+    data: { items: number[] };
+}
+
+function getAppState(): DeepReadonly<AppState> {
+    return {
+        user: { name: "Alice", settings: { theme: "dark" } },
+        data: { items: [1, 2, 3] }
+    };
+}
+
+// Working with readonly
+class StateManager {
+    private state: MutableState = { count: 0, items: [], lastUpdated: new Date() };
+
+    getState(): Readonly<MutableState> {
+        return this.state;
+    }
+
+    increment(): void {
+        this.state.count++;
+        this.state.lastUpdated = new Date();
+    }
+}
+
+const manager = new StateManager();
+const readonlyState = manager.getState();
+console.log(readonlyState.count);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("freezeState"),
+        "expected freezeState function in output. output: {output}"
+    );
+    assert!(
+        output.contains("getAppState"),
+        "expected getAppState function in output. output: {output}"
+    );
+    assert!(
+        output.contains("StateManager"),
+        "expected StateManager class in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for Readonly mapped type"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+/// Test source map generation for Pick<T, K> mapped type in ES5 output.
+/// Validates that Pick utility type generates proper source mappings.
+#[test]
+fn test_source_map_mapped_type_pick_es5() {
+    let source = r#"// Custom Pick implementation
+type MyPick<T, K extends keyof T> = {
+    [P in K]: T[P];
+};
+
+interface FullUser {
+    id: number;
+    name: string;
+    email: string;
+    password: string;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+// Pick specific properties
+type PublicUser = Pick<FullUser, "id" | "name" | "email">;
+type UserCredentials = MyPick<FullUser, "email" | "password">;
+
+function getPublicProfile(user: FullUser): PublicUser {
+    return {
+        id: user.id,
+        name: user.name,
+        email: user.email
+    };
+}
+
+function extractCredentials(user: FullUser): UserCredentials {
+    return {
+        email: user.email,
+        password: user.password
+    };
+}
+
+// Generic pick function
+function pick<T extends object, K extends keyof T>(
+    obj: T,
+    keys: K[]
+): Pick<T, K> {
+    const result = {} as Pick<T, K>;
+    for (const key of keys) {
+        result[key] = obj[key];
+    }
+    return result;
+}
+
+const fullUser: FullUser = {
+    id: 1,
+    name: "Alice",
+    email: "alice@example.com",
+    password: "secret",
+    createdAt: new Date(),
+    updatedAt: new Date()
+};
+
+const publicUser = getPublicProfile(fullUser);
+const picked = pick(fullUser, ["id", "name"]);
+console.log(publicUser, picked);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("getPublicProfile"),
+        "expected getPublicProfile function in output. output: {output}"
+    );
+    assert!(
+        output.contains("extractCredentials"),
+        "expected extractCredentials function in output. output: {output}"
+    );
+    assert!(
+        output.contains("pick"),
+        "expected pick function in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for Pick mapped type"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+/// Test source map generation for Record<K, T> mapped type in ES5 output.
+/// Validates that Record utility type generates proper source mappings.
+#[test]
+fn test_source_map_mapped_type_record_es5() {
+    let source = r#"// Custom Record implementation
+type MyRecord<K extends keyof any, T> = {
+    [P in K]: T;
+};
+
+// Record with string keys
+type UserRoles = Record<string, boolean>;
+type CountryCode = "US" | "UK" | "CA" | "AU";
+type CountryNames = Record<CountryCode, string>;
+
+function createUserRoles(): UserRoles {
+    return {
+        admin: true,
+        editor: false,
+        viewer: true
+    };
+}
+
+function getCountryNames(): CountryNames {
+    return {
+        US: "United States",
+        UK: "United Kingdom",
+        CA: "Canada",
+        AU: "Australia"
+    };
+}
+
+// Record with number keys
+type IndexedData = Record<number, string>;
+
+function createIndexedData(items: string[]): IndexedData {
+    const result: IndexedData = {};
+    items.forEach((item, index) => {
+        result[index] = item;
+    });
+    return result;
+}
+
+// Nested Record
+type NestedRecord = Record<string, Record<string, number>>;
+
+function createNestedRecord(): NestedRecord {
+    return {
+        users: { count: 100, active: 50 },
+        posts: { count: 500, published: 450 }
+    };
+}
+
+// Generic record creator
+function createRecord<K extends string, T>(
+    keys: K[],
+    value: T
+): MyRecord<K, T> {
+    const result = {} as MyRecord<K, T>;
+    for (const key of keys) {
+        result[key] = value;
+    }
+    return result;
+}
+
+const roles = createUserRoles();
+const countries = getCountryNames();
+const indexed = createIndexedData(["a", "b", "c"]);
+console.log(roles, countries, indexed);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("createUserRoles"),
+        "expected createUserRoles function in output. output: {output}"
+    );
+    assert!(
+        output.contains("getCountryNames"),
+        "expected getCountryNames function in output. output: {output}"
+    );
+    assert!(
+        output.contains("createNestedRecord"),
+        "expected createNestedRecord function in output. output: {output}"
+    );
+    assert!(
+        output.contains("createRecord"),
+        "expected createRecord function in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for Record mapped type"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+/// Comprehensive test combining multiple mapped type patterns.
+/// Tests Partial, Required, Readonly, Pick, Record, and custom mapped types together.
+#[test]
+fn test_source_map_mapped_type_es5_comprehensive() {
+    let source = r#"// Comprehensive mapped type utility library
+
+// Standard mapped types
+type Partial<T> = { [P in keyof T]?: T[P] };
+type Required<T> = { [P in keyof T]-?: T[P] };
+type Readonly<T> = { readonly [P in keyof T]: T[P] };
+type Pick<T, K extends keyof T> = { [P in K]: T[P] };
+type Record<K extends keyof any, T> = { [P in K]: T };
+type Omit<T, K extends keyof any> = Pick<T, Exclude<keyof T, K>>;
+
+// Custom mapped types
+type Mutable<T> = { -readonly [P in keyof T]: T[P] };
+type Nullable<T> = { [P in keyof T]: T[P] | null };
+type NonNullableProps<T> = { [P in keyof T]: NonNullable<T[P]> };
+
+// Key remapping
+type Getters<T> = {
+    [K in keyof T as `get${Capitalize<string & K>}`]: () => T[K];
+};
+
+type Setters<T> = {
+    [K in keyof T as `set${Capitalize<string & K>}`]: (value: T[K]) => void;
+};
+
+// Entity interface
+interface Entity {
+    id: number;
+    name: string;
+    createdAt: Date;
+    updatedAt: Date | null;
+}
+
+// Repository using mapped types
+class Repository<T extends Entity> {
+    private items: Map<number, T> = new Map();
+
+    create(data: Omit<T, "id" | "createdAt" | "updatedAt">): T {
+        const now = new Date();
+        const id = this.items.size + 1;
+        const entity = {
+            ...data,
+            id,
+            createdAt: now,
+            updatedAt: null
+        } as T;
+        this.items.set(id, entity);
+        return entity;
+    }
+
+    update(id: number, data: Partial<Omit<T, "id" | "createdAt">>): T | undefined {
+        const entity = this.items.get(id);
+        if (entity) {
+            const updated = { ...entity, ...data, updatedAt: new Date() };
+            this.items.set(id, updated);
+            return updated;
+        }
+        return undefined;
+    }
+
+    findById(id: number): Readonly<T> | undefined {
+        return this.items.get(id);
+    }
+
+    findAll(): ReadonlyArray<Readonly<T>> {
+        return Array.from(this.items.values());
+    }
+
+    getFields<K extends keyof T>(id: number, fields: K[]): Pick<T, K> | undefined {
+        const entity = this.items.get(id);
+        if (entity) {
+            const result = {} as Pick<T, K>;
+            for (const field of fields) {
+                result[field] = entity[field];
+            }
+            return result;
+        }
+        return undefined;
+    }
+}
+
+// Form state using mapped types
+type FormState<T> = {
+    values: T;
+    errors: Partial<Record<keyof T, string>>;
+    touched: Partial<Record<keyof T, boolean>>;
+    dirty: boolean;
+};
+
+function createFormState<T>(initial: T): FormState<T> {
+    return {
+        values: initial,
+        errors: {},
+        touched: {},
+        dirty: false
+    };
+}
+
+interface User extends Entity {
+    email: string;
+    role: "admin" | "user";
+}
+
+const userRepo = new Repository<User>();
+const newUser = userRepo.create({ name: "Alice", email: "alice@example.com", role: "user" });
+const formState = createFormState({ name: "", email: "" });
+console.log(newUser, formState);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("Repository"),
+        "expected Repository class in output. output: {output}"
+    );
+    assert!(
+        output.contains("create"),
+        "expected create method in output. output: {output}"
+    );
+    assert!(
+        output.contains("update"),
+        "expected update method in output. output: {output}"
+    );
+    assert!(
+        output.contains("findById"),
+        "expected findById method in output. output: {output}"
+    );
+    assert!(
+        output.contains("getFields"),
+        "expected getFields method in output. output: {output}"
+    );
+    assert!(
+        output.contains("createFormState"),
+        "expected createFormState function in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for comprehensive mapped types"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+// =============================================================================
+// ES5 SOURCE MAP TESTS: UTILITY TYPES
+// =============================================================================
+
+/// Test source map generation for ReturnType<T> utility type in ES5 output.
+/// Validates that ReturnType extraction generates proper source mappings.
+#[test]
+fn test_source_map_utility_type_return_type_es5() {
+    let source = r#"// Custom ReturnType implementation
+type MyReturnType<T extends (...args: any[]) => any> = T extends (...args: any[]) => infer R ? R : never;
+
+// Functions to extract return types from
+function getString(): string {
+    return "hello";
+}
+
+function getNumber(): number {
+    return 42;
+}
+
+async function getAsyncData(): Promise<{ id: number; name: string }> {
+    return { id: 1, name: "test" };
+}
+
+function getCallback(): (x: number) => boolean {
+    return (x) => x > 0;
+}
+
+// Using ReturnType
+type StringResult = ReturnType<typeof getString>;
+type NumberResult = ReturnType<typeof getNumber>;
+type AsyncResult = ReturnType<typeof getAsyncData>;
+type CallbackResult = MyReturnType<typeof getCallback>;
+
+// Functions that use extracted types
+function processString(value: StringResult): void {
+    console.log(value.toUpperCase());
+}
+
+function processNumber(value: NumberResult): void {
+    console.log(value.toFixed(2));
+}
+
+// Generic wrapper using ReturnType
+function wrapResult<T extends (...args: any[]) => any>(
+    fn: T
+): { result: ReturnType<T>; timestamp: Date } | null {
+    try {
+        return { result: fn(), timestamp: new Date() };
+    } catch {
+        return null;
+    }
+}
+
+const wrapped = wrapResult(getString);
+processString("test");
+processNumber(123);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("getString"),
+        "expected getString function in output. output: {output}"
+    );
+    assert!(
+        output.contains("wrapResult"),
+        "expected wrapResult function in output. output: {output}"
+    );
+    assert!(
+        output.contains("processString"),
+        "expected processString function in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for ReturnType utility"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+/// Test source map generation for Parameters<T> utility type in ES5 output.
+/// Validates that Parameters extraction generates proper source mappings.
+#[test]
+fn test_source_map_utility_type_parameters_es5() {
+    let source = r#"// Custom Parameters implementation
+type MyParameters<T extends (...args: any[]) => any> = T extends (...args: infer P) => any ? P : never;
+
+// Functions with various parameter signatures
+function simpleFunc(a: string, b: number): void {
+    console.log(a, b);
+}
+
+function optionalFunc(required: string, optional?: number): boolean {
+    return optional !== undefined;
+}
+
+function restFunc(first: string, ...rest: number[]): number {
+    return rest.reduce((sum, n) => sum + n, 0);
+}
+
+function complexFunc(
+    config: { host: string; port: number },
+    callback: (err: Error | null, result: string) => void
+): void {
+    callback(null, `${config.host}:${config.port}`);
+}
+
+// Using Parameters
+type SimpleParams = Parameters<typeof simpleFunc>;
+type OptionalParams = Parameters<typeof optionalFunc>;
+type RestParams = MyParameters<typeof restFunc>;
+type ComplexParams = Parameters<typeof complexFunc>;
+
+// Function that forwards parameters
+function forward<T extends (...args: any[]) => any>(
+    fn: T,
+    ...args: Parameters<T>
+): ReturnType<T> {
+    return fn(...args);
+}
+
+// Partial application using Parameters
+function partial<T extends (...args: any[]) => any>(
+    fn: T,
+    firstArg: Parameters<T>[0]
+): (...rest: Parameters<T> extends [any, ...infer R] ? R : never[]) => ReturnType<T> {
+    return (...rest) => fn(firstArg, ...rest);
+}
+
+const forwardedResult = forward(simpleFunc, "hello", 42);
+const partialSimple = partial(simpleFunc, "fixed");
+partialSimple(123);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("simpleFunc"),
+        "expected simpleFunc function in output. output: {output}"
+    );
+    assert!(
+        output.contains("forward"),
+        "expected forward function in output. output: {output}"
+    );
+    assert!(
+        output.contains("partial"),
+        "expected partial function in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for Parameters utility"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+/// Test source map generation for ConstructorParameters<T> utility type in ES5 output.
+/// Validates that ConstructorParameters extraction generates proper source mappings.
+#[test]
+fn test_source_map_utility_type_constructor_params_es5() {
+    let source = r#"// Custom ConstructorParameters implementation
+type MyConstructorParameters<T extends abstract new (...args: any) => any> =
+    T extends abstract new (...args: infer P) => any ? P : never;
+
+// Classes with various constructor signatures
+class SimpleClass {
+    constructor(public name: string, public age: number) {}
+}
+
+class ConfigurableClass {
+    constructor(
+        public config: { host: string; port: number },
+        public options?: { timeout?: number; retries?: number }
+    ) {}
+}
+
+class VariadicClass {
+    public items: string[];
+    constructor(first: string, ...rest: string[]) {
+        this.items = [first, ...rest];
+    }
+}
+
+// Using ConstructorParameters
+type SimpleCtorParams = ConstructorParameters<typeof SimpleClass>;
+type ConfigCtorParams = ConstructorParameters<typeof ConfigurableClass>;
+type VariadicCtorParams = MyConstructorParameters<typeof VariadicClass>;
+
+// Factory function using ConstructorParameters
+function createInstance<T extends new (...args: any[]) => any>(
+    ctor: T,
+    ...args: ConstructorParameters<T>
+): InstanceType<T> {
+    return new ctor(...args);
+}
+
+// Builder pattern with ConstructorParameters
+class Factory<T extends new (...args: any[]) => any> {
+    private args: ConstructorParameters<T> | null = null;
+
+    constructor(private ctor: T) {}
+
+    withArgs(...args: ConstructorParameters<T>): this {
+        this.args = args;
+        return this;
+    }
+
+    build(): InstanceType<T> {
+        if (!this.args) throw new Error("Args not set");
+        return new this.ctor(...this.args);
+    }
+}
+
+const simple = createInstance(SimpleClass, "Alice", 30);
+const factory = new Factory(ConfigurableClass);
+const configured = factory.withArgs({ host: "localhost", port: 8080 }).build();
+console.log(simple, configured);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("SimpleClass"),
+        "expected SimpleClass in output. output: {output}"
+    );
+    assert!(
+        output.contains("createInstance"),
+        "expected createInstance function in output. output: {output}"
+    );
+    assert!(
+        output.contains("Factory"),
+        "expected Factory class in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for ConstructorParameters utility"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+/// Test source map generation for InstanceType<T> utility type in ES5 output.
+/// Validates that InstanceType extraction generates proper source mappings.
+#[test]
+fn test_source_map_utility_type_instance_type_es5() {
+    let source = r#"// Custom InstanceType implementation
+type MyInstanceType<T extends abstract new (...args: any) => any> =
+    T extends abstract new (...args: any) => infer R ? R : never;
+
+// Various classes
+class User {
+    constructor(public id: number, public name: string) {}
+
+    greet(): string {
+        return `Hello, ${this.name}`;
+    }
+}
+
+class Product {
+    constructor(
+        public sku: string,
+        public price: number,
+        public inStock: boolean
+    ) {}
+
+    getDisplayPrice(): string {
+        return `$${this.price.toFixed(2)}`;
+    }
+}
+
+abstract class Entity {
+    abstract getId(): string;
+}
+
+class ConcreteEntity extends Entity {
+    constructor(private id: string) {
+        super();
+    }
+
+    getId(): string {
+        return this.id;
+    }
+}
+
+// Using InstanceType
+type UserInstance = InstanceType<typeof User>;
+type ProductInstance = InstanceType<typeof Product>;
+type EntityInstance = MyInstanceType<typeof ConcreteEntity>;
+
+// Registry using InstanceType
+class Registry<T extends new (...args: any[]) => any> {
+    private instances: Map<string, InstanceType<T>> = new Map();
+
+    register(key: string, instance: InstanceType<T>): void {
+        this.instances.set(key, instance);
+    }
+
+    get(key: string): InstanceType<T> | undefined {
+        return this.instances.get(key);
+    }
+
+    getAll(): InstanceType<T>[] {
+        return Array.from(this.instances.values());
+    }
+}
+
+const userRegistry = new Registry<typeof User>();
+userRegistry.register("user1", new User(1, "Alice"));
+userRegistry.register("user2", new User(2, "Bob"));
+
+const users = userRegistry.getAll();
+console.log(users.map(u => u.greet()));"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("User"),
+        "expected User class in output. output: {output}"
+    );
+    assert!(
+        output.contains("Product"),
+        "expected Product class in output. output: {output}"
+    );
+    assert!(
+        output.contains("Registry"),
+        "expected Registry class in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for InstanceType utility"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+/// Test source map generation for ThisParameterType<T> utility type in ES5 output.
+/// Validates that ThisParameterType extraction generates proper source mappings.
+#[test]
+fn test_source_map_utility_type_this_parameter_es5() {
+    let source = r#"// Custom ThisParameterType implementation
+type MyThisParameterType<T> = T extends (this: infer U, ...args: any[]) => any ? U : unknown;
+
+// Custom OmitThisParameter implementation
+type MyOmitThisParameter<T> = unknown extends ThisParameterType<T>
+    ? T
+    : T extends (...args: infer A) => infer R
+    ? (...args: A) => R
+    : T;
+
+// Functions with explicit this parameter
+function greet(this: { name: string }): string {
+    return `Hello, ${this.name}`;
+}
+
+function calculate(this: { multiplier: number }, value: number): number {
+    return value * this.multiplier;
+}
+
+function processItems(
+    this: { prefix: string },
+    items: string[]
+): string[] {
+    return items.map(item => `${this.prefix}: ${item}`);
+}
+
+// Using ThisParameterType
+type GreetThis = ThisParameterType<typeof greet>;
+type CalculateThis = ThisParameterType<typeof calculate>;
+type ProcessThis = MyThisParameterType<typeof processItems>;
+
+// Binding functions with correct this
+function bindThis<T, A extends any[], R>(
+    fn: (this: T, ...args: A) => R,
+    thisArg: T
+): (...args: A) => R {
+    return fn.bind(thisArg);
+}
+
+const context = { name: "Alice", multiplier: 2, prefix: "Item" };
+const boundGreet = bindThis(greet, context);
+const boundCalculate = bindThis(calculate, context);
+
+// Method extraction with this handling
+class Counter {
+    count = 0;
+
+    increment(this: Counter): void {
+        this.count++;
+    }
+
+    getCount(this: Counter): number {
+        return this.count;
+    }
+}
+
+const counter = new Counter();
+const incrementFn: MyOmitThisParameter<typeof counter.increment> = counter.increment.bind(counter);
+incrementFn();
+
+console.log(boundGreet(), boundCalculate(5), counter.getCount());"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("greet"),
+        "expected greet function in output. output: {output}"
+    );
+    assert!(
+        output.contains("bindThis"),
+        "expected bindThis function in output. output: {output}"
+    );
+    assert!(
+        output.contains("Counter"),
+        "expected Counter class in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for ThisParameterType utility"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+/// Comprehensive test combining multiple utility type patterns.
+/// Tests ReturnType, Parameters, ConstructorParameters, InstanceType, and ThisParameterType together.
+#[test]
+fn test_source_map_utility_type_es5_comprehensive() {
+    let source = r#"// Comprehensive utility type patterns
+
+// All utility types defined
+type ReturnType<T extends (...args: any) => any> = T extends (...args: any) => infer R ? R : never;
+type Parameters<T extends (...args: any) => any> = T extends (...args: infer P) => any ? P : never;
+type ConstructorParameters<T extends abstract new (...args: any) => any> =
+    T extends abstract new (...args: infer P) => any ? P : never;
+type InstanceType<T extends abstract new (...args: any) => any> =
+    T extends abstract new (...args: any) => infer R ? R : never;
+type ThisParameterType<T> = T extends (this: infer U, ...args: any[]) => any ? U : unknown;
+type OmitThisParameter<T> = unknown extends ThisParameterType<T>
+    ? T
+    : T extends (...args: infer A) => infer R ? (...args: A) => R : T;
+
+// Service class using utility types
+class ApiService {
+    private baseUrl: string;
+
+    constructor(baseUrl: string, private timeout: number = 5000) {
+        this.baseUrl = baseUrl;
+    }
+
+    async fetch<T>(endpoint: string): Promise<T> {
+        const response = await fetch(`${this.baseUrl}${endpoint}`);
+        return response.json();
+    }
+
+    post<T, R>(endpoint: string, data: T): Promise<R> {
+        return fetch(`${this.baseUrl}${endpoint}`, {
+            method: "POST",
+            body: JSON.stringify(data)
+        }).then(r => r.json());
+    }
+}
+
+// Dependency injection container using utility types
+class Container {
+    private factories: Map<string, (...args: any[]) => any> = new Map();
+    private instances: Map<string, any> = new Map();
+
+    register<T extends new (...args: any[]) => any>(
+        key: string,
+        ctor: T,
+        ...args: ConstructorParameters<T>
+    ): void {
+        this.factories.set(key, () => new ctor(...args));
+    }
+
+    resolve<T extends new (...args: any[]) => any>(key: string): InstanceType<T> {
+        if (!this.instances.has(key)) {
+            const factory = this.factories.get(key);
+            if (factory) {
+                this.instances.set(key, factory());
+            }
+        }
+        return this.instances.get(key);
+    }
+}
+
+// Function composition using Parameters and ReturnType
+function compose<
+    F extends (...args: any[]) => any,
+    G extends (arg: ReturnType<F>) => any
+>(f: F, g: G): (...args: Parameters<F>) => ReturnType<G> {
+    return (...args) => g(f(...args));
+}
+
+// Method decorator factory using utility types
+function logMethod<T extends (...args: any[]) => any>(
+    target: any,
+    propertyKey: string,
+    descriptor: TypedPropertyDescriptor<T>
+): void {
+    const original = descriptor.value!;
+    descriptor.value = function(this: ThisParameterType<T>, ...args: Parameters<T>): ReturnType<T> {
+        console.log(`Calling ${propertyKey} with`, args);
+        return original.apply(this, args);
+    } as T;
+}
+
+// Event handler with proper typing
+interface EventMap {
+    click: { x: number; y: number };
+    keypress: { key: string; code: number };
+    submit: { data: Record<string, string> };
+}
+
+class EventEmitter<T extends Record<string, any>> {
+    private handlers: Map<keyof T, ((event: any) => void)[]> = new Map();
+
+    on<K extends keyof T>(
+        event: K,
+        handler: (event: T[K]) => void
+    ): void {
+        if (!this.handlers.has(event)) {
+            this.handlers.set(event, []);
+        }
+        this.handlers.get(event)!.push(handler);
+    }
+
+    emit<K extends keyof T>(event: K, data: T[K]): void {
+        const handlers = this.handlers.get(event) || [];
+        handlers.forEach(h => h(data));
+    }
+}
+
+// Usage
+const container = new Container();
+container.register("api", ApiService, "https://api.example.com", 3000);
+const api = container.resolve<typeof ApiService>("api");
+
+const double = (x: number) => x * 2;
+const stringify = (x: number) => x.toString();
+const doubleAndStringify = compose(double, stringify);
+
+const emitter = new EventEmitter<EventMap>();
+emitter.on("click", (e) => console.log(e.x, e.y));
+emitter.emit("click", { x: 10, y: 20 });
+
+console.log(api, doubleAndStringify(21));"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("ApiService"),
+        "expected ApiService class in output. output: {output}"
+    );
+    assert!(
+        output.contains("Container"),
+        "expected Container class in output. output: {output}"
+    );
+    assert!(
+        output.contains("compose"),
+        "expected compose function in output. output: {output}"
+    );
+    assert!(
+        output.contains("EventEmitter"),
+        "expected EventEmitter class in output. output: {output}"
+    );
+    assert!(
+        output.contains("register"),
+        "expected register method in output. output: {output}"
+    );
+    assert!(
+        output.contains("resolve"),
+        "expected resolve method in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for comprehensive utility types"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}

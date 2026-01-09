@@ -26705,3 +26705,2609 @@ const userEntity = new UserEntity();
         output
     );
 }
+
+/// Test basic mixin function pattern
+#[test]
+fn test_parity_es5_mixin_basic_function() {
+    let source = r#"
+type Constructor<T = {}> = new (...args: any[]) => T;
+
+interface Timestamped {
+    timestamp: Date;
+    getTimestamp(): Date;
+}
+
+function Timestamped<TBase extends Constructor>(Base: TBase) {
+    return class extends Base implements Timestamped {
+        timestamp = new Date();
+
+        getTimestamp(): Date {
+            return this.timestamp;
+        }
+    };
+}
+
+interface Named {
+    name: string;
+    getName(): string;
+}
+
+function Named<TBase extends Constructor>(Base: TBase) {
+    return class extends Base implements Named {
+        name = "";
+
+        getName(): string {
+            return this.name;
+        }
+
+        setName(name: string): void {
+            this.name = name;
+        }
+    };
+}
+
+class Entity {
+    id: number;
+
+    constructor(id: number) {
+        this.id = id;
+    }
+}
+
+const TimestampedEntity = Timestamped(Entity);
+const NamedEntity = Named(Entity);
+const entity = new TimestampedEntity(1);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes and functions should be present
+    assert!(
+        output.contains("Entity") && output.contains("Timestamped") && output.contains("Named"),
+        "Classes and mixin functions should be present: {}",
+        output
+    );
+    // Type alias should be erased
+    assert!(
+        !output.contains("type Constructor"),
+        "Type alias should be erased: {}",
+        output
+    );
+    // Interfaces should be erased
+    assert!(
+        !output.contains("interface Timestamped") && !output.contains("interface Named"),
+        "Interfaces should be erased: {}",
+        output
+    );
+    // Implements clauses should be erased
+    assert!(
+        !output.contains("implements Timestamped") && !output.contains("implements Named"),
+        "Implements clauses should be erased: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": Date") && !output.contains(": string") && !output.contains(": void"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test mixin with generics
+#[test]
+fn test_parity_es5_mixin_generics() {
+    let source = r#"
+type Constructor<T = {}> = new (...args: any[]) => T;
+
+interface Comparable<T> {
+    compareTo(other: T): number;
+}
+
+function Comparable<T, TBase extends Constructor>(Base: TBase) {
+    abstract class ComparableClass extends Base implements Comparable<T> {
+        abstract compareTo(other: T): number;
+
+        isEqual(other: T): boolean {
+            return this.compareTo(other) === 0;
+        }
+
+        isLessThan(other: T): boolean {
+            return this.compareTo(other) < 0;
+        }
+
+        isGreaterThan(other: T): boolean {
+            return this.compareTo(other) > 0;
+        }
+    }
+    return ComparableClass;
+}
+
+interface Serializable<T> {
+    serialize(): string;
+    deserialize(data: string): T;
+}
+
+function Serializable<T, TBase extends Constructor>(Base: TBase) {
+    abstract class SerializableClass extends Base implements Serializable<T> {
+        abstract serialize(): string;
+        abstract deserialize(data: string): T;
+
+        toJSON(): string {
+            return this.serialize();
+        }
+    }
+    return SerializableClass;
+}
+
+class BaseModel {
+    id: string;
+
+    constructor(id: string) {
+        this.id = id;
+    }
+}
+
+class User extends Serializable<User, typeof BaseModel>(Comparable<User, typeof BaseModel>(BaseModel)) {
+    name: string;
+
+    constructor(id: string, name: string) {
+        super(id);
+        this.name = name;
+    }
+
+    compareTo(other: User): number {
+        return this.name.localeCompare(other.name);
+    }
+
+    serialize(): string {
+        return JSON.stringify({ id: this.id, name: this.name });
+    }
+
+    deserialize(data: string): User {
+        const obj = JSON.parse(data);
+        return new User(obj.id, obj.name);
+    }
+}
+
+const user = new User("1", "Alice");
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes should be present
+    assert!(
+        output.contains("BaseModel") && output.contains("User"),
+        "Classes should be present: {}",
+        output
+    );
+    // Mixin functions should be present
+    assert!(
+        output.contains("Comparable") && output.contains("Serializable"),
+        "Mixin functions should be present: {}",
+        output
+    );
+    // Generic type parameters should be erased
+    assert!(
+        !output.contains("<T>") && !output.contains("<User>") && !output.contains("<T, TBase"),
+        "Generic type parameters should be erased: {}",
+        output
+    );
+    // Abstract keyword should be erased
+    assert!(
+        !output.contains("abstract class") && !output.contains("abstract compareTo"),
+        "Abstract keyword should be erased: {}",
+        output
+    );
+    // Interfaces should be erased
+    assert!(
+        !output.contains("interface Comparable") && !output.contains("interface Serializable"),
+        "Interfaces should be erased: {}",
+        output
+    );
+}
+
+/// Test multiple mixin composition
+#[test]
+fn test_parity_es5_mixin_composition() {
+    let source = r#"
+type Constructor<T = {}> = new (...args: any[]) => T;
+
+interface Loggable {
+    log(message: string): void;
+}
+
+function Loggable<TBase extends Constructor>(Base: TBase) {
+    return class extends Base implements Loggable {
+        log(message: string): void {
+            console.log("[" + this.constructor.name + "] " + message);
+        }
+    };
+}
+
+interface Disposable {
+    dispose(): void;
+    isDisposed: boolean;
+}
+
+function Disposable<TBase extends Constructor>(Base: TBase) {
+    return class extends Base implements Disposable {
+        isDisposed = false;
+
+        dispose(): void {
+            this.isDisposed = true;
+        }
+    };
+}
+
+interface Activatable {
+    activate(): void;
+    deactivate(): void;
+    isActive: boolean;
+}
+
+function Activatable<TBase extends Constructor>(Base: TBase) {
+    return class extends Base implements Activatable {
+        isActive = false;
+
+        activate(): void {
+            this.isActive = true;
+        }
+
+        deactivate(): void {
+            this.isActive = false;
+        }
+    };
+}
+
+class Component {
+    name: string;
+
+    constructor(name: string) {
+        this.name = name;
+    }
+}
+
+const EnhancedComponent = Loggable(Disposable(Activatable(Component)));
+
+class Widget extends EnhancedComponent {
+    private width: number;
+    private height: number;
+
+    constructor(name: string, width: number, height: number) {
+        super(name);
+        this.width = width;
+        this.height = height;
+    }
+
+    render(): void {
+        this.log("Rendering widget: " + this.name);
+    }
+}
+
+const widget = new Widget("MyWidget", 100, 200);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes should be present
+    assert!(
+        output.contains("Component") && output.contains("Widget"),
+        "Classes should be present: {}",
+        output
+    );
+    // Mixin functions should be present
+    assert!(
+        output.contains("Loggable") && output.contains("Disposable") && output.contains("Activatable"),
+        "Mixin functions should be present: {}",
+        output
+    );
+    // Interfaces should be erased
+    assert!(
+        !output.contains("interface Loggable") && !output.contains("interface Disposable"),
+        "Interfaces should be erased: {}",
+        output
+    );
+    // Type alias should be erased
+    assert!(
+        !output.contains("type Constructor"),
+        "Type alias should be erased: {}",
+        output
+    );
+    // Private modifier should be erased
+    assert!(
+        !output.contains("private width") && !output.contains("private height"),
+        "Private modifier should be erased: {}",
+        output
+    );
+}
+
+/// Test mixin with static members
+#[test]
+fn test_parity_es5_mixin_static_members() {
+    let source = r#"
+type Constructor<T = {}> = new (...args: any[]) => T;
+
+interface Countable {
+    getInstanceId(): number;
+}
+
+function Countable<TBase extends Constructor>(Base: TBase) {
+    return class extends Base implements Countable {
+        static instanceCount: number = 0;
+        static readonly MAX_INSTANCES: number = 1000;
+
+        private instanceId: number;
+
+        constructor(...args: any[]) {
+            super(...args);
+            (this.constructor as any).instanceCount++;
+            this.instanceId = (this.constructor as any).instanceCount;
+        }
+
+        static getCount(): number {
+            return this.instanceCount;
+        }
+
+        static resetCount(): void {
+            this.instanceCount = 0;
+        }
+
+        getInstanceId(): number {
+            return this.instanceId;
+        }
+    };
+}
+
+interface Registrable {
+    register(): void;
+    unregister(): void;
+}
+
+function Registrable<TBase extends Constructor>(Base: TBase) {
+    return class extends Base implements Registrable {
+        static registry: Set<any> = new Set();
+
+        static getRegistered(): any[] {
+            return Array.from(this.registry);
+        }
+
+        static clearRegistry(): void {
+            this.registry.clear();
+        }
+
+        register(): void {
+            (this.constructor as any).registry.add(this);
+        }
+
+        unregister(): void {
+            (this.constructor as any).registry.delete(this);
+        }
+    };
+}
+
+class Service {
+    name: string;
+
+    constructor(name: string) {
+        this.name = name;
+    }
+}
+
+const TrackedService = Countable(Registrable(Service));
+
+class DatabaseService extends TrackedService {
+    connectionString: string;
+
+    constructor(name: string, connectionString: string) {
+        super(name);
+        this.connectionString = connectionString;
+    }
+}
+
+const db = new DatabaseService("DB", "localhost:5432");
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes should be present
+    assert!(
+        output.contains("Service") && output.contains("DatabaseService"),
+        "Classes should be present: {}",
+        output
+    );
+    // Mixin functions should be present
+    assert!(
+        output.contains("Countable") && output.contains("Registrable"),
+        "Mixin functions should be present: {}",
+        output
+    );
+    // Interfaces should be erased
+    assert!(
+        !output.contains("interface Countable") && !output.contains("interface Registrable"),
+        "Interfaces should be erased: {}",
+        output
+    );
+    // Readonly modifier should be erased
+    assert!(
+        !output.contains("readonly MAX_INSTANCES"),
+        "Readonly modifier should be erased: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number") && !output.contains(": Set<"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test mixin with private fields
+#[test]
+fn test_parity_es5_mixin_private_fields() {
+    let source = r#"
+type Constructor<T = {}> = new (...args: any[]) => T;
+
+interface Cacheable {
+    getCached<T>(key: string): T | undefined;
+    setCached<T>(key: string, value: T): void;
+    clearCache(): void;
+}
+
+function Cacheable<TBase extends Constructor>(Base: TBase) {
+    return class extends Base implements Cacheable {
+        #cache: Map<string, any> = new Map();
+        #cacheHits: number = 0;
+        #cacheMisses: number = 0;
+
+        getCached<T>(key: string): T | undefined {
+            if (this.#cache.has(key)) {
+                this.#cacheHits++;
+                return this.#cache.get(key);
+            }
+            this.#cacheMisses++;
+            return undefined;
+        }
+
+        setCached<T>(key: string, value: T): void {
+            this.#cache.set(key, value);
+        }
+
+        clearCache(): void {
+            this.#cache.clear();
+            this.#cacheHits = 0;
+            this.#cacheMisses = 0;
+        }
+
+        getCacheStats(): { hits: number; misses: number } {
+            return { hits: this.#cacheHits, misses: this.#cacheMisses };
+        }
+    };
+}
+
+interface Lockable {
+    lock(): void;
+    unlock(): void;
+    isLocked(): boolean;
+}
+
+function Lockable<TBase extends Constructor>(Base: TBase) {
+    return class extends Base implements Lockable {
+        #locked: boolean = false;
+        #lockCount: number = 0;
+
+        lock(): void {
+            this.#locked = true;
+            this.#lockCount++;
+        }
+
+        unlock(): void {
+            this.#locked = false;
+        }
+
+        isLocked(): boolean {
+            return this.#locked;
+        }
+
+        getLockCount(): number {
+            return this.#lockCount;
+        }
+    };
+}
+
+class Resource {
+    name: string;
+
+    constructor(name: string) {
+        this.name = name;
+    }
+}
+
+const SecureResource = Cacheable(Lockable(Resource));
+
+class FileResource extends SecureResource {
+    path: string;
+
+    constructor(name: string, path: string) {
+        super(name);
+        this.path = path;
+    }
+
+    read(): string {
+        if (this.isLocked()) {
+            throw new Error("Resource is locked");
+        }
+        const cached = this.getCached<string>("content");
+        if (cached) return cached;
+        const content = "File content of " + this.path;
+        this.setCached("content", content);
+        return content;
+    }
+}
+
+const file = new FileResource("config", "/etc/config.json");
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes should be present
+    assert!(
+        output.contains("Resource") && output.contains("FileResource"),
+        "Classes should be present: {}",
+        output
+    );
+    // Mixin functions should be present
+    assert!(
+        output.contains("Cacheable") && output.contains("Lockable"),
+        "Mixin functions should be present: {}",
+        output
+    );
+    // Interfaces should be erased
+    assert!(
+        !output.contains("interface Cacheable") && !output.contains("interface Lockable"),
+        "Interfaces should be erased: {}",
+        output
+    );
+    // Type alias should be erased
+    assert!(
+        !output.contains("type Constructor"),
+        "Type alias should be erased: {}",
+        output
+    );
+    // Generic type annotations should be erased
+    assert!(
+        !output.contains("<T>") && !output.contains("<string>"),
+        "Generic type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test combined mixin patterns
+#[test]
+fn test_parity_es5_mixin_combined_patterns() {
+    let source = r#"
+type Constructor<T = {}> = new (...args: any[]) => T;
+type GConstructor<T = {}> = new (...args: any[]) => T;
+
+interface EventEmitter {
+    on(event: string, handler: Function): void;
+    off(event: string, handler: Function): void;
+    emit(event: string, ...args: any[]): void;
+}
+
+function EventEmitter<TBase extends Constructor>(Base: TBase) {
+    return class extends Base implements EventEmitter {
+        #handlers: Map<string, Set<Function>> = new Map();
+
+        on(event: string, handler: Function): void {
+            if (!this.#handlers.has(event)) {
+                this.#handlers.set(event, new Set());
+            }
+            this.#handlers.get(event)!.add(handler);
+        }
+
+        off(event: string, handler: Function): void {
+            this.#handlers.get(event)?.delete(handler);
+        }
+
+        emit(event: string, ...args: any[]): void {
+            this.#handlers.get(event)?.forEach(handler => handler(...args));
+        }
+
+        listenerCount(event: string): number {
+            return this.#handlers.get(event)?.size ?? 0;
+        }
+    };
+}
+
+interface Observable<T> {
+    subscribe(observer: (value: T) => void): () => void;
+    getValue(): T;
+}
+
+function Observable<T, TBase extends Constructor>(Base: TBase) {
+    abstract class ObservableClass extends Base implements Observable<T> {
+        #observers: Set<(value: T) => void> = new Set();
+        #value: T | undefined;
+
+        abstract getValue(): T;
+
+        protected setValue(value: T): void {
+            this.#value = value;
+            this.#notifyObservers(value);
+        }
+
+        #notifyObservers(value: T): void {
+            this.#observers.forEach(observer => observer(value));
+        }
+
+        subscribe(observer: (value: T) => void): () => void {
+            this.#observers.add(observer);
+            return () => this.#observers.delete(observer);
+        }
+    }
+    return ObservableClass;
+}
+
+interface Validatable {
+    validate(): boolean;
+    getErrors(): string[];
+}
+
+function Validatable<TBase extends Constructor>(Base: TBase) {
+    return class extends Base implements Validatable {
+        protected errors: string[] = [];
+
+        validate(): boolean {
+            this.errors = [];
+            return true;
+        }
+
+        getErrors(): string[] {
+            return [...this.errors];
+        }
+
+        protected addError(error: string): void {
+            this.errors.push(error);
+        }
+    };
+}
+
+class Model {
+    id: string;
+    createdAt: Date;
+
+    constructor(id: string) {
+        this.id = id;
+        this.createdAt = new Date();
+    }
+}
+
+const ReactiveModel = EventEmitter(Observable<any, typeof Model>(Validatable(Model)));
+
+class UserModel extends ReactiveModel {
+    private _name: string = "";
+    private _email: string = "";
+
+    get name(): string {
+        return this._name;
+    }
+
+    set name(value: string) {
+        this._name = value;
+        this.emit("change", { field: "name", value });
+    }
+
+    get email(): string {
+        return this._email;
+    }
+
+    set email(value: string) {
+        this._email = value;
+        this.emit("change", { field: "email", value });
+    }
+
+    getValue(): any {
+        return { id: this.id, name: this._name, email: this._email };
+    }
+
+    validate(): boolean {
+        super.validate();
+        if (!this._name) this.addError("Name is required");
+        if (!this._email.includes("@")) this.addError("Invalid email");
+        return this.getErrors().length === 0;
+    }
+}
+
+const user = new UserModel("user-1");
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes should be present
+    assert!(
+        output.contains("Model") && output.contains("UserModel"),
+        "Classes should be present: {}",
+        output
+    );
+    // Mixin functions should be present
+    assert!(
+        output.contains("EventEmitter") && output.contains("Observable") && output.contains("Validatable"),
+        "Mixin functions should be present: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type Constructor") && !output.contains("type GConstructor"),
+        "Type aliases should be erased: {}",
+        output
+    );
+    // Interfaces should be erased
+    assert!(
+        !output.contains("interface EventEmitter") && !output.contains("interface Observable"),
+        "Interfaces should be erased: {}",
+        output
+    );
+    // Abstract keyword should be erased
+    assert!(
+        !output.contains("abstract class") && !output.contains("abstract getValue"),
+        "Abstract keyword should be erased: {}",
+        output
+    );
+    // Protected modifier should be erased
+    assert!(
+        !output.contains("protected errors") && !output.contains("protected setValue"),
+        "Protected modifier should be erased: {}",
+        output
+    );
+    // Generic type parameters should be erased
+    assert!(
+        !output.contains("<T>") && !output.contains("<TBase") && !output.contains("<any,"),
+        "Generic type parameters should be erased: {}",
+        output
+    );
+}
+
+// ============================================================================
+// ES5 Generic Class Patterns Parity Tests
+// ============================================================================
+
+/// Test ES5 generic class with single type parameter
+#[test]
+fn test_parity_es5_generic_class_single_param() {
+    let source = r#"
+class Container<T> {
+    private value: T;
+
+    constructor(value: T) {
+        this.value = value;
+    }
+
+    getValue(): T {
+        return this.value;
+    }
+
+    setValue(value: T): void {
+        this.value = value;
+    }
+}
+
+class StringContainer extends Container<string> {
+    getLength(): number {
+        return this.getValue().length;
+    }
+}
+
+const numContainer = new Container<number>(42);
+const strContainer = new StringContainer("hello");
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes should be present
+    assert!(
+        output.contains("Container") && output.contains("StringContainer"),
+        "Classes should be present: {}",
+        output
+    );
+    // Generic type parameter should be erased
+    assert!(
+        !output.contains("<T>") && !output.contains("<string>") && !output.contains("<number>"),
+        "Generic type parameters should be erased: {}",
+        output
+    );
+    // Return type annotations should be erased
+    assert!(
+        !output.contains(": T") && !output.contains(": number") && !output.contains(": void"),
+        "Return type annotations should be erased: {}",
+        output
+    );
+    // Private modifier should be erased
+    assert!(
+        !output.contains("private value"),
+        "Private modifier should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 generic class with multiple type parameters
+#[test]
+fn test_parity_es5_generic_class_multi_params() {
+    let source = r#"
+class Pair<K, V> {
+    constructor(public key: K, public value: V) {}
+
+    getKey(): K { return this.key; }
+    getValue(): V { return this.value; }
+    swap(): Pair<V, K> { return new Pair(this.value, this.key); }
+}
+
+class Triple<A, B, C> {
+    constructor(
+        private first: A,
+        private second: B,
+        private third: C
+    ) {}
+
+    toArray(): [A, B, C] {
+        return [this.first, this.second, this.third];
+    }
+}
+
+class Dictionary<K extends string, V> {
+    private items: Map<K, V> = new Map();
+
+    set(key: K, value: V): void {
+        this.items.set(key, value);
+    }
+
+    get(key: K): V | undefined {
+        return this.items.get(key);
+    }
+}
+
+const pair = new Pair<string, number>("age", 25);
+const triple = new Triple<number, string, boolean>(1, "two", true);
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes should be present
+    assert!(
+        output.contains("Pair") && output.contains("Triple") && output.contains("Dictionary"),
+        "Classes should be present: {}",
+        output
+    );
+    // Generic type parameters should be erased
+    assert!(
+        !output.contains("<K,") && !output.contains("<A,") && !output.contains("<K extends"),
+        "Generic type parameters should be erased: {}",
+        output
+    );
+    // Return type annotations should be erased
+    assert!(
+        !output.contains("): K") && !output.contains("): V") && !output.contains("): [A,"),
+        "Return type annotations should be erased: {}",
+        output
+    );
+    // Public/private modifiers should be erased
+    assert!(
+        !output.contains("public key") && !output.contains("private first"),
+        "Access modifiers should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 generic class with constraints
+#[test]
+fn test_parity_es5_generic_class_constraints() {
+    let source = r#"
+interface Comparable<T> {
+    compareTo(other: T): number;
+}
+
+interface Serializable {
+    serialize(): string;
+}
+
+class SortedList<T extends Comparable<T>> {
+    private items: T[] = [];
+
+    add(item: T): void {
+        this.items.push(item);
+        this.items.sort((a, b) => a.compareTo(b));
+    }
+
+    get(index: number): T {
+        return this.items[index];
+    }
+}
+
+class Repository<T extends { id: string } & Serializable> {
+    private data: Map<string, T> = new Map();
+
+    save(item: T): void {
+        this.data.set(item.id, item);
+    }
+
+    find(id: string): T | undefined {
+        return this.data.get(id);
+    }
+
+    exportAll(): string[] {
+        return Array.from(this.data.values()).map(v => v.serialize());
+    }
+}
+
+class KeyValueStore<K extends string | number, V extends object> {
+    private store: Record<string, V> = {};
+
+    put(key: K, value: V): void {
+        this.store[String(key)] = value;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes should be present
+    assert!(
+        output.contains("SortedList") && output.contains("Repository") && output.contains("KeyValueStore"),
+        "Classes should be present: {}",
+        output
+    );
+    // Interfaces should be erased
+    assert!(
+        !output.contains("interface Comparable") && !output.contains("interface Serializable"),
+        "Interfaces should be erased: {}",
+        output
+    );
+    // Generic constraints should be erased
+    assert!(
+        !output.contains("<T extends Comparable") && !output.contains("<T extends {"),
+        "Generic constraints should be erased: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": T[]") && !output.contains(": Map<") && !output.contains(": Record<"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 generic class extending generic base
+#[test]
+fn test_parity_es5_generic_class_extends_generic() {
+    let source = r#"
+abstract class BaseRepository<T, ID> {
+    protected items: Map<ID, T> = new Map();
+
+    abstract create(data: Partial<T>): T;
+
+    findById(id: ID): T | undefined {
+        return this.items.get(id);
+    }
+
+    save(id: ID, item: T): void {
+        this.items.set(id, item);
+    }
+}
+
+interface User {
+    id: string;
+    name: string;
+    email: string;
+}
+
+class UserRepository extends BaseRepository<User, string> {
+    create(data: Partial<User>): User {
+        const user: User = {
+            id: Math.random().toString(36),
+            name: data.name || "",
+            email: data.email || ""
+        };
+        return user;
+    }
+
+    findByEmail(email: string): User | undefined {
+        for (const user of this.items.values()) {
+            if (user.email === email) return user;
+        }
+        return undefined;
+    }
+}
+
+class CachedRepository<T, ID> extends BaseRepository<T, ID> {
+    private cache: Map<ID, { value: T; timestamp: number }> = new Map();
+
+    create(data: Partial<T>): T {
+        return data as T;
+    }
+
+    getCached(id: ID, maxAge: number): T | undefined {
+        const cached = this.cache.get(id);
+        if (cached && Date.now() - cached.timestamp < maxAge) {
+            return cached.value;
+        }
+        return this.findById(id);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes should be present
+    assert!(
+        output.contains("BaseRepository") && output.contains("UserRepository") && output.contains("CachedRepository"),
+        "Classes should be present: {}",
+        output
+    );
+    // Abstract keyword should be erased
+    assert!(
+        !output.contains("abstract class") && !output.contains("abstract create"),
+        "Abstract keyword should be erased: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface User"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Generic type parameters should be erased
+    assert!(
+        !output.contains("<T, ID>") && !output.contains("<User, string>"),
+        "Generic type parameters should be erased: {}",
+        output
+    );
+    // Protected modifier should be erased
+    assert!(
+        !output.contains("protected items"),
+        "Protected modifier should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 generic class with default type parameters
+#[test]
+fn test_parity_es5_generic_class_default_params() {
+    let source = r#"
+class EventEmitter<T = any> {
+    private listeners: Array<(data: T) => void> = [];
+
+    on(callback: (data: T) => void): void {
+        this.listeners.push(callback);
+    }
+
+    emit(data: T): void {
+        this.listeners.forEach(cb => cb(data));
+    }
+}
+
+class TypedMap<K = string, V = unknown> {
+    private map: Map<K, V> = new Map();
+
+    set(key: K, value: V): this {
+        this.map.set(key, value);
+        return this;
+    }
+
+    get(key: K): V | undefined {
+        return this.map.get(key);
+    }
+}
+
+class ConfigStore<T extends object = Record<string, any>> {
+    private config: T;
+
+    constructor(initial: T) {
+        this.config = initial;
+    }
+
+    get<K extends keyof T>(key: K): T[K] {
+        return this.config[key];
+    }
+
+    set<K extends keyof T>(key: K, value: T[K]): void {
+        this.config[key] = value;
+    }
+}
+
+// Usage with defaults
+const emitter1 = new EventEmitter();
+const emitter2 = new EventEmitter<string>();
+const map1 = new TypedMap();
+const map2 = new TypedMap<number, boolean>();
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes should be present
+    assert!(
+        output.contains("EventEmitter") && output.contains("TypedMap") && output.contains("ConfigStore"),
+        "Classes should be present: {}",
+        output
+    );
+    // Generic type parameters with defaults should be erased
+    assert!(
+        !output.contains("<T = any>") && !output.contains("<K = string") && !output.contains("<T extends object ="),
+        "Generic type parameters with defaults should be erased: {}",
+        output
+    );
+    // Instantiation type arguments should be erased
+    assert!(
+        !output.contains("EventEmitter<string>") && !output.contains("TypedMap<number"),
+        "Instantiation type arguments should be erased: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": this") && !output.contains(": T[K]"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 combined generic class patterns
+#[test]
+fn test_parity_es5_generic_class_combined() {
+    let source = r#"
+interface Entity {
+    id: string;
+    createdAt: Date;
+}
+
+interface Service<T> {
+    process(item: T): Promise<T>;
+}
+
+abstract class BaseService<T extends Entity, R = void> implements Service<T> {
+    protected readonly serviceName: string;
+
+    constructor(name: string) {
+        this.serviceName = name;
+    }
+
+    abstract validate(item: T): boolean;
+    abstract transform(item: T): R;
+
+    async process(item: T): Promise<T> {
+        if (!this.validate(item)) {
+            throw new Error("Validation failed");
+        }
+        return item;
+    }
+}
+
+class CompositeService<T extends Entity, U extends Entity = T> extends BaseService<T, U[]> {
+    private services: Array<BaseService<T, any>> = [];
+
+    validate(item: T): boolean {
+        return item.id !== undefined;
+    }
+
+    transform(item: T): U[] {
+        return [item as unknown as U];
+    }
+
+    addService<S extends BaseService<T, any>>(service: S): this {
+        this.services.push(service);
+        return this;
+    }
+}
+
+class GenericFactory<T extends new (...args: any[]) => any> {
+    constructor(private readonly ctor: T) {}
+
+    create(...args: ConstructorParameters<T>): InstanceType<T> {
+        return new this.ctor(...args);
+    }
+}
+
+type Handler<T, R> = (input: T) => R;
+
+class Pipeline<TInput, TOutput = TInput> {
+    private handlers: Array<Handler<any, any>> = [];
+
+    pipe<TNext>(handler: Handler<TOutput, TNext>): Pipeline<TInput, TNext> {
+        const next = new Pipeline<TInput, TNext>();
+        next.handlers = [...this.handlers, handler];
+        return next;
+    }
+
+    execute(input: TInput): TOutput {
+        return this.handlers.reduce((acc, handler) => handler(acc), input as any);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes should be present
+    assert!(
+        output.contains("BaseService") && output.contains("CompositeService") && output.contains("GenericFactory") && output.contains("Pipeline"),
+        "Classes should be present: {}",
+        output
+    );
+    // Interfaces should be erased
+    assert!(
+        !output.contains("interface Entity") && !output.contains("interface Service"),
+        "Interfaces should be erased: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type Handler"),
+        "Type aliases should be erased: {}",
+        output
+    );
+    // Abstract keyword should be erased
+    assert!(
+        !output.contains("abstract class") && !output.contains("abstract validate"),
+        "Abstract keyword should be erased: {}",
+        output
+    );
+    // Implements clause should be erased
+    assert!(
+        !output.contains("implements Service"),
+        "Implements clause should be erased: {}",
+        output
+    );
+    // Generic type parameters should be erased
+    assert!(
+        !output.contains("<T extends Entity") && !output.contains("<TInput,") && !output.contains("<T extends new"),
+        "Generic type parameters should be erased: {}",
+        output
+    );
+    // Protected/readonly modifiers should be erased
+    assert!(
+        !output.contains("protected readonly") && !output.contains("private readonly ctor"),
+        "Access modifiers should be erased: {}",
+        output
+    );
+}
+
+// ============================================================================
+// ES5 Tuple Type Patterns Parity Tests
+// ============================================================================
+
+/// Test ES5 basic tuple type
+#[test]
+fn test_parity_es5_tuple_basic() {
+    let source = r#"
+type Point = [number, number];
+type RGB = [number, number, number];
+type NameAge = [string, number];
+
+function createPoint(x: number, y: number): Point {
+    return [x, y];
+}
+
+function getColor(): RGB {
+    return [255, 128, 0];
+}
+
+function processEntry(entry: NameAge): void {
+    const [name, age] = entry;
+    console.log(name, age);
+}
+
+const point: Point = [10, 20];
+const color: RGB = [100, 150, 200];
+const person: NameAge = ["Alice", 30];
+
+// Destructuring tuples
+const [x, y] = point;
+const [r, g, b] = color;
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions should be present
+    assert!(
+        output.contains("createPoint") && output.contains("getColor") && output.contains("processEntry"),
+        "Functions should be present: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type Point") && !output.contains("type RGB") && !output.contains("type NameAge"),
+        "Type aliases should be erased: {}",
+        output
+    );
+    // Return type annotations should be erased
+    assert!(
+        !output.contains("): Point") && !output.contains("): RGB") && !output.contains("): void"),
+        "Return type annotations should be erased: {}",
+        output
+    );
+    // Variable type annotations should be erased
+    assert!(
+        !output.contains(": Point") && !output.contains(": RGB") && !output.contains(": NameAge"),
+        "Variable type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 tuple with optional elements
+#[test]
+fn test_parity_es5_tuple_optional() {
+    let source = r#"
+type OptionalTuple = [string, number?, boolean?];
+type ConfigTuple = [string, number | undefined, boolean?];
+
+function processOptional(tuple: OptionalTuple): string {
+    const [name, age, active] = tuple;
+    return name + (age ?? 0) + (active ?? false);
+}
+
+function createConfig(name: string, count?: number, enabled?: boolean): ConfigTuple {
+    return [name, count, enabled];
+}
+
+class TupleHandler {
+    private data: OptionalTuple;
+
+    constructor(name: string, age?: number) {
+        this.data = [name, age];
+    }
+
+    getData(): OptionalTuple {
+        return this.data;
+    }
+
+    setActive(active: boolean): void {
+        this.data = [this.data[0], this.data[1], active];
+    }
+}
+
+const minimal: OptionalTuple = ["test"];
+const partial: OptionalTuple = ["test", 42];
+const full: OptionalTuple = ["test", 42, true];
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions and class should be present
+    assert!(
+        output.contains("processOptional") && output.contains("createConfig") && output.contains("TupleHandler"),
+        "Functions and class should be present: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type OptionalTuple") && !output.contains("type ConfigTuple"),
+        "Type aliases should be erased: {}",
+        output
+    );
+    // Tuple type annotations should be erased
+    assert!(
+        !output.contains(": OptionalTuple") && !output.contains(": ConfigTuple"),
+        "Tuple type annotations should be erased: {}",
+        output
+    );
+    // Private modifier should be erased
+    assert!(
+        !output.contains("private data"),
+        "Private modifier should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 tuple with rest elements
+#[test]
+fn test_parity_es5_tuple_rest() {
+    let source = r#"
+type StringNumberBooleans = [string, number, ...boolean[]];
+type StringNumbers = [string, ...number[]];
+type Unbounded = [...string[]];
+
+function logStringsAndNumbers(first: string, ...rest: number[]): void {
+    console.log(first, ...rest);
+}
+
+function processRestTuple(tuple: StringNumberBooleans): number {
+    const [str, num, ...flags] = tuple;
+    return flags.filter(f => f).length + num;
+}
+
+function combineArrays<T, U>(arr1: T[], arr2: U[]): [...T[], ...U[]] {
+    return [...arr1, ...arr2];
+}
+
+class RestTupleProcessor {
+    process(data: StringNumbers): string[] {
+        const [prefix, ...numbers] = data;
+        return numbers.map(n => prefix + n);
+    }
+}
+
+const tuple1: StringNumberBooleans = ["start", 10, true, false, true];
+const tuple2: StringNumbers = ["value", 1, 2, 3, 4, 5];
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions and class should be present
+    assert!(
+        output.contains("logStringsAndNumbers") && output.contains("processRestTuple") && output.contains("RestTupleProcessor"),
+        "Functions and class should be present: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type StringNumberBooleans") && !output.contains("type StringNumbers") && !output.contains("type Unbounded"),
+        "Type aliases should be erased: {}",
+        output
+    );
+    // Generic return types should be erased
+    assert!(
+        !output.contains("): [...T[]") && !output.contains("<T, U>"),
+        "Generic types should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 named tuple elements
+#[test]
+fn test_parity_es5_tuple_named() {
+    let source = r#"
+type Coordinate = [x: number, y: number, z?: number];
+type Person = [name: string, age: number, email: string];
+type Range = [start: number, end: number];
+
+function createCoordinate(x: number, y: number, z?: number): Coordinate {
+    return z !== undefined ? [x, y, z] : [x, y];
+}
+
+function formatPerson(person: Person): string {
+    const [name, age, email] = person;
+    return `${name} (${age}): ${email}`;
+}
+
+function* iterateRange(range: Range): Generator<number> {
+    const [start, end] = range;
+    for (let i = start; i <= end; i++) {
+        yield i;
+    }
+}
+
+interface CoordinateProcessor {
+    process(coord: Coordinate): number;
+}
+
+class RangeCalculator implements CoordinateProcessor {
+    process(coord: Coordinate): number {
+        const [x, y, z = 0] = coord;
+        return Math.sqrt(x * x + y * y + z * z);
+    }
+}
+
+const point3D: Coordinate = [1, 2, 3];
+const user: Person = ["John", 25, "john@example.com"];
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions and class should be present
+    assert!(
+        output.contains("createCoordinate") && output.contains("formatPerson") && output.contains("RangeCalculator"),
+        "Functions and class should be present: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type Coordinate") && !output.contains("type Person") && !output.contains("type Range"),
+        "Type aliases should be erased: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface CoordinateProcessor"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Implements clause should be erased
+    assert!(
+        !output.contains("implements CoordinateProcessor"),
+        "Implements clause should be erased: {}",
+        output
+    );
+    // Return type with Generator should be erased
+    assert!(
+        !output.contains("): Generator<"),
+        "Generator return type should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 variadic tuple types
+#[test]
+fn test_parity_es5_tuple_variadic() {
+    let source = r#"
+type Concat<T extends unknown[], U extends unknown[]> = [...T, ...U];
+type Prepend<T, U extends unknown[]> = [T, ...U];
+type Append<T extends unknown[], U> = [...T, U];
+
+function concat<T extends unknown[], U extends unknown[]>(arr1: T, arr2: U): Concat<T, U> {
+    return [...arr1, ...arr2] as Concat<T, U>;
+}
+
+function prepend<T, U extends unknown[]>(item: T, arr: U): Prepend<T, U> {
+    return [item, ...arr];
+}
+
+function append<T extends unknown[], U>(arr: T, item: U): Append<T, U> {
+    return [...arr, item] as Append<T, U>;
+}
+
+type Tail<T extends unknown[]> = T extends [unknown, ...infer Rest] ? Rest : never;
+type Head<T extends unknown[]> = T extends [infer First, ...unknown[]] ? First : never;
+
+function tail<T extends unknown[]>(arr: T): Tail<T> {
+    const [, ...rest] = arr;
+    return rest as Tail<T>;
+}
+
+function head<T extends unknown[]>(arr: T): Head<T> {
+    return arr[0] as Head<T>;
+}
+
+const combined = concat([1, 2], ["a", "b"]);
+const withPrefix = prepend("start", [1, 2, 3]);
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions should be present
+    assert!(
+        output.contains("concat") && output.contains("prepend") && output.contains("append") && output.contains("tail"),
+        "Functions should be present: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type Concat") && !output.contains("type Prepend") && !output.contains("type Tail"),
+        "Type aliases should be erased: {}",
+        output
+    );
+    // Generic type parameters should be erased
+    assert!(
+        !output.contains("<T extends unknown[]") && !output.contains("<T, U extends"),
+        "Generic type parameters should be erased: {}",
+        output
+    );
+    // Return type annotations should be erased
+    assert!(
+        !output.contains("): Concat<") && !output.contains("): Prepend<") && !output.contains("): Tail<"),
+        "Return type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 combined tuple patterns
+#[test]
+fn test_parity_es5_tuple_combined() {
+    let source = r#"
+type EventData = [type: string, timestamp: number, payload?: unknown];
+type AsyncResult<T> = [error: Error | null, data: T | null];
+type PaginatedResult<T> = [items: T[], total: number, page: number, ...metadata: string[]];
+
+interface EventHandler {
+    handle(event: EventData): AsyncResult<boolean>;
+}
+
+abstract class BaseProcessor<T> {
+    protected abstract transform(input: T): AsyncResult<T>;
+
+    async process(input: T): Promise<AsyncResult<T>> {
+        try {
+            return this.transform(input);
+        } catch (e) {
+            return [e as Error, null];
+        }
+    }
+}
+
+class DataProcessor extends BaseProcessor<string> implements EventHandler {
+    protected transform(input: string): AsyncResult<string> {
+        return [null, input.toUpperCase()];
+    }
+
+    handle(event: EventData): AsyncResult<boolean> {
+        const [type, timestamp, payload] = event;
+        console.log(type, timestamp, payload);
+        return [null, true];
+    }
+}
+
+function paginate<T>(items: T[], page: number, perPage: number): PaginatedResult<T> {
+    const start = (page - 1) * perPage;
+    const pageItems = items.slice(start, start + perPage);
+    return [pageItems, items.length, page, "cached", "validated"];
+}
+
+type ReadonlyTuple = readonly [string, number];
+type MutableFromReadonly<T extends readonly unknown[]> = [...T];
+
+const readonlyData: ReadonlyTuple = ["immutable", 42];
+const mutableCopy: MutableFromReadonly<ReadonlyTuple> = [...readonlyData];
+
+async function fetchData(): Promise<AsyncResult<object>> {
+    return [null, { success: true }];
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes and functions should be present
+    assert!(
+        output.contains("BaseProcessor") && output.contains("DataProcessor") && output.contains("paginate"),
+        "Classes and functions should be present: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type EventData") && !output.contains("type AsyncResult") && !output.contains("type PaginatedResult"),
+        "Type aliases should be erased: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface EventHandler"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Abstract keyword should be erased
+    assert!(
+        !output.contains("abstract class") && !output.contains("protected abstract"),
+        "Abstract keyword should be erased: {}",
+        output
+    );
+    // Implements clause should be erased
+    assert!(
+        !output.contains("implements EventHandler"),
+        "Implements clause should be erased: {}",
+        output
+    );
+    // Generic type parameters should be erased
+    assert!(
+        !output.contains("<T>") && !output.contains("<T extends readonly"),
+        "Generic type parameters should be erased: {}",
+        output
+    );
+    // Readonly modifier in type should be erased
+    assert!(
+        !output.contains("readonly [string"),
+        "Readonly tuple type should be erased: {}",
+        output
+    );
+}
+
+// ============================================================================
+// ES5 Union/Intersection Type Patterns Parity Tests
+// ============================================================================
+
+/// Test ES5 basic union type
+#[test]
+fn test_parity_es5_union_basic() {
+    let source = r#"
+type StringOrNumber = string | number;
+type Primitive = string | number | boolean | null | undefined;
+type Status = "pending" | "success" | "error";
+
+function formatValue(value: StringOrNumber): string {
+    if (typeof value === "string") {
+        return value.toUpperCase();
+    }
+    return value.toFixed(2);
+}
+
+function getStatus(): Status {
+    return "success";
+}
+
+function processPrimitive(p: Primitive): string {
+    if (p === null || p === undefined) {
+        return "empty";
+    }
+    return String(p);
+}
+
+class UnionHandler {
+    private value: StringOrNumber;
+
+    constructor(initial: StringOrNumber) {
+        this.value = initial;
+    }
+
+    getValue(): StringOrNumber {
+        return this.value;
+    }
+
+    setValue(value: StringOrNumber): void {
+        this.value = value;
+    }
+}
+
+const val1: StringOrNumber = "hello";
+const val2: StringOrNumber = 42;
+const status: Status = "pending";
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions and class should be present
+    assert!(
+        output.contains("formatValue") && output.contains("getStatus") && output.contains("UnionHandler"),
+        "Functions and class should be present: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type StringOrNumber") && !output.contains("type Primitive") && !output.contains("type Status"),
+        "Type aliases should be erased: {}",
+        output
+    );
+    // Union type annotations should be erased
+    assert!(
+        !output.contains(": StringOrNumber") && !output.contains(": Status") && !output.contains(": Primitive"),
+        "Union type annotations should be erased: {}",
+        output
+    );
+    // Private modifier should be erased
+    assert!(
+        !output.contains("private value"),
+        "Private modifier should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 discriminated union
+#[test]
+fn test_parity_es5_union_discriminated() {
+    let source = r#"
+interface Circle {
+    kind: "circle";
+    radius: number;
+}
+
+interface Rectangle {
+    kind: "rectangle";
+    width: number;
+    height: number;
+}
+
+interface Triangle {
+    kind: "triangle";
+    base: number;
+    height: number;
+}
+
+type Shape = Circle | Rectangle | Triangle;
+
+function getArea(shape: Shape): number {
+    switch (shape.kind) {
+        case "circle":
+            return Math.PI * shape.radius ** 2;
+        case "rectangle":
+            return shape.width * shape.height;
+        case "triangle":
+            return (shape.base * shape.height) / 2;
+    }
+}
+
+function isCircle(shape: Shape): shape is Circle {
+    return shape.kind === "circle";
+}
+
+class ShapeProcessor {
+    process(shape: Shape): string {
+        return `Area: ${getArea(shape)}`;
+    }
+
+    filterCircles(shapes: Shape[]): Circle[] {
+        return shapes.filter(isCircle);
+    }
+}
+
+const circle: Circle = { kind: "circle", radius: 5 };
+const rect: Rectangle = { kind: "rectangle", width: 10, height: 20 };
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions and class should be present
+    assert!(
+        output.contains("getArea") && output.contains("isCircle") && output.contains("ShapeProcessor"),
+        "Functions and class should be present: {}",
+        output
+    );
+    // Interfaces should be erased
+    assert!(
+        !output.contains("interface Circle") && !output.contains("interface Rectangle") && !output.contains("interface Triangle"),
+        "Interfaces should be erased: {}",
+        output
+    );
+    // Type alias should be erased
+    assert!(
+        !output.contains("type Shape"),
+        "Type alias should be erased: {}",
+        output
+    );
+    // Type predicate should be erased
+    assert!(
+        !output.contains("shape is Circle"),
+        "Type predicate should be erased: {}",
+        output
+    );
+    // Parameter type annotations should be erased
+    assert!(
+        !output.contains("shape: Shape") && !output.contains("shapes: Shape[]"),
+        "Parameter type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 intersection type
+#[test]
+fn test_parity_es5_intersection_basic() {
+    let source = r#"
+interface Named {
+    name: string;
+}
+
+interface Aged {
+    age: number;
+}
+
+interface Emailable {
+    email: string;
+}
+
+type Person = Named & Aged;
+type Contact = Named & Emailable;
+type FullContact = Named & Aged & Emailable;
+
+function greet(person: Person): string {
+    return `Hello, ${person.name}! You are ${person.age} years old.`;
+}
+
+function sendEmail(contact: Contact): void {
+    console.log(`Sending to ${contact.email}`);
+}
+
+function processFullContact(contact: FullContact): string {
+    return `${contact.name} (${contact.age}): ${contact.email}`;
+}
+
+class ContactManager {
+    private contacts: FullContact[] = [];
+
+    add(contact: FullContact): void {
+        this.contacts.push(contact);
+    }
+
+    findByName(name: string): FullContact | undefined {
+        return this.contacts.find(c => c.name === name);
+    }
+}
+
+const person: Person = { name: "Alice", age: 30 };
+const fullContact: FullContact = { name: "Bob", age: 25, email: "bob@example.com" };
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions and class should be present
+    assert!(
+        output.contains("greet") && output.contains("sendEmail") && output.contains("ContactManager"),
+        "Functions and class should be present: {}",
+        output
+    );
+    // Interfaces should be erased
+    assert!(
+        !output.contains("interface Named") && !output.contains("interface Aged") && !output.contains("interface Emailable"),
+        "Interfaces should be erased: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type Person") && !output.contains("type Contact") && !output.contains("type FullContact"),
+        "Type aliases should be erased: {}",
+        output
+    );
+    // Intersection type annotations should be erased
+    assert!(
+        !output.contains(": Person") && !output.contains(": FullContact"),
+        "Intersection type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 union with null/undefined
+#[test]
+fn test_parity_es5_union_nullable() {
+    let source = r#"
+type Nullable<T> = T | null;
+type Optional<T> = T | undefined;
+type Maybe<T> = T | null | undefined;
+
+function getValue<T>(value: Nullable<T>, defaultValue: T): T {
+    return value !== null ? value : defaultValue;
+}
+
+function processOptional<T>(value: Optional<T>): T | undefined {
+    return value;
+}
+
+function handleMaybe<T>(value: Maybe<T>, fallback: T): T {
+    return value ?? fallback;
+}
+
+class NullableContainer<T> {
+    private value: Nullable<T>;
+
+    constructor(value: Nullable<T>) {
+        this.value = value;
+    }
+
+    get(): Nullable<T> {
+        return this.value;
+    }
+
+    getOrDefault(defaultValue: T): T {
+        return this.value ?? defaultValue;
+    }
+
+    map<U>(fn: (v: T) => U): NullableContainer<U> {
+        return new NullableContainer(this.value !== null ? fn(this.value) : null);
+    }
+}
+
+function strictNullCheck(value: string | null | undefined): string {
+    if (value === null) return "null";
+    if (value === undefined) return "undefined";
+    return value;
+}
+
+const nullable: Nullable<string> = null;
+const optional: Optional<number> = undefined;
+const maybe: Maybe<boolean> = true;
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions and class should be present
+    assert!(
+        output.contains("getValue") && output.contains("handleMaybe") && output.contains("NullableContainer"),
+        "Functions and class should be present: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type Nullable") && !output.contains("type Optional") && !output.contains("type Maybe"),
+        "Type aliases should be erased: {}",
+        output
+    );
+    // Generic type parameters should be erased
+    assert!(
+        !output.contains("<T>") && !output.contains("<U>"),
+        "Generic type parameters should be erased: {}",
+        output
+    );
+    // Nullable type annotations should be erased
+    assert!(
+        !output.contains(": Nullable<") && !output.contains(": Maybe<"),
+        "Nullable type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 complex intersection patterns
+#[test]
+fn test_parity_es5_intersection_complex() {
+    let source = r#"
+interface Timestamped {
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+interface Identifiable {
+    id: string;
+}
+
+interface Serializable {
+    toJSON(): object;
+}
+
+type Entity = Identifiable & Timestamped;
+type SerializableEntity = Entity & Serializable;
+
+type WithMethods<T> = T & {
+    clone(): T;
+    equals(other: T): boolean;
+};
+
+function createEntity<T extends object>(data: T): T & Entity {
+    return {
+        ...data,
+        id: Math.random().toString(36),
+        createdAt: new Date(),
+        updatedAt: new Date()
+    };
+}
+
+abstract class BaseEntity implements Entity {
+    id: string;
+    createdAt: Date;
+    updatedAt: Date;
+
+    constructor() {
+        this.id = Math.random().toString(36);
+        this.createdAt = new Date();
+        this.updatedAt = new Date();
+    }
+}
+
+class User extends BaseEntity implements SerializableEntity {
+    constructor(public name: string, public email: string) {
+        super();
+    }
+
+    toJSON(): object {
+        return { id: this.id, name: this.name, email: this.email };
+    }
+}
+
+type Mixin<T, U> = T & U;
+type ReadonlyEntity<T> = Readonly<T> & Entity;
+
+const user: SerializableEntity = new User("Alice", "alice@example.com");
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions and classes should be present
+    assert!(
+        output.contains("createEntity") && output.contains("BaseEntity") && output.contains("User"),
+        "Functions and classes should be present: {}",
+        output
+    );
+    // Interfaces should be erased
+    assert!(
+        !output.contains("interface Timestamped") && !output.contains("interface Identifiable"),
+        "Interfaces should be erased: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type Entity") && !output.contains("type SerializableEntity") && !output.contains("type WithMethods"),
+        "Type aliases should be erased: {}",
+        output
+    );
+    // Implements clause should be erased
+    assert!(
+        !output.contains("implements Entity") && !output.contains("implements SerializableEntity"),
+        "Implements clause should be erased: {}",
+        output
+    );
+    // Abstract keyword should be erased
+    assert!(
+        !output.contains("abstract class"),
+        "Abstract keyword should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 combined union/intersection patterns
+#[test]
+fn test_parity_es5_union_intersection_combined() {
+    let source = r#"
+interface Success<T> {
+    status: "success";
+    data: T;
+}
+
+interface Failure {
+    status: "failure";
+    error: Error;
+}
+
+type Result<T> = Success<T> | Failure;
+type AsyncResult<T> = Promise<Result<T>>;
+
+interface Logger {
+    log(message: string): void;
+}
+
+interface Metrics {
+    track(event: string, data?: object): void;
+}
+
+type Instrumented<T> = T & Logger & Metrics;
+
+function isSuccess<T>(result: Result<T>): result is Success<T> {
+    return result.status === "success";
+}
+
+async function fetchData<T>(url: string): AsyncResult<T> {
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+        return { status: "success", data };
+    } catch (e) {
+        return { status: "failure", error: e as Error };
+    }
+}
+
+class InstrumentedService<T> implements Logger, Metrics {
+    private data: Result<T> | null = null;
+
+    log(message: string): void {
+        console.log(`[LOG] ${message}`);
+    }
+
+    track(event: string, data?: object): void {
+        console.log(`[TRACK] ${event}`, data);
+    }
+
+    async execute(fn: () => Promise<T>): AsyncResult<T> {
+        this.log("Starting execution");
+        try {
+            const result = await fn();
+            this.data = { status: "success", data: result };
+            this.track("success");
+            return this.data;
+        } catch (e) {
+            this.data = { status: "failure", error: e as Error };
+            this.track("failure", { error: (e as Error).message });
+            return this.data;
+        }
+    }
+}
+
+type Either<L, R> = { tag: "left"; value: L } | { tag: "right"; value: R };
+type PromiseOr<T> = T | Promise<T>;
+type ArrayOr<T> = T | T[];
+
+function normalizeArray<T>(input: ArrayOr<T>): T[] {
+    return Array.isArray(input) ? input : [input];
+}
+
+const service: Instrumented<{ name: string }> = {
+    name: "test",
+    log: (msg) => console.log(msg),
+    track: (evt) => console.log(evt)
+};
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions and class should be present
+    assert!(
+        output.contains("isSuccess") && output.contains("fetchData") && output.contains("InstrumentedService"),
+        "Functions and class should be present: {}",
+        output
+    );
+    // Interfaces should be erased
+    assert!(
+        !output.contains("interface Success") && !output.contains("interface Failure") && !output.contains("interface Logger"),
+        "Interfaces should be erased: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type Result") && !output.contains("type AsyncResult") && !output.contains("type Instrumented"),
+        "Type aliases should be erased: {}",
+        output
+    );
+    // Type predicate should be erased
+    assert!(
+        !output.contains("result is Success"),
+        "Type predicate should be erased: {}",
+        output
+    );
+    // Implements clause should be erased
+    assert!(
+        !output.contains("implements Logger") && !output.contains("implements Metrics"),
+        "Implements clause should be erased: {}",
+        output
+    );
+    // Generic type parameters should be erased
+    assert!(
+        !output.contains("<T>") && !output.contains("<L, R>"),
+        "Generic type parameters should be erased: {}",
+        output
+    );
+}

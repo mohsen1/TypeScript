@@ -13565,3 +13565,203 @@ fn test_async_yielddeleg_ignores_nested() {
     );
     assert!(!result, "Should not detect await inside nested async generator");
 }
+
+// FOR-AWAIT-OF EDGE CASE TESTS
+
+#[test]
+fn test_async_forawait_edge_break() {
+    let result = async_error_propagation_contains_await(
+        "async function process() { for (const x of items) { await handle(x); if (x.done) break; } }",
+    );
+    assert!(result, "Should detect await in for-await-of with break");
+}
+
+#[test]
+fn test_async_forawait_edge_continue() {
+    let result = async_error_propagation_contains_await(
+        "async function process() { for (const x of items) { if (x.skip) continue; await handle(x); } }",
+    );
+    assert!(result, "Should detect await in for-await-of with continue");
+}
+
+#[test]
+fn test_async_forawait_edge_return() {
+    let result = async_error_propagation_contains_await(
+        "async function findFirst() { for (const x of items) { if (await matches(x)) return x; } }",
+    );
+    assert!(result, "Should detect await in for-await-of with return");
+}
+
+#[test]
+fn test_async_forawait_edge_nested() {
+    let result = async_error_propagation_contains_await(
+        "async function process() { for (const a of outer) { for (const b of inner) { await handle(a, b); } } }",
+    );
+    assert!(result, "Should detect await in for-await-of nested loops");
+}
+
+#[test]
+fn test_async_forawait_edge_try_catch() {
+    let result = async_error_propagation_contains_await(
+        "async function process() { for (const x of items) { try { await handle(x); } catch (e) { console.error(e); } } }",
+    );
+    assert!(result, "Should detect await in for-await-of with try/catch");
+}
+
+#[test]
+fn test_async_forawait_edge_combined() {
+    let result = async_error_propagation_contains_await(
+        "async function process() { for (const x of items) { try { if (await check(x)) continue; await handle(x); } catch (e) { break; } } }",
+    );
+    assert!(result, "Should detect await in combined for-await-of patterns");
+}
+
+// PROMISE.ALLSETTLED PATTERN TESTS
+
+#[test]
+fn test_async_allsettled_basic() {
+    let result = async_error_propagation_contains_await(
+        "async function fetch() { return await Promise.allSettled(promises); }",
+    );
+    assert!(result, "Should detect await in basic Promise.allSettled");
+}
+
+#[test]
+fn test_async_allsettled_error_handling() {
+    let result = async_error_propagation_contains_await(
+        "async function fetch() { try { return await Promise.allSettled(tasks); } catch (e) { return []; } }",
+    );
+    assert!(result, "Should detect await in Promise.allSettled with error handling");
+}
+
+#[test]
+fn test_async_allsettled_mixed_results() {
+    let result = async_error_propagation_contains_await(
+        "async function process() { return await Promise.allSettled([p1, p2, p3]); }",
+    );
+    assert!(result, "Should detect await in Promise.allSettled with mixed results");
+}
+
+#[test]
+fn test_async_allsettled_class_method() {
+    let result = async_error_propagation_contains_await(
+        "async function method() { return await Promise.allSettled(this.tasks); }",
+    );
+    assert!(result, "Should detect await in Promise.allSettled in class method");
+}
+
+#[test]
+fn test_async_allsettled_destructuring() {
+    let result = async_error_propagation_contains_await(
+        "async function fetch() { return await Promise.allSettled([p1, p2]); }",
+    );
+    assert!(result, "Should detect await in Promise.allSettled with destructuring");
+}
+
+#[test]
+fn test_async_allsettled_combined() {
+    let result = async_error_propagation_contains_await(
+        "async function process() { return await Promise.allSettled(items.map(i => fetch(i))); }",
+    );
+    assert!(result, "Should detect await in combined Promise.allSettled patterns");
+}
+
+// ASYNC IIFE PATTERN TESTS
+
+#[test]
+fn test_async_iifepat_basic() {
+    let result = async_error_propagation_contains_await(
+        "async function run() { return await fetch(url); }",
+    );
+    assert!(result, "Should detect await in basic async IIFE");
+}
+
+#[test]
+fn test_async_iifepat_with_params() {
+    let result = async_error_propagation_contains_await(
+        "async function run() { return await process(arg1, arg2); }",
+    );
+    assert!(result, "Should detect await in async IIFE with parameters");
+}
+
+#[test]
+fn test_async_iifepat_module_scope() {
+    let result = async_error_propagation_contains_await(
+        "async function init() { await setup(); await configure(); }",
+    );
+    assert!(result, "Should detect await in async IIFE in module scope");
+}
+
+#[test]
+fn test_async_iifepat_try_catch() {
+    let result = async_error_propagation_contains_await(
+        "async function run() { try { return await fetch(url); } catch (e) { return null; } }",
+    );
+    assert!(result, "Should detect await in async IIFE with try/catch");
+}
+
+#[test]
+fn test_async_iifepat_promise_all() {
+    let result = async_error_propagation_contains_await(
+        "async function run() { return await Promise.all([p1, p2, p3]); }",
+    );
+    assert!(result, "Should detect await in async IIFE with Promise.all");
+}
+
+#[test]
+fn test_async_iifepat_combined() {
+    let result = async_error_propagation_contains_await(
+        "async function run() { try { await init(); return await Promise.all(tasks); } catch (e) { return []; } }",
+    );
+    assert!(result, "Should detect await in combined async IIFE patterns");
+}
+
+// ASYNC METHOD CHAINING PATTERN TESTS
+
+#[test]
+fn test_async_methchain_basic() {
+    let result = async_error_propagation_contains_await(
+        "async function chain() { return await obj.method1().method2(); }",
+    );
+    assert!(result, "Should detect await in basic async method chain");
+}
+
+#[test]
+fn test_async_methchain_with_await() {
+    let result = async_error_propagation_contains_await(
+        "async function chain() { return await builder.step1().step2().build(); }",
+    );
+    assert!(result, "Should detect await in async chain with await");
+}
+
+#[test]
+fn test_async_methchain_fluent_builder() {
+    let result = async_error_propagation_contains_await(
+        "async function build() { return await new Builder().setName(n).setValue(v).build(); }",
+    );
+    assert!(result, "Should detect await in fluent async builder");
+}
+
+#[test]
+fn test_async_methchain_pipeline() {
+    let result = async_error_propagation_contains_await(
+        "async function pipeline() { return await data.filter(f).map(m).reduce(r); }",
+    );
+    assert!(result, "Should detect await in async pipeline pattern");
+}
+
+#[test]
+fn test_async_methchain_error_handling() {
+    let result = async_error_propagation_contains_await(
+        "async function chain() { try { return await api.fetch().parse().validate(); } catch (e) { return null; } }",
+    );
+    assert!(result, "Should detect await in async chain with error handling");
+}
+
+#[test]
+fn test_async_methchain_combined() {
+    let result = async_error_propagation_contains_await(
+        "async function process() { return await this.init().configure().execute(); }",
+    );
+    assert!(result, "Should detect await in combined async chain patterns");
+}

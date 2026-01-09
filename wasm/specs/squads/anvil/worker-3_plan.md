@@ -7,20 +7,20 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-Add ES5 conditional type expression source map tests
+Add ES5 string template literal source map tests
 
 Per GOALS.md Objective 2: Source map validation
 
 Steps:
-1. Add 6 ES5 conditional type expression source map tests to `wasm/src/source_map_tests.rs`:
-   - Conditional type with infer
-   - Distributive conditional type
-   - Nested conditional types
-   - Conditional type in function return
-   - Conditional type with union
-   - Combined conditional patterns
+1. Add 6 ES5 string template literal source map tests to `wasm/src/source_map_tests.rs`:
+   - Basic template literal
+   - Template with expressions
+   - Tagged template literal
+   - Nested template literals
+   - Template with method calls
+   - Combined template patterns
 2. Run `./wasm/test.sh source_map` to verify all tests pass
-3. Commit with message: `[wasm] source_map: add conditional type expression tests`
+3. Commit with message: `[wasm] source_map: add string template literal tests`
 4. Push to `origin/worker/anvil-3`
 5. Update this plan file and push
 
@@ -33,6 +33,10 @@ git fetch origin && git reset --hard origin/squad/anvil
 (empty - will receive new tasks from EM after completing current assignment)
 
 ## Completed
+- [x] Added utility type ES5 source map tests (ReturnType, Parameters, ConstructorParameters, InstanceType, ThisParameterType, comprehensive); 905 tests pass.
+- [x] Added mapped type expression ES5 source map tests (Partial, Required, Readonly, Pick, Record, comprehensive); 899 tests pass.
+- [x] Added import/export alias ES5 source map tests (named import alias, named export alias, re-export alias, default import alias, namespace import alias, comprehensive); 893 tests pass.
+- [x] Added conditional type expression ES5 source map tests (infer keyword, distributive, nested, function return, union, comprehensive); 887 tests pass.
 - [x] Added type parameter constraint ES5 source map tests (generic function, generic class, generic interface, multiple params, union constraints, comprehensive); 881 tests pass.
 - [x] Added private class features ES5 source map tests (private field read, private field write, private method call, private accessor, private static members, comprehensive); 875 tests pass.
 - [x] Added generator transform ES5 source map tests (basic yield mapping, multiple yields, yield* delegation, class method, try/finally cleanup, comprehensive); 869 tests pass.

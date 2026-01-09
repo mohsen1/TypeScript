@@ -18,12 +18,43 @@ Priority: 2
 - [x] Never type tests (impossible values, exhaustiveness)
 - [x] Any type tests (type erasure, type assertions)
 - [x] Tuple type tests (labeled elements, rest, optional, spreads)
+- [x] Array type tests (readonly, generic, type inference)
+- [x] Union type tests (type narrowing, union distribution)
 
 ## Task Queue
 - [ ] Implement TypeResolver for TypeEvaluator to resolve Refs inside Mapped/Conditional types
 - [ ] This would enable full evaluation of complex patterns like `{ [K in keyof R]: ExtractAction<R[K]> }[keyof R]`
 
 ## Completed
+- [x] Added 40 union type tests including:
+  - Basic unions (string | number, 3+ types)
+  - Nullable types (string | null, string | undefined)
+  - Literal unions (string, number, boolean literals)
+  - Object/function/array/tuple unions
+  - Never absorption (string | never = string)
+  - Any absorption (string | any = any)
+  - Unknown in unions
+  - Duplicate removal, order independence
+  - Nested union flattening
+  - Unions in function params/returns
+  - Unions in object properties/array elements
+  - Union inference
+  - Discriminated unions (string/number discriminants)
+  - Conditional type distribution
+  - Unions with void, promises, intersections
+- [x] Added 32 array type tests including:
+  - Basic primitive arrays (string[], number[], boolean[])
+  - Readonly arrays (readonly string[], readonly number[])
+  - Mutable vs readonly distinction
+  - Arrays of complex types (union, object, function, tuple)
+  - Nested arrays (2D, 3D)
+  - Special type arrays (any[], unknown[], never[], void[], null[], undefined[])
+  - Literal type arrays ("hello"[], 42[])
+  - Array type equality/inequality
+  - Arrays in function params/returns/rest params
+  - Array inference from element types
+  - Arrays in object properties (optional, readonly)
+  - Arrays of intersection, promise, keyof types
 - [x] Added 29 tuple type tests including:
   - Basic fixed-length tuples
   - Labeled elements [name: string, age: number]
@@ -190,6 +221,8 @@ Solution options:
 **YES** - Branch reset to squad/forge baseline and new tests added.
 
 Worker 2 branch now contains:
+- 40 union type tests (type narrowing, union distribution)
+- 32 array type tests (readonly, generic, type inference)
 - 28 new utility type edge case tests (ReturnType, Parameters, InstanceType, etc.)
 - 18 distributive conditional type stress tests
 - 24 context-sensitive typing tests (generic inference, contextual typing)
@@ -210,6 +243,7 @@ Worker 2 branch now contains:
 - Reduction: 67%
 
 ## Notes
+- **File Corruption Issue**: `wasm/src/solver/infer_tests.rs` has pre-existing syntax errors in lines ~19206-22872 (unclosed delimiters, missing #[test] attributes, missing function boundaries). These need to be fixed separately. Array tests were added at end of file (lines 24026+) and don't introduce new errors.
 - Project Direction: integration and conformance-first; prioritize solver correctness
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md`
 - Use Docker for Rust tests: `./wasm/test.sh`

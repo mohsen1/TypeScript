@@ -18737,220 +18737,670 @@ fn test_this_in_overload_signature() {
 }
 
 // =============================================================================
-// Literal Type Tests - String, Number, Boolean, Template Literal
+// SYMBOL TYPE TESTS - Unique Symbols, Well-Known Symbols, Symbol.iterator
 // =============================================================================
 
 #[test]
-fn test_string_literal_subtype_of_string() {
-    // "hello" is subtype of string
+fn test_unique_symbol_self_subtype() {
+    // A unique symbol is subtype of itself
     let interner = TypeInterner::new();
-
-    let hello_lit = interner.string_literal("hello");
-
     let mut checker = SubtypeChecker::new(&interner);
-    assert!(checker.is_subtype_of(hello_lit, TypeId::STRING));
-    assert!(!checker.is_subtype_of(TypeId::STRING, hello_lit));
+
+    let sym = interner.intern(TypeKey::UniqueSymbol(SymbolRef(42)));
+
+    assert!(checker.is_subtype_of(sym, sym));
 }
 
 #[test]
-fn test_string_literal_same_value() {
-    // "hello" is subtype of "hello"
+fn test_unique_symbol_not_subtype_of_different() {
+    // Different unique symbols are not subtypes of each other
     let interner = TypeInterner::new();
-
-    let hello1 = interner.string_literal("hello");
-    let hello2 = interner.string_literal("hello");
-
     let mut checker = SubtypeChecker::new(&interner);
-    assert!(checker.is_subtype_of(hello1, hello2));
-    assert!(checker.is_subtype_of(hello2, hello1));
+
+    let sym_a = interner.intern(TypeKey::UniqueSymbol(SymbolRef(1)));
+    let sym_b = interner.intern(TypeKey::UniqueSymbol(SymbolRef(2)));
+
+    assert!(!checker.is_subtype_of(sym_a, sym_b));
+    assert!(!checker.is_subtype_of(sym_b, sym_a));
 }
 
 #[test]
-fn test_string_literal_different_values() {
-    // "hello" is not subtype of "world"
+fn test_unique_symbol_subtype_of_symbol() {
+    // Every unique symbol is subtype of symbol primitive
     let interner = TypeInterner::new();
-
-    let hello = interner.string_literal("hello");
-    let world = interner.string_literal("world");
-
     let mut checker = SubtypeChecker::new(&interner);
-    assert!(!checker.is_subtype_of(hello, world));
-    assert!(!checker.is_subtype_of(world, hello));
+
+    let unique_sym = interner.intern(TypeKey::UniqueSymbol(SymbolRef(100)));
+
+    assert!(checker.is_subtype_of(unique_sym, TypeId::SYMBOL));
 }
 
 #[test]
-fn test_number_literal_subtype_of_number() {
-    // 42 is subtype of number
+fn test_symbol_not_subtype_of_unique_symbol() {
+    // symbol primitive is not subtype of any unique symbol
     let interner = TypeInterner::new();
-
-    let forty_two = interner.number_literal(42.0);
-
     let mut checker = SubtypeChecker::new(&interner);
-    assert!(checker.is_subtype_of(forty_two, TypeId::NUMBER));
-    assert!(!checker.is_subtype_of(TypeId::NUMBER, forty_two));
+
+    let unique_sym = interner.intern(TypeKey::UniqueSymbol(SymbolRef(100)));
+
+    assert!(!checker.is_subtype_of(TypeId::SYMBOL, unique_sym));
 }
 
 #[test]
-fn test_number_literal_same_value() {
-    // 42 is subtype of 42
+fn test_unique_symbol_in_union() {
+    // unique symbol | string
     let interner = TypeInterner::new();
-
-    let n1 = interner.number_literal(42.0);
-    let n2 = interner.number_literal(42.0);
-
     let mut checker = SubtypeChecker::new(&interner);
-    assert!(checker.is_subtype_of(n1, n2));
-    assert!(checker.is_subtype_of(n2, n1));
+
+    let unique_sym = interner.intern(TypeKey::UniqueSymbol(SymbolRef(1)));
+    let sym_or_string = interner.union(vec![unique_sym, TypeId::STRING]);
+
+    // unique symbol is subtype of the union
+    assert!(checker.is_subtype_of(unique_sym, sym_or_string));
+
+    // string is subtype of the union
+    assert!(checker.is_subtype_of(TypeId::STRING, sym_or_string));
+
+    // union is subtype of symbol | string
+    let symbol_or_string = interner.union(vec![TypeId::SYMBOL, TypeId::STRING]);
+    assert!(checker.is_subtype_of(sym_or_string, symbol_or_string));
 }
 
 #[test]
-fn test_number_literal_different_values() {
-    // 42 is not subtype of 43
+fn test_well_known_symbol_iterator() {
+    // Symbol.iterator is a unique symbol
     let interner = TypeInterner::new();
-
-    let n42 = interner.number_literal(42.0);
-    let n43 = interner.number_literal(43.0);
-
     let mut checker = SubtypeChecker::new(&interner);
-    assert!(!checker.is_subtype_of(n42, n43));
-    assert!(!checker.is_subtype_of(n43, n42));
+
+    // Using conventional SymbolRef for well-known symbols
+    let sym_iterator = interner.intern(TypeKey::UniqueSymbol(SymbolRef(1000)));
+
+    // It's a subtype of symbol
+    assert!(checker.is_subtype_of(sym_iterator, TypeId::SYMBOL));
+
+    // But not equal to another unique symbol
+    let sym_async_iterator = interner.intern(TypeKey::UniqueSymbol(SymbolRef(1001)));
+    assert!(!checker.is_subtype_of(sym_iterator, sym_async_iterator));
 }
 
 #[test]
-fn test_boolean_literal_true_subtype_of_boolean() {
-    // true is subtype of boolean
+fn test_well_known_symbol_async_iterator() {
+    // Symbol.asyncIterator is a unique symbol
     let interner = TypeInterner::new();
-
     let mut checker = SubtypeChecker::new(&interner);
-    assert!(checker.is_subtype_of(TypeId::TRUE, TypeId::BOOLEAN));
-    assert!(!checker.is_subtype_of(TypeId::BOOLEAN, TypeId::TRUE));
+
+    let sym_async_iterator = interner.intern(TypeKey::UniqueSymbol(SymbolRef(1001)));
+
+    assert!(checker.is_subtype_of(sym_async_iterator, TypeId::SYMBOL));
 }
 
 #[test]
-fn test_boolean_literal_false_subtype_of_boolean() {
-    // false is subtype of boolean
+fn test_well_known_symbol_to_string_tag() {
+    // Symbol.toStringTag is a unique symbol
     let interner = TypeInterner::new();
-
     let mut checker = SubtypeChecker::new(&interner);
-    assert!(checker.is_subtype_of(TypeId::FALSE, TypeId::BOOLEAN));
-    assert!(!checker.is_subtype_of(TypeId::BOOLEAN, TypeId::FALSE));
+
+    let sym_to_string_tag = interner.intern(TypeKey::UniqueSymbol(SymbolRef(1002)));
+
+    assert!(checker.is_subtype_of(sym_to_string_tag, TypeId::SYMBOL));
 }
 
 #[test]
-fn test_boolean_literal_true_not_subtype_of_false() {
-    // true is not subtype of false
+fn test_well_known_symbol_has_instance() {
+    // Symbol.hasInstance is a unique symbol
     let interner = TypeInterner::new();
-
     let mut checker = SubtypeChecker::new(&interner);
-    assert!(!checker.is_subtype_of(TypeId::TRUE, TypeId::FALSE));
-    assert!(!checker.is_subtype_of(TypeId::FALSE, TypeId::TRUE));
+
+    let sym_has_instance = interner.intern(TypeKey::UniqueSymbol(SymbolRef(1003)));
+
+    assert!(checker.is_subtype_of(sym_has_instance, TypeId::SYMBOL));
 }
 
 #[test]
-fn test_string_literal_union() {
-    // type Status = "pending" | "active" | "done"
+fn test_symbol_keyed_object_property() {
+    // Object with symbol-keyed property
+    // { [Symbol.iterator]: () => Iterator }
     let interner = TypeInterner::new();
-
-    let pending = interner.string_literal("pending");
-    let active = interner.string_literal("active");
-    let done = interner.string_literal("done");
-
-    let status = interner.union(vec![pending, active, done]);
-
     let mut checker = SubtypeChecker::new(&interner);
-    // Each literal is subtype of the union
-    assert!(checker.is_subtype_of(pending, status));
-    assert!(checker.is_subtype_of(active, status));
-    assert!(checker.is_subtype_of(done, status));
-    // Union is subtype of string
-    assert!(checker.is_subtype_of(status, TypeId::STRING));
-}
 
-#[test]
-fn test_number_literal_union() {
-    // type OneToThree = 1 | 2 | 3
-    let interner = TypeInterner::new();
+    let sym_iterator = interner.intern(TypeKey::UniqueSymbol(SymbolRef(1000)));
 
-    let one = interner.number_literal(1.0);
-    let two = interner.number_literal(2.0);
-    let three = interner.number_literal(3.0);
-
-    let one_to_three = interner.union(vec![one, two, three]);
-
-    let mut checker = SubtypeChecker::new(&interner);
-    assert!(checker.is_subtype_of(one, one_to_three));
-    assert!(checker.is_subtype_of(two, one_to_three));
-    assert!(checker.is_subtype_of(three, one_to_three));
-    assert!(checker.is_subtype_of(one_to_three, TypeId::NUMBER));
-}
-
-#[test]
-fn test_mixed_literal_union() {
-    // type Mixed = "a" | 1 | true
-    let interner = TypeInterner::new();
-
-    let a = interner.string_literal("a");
-    let one = interner.number_literal(1.0);
-
-    let mixed = interner.union(vec![a, one, TypeId::TRUE]);
-
-    let mut checker = SubtypeChecker::new(&interner);
-    assert!(checker.is_subtype_of(a, mixed));
-    assert!(checker.is_subtype_of(one, mixed));
-    assert!(checker.is_subtype_of(TypeId::TRUE, mixed));
-}
-
-#[test]
-fn test_template_literal_simple() {
-    // type Greeting = `Hello, ${string}!`
-    let interner = TypeInterner::new();
-
-    let hello_prefix = interner.string_literal("Hello, ");
-    let suffix = interner.string_literal("!");
-
-    let template = interner.template_literal(TemplateLiteralType {
-        texts: vec![hello_prefix, suffix],
-        types: vec![TypeId::STRING],
+    // Iterator-like return type
+    let iterator_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::ANY,
+        type_predicate: None,
+        is_constructor: false,
     });
 
-    assert!(template != TypeId::ERROR);
+    // Object with symbol-keyed method (using string name as proxy)
+    let iterable_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("[Symbol.iterator]"),
+        type_id: iterator_fn,
+        write_type: iterator_fn,
+        optional: false,
+        readonly: true,
+        is_method: true,
+    }]);
+
+    assert!(iterable_obj != TypeId::ERROR);
 }
 
 #[test]
-fn test_template_literal_subtype_of_string() {
-    // `prefix${string}` is subtype of string
+fn test_symbol_union_with_multiple_unique() {
+    // Union of multiple unique symbols
     let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
 
-    let prefix = interner.string_literal("prefix");
+    let sym_a = interner.intern(TypeKey::UniqueSymbol(SymbolRef(1)));
+    let sym_b = interner.intern(TypeKey::UniqueSymbol(SymbolRef(2)));
+    let sym_c = interner.intern(TypeKey::UniqueSymbol(SymbolRef(3)));
 
-    let template = interner.template_literal(TemplateLiteralType {
-        texts: vec![prefix, interner.intern_string("")],
-        types: vec![TypeId::STRING],
+    let sym_union = interner.union(vec![sym_a, sym_b, sym_c]);
+
+    // Each unique symbol is subtype of the union
+    assert!(checker.is_subtype_of(sym_a, sym_union));
+    assert!(checker.is_subtype_of(sym_b, sym_union));
+    assert!(checker.is_subtype_of(sym_c, sym_union));
+
+    // Union is subtype of symbol
+    assert!(checker.is_subtype_of(sym_union, TypeId::SYMBOL));
+}
+
+#[test]
+fn test_symbol_not_subtype_of_string() {
+    // symbol is not subtype of string
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    assert!(!checker.is_subtype_of(TypeId::SYMBOL, TypeId::STRING));
+    assert!(!checker.is_subtype_of(TypeId::STRING, TypeId::SYMBOL));
+}
+
+#[test]
+fn test_symbol_not_subtype_of_number() {
+    // symbol is not subtype of number
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    assert!(!checker.is_subtype_of(TypeId::SYMBOL, TypeId::NUMBER));
+    assert!(!checker.is_subtype_of(TypeId::NUMBER, TypeId::SYMBOL));
+}
+
+#[test]
+fn test_unique_symbol_intersection() {
+    // Intersection of unique symbol with other type
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let unique_sym = interner.intern(TypeKey::UniqueSymbol(SymbolRef(42)));
+
+    // unique symbol & symbol = unique symbol (more specific)
+    let intersection = interner.intersection(vec![unique_sym, TypeId::SYMBOL]);
+
+    // The intersection is subtype of symbol
+    assert!(checker.is_subtype_of(intersection, TypeId::SYMBOL));
+}
+
+#[test]
+fn test_symbol_as_property_key() {
+    // Symbols can be used as property keys: PropertyKey = string | number | symbol
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let property_key = interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::SYMBOL]);
+
+    // symbol is subtype of PropertyKey
+    assert!(checker.is_subtype_of(TypeId::SYMBOL, property_key));
+
+    // unique symbol is also subtype of PropertyKey
+    let unique_sym = interner.intern(TypeKey::UniqueSymbol(SymbolRef(1)));
+    assert!(checker.is_subtype_of(unique_sym, property_key));
+}
+
+#[test]
+fn test_const_unique_symbol_type() {
+    // const sym = Symbol("description") has type unique symbol
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let const_sym = interner.intern(TypeKey::UniqueSymbol(SymbolRef(999)));
+
+    // Type is unique symbol, not just symbol
+    assert!(checker.is_subtype_of(const_sym, TypeId::SYMBOL));
+    assert!(!checker.is_subtype_of(TypeId::SYMBOL, const_sym));
+}
+
+#[test]
+fn test_let_symbol_type() {
+    // let sym = Symbol("description") has type symbol (widened)
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    // let binding gets widened to symbol
+    let let_sym = TypeId::SYMBOL;
+
+    // It's just symbol, not unique
+    assert!(checker.is_subtype_of(let_sym, TypeId::SYMBOL));
+}
+
+#[test]
+fn test_symbol_for_shared() {
+    // Symbol.for("key") returns shared symbol (not unique)
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    // Symbol.for returns symbol type (not unique symbol)
+    let shared_sym = TypeId::SYMBOL;
+
+    assert!(checker.is_subtype_of(shared_sym, TypeId::SYMBOL));
+}
+
+#[test]
+fn test_iterable_protocol_types() {
+    // Iterable<T> has [Symbol.iterator](): Iterator<T>
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    // IteratorResult<number> = { value: number, done: boolean }
+    let value_name = interner.intern_string("value");
+    let done_name = interner.intern_string("done");
+
+    let iter_result = interner.object(vec![
+        PropertyInfo {
+            name: value_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: true,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: done_name,
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: true,
+            is_method: false,
+        },
+    ]);
+
+    // Iterator<number> = { next(): IteratorResult<number> }
+    let next_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: iter_result,
+        type_predicate: None,
+        is_constructor: false,
     });
 
-    let mut checker = SubtypeChecker::new(&interner);
-    assert!(checker.is_subtype_of(template, TypeId::STRING));
+    let iterator = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("next"),
+        type_id: next_fn,
+        write_type: next_fn,
+        optional: false,
+        readonly: true,
+        is_method: true,
+    }]);
+
+    // Iterator is valid object type
+    assert!(iterator != TypeId::ERROR);
 }
 
 #[test]
-fn test_string_literal_in_object_property() {
-    // const obj = { type: "success" } as const
+fn test_async_iterable_protocol_types() {
+    // AsyncIterable<T> has [Symbol.asyncIterator](): AsyncIterator<T>
     let interner = TypeInterner::new();
+    let _checker = SubtypeChecker::new(&interner);
 
-    let type_name = interner.intern_string("type");
-    let success = interner.string_literal("success");
+    // AsyncIteratorResult<number> = { value: number, done: boolean }
+    let value_name = interner.intern_string("value");
+    let done_name = interner.intern_string("done");
 
-    let const_obj = interner.object(vec![PropertyInfo {
-        name: type_name,
-        type_id: success,
-        write_type: success,
+    let async_iter_result = interner.object(vec![
+        PropertyInfo {
+            name: value_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: true,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: done_name,
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: true,
+            is_method: false,
+        },
+    ]);
+
+    // Promise<AsyncIteratorResult<number>>
+    let promise = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("then"),
+        type_id: async_iter_result,
+        write_type: async_iter_result,
+        optional: false,
+        readonly: true,
+        is_method: true,
+    }]);
+
+    // AsyncIterator<number> = { next(): Promise<AsyncIteratorResult<number>> }
+    let next_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: promise,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let async_iterator = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("next"),
+        type_id: next_fn,
+        write_type: next_fn,
+        optional: false,
+        readonly: true,
+        is_method: true,
+    }]);
+
+    // AsyncIterator is valid object type
+    assert!(async_iterator != TypeId::ERROR);
+}
+
+#[test]
+fn test_symbol_keyof_type() {
+    // keyof { [sym]: value } includes the symbol
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let unique_sym = interner.intern(TypeKey::UniqueSymbol(SymbolRef(1)));
+
+    // keyof type includes the symbol
+    let keyof_result = interner.union(vec![unique_sym, interner.literal_string("name")]);
+
+    // symbol is in the keyof result
+    assert!(checker.is_subtype_of(unique_sym, keyof_result));
+}
+
+#[test]
+fn test_symbol_in_discriminated_union() {
+    // Symbol can be used as discriminant
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let sym_a = interner.intern(TypeKey::UniqueSymbol(SymbolRef(1)));
+    let sym_b = interner.intern(TypeKey::UniqueSymbol(SymbolRef(2)));
+
+    // Two variants discriminated by symbol
+    let variant_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("kind"),
+        type_id: sym_a,
+        write_type: sym_a,
         optional: false,
         readonly: true,
         is_method: false,
     }]);
 
-    let wide_obj = interner.object(vec![PropertyInfo {
-        name: type_name,
+    let variant_b = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("kind"),
+        type_id: sym_b,
+        write_type: sym_b,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let discriminated_union = interner.union(vec![variant_a, variant_b]);
+
+    // Each variant is subtype of union
+    assert!(checker.is_subtype_of(variant_a, discriminated_union));
+    assert!(checker.is_subtype_of(variant_b, discriminated_union));
+
+    // But not interchangeable
+    assert!(!checker.is_subtype_of(variant_a, variant_b));
+}
+
+// =============================================================================
+// NULL TYPE TESTS - Strict Null Checks, Nullable Unions
+// =============================================================================
+
+#[test]
+fn test_null_not_subtype_of_string_strict() {
+    // With strictNullChecks, null is not assignable to string
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+    checker.strict_null_checks = true;
+
+    assert!(!checker.is_subtype_of(TypeId::NULL, TypeId::STRING));
+}
+
+#[test]
+fn test_undefined_not_subtype_of_string_strict() {
+    // With strictNullChecks, undefined is not assignable to string
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+    checker.strict_null_checks = true;
+
+    assert!(!checker.is_subtype_of(TypeId::UNDEFINED, TypeId::STRING));
+}
+
+#[test]
+fn test_null_subtype_of_string_legacy() {
+    // Without strictNullChecks, null is assignable to string
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+    checker.strict_null_checks = false;
+
+    assert!(checker.is_subtype_of(TypeId::NULL, TypeId::STRING));
+}
+
+#[test]
+fn test_undefined_subtype_of_string_legacy() {
+    // Without strictNullChecks, undefined is assignable to string
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+    checker.strict_null_checks = false;
+
+    assert!(checker.is_subtype_of(TypeId::UNDEFINED, TypeId::STRING));
+}
+
+#[test]
+fn test_nullable_union_string() {
+    // string | null
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+    checker.strict_null_checks = true;
+
+    let nullable_string = interner.union(vec![TypeId::STRING, TypeId::NULL]);
+
+    // null is subtype of string | null
+    assert!(checker.is_subtype_of(TypeId::NULL, nullable_string));
+
+    // string is subtype of string | null
+    assert!(checker.is_subtype_of(TypeId::STRING, nullable_string));
+
+    // string | null is not subtype of string
+    assert!(!checker.is_subtype_of(nullable_string, TypeId::STRING));
+}
+
+#[test]
+fn test_nullable_union_number() {
+    // number | null
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+    checker.strict_null_checks = true;
+
+    let nullable_number = interner.union(vec![TypeId::NUMBER, TypeId::NULL]);
+
+    assert!(checker.is_subtype_of(TypeId::NULL, nullable_number));
+    assert!(checker.is_subtype_of(TypeId::NUMBER, nullable_number));
+    assert!(!checker.is_subtype_of(nullable_number, TypeId::NUMBER));
+}
+
+#[test]
+fn test_optional_union_undefined() {
+    // string | undefined (optional parameter type)
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+    checker.strict_null_checks = true;
+
+    let optional_string = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+
+    // undefined is subtype of string | undefined
+    assert!(checker.is_subtype_of(TypeId::UNDEFINED, optional_string));
+
+    // string is subtype of string | undefined
+    assert!(checker.is_subtype_of(TypeId::STRING, optional_string));
+
+    // string | undefined is not subtype of string
+    assert!(!checker.is_subtype_of(optional_string, TypeId::STRING));
+}
+
+#[test]
+fn test_nullable_and_optional_union() {
+    // string | null | undefined
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+    checker.strict_null_checks = true;
+
+    let nullable_optional = interner.union(vec![TypeId::STRING, TypeId::NULL, TypeId::UNDEFINED]);
+
+    // All three are subtypes
+    assert!(checker.is_subtype_of(TypeId::STRING, nullable_optional));
+    assert!(checker.is_subtype_of(TypeId::NULL, nullable_optional));
+    assert!(checker.is_subtype_of(TypeId::UNDEFINED, nullable_optional));
+
+    // Not subtype of any individual
+    assert!(!checker.is_subtype_of(nullable_optional, TypeId::STRING));
+    assert!(!checker.is_subtype_of(nullable_optional, TypeId::NULL));
+    assert!(!checker.is_subtype_of(nullable_optional, TypeId::UNDEFINED));
+}
+
+#[test]
+fn test_null_distinct_from_undefined() {
+    // null and undefined are distinct types
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+    checker.strict_null_checks = true;
+
+    assert!(!checker.is_subtype_of(TypeId::NULL, TypeId::UNDEFINED));
+    assert!(!checker.is_subtype_of(TypeId::UNDEFINED, TypeId::NULL));
+}
+
+#[test]
+fn test_null_subtype_of_self() {
+    // null is subtype of null
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+    checker.strict_null_checks = true;
+
+    assert!(checker.is_subtype_of(TypeId::NULL, TypeId::NULL));
+}
+
+#[test]
+fn test_undefined_subtype_of_self() {
+    // undefined is subtype of undefined
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+    checker.strict_null_checks = true;
+
+    assert!(checker.is_subtype_of(TypeId::UNDEFINED, TypeId::UNDEFINED));
+}
+
+#[test]
+fn test_null_subtype_of_any() {
+    // null is subtype of any
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+    checker.strict_null_checks = true;
+
+    assert!(checker.is_subtype_of(TypeId::NULL, TypeId::ANY));
+}
+
+#[test]
+fn test_undefined_subtype_of_any() {
+    // undefined is subtype of any
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+    checker.strict_null_checks = true;
+
+    assert!(checker.is_subtype_of(TypeId::UNDEFINED, TypeId::ANY));
+}
+
+#[test]
+fn test_null_subtype_of_unknown() {
+    // null is subtype of unknown
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+    checker.strict_null_checks = true;
+
+    assert!(checker.is_subtype_of(TypeId::NULL, TypeId::UNKNOWN));
+}
+
+#[test]
+fn test_undefined_subtype_of_unknown() {
+    // undefined is subtype of unknown
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+    checker.strict_null_checks = true;
+
+    assert!(checker.is_subtype_of(TypeId::UNDEFINED, TypeId::UNKNOWN));
+}
+
+#[test]
+fn test_null_not_subtype_of_object() {
+    // null is not subtype of object
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+    checker.strict_null_checks = true;
+
+    assert!(!checker.is_subtype_of(TypeId::NULL, TypeId::OBJECT));
+}
+
+#[test]
+fn test_undefined_not_subtype_of_object() {
+    // undefined is not subtype of object
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+    checker.strict_null_checks = true;
+
+    assert!(!checker.is_subtype_of(TypeId::UNDEFINED, TypeId::OBJECT));
+}
+
+#[test]
+fn test_null_not_subtype_of_never() {
+    // null is not subtype of never
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+    checker.strict_null_checks = true;
+
+    assert!(!checker.is_subtype_of(TypeId::NULL, TypeId::NEVER));
+}
+
+#[test]
+fn test_never_subtype_of_null() {
+    // never is subtype of null (never is bottom type)
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+    checker.strict_null_checks = true;
+
+    assert!(checker.is_subtype_of(TypeId::NEVER, TypeId::NULL));
+}
+
+#[test]
+fn test_nullable_object_type() {
+    // { x: string } | null
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+    checker.strict_null_checks = true;
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
         type_id: TypeId::STRING,
         write_type: TypeId::STRING,
         optional: false,
@@ -18958,453 +19408,922 @@ fn test_string_literal_in_object_property() {
         is_method: false,
     }]);
 
+    let nullable_obj = interner.union(vec![obj, TypeId::NULL]);
+
+    // Object is subtype of nullable object
+    assert!(checker.is_subtype_of(obj, nullable_obj));
+
+    // null is subtype of nullable object
+    assert!(checker.is_subtype_of(TypeId::NULL, nullable_obj));
+
+    // Nullable object is not subtype of object
+    assert!(!checker.is_subtype_of(nullable_obj, obj));
+}
+
+#[test]
+fn test_nullable_function_type() {
+    // (() => void) | null
+    let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
-    // Const object with literal is subtype of wide object
-    assert!(checker.is_subtype_of(const_obj, wide_obj));
-}
-
-#[test]
-fn test_number_literal_in_tuple() {
-    // const tuple = [1, 2, 3] as const -> readonly [1, 2, 3]
-    let interner = TypeInterner::new();
-
-    let one = interner.number_literal(1.0);
-    let two = interner.number_literal(2.0);
-    let three = interner.number_literal(3.0);
-
-    let const_tuple = interner.tuple(vec![one, two, three]);
-    let wide_tuple = interner.tuple(vec![TypeId::NUMBER, TypeId::NUMBER, TypeId::NUMBER]);
-
-    let mut checker = SubtypeChecker::new(&interner);
-    assert!(checker.is_subtype_of(const_tuple, wide_tuple));
-    assert!(!checker.is_subtype_of(wide_tuple, const_tuple));
-}
-
-#[test]
-fn test_literal_widening_string() {
-    // let x = "hello" -> string (widened)
-    // const y = "hello" -> "hello" (literal preserved)
-    let interner = TypeInterner::new();
-
-    let hello_lit = interner.string_literal("hello");
-
-    let mut checker = SubtypeChecker::new(&interner);
-    // Literal can be assigned to widened type
-    assert!(checker.is_subtype_of(hello_lit, TypeId::STRING));
-}
-
-#[test]
-fn test_literal_narrowing_discriminant() {
-    // type A = { kind: "a", x: number }
-    // type B = { kind: "b", y: string }
-    let interner = TypeInterner::new();
-
-    let kind_name = interner.intern_string("kind");
-    let x_name = interner.intern_string("x");
-    let y_name = interner.intern_string("y");
-
-    let kind_a = interner.string_literal("a");
-    let kind_b = interner.string_literal("b");
-
-    let type_a = interner.object(vec![
-        PropertyInfo {
-            name: kind_name,
-            type_id: kind_a,
-            write_type: kind_a,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-        PropertyInfo {
-            name: x_name,
-            type_id: TypeId::NUMBER,
-            write_type: TypeId::NUMBER,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-    ]);
-
-    let type_b = interner.object(vec![
-        PropertyInfo {
-            name: kind_name,
-            type_id: kind_b,
-            write_type: kind_b,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-        PropertyInfo {
-            name: y_name,
-            type_id: TypeId::STRING,
-            write_type: TypeId::STRING,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-    ]);
-
-    let mut checker = SubtypeChecker::new(&interner);
-    // Neither is subtype of the other
-    assert!(!checker.is_subtype_of(type_a, type_b));
-    assert!(!checker.is_subtype_of(type_b, type_a));
-}
-
-#[test]
-fn test_template_literal_with_union() {
-    // type Event = `on${Capitalize<"click" | "hover">}`
-    // = "onClick" | "onHover"
-    let interner = TypeInterner::new();
-
-    let on_click = interner.string_literal("onClick");
-    let on_hover = interner.string_literal("onHover");
-
-    let event_union = interner.union(vec![on_click, on_hover]);
-
-    let mut checker = SubtypeChecker::new(&interner);
-    assert!(checker.is_subtype_of(on_click, event_union));
-    assert!(checker.is_subtype_of(on_hover, event_union));
-    assert!(checker.is_subtype_of(event_union, TypeId::STRING));
-}
-
-#[test]
-fn test_number_literal_negative() {
-    // -42 as literal
-    let interner = TypeInterner::new();
-
-    let neg_42 = interner.number_literal(-42.0);
-    let pos_42 = interner.number_literal(42.0);
-
-    let mut checker = SubtypeChecker::new(&interner);
-    assert!(checker.is_subtype_of(neg_42, TypeId::NUMBER));
-    assert!(!checker.is_subtype_of(neg_42, pos_42));
-}
-
-#[test]
-fn test_number_literal_zero() {
-    // 0 as literal
-    let interner = TypeInterner::new();
-
-    let zero = interner.number_literal(0.0);
-
-    let mut checker = SubtypeChecker::new(&interner);
-    assert!(checker.is_subtype_of(zero, TypeId::NUMBER));
-}
-
-#[test]
-fn test_number_literal_float() {
-    // 3.14 as literal
-    let interner = TypeInterner::new();
-
-    let pi = interner.number_literal(3.14);
-
-    let mut checker = SubtypeChecker::new(&interner);
-    assert!(checker.is_subtype_of(pi, TypeId::NUMBER));
-}
-
-#[test]
-fn test_string_literal_empty() {
-    // "" as literal
-    let interner = TypeInterner::new();
-
-    let empty = interner.string_literal("");
-
-    let mut checker = SubtypeChecker::new(&interner);
-    assert!(checker.is_subtype_of(empty, TypeId::STRING));
-}
-
-#[test]
-fn test_bigint_literal_subtype() {
-    // 100n as literal is subtype of bigint
-    let interner = TypeInterner::new();
-
-    let big = interner.bigint_literal(100);
-
-    let mut checker = SubtypeChecker::new(&interner);
-    assert!(checker.is_subtype_of(big, TypeId::BIGINT));
-    assert!(!checker.is_subtype_of(TypeId::BIGINT, big));
-}
-
-#[test]
-fn test_bigint_literal_different_values() {
-    // 100n is not subtype of 200n
-    let interner = TypeInterner::new();
-
-    let n100 = interner.bigint_literal(100);
-    let n200 = interner.bigint_literal(200);
-
-    let mut checker = SubtypeChecker::new(&interner);
-    assert!(!checker.is_subtype_of(n100, n200));
-    assert!(!checker.is_subtype_of(n200, n100));
-}
-
-#[test]
-fn test_literal_union_subset() {
-    // "a" | "b" is subtype of "a" | "b" | "c"
-    let interner = TypeInterner::new();
-
-    let a = interner.string_literal("a");
-    let b = interner.string_literal("b");
-    let c = interner.string_literal("c");
-
-    let ab = interner.union(vec![a, b]);
-    let abc = interner.union(vec![a, b, c]);
-
-    let mut checker = SubtypeChecker::new(&interner);
-    assert!(checker.is_subtype_of(ab, abc));
-    assert!(!checker.is_subtype_of(abc, ab));
-}
-
-#[test]
-fn test_template_literal_multiple_spans() {
-    // type Path = `/${string}/${string}`
-    let interner = TypeInterner::new();
-
-    let slash = interner.string_literal("/");
-
-    let template = interner.template_literal(TemplateLiteralType {
-        texts: vec![slash, slash, interner.intern_string("")],
-        types: vec![TypeId::STRING, TypeId::STRING],
-    });
-
-    assert!(template != TypeId::ERROR);
-}
-
-#[test]
-fn test_template_literal_with_number() {
-    // type Port = `port:${number}`
-    let interner = TypeInterner::new();
-
-    let port_prefix = interner.string_literal("port:");
-
-    let template = interner.template_literal(TemplateLiteralType {
-        texts: vec![port_prefix, interner.intern_string("")],
-        types: vec![TypeId::NUMBER],
-    });
-
-    assert!(template != TypeId::ERROR);
-}
-
-#[test]
-fn test_literal_in_function_param() {
-    // function f(x: "a" | "b"): void
-    let interner = TypeInterner::new();
-
-    let a = interner.string_literal("a");
-    let b = interner.string_literal("b");
-    let x_name = interner.intern_string("x");
-
-    let param_type = interner.union(vec![a, b]);
-
-    let fn_type = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![ParamInfo {
-            name: Some(x_name),
-            type_id: param_type,
-            optional: false,
-            rest: false,
-        }],
-        this_type: None,
-        return_type: TypeId::VOID,
-        type_predicate: None,
-        is_constructor: false,
-    });
-
-    assert!(fn_type != TypeId::ERROR);
-}
-
-#[test]
-fn test_literal_in_function_return() {
-    // function f(): "success" | "failure"
-    let interner = TypeInterner::new();
-
-    let success = interner.string_literal("success");
-    let failure = interner.string_literal("failure");
-
-    let return_type = interner.union(vec![success, failure]);
+    checker.strict_null_checks = true;
 
     let fn_type = interner.function(FunctionShape {
         type_params: vec![],
         params: vec![],
         this_type: None,
-        return_type,
+        return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
     });
 
-    assert!(fn_type != TypeId::ERROR);
+    let nullable_fn = interner.union(vec![fn_type, TypeId::NULL]);
+
+    // Function is subtype of nullable function
+    assert!(checker.is_subtype_of(fn_type, nullable_fn));
+
+    // null is subtype of nullable function
+    assert!(checker.is_subtype_of(TypeId::NULL, nullable_fn));
 }
 
 #[test]
-fn test_literal_as_index_type() {
-    // T["length"] where "length" is a literal key
+fn test_nullable_array_type() {
+    // string[] | null
     let interner = TypeInterner::new();
-
-    let length_key = interner.string_literal("length");
-
-    let indexed = interner.indexed_access(TypeId::STRING, length_key);
-    assert!(indexed != TypeId::ERROR);
-}
-
-#[test]
-fn test_boolean_union_equals_boolean() {
-    // true | false should be equivalent to boolean
-    let interner = TypeInterner::new();
-
-    let bool_union = interner.union(vec![TypeId::TRUE, TypeId::FALSE]);
-
     let mut checker = SubtypeChecker::new(&interner);
-    // true | false is subtype of boolean
-    assert!(checker.is_subtype_of(bool_union, TypeId::BOOLEAN));
-    // boolean is subtype of true | false
-    assert!(checker.is_subtype_of(TypeId::BOOLEAN, bool_union));
+    checker.strict_null_checks = true;
+
+    let string_array = interner.array(TypeId::STRING);
+    let nullable_array = interner.union(vec![string_array, TypeId::NULL]);
+
+    // Array is subtype of nullable array
+    assert!(checker.is_subtype_of(string_array, nullable_array));
+
+    // null is subtype of nullable array
+    assert!(checker.is_subtype_of(TypeId::NULL, nullable_array));
 }
 
 #[test]
-fn test_null_literal() {
-    // null is a literal type
+fn test_void_distinct_from_undefined() {
+    // void is not the same as undefined
     let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+    checker.strict_null_checks = true;
+
+    // undefined is subtype of void
+    assert!(checker.is_subtype_of(TypeId::UNDEFINED, TypeId::VOID));
+
+    // void is not subtype of undefined (void is wider)
+    // Note: In TypeScript, void can accept undefined
+    // but void is not assignable to undefined
+}
+
+#[test]
+fn test_nullable_literal_type() {
+    // "hello" | null
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+    checker.strict_null_checks = true;
+
+    let hello = interner.literal_string("hello");
+    let nullable_hello = interner.union(vec![hello, TypeId::NULL]);
+
+    // Literal is subtype of nullable literal
+    assert!(checker.is_subtype_of(hello, nullable_hello));
+
+    // null is subtype of nullable literal
+    assert!(checker.is_subtype_of(TypeId::NULL, nullable_hello));
+
+    // string is not subtype of nullable literal
+    assert!(!checker.is_subtype_of(TypeId::STRING, nullable_hello));
+}
+
+#[test]
+fn test_non_null_assertion_type() {
+    // NonNullable<string | null | undefined> = string
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+    checker.strict_null_checks = true;
+
+    // After non-null assertion, only string remains
+    let non_null_result = TypeId::STRING;
+
+    // string is subtype of the original union
+    let nullable_optional = interner.union(vec![TypeId::STRING, TypeId::NULL, TypeId::UNDEFINED]);
+    assert!(checker.is_subtype_of(non_null_result, nullable_optional));
+}
+
+#[test]
+fn test_nullable_union_widening() {
+    // string | null | undefined is wider than string | null
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+    checker.strict_null_checks = true;
 
     let nullable = interner.union(vec![TypeId::STRING, TypeId::NULL]);
+    let nullable_optional = interner.union(vec![TypeId::STRING, TypeId::NULL, TypeId::UNDEFINED]);
 
-    let mut checker = SubtypeChecker::new(&interner);
-    assert!(checker.is_subtype_of(TypeId::NULL, nullable));
-    assert!(checker.is_subtype_of(TypeId::STRING, nullable));
+    // string | null is subtype of string | null | undefined
+    assert!(checker.is_subtype_of(nullable, nullable_optional));
+
+    // string | null | undefined is not subtype of string | null
+    assert!(!checker.is_subtype_of(nullable_optional, nullable));
 }
 
 #[test]
-fn test_undefined_literal() {
-    // undefined as literal in union
+fn test_null_in_intersection() {
+    // string & null = never (incompatible)
     let interner = TypeInterner::new();
-
-    let optional_string = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
-
     let mut checker = SubtypeChecker::new(&interner);
-    assert!(checker.is_subtype_of(TypeId::UNDEFINED, optional_string));
-    assert!(checker.is_subtype_of(TypeId::STRING, optional_string));
+    checker.strict_null_checks = true;
+
+    let intersection = interner.intersection(vec![TypeId::STRING, TypeId::NULL]);
+
+    // Intersection of incompatible types reduces to never-like
+    // The intersection is subtype of string (vacuously)
+    assert!(checker.is_subtype_of(intersection, TypeId::STRING));
 }
 
 #[test]
-fn test_unique_symbol() {
-    // unique symbol is a literal-like type
+fn test_optional_property_accepts_undefined() {
+    // { x?: string } - x can be string | undefined
     let interner = TypeInterner::new();
-
-    // unique symbols are distinct
-    let sym1 = interner.unique_symbol(SymbolRef(1));
-    let sym2 = interner.unique_symbol(SymbolRef(2));
-
     let mut checker = SubtypeChecker::new(&interner);
-    // Unique symbols are subtypes of symbol
-    assert!(checker.is_subtype_of(sym1, TypeId::SYMBOL));
-    assert!(checker.is_subtype_of(sym2, TypeId::SYMBOL));
-    // But not of each other
-    assert!(!checker.is_subtype_of(sym1, sym2));
+    checker.strict_null_checks = true;
+
+    // Optional property type
+    let optional_value = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+
+    // undefined is valid
+    assert!(checker.is_subtype_of(TypeId::UNDEFINED, optional_value));
+
+    // string is valid
+    assert!(checker.is_subtype_of(TypeId::STRING, optional_value));
+
+    // null is not valid for optional property (unless explicitly added)
+    assert!(!checker.is_subtype_of(TypeId::NULL, optional_value));
 }
 
 #[test]
-fn test_const_enum_member() {
-    // const enum Direction { Up = 0, Down = 1 }
-    // Direction.Up has literal type 0
+fn test_nullish_coalescing_result_type() {
+    // (string | null) ?? "default" -> string
+    // The result excludes null
     let interner = TypeInterner::new();
-
-    let up = interner.number_literal(0.0);
-    let down = interner.number_literal(1.0);
-
-    let direction = interner.union(vec![up, down]);
-
     let mut checker = SubtypeChecker::new(&interner);
-    assert!(checker.is_subtype_of(up, direction));
-    assert!(checker.is_subtype_of(down, direction));
-    assert!(checker.is_subtype_of(direction, TypeId::NUMBER));
+    checker.strict_null_checks = true;
+
+    // After ?? operation, null is excluded
+    let result = TypeId::STRING;
+
+    // Result is subtype of original nullable
+    let nullable = interner.union(vec![TypeId::STRING, TypeId::NULL]);
+    assert!(checker.is_subtype_of(result, nullable));
 }
 
 #[test]
-fn test_string_enum_member() {
-    // enum Status { Active = "active", Inactive = "inactive" }
+fn test_null_union_with_literal_numbers() {
+    // 1 | 2 | 3 | null
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+    checker.strict_null_checks = true;
+
+    let lit_1 = interner.literal_number(1.0);
+    let lit_2 = interner.literal_number(2.0);
+    let lit_3 = interner.literal_number(3.0);
+
+    let nullable_nums = interner.union(vec![lit_1, lit_2, lit_3, TypeId::NULL]);
+
+    // Each literal is subtype
+    assert!(checker.is_subtype_of(lit_1, nullable_nums));
+    assert!(checker.is_subtype_of(lit_2, nullable_nums));
+    assert!(checker.is_subtype_of(lit_3, nullable_nums));
+    assert!(checker.is_subtype_of(TypeId::NULL, nullable_nums));
+
+    // Number itself is not subtype
+    assert!(!checker.is_subtype_of(TypeId::NUMBER, nullable_nums));
+}
+
+#[test]
+fn test_undefined_union_with_boolean() {
+    // boolean | undefined
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+    checker.strict_null_checks = true;
+
+    let optional_bool = interner.union(vec![TypeId::BOOLEAN, TypeId::UNDEFINED]);
+
+    assert!(checker.is_subtype_of(TypeId::BOOLEAN, optional_bool));
+    assert!(checker.is_subtype_of(TypeId::UNDEFINED, optional_bool));
+
+    // true/false literals are subtypes too
+    let lit_true = interner.literal_boolean(true);
+    let lit_false = interner.literal_boolean(false);
+    assert!(checker.is_subtype_of(lit_true, optional_bool));
+    assert!(checker.is_subtype_of(lit_false, optional_bool));
+}
+
+// =============================================================================
+// Intersection Type Tests - Object and Primitive Intersections
+// =============================================================================
+// Additional tests for intersection type behavior
+
+#[test]
+fn test_primitive_intersection_string_number_is_never() {
+    // string & number should reduce to never (disjoint primitives)
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let string_and_number = interner.intersection(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    // Should be never (or equivalent to never)
+    assert!(checker.is_subtype_of(string_and_number, TypeId::NEVER));
+}
+
+#[test]
+fn test_primitive_intersection_boolean_string_is_never() {
+    // boolean & string should reduce to never
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let bool_and_string = interner.intersection(vec![TypeId::BOOLEAN, TypeId::STRING]);
+
+    assert!(checker.is_subtype_of(bool_and_string, TypeId::NEVER));
+}
+
+#[test]
+fn test_primitive_intersection_number_bigint_is_never() {
+    // number & bigint should reduce to never
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let num_and_bigint = interner.intersection(vec![TypeId::NUMBER, TypeId::BIGINT]);
+
+    assert!(checker.is_subtype_of(num_and_bigint, TypeId::NEVER));
+}
+
+#[test]
+fn test_literal_intersection_same_type() {
+    // "hello" & string should be "hello"
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let hello = interner.literal_string("hello");
+    let hello_and_string = interner.intersection(vec![hello, TypeId::STRING]);
+
+    // "hello" & string is just "hello"
+    assert!(checker.is_subtype_of(hello_and_string, hello));
+    assert!(checker.is_subtype_of(hello, hello_and_string));
+}
+
+#[test]
+fn test_literal_intersection_different_literals_is_never() {
+    // "hello" & "world" should be never
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let hello = interner.literal_string("hello");
+    let world = interner.literal_string("world");
+    let hello_and_world = interner.intersection(vec![hello, world]);
+
+    assert!(checker.is_subtype_of(hello_and_world, TypeId::NEVER));
+}
+
+#[test]
+fn test_number_literal_intersection_different_values() {
+    // 1 & 2 should be never
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let one = interner.literal_number(1.0);
+    let two = interner.literal_number(2.0);
+    let one_and_two = interner.intersection(vec![one, two]);
+
+    assert!(checker.is_subtype_of(one_and_two, TypeId::NEVER));
+}
+
+#[test]
+fn test_boolean_literal_intersection() {
+    // true & false should be never
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let lit_true = interner.literal_boolean(true);
+    let lit_false = interner.literal_boolean(false);
+    let true_and_false = interner.intersection(vec![lit_true, lit_false]);
+
+    assert!(checker.is_subtype_of(true_and_false, TypeId::NEVER));
+}
+
+#[test]
+fn test_object_intersection_disjoint_properties() {
+    // { a: string } & { b: number } = { a: string, b: number }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_name = interner.intern_string("a");
+    let b_name = interner.intern_string("b");
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: b_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![obj_a, obj_b]);
+
+    // Should be subtype of both components
+    assert!(checker.is_subtype_of(intersection, obj_a));
+    assert!(checker.is_subtype_of(intersection, obj_b));
+}
+
+#[test]
+fn test_object_intersection_same_property_compatible() {
+    // { x: string } & { x: string } = { x: string }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let x_name = interner.intern_string("x");
+
+    let obj1 = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj2 = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![obj1, obj2]);
+
+    // Should be equivalent to the original
+    assert!(checker.is_subtype_of(intersection, obj1));
+    assert!(checker.is_subtype_of(obj1, intersection));
+}
+
+#[test]
+fn test_object_intersection_property_narrowing() {
+    // { x: string | number } & { x: string } = { x: string }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let x_name = interner.intern_string("x");
+    let string_or_number = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    let obj_wide = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: string_or_number,
+        write_type: string_or_number,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_narrow = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![obj_wide, obj_narrow]);
+
+    // Intersection should be subtype of the narrow version
+    assert!(checker.is_subtype_of(intersection, obj_narrow));
+}
+
+#[test]
+fn test_intersection_with_any() {
+    // T & any = any (any absorbs in intersection for assignability)
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let x_name = interner.intern_string("x");
+    let obj = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_and_any = interner.intersection(vec![obj, TypeId::ANY]);
+
+    // any is assignable to/from most things
+    assert!(checker.is_subtype_of(TypeId::ANY, obj_and_any));
+}
+
+#[test]
+fn test_intersection_with_unknown() {
+    // T & unknown = T (unknown is identity for intersection)
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let x_name = interner.intern_string("x");
+    let obj = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_and_unknown = interner.intersection(vec![obj, TypeId::UNKNOWN]);
+
+    // Should be equivalent to obj
+    assert!(checker.is_subtype_of(obj_and_unknown, obj));
+    assert!(checker.is_subtype_of(obj, obj_and_unknown));
+}
+
+#[test]
+fn test_function_intersection_creates_overload() {
+    // ((x: string) => number) & ((x: number) => string)
+    // Creates an overloaded function type
     let interner = TypeInterner::new();
 
-    let active = interner.string_literal("active");
-    let inactive = interner.string_literal("inactive");
+    let x_name = interner.intern_string("x");
 
-    let status = interner.union(vec![active, inactive]);
-
-    let mut checker = SubtypeChecker::new(&interner);
-    assert!(checker.is_subtype_of(active, status));
-    assert!(checker.is_subtype_of(inactive, status));
-    assert!(checker.is_subtype_of(status, TypeId::STRING));
-}
-// COVARIANCE / CONTRAVARIANCE EDGE CASE TESTS
-fn test_variance_nested_function_contravariance() {
-    // (f: (x: string) => void) => void  <:  (f: (x: string | number) => void) => void
-    // The callback parameter is contravariant, so callbacks with wider params are subtypes
-    // Callback with narrow param
-    let narrow_callback = interner.function(FunctionShape {
+    let fn_str_to_num = interner.function(FunctionShape {
         type_params: vec![],
         params: vec![ParamInfo {
-            name: Some(interner.intern_string("x")),
+            name: Some(x_name),
             type_id: TypeId::STRING,
             optional: false,
             rest: false,
         }],
         this_type: None,
-        return_type: TypeId::VOID,
+        return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
     });
-    // Callback with wide param
-    let wide_param = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
-    let wide_callback = interner.function(FunctionShape {
+
+    let fn_num_to_str = interner.function(FunctionShape {
         type_params: vec![],
         params: vec![ParamInfo {
-            name: Some(interner.intern_string("x")),
-            type_id: wide_param,
+            name: Some(x_name),
+            type_id: TypeId::NUMBER,
             optional: false,
             rest: false,
         }],
         this_type: None,
-        return_type: TypeId::VOID,
+        return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
     });
-    // HOF taking narrow callback
-    let hof_narrow = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![ParamInfo {
-            name: Some(interner.intern_string("f")),
-            type_id: narrow_callback,
+
+    let intersection = interner.intersection(vec![fn_str_to_num, fn_num_to_str]);
+
+    // Intersection should be valid (creates overloaded type)
+    assert!(intersection != TypeId::ERROR);
+    assert!(intersection != TypeId::NEVER);
+}
+
+#[test]
+fn test_intersection_brand_pattern() {
+    // Branded type: string & { __brand: "UserId" }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let brand_name = interner.intern_string("__brand");
+    let user_id_lit = interner.literal_string("UserId");
+
+    let brand_obj = interner.object(vec![PropertyInfo {
+        name: brand_name,
+        type_id: user_id_lit,
+        write_type: user_id_lit,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let branded_string = interner.intersection(vec![TypeId::STRING, brand_obj]);
+
+    // Branded string should NOT be assignable to plain string
+    // (intersection is more specific)
+    assert!(!checker.is_subtype_of(TypeId::STRING, branded_string));
+
+    // Branded string IS a subtype of string
+    assert!(checker.is_subtype_of(branded_string, TypeId::STRING));
+}
+
+#[test]
+fn test_intersection_different_brands_is_never() {
+    // (string & {__brand: "A"}) & (string & {__brand: "B"}) = never
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let brand_name = interner.intern_string("__brand");
+    let lit_a = interner.literal_string("A");
+    let lit_b = interner.literal_string("B");
+
+    let brand_a = interner.object(vec![PropertyInfo {
+        name: brand_name,
+        type_id: lit_a,
+        write_type: lit_a,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let brand_b = interner.object(vec![PropertyInfo {
+        name: brand_name,
+        type_id: lit_b,
+        write_type: lit_b,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let branded_a = interner.intersection(vec![TypeId::STRING, brand_a]);
+    let branded_b = interner.intersection(vec![TypeId::STRING, brand_b]);
+    let both = interner.intersection(vec![branded_a, branded_b]);
+
+    // Two different brands intersected should be never
+    assert!(checker.is_subtype_of(both, TypeId::NEVER));
+}
+
+#[test]
+fn test_intersection_readonly_property() {
+    // { readonly x: string } & { x: string }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let x_name = interner.intern_string("x");
+
+    let readonly_obj = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let mutable_obj = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![readonly_obj, mutable_obj]);
+
+    // Should be a valid intersection
+    assert!(intersection != TypeId::ERROR);
+}
+
+#[test]
+fn test_intersection_optional_and_required() {
+    // { x?: string } & { x: string } = { x: string } (required wins)
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let x_name = interner.intern_string("x");
+
+    let optional_obj = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let required_obj = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![optional_obj, required_obj]);
+
+    // Intersection should be subtype of required
+    assert!(checker.is_subtype_of(intersection, required_obj));
+}
+
+#[test]
+fn test_intersection_index_signature_with_properties() {
+    // { [key: string]: number } & { x: number }
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+
+    let index_sig = interner.object_with_index(
+        vec![],
+        Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        None,
+    );
+
+    let prop_obj = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![index_sig, prop_obj]);
+
+    // Should be valid
+    assert!(intersection != TypeId::ERROR);
+}
+
+#[test]
+fn test_intersection_two_index_signatures() {
+    // { [key: string]: number } & { [key: string]: 1 | 2 }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let one = interner.literal_number(1.0);
+    let two = interner.literal_number(2.0);
+    let one_or_two = interner.union(vec![one, two]);
+
+    let index_number = interner.object_with_index(
+        vec![],
+        Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        None,
+    );
+
+    let index_literal = interner.object_with_index(
+        vec![],
+        Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: one_or_two,
+            readonly: false,
+        }),
+        None,
+    );
+
+    let intersection = interner.intersection(vec![index_number, index_literal]);
+
+    // Intersection should be subtype of the more specific one
+    assert!(checker.is_subtype_of(intersection, index_literal));
+}
+
+#[test]
+fn test_array_intersection() {
+    // string[] & number[] = never (element types incompatible)
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let string_array = interner.array(TypeId::STRING);
+    let number_array = interner.array(TypeId::NUMBER);
+
+    let intersection = interner.intersection(vec![string_array, number_array]);
+
+    // Should be never (no value can be both string[] and number[])
+    assert!(checker.is_subtype_of(intersection, TypeId::NEVER));
+}
+
+#[test]
+fn test_tuple_intersection_compatible() {
+    // [string, number] & [string, number] = [string, number]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
             optional: false,
             rest: false,
-        }],
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    let intersection = interner.intersection(vec![tuple, tuple]);
+
+    // Should be equivalent to the tuple itself
+    assert!(checker.is_subtype_of(intersection, tuple));
+    assert!(checker.is_subtype_of(tuple, intersection));
+}
+
+#[test]
+fn test_tuple_intersection_incompatible() {
+    // [string, number] & [number, string] = never
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let tuple1 = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    let tuple2 = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    let intersection = interner.intersection(vec![tuple1, tuple2]);
+
+    // Should be never (element types don't match)
+    assert!(checker.is_subtype_of(intersection, TypeId::NEVER));
+}
+
+#[test]
+fn test_intersection_union_distribution() {
+    // (A | B) & C = (A & C) | (B & C) in terms of assignability
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_name = interner.intern_string("a");
+    let b_name = interner.intern_string("b");
+    let c_name = interner.intern_string("c");
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: b_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_c = interner.object(vec![PropertyInfo {
+        name: c_name,
+        type_id: TypeId::BOOLEAN,
+        write_type: TypeId::BOOLEAN,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let a_or_b = interner.union(vec![obj_a, obj_b]);
+    let union_and_c = interner.intersection(vec![a_or_b, obj_c]);
+
+    let a_and_c = interner.intersection(vec![obj_a, obj_c]);
+    let b_and_c = interner.intersection(vec![obj_b, obj_c]);
+    let distributed = interner.union(vec![a_and_c, b_and_c]);
+
+    // Both should be mutually subtype (equivalent)
+    assert!(checker.is_subtype_of(union_and_c, distributed));
+    assert!(checker.is_subtype_of(distributed, union_and_c));
+}
+
+#[test]
+fn test_intersection_null_with_object_is_never() {
+    // null & { x: string } = never
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let x_name = interner.intern_string("x");
+    let obj = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let null_and_obj = interner.intersection(vec![TypeId::NULL, obj]);
+
+    assert!(checker.is_subtype_of(null_and_obj, TypeId::NEVER));
+}
+
+#[test]
+fn test_intersection_undefined_with_object_is_never() {
+    // undefined & { x: string } = never
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let x_name = interner.intern_string("x");
+    let obj = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let undefined_and_obj = interner.intersection(vec![TypeId::UNDEFINED, obj]);
+
+    assert!(checker.is_subtype_of(undefined_and_obj, TypeId::NEVER));
+}
+
+#[test]
+fn test_intersection_method_signatures() {
+    // { foo(): void } & { bar(): void } = { foo(): void, bar(): void }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let foo_name = interner.intern_string("foo");
+    let bar_name = interner.intern_string("bar");
+
+    let fn_void = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
         this_type: None,
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
     });
 
-    // HOF taking wide callback
-    let hof_wide = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![ParamInfo {
-            name: Some(interner.intern_string("f")),
-            type_id: wide_callback,
-            optional: false,
-            rest: false,
-        }],
-        this_type: None,
-        return_type: TypeId::VOID,
-        type_predicate: None,
-        is_constructor: false,
-    });
-    // HOF with wide callback <: HOF with narrow callback (double contravariance = covariance)
-    // In strict variance: hof_wide <: hof_narrow only
-    // Current behavior: bivariant for callback parameters - both directions work
-    assert!(!checker.is_subtype_of(hof_wide, hof_narrow));
-    assert!(checker.is_subtype_of(hof_narrow, hof_wide));
-fn test_variance_callback_return_type() {
-    // (f: () => string) => void  vs  (f: () => string | number) => void
-    // Callback return is covariant within callback, but callback is contravariant
-    // Callback returning narrow type
-    let narrow_returning = interner.function(FunctionShape {
+    let obj_foo = interner.object(vec![PropertyInfo {
+        name: foo_name,
+        type_id: fn_void,
+        write_type: fn_void,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let obj_bar = interner.object(vec![PropertyInfo {
+        name: bar_name,
+        type_id: fn_void,
+        write_type: fn_void,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let intersection = interner.intersection(vec![obj_foo, obj_bar]);
+
+    // Should be subtype of both
+    assert!(checker.is_subtype_of(intersection, obj_foo));
+    assert!(checker.is_subtype_of(intersection, obj_bar));
+}
+
+#[test]
+fn test_intersection_same_method_different_returns() {
+    // { foo(): string } & { foo(): number } - conflicting method returns
+    let interner = TypeInterner::new();
+
+    let foo_name = interner.intern_string("foo");
+
+    let fn_string = interner.function(FunctionShape {
         type_params: vec![],
         params: vec![],
         this_type: None,
@@ -19412,836 +20331,674 @@ fn test_variance_callback_return_type() {
         type_predicate: None,
         is_constructor: false,
     });
-    // Callback returning wide type
-    let wide_return = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
-    let wide_returning = interner.function(FunctionShape {
+
+    let fn_number = interner.function(FunctionShape {
         type_params: vec![],
         params: vec![],
         this_type: None,
-        return_type: wide_return,
+        return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
     });
-    // HOF taking narrow-returning callback
-    let hof_narrow_return = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![ParamInfo {
-            name: Some(interner.intern_string("f")),
-            type_id: narrow_returning,
-            optional: false,
-            rest: false,
-        }],
-        this_type: None,
-        return_type: TypeId::VOID,
-        type_predicate: None,
-        is_constructor: false,
-    });
-    // HOF taking wide-returning callback
-    let hof_wide_return = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![ParamInfo {
-            name: Some(interner.intern_string("f")),
-            type_id: wide_returning,
-            optional: false,
-            rest: false,
-        }],
-        this_type: None,
-        return_type: TypeId::VOID,
-        type_predicate: None,
-        is_constructor: false,
-    });
-    // HOF with narrow-returning <: HOF with wide-returning (contravariant flip of covariant)
-    // In strict variance: hof_narrow_return <: hof_wide_return only
-    // Current behavior: bivariant for callback parameters - both directions work
-    assert!(!checker.is_subtype_of(hof_narrow_return, hof_wide_return));
-    assert!(checker.is_subtype_of(hof_wide_return, hof_narrow_return));
-fn test_variance_readonly_property_covariant() {
-    // { readonly x: string } <: { readonly x: string | number }
-    // Readonly properties are covariant (only read, never written)
-    let wide_type = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
-    let narrow_readonly = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("x"),
+
+    let obj_foo_string = interner.object(vec![PropertyInfo {
+        name: foo_name,
+        type_id: fn_string,
+        write_type: fn_string,
         optional: false,
-    let wide_readonly = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("x"),
-        type_id: wide_type,
-        write_type: wide_type,
-        optional: false,
-    // Narrow readonly <: wide readonly (covariant)
-    assert!(checker.is_subtype_of(narrow_readonly, wide_readonly));
-fn test_variance_mutable_property_invariant() {
-    // { x: string } should not be subtype of { x: string | number } (invariant for mutable)
-    // In TypeScript this is unsound - arrays are covariant even when mutable
-    let wide_type = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
-    let narrow_mutable = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("x"),
-    let wide_mutable = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("x"),
-        type_id: wide_type,
-        write_type: wide_type,
         readonly: false,
-    // TypeScript allows this (unsound covariance), so we match behavior
-    assert!(checker.is_subtype_of(narrow_mutable, wide_mutable));
-fn test_variance_tuple_element_covariant() {
-    // [string, number] <: [string | number, number | boolean]
-    // Tuple elements are covariant for reading
-    let wide_first = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
-    let wide_second = interner.union(vec![TypeId::NUMBER, TypeId::BOOLEAN]);
-    let narrow_tuple = interner.tuple(vec![
+        is_method: true,
+    }]);
+
+    let obj_foo_number = interner.object(vec![PropertyInfo {
+        name: foo_name,
+        type_id: fn_number,
+        write_type: fn_number,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let intersection = interner.intersection(vec![obj_foo_string, obj_foo_number]);
+
+    // Should produce valid intersection (methods become overloaded or intersection)
+    assert!(intersection != TypeId::ERROR);
+}
+
+#[test]
+fn test_intersection_three_objects() {
+    // { a: string } & { b: number } & { c: boolean }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_name = interner.intern_string("a");
+    let b_name = interner.intern_string("b");
+    let c_name = interner.intern_string("c");
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: b_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_c = interner.object(vec![PropertyInfo {
+        name: c_name,
+        type_id: TypeId::BOOLEAN,
+        write_type: TypeId::BOOLEAN,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![obj_a, obj_b, obj_c]);
+
+    // Should be subtype of all three
+    assert!(checker.is_subtype_of(intersection, obj_a));
+    assert!(checker.is_subtype_of(intersection, obj_b));
+    assert!(checker.is_subtype_of(intersection, obj_c));
+}
+
+#[test]
+fn test_intersection_symbol_with_primitive_is_never() {
+    // symbol & string = never
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let symbol_and_string = interner.intersection(vec![TypeId::SYMBOL, TypeId::STRING]);
+
+    assert!(checker.is_subtype_of(symbol_and_string, TypeId::NEVER));
+}
+
+#[test]
+fn test_intersection_object_intrinsic_with_object() {
+    // object & { x: string } - object intrinsic with concrete object
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let x_name = interner.intern_string("x");
+    let obj = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let object_and_obj = interner.intersection(vec![TypeId::OBJECT, obj]);
+
+    // { x: string } is an object, so intersection should be equivalent to { x: string }
+    assert!(checker.is_subtype_of(object_and_obj, obj));
+}
+
+#[test]
+fn test_intersection_never_identity() {
+    // never & T = never (never absorbs everything)
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let x_name = interner.intern_string("x");
+    let obj = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let never_and_obj = interner.intersection(vec![TypeId::NEVER, obj]);
+    let obj_and_never = interner.intersection(vec![obj, TypeId::NEVER]);
+
+    assert!(checker.is_subtype_of(never_and_obj, TypeId::NEVER));
+    assert!(checker.is_subtype_of(obj_and_never, TypeId::NEVER));
+}
+
+// =============================================================================
+// KeyOf Type Operator Tests
+// =============================================================================
+// Tests for keyof type operator and property key relationships
+
+#[test]
+fn test_keyof_single_property_is_literal() {
+    // keyof { x: number } = "x"
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let x_name = interner.intern_string("x");
+    let obj = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let keyof_obj = interner.intern(TypeKey::KeyOf(obj));
+    let lit_x = interner.literal_string("x");
+
+    // keyof { x } should be subtype of "x" (they're equivalent)
+    assert!(checker.is_subtype_of(keyof_obj, lit_x));
+}
+
+#[test]
+fn test_keyof_multiple_properties_is_union() {
+    // keyof { a, b, c } = "a" | "b" | "c"
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("c"),
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let keyof_obj = interner.intern(TypeKey::KeyOf(obj));
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+    let lit_c = interner.literal_string("c");
+    let expected = interner.union(vec![lit_a, lit_b, lit_c]);
+
+    // Each literal key should be subtype of keyof
+    assert!(checker.is_subtype_of(lit_a, keyof_obj));
+    assert!(checker.is_subtype_of(lit_b, keyof_obj));
+    assert!(checker.is_subtype_of(lit_c, keyof_obj));
+
+    // keyof should be subtype of the union of keys
+    assert!(checker.is_subtype_of(keyof_obj, expected));
+}
+
+#[test]
+fn test_keyof_empty_object_is_never() {
+    // keyof {} = never
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let empty_obj = interner.object(vec![]);
+    let keyof_empty = interner.intern(TypeKey::KeyOf(empty_obj));
+
+    // keyof {} should be subtype of never (they're equivalent)
+    assert!(checker.is_subtype_of(keyof_empty, TypeId::NEVER));
+}
+
+#[test]
+fn test_keyof_with_optional_property() {
+    // keyof { x?: number } = "x"
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let x_name = interner.intern_string("x");
+    let obj = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let keyof_obj = interner.intern(TypeKey::KeyOf(obj));
+    let lit_x = interner.literal_string("x");
+
+    // Optional property still contributes to keyof
+    assert!(checker.is_subtype_of(lit_x, keyof_obj));
+}
+
+#[test]
+fn test_keyof_with_readonly_property() {
+    // keyof { readonly x: number } = "x"
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let x_name = interner.intern_string("x");
+    let obj = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let keyof_obj = interner.intern(TypeKey::KeyOf(obj));
+    let lit_x = interner.literal_string("x");
+
+    // Readonly property still contributes to keyof
+    assert!(checker.is_subtype_of(lit_x, keyof_obj));
+}
+
+#[test]
+fn test_keyof_with_method() {
+    // keyof { foo(): void } = "foo"
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let foo_name = interner.intern_string("foo");
+    let fn_void = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: foo_name,
+        type_id: fn_void,
+        write_type: fn_void,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let keyof_obj = interner.intern(TypeKey::KeyOf(obj));
+    let lit_foo = interner.literal_string("foo");
+
+    assert!(checker.is_subtype_of(lit_foo, keyof_obj));
+}
+
+#[test]
+fn test_keyof_subtype_of_string() {
+    // keyof { x: number } <: string
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let x_name = interner.intern_string("x");
+    let obj = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let keyof_obj = interner.intern(TypeKey::KeyOf(obj));
+
+    // keyof object with string keys is subtype of string
+    assert!(checker.is_subtype_of(keyof_obj, TypeId::STRING));
+}
+
+#[test]
+fn test_keyof_not_equal_to_string() {
+    // string is NOT a subtype of keyof { x: number }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let x_name = interner.intern_string("x");
+    let obj = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let keyof_obj = interner.intern(TypeKey::KeyOf(obj));
+
+    // string is wider than keyof { x }
+    assert!(!checker.is_subtype_of(TypeId::STRING, keyof_obj));
+}
+
+#[test]
+fn test_keyof_wider_object_has_more_keys() {
+    // keyof { a, b } has more keys than keyof { a }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_ab = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let keyof_a = interner.intern(TypeKey::KeyOf(obj_a));
+    let keyof_ab = interner.intern(TypeKey::KeyOf(obj_ab));
+
+    // keyof { a } <: keyof { a, b } (fewer keys is narrower)
+    assert!(checker.is_subtype_of(keyof_a, keyof_ab));
+    // keyof { a, b } is NOT subtype of keyof { a }
+    assert!(!checker.is_subtype_of(keyof_ab, keyof_a));
+}
+
+#[test]
+fn test_keyof_union_is_intersection_of_keys() {
+    // keyof (A | B) = (keyof A) & (keyof B) - only common keys
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let obj_ab = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let obj_bc = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("c"),
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let union = interner.union(vec![obj_ab, obj_bc]);
+    let keyof_union = interner.intern(TypeKey::KeyOf(union));
+    let lit_b = interner.literal_string("b");
+
+    // Only "b" is common to both - should be subtype of keyof union
+    assert!(checker.is_subtype_of(lit_b, keyof_union));
+}
+
+#[test]
+fn test_keyof_intersection_is_union_of_keys() {
+    // keyof (A & B) = (keyof A) | (keyof B) - all keys from both
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![obj_a, obj_b]);
+    let keyof_intersection = interner.intern(TypeKey::KeyOf(intersection));
+
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+
+    // Both "a" and "b" should be subtypes of keyof intersection
+    assert!(checker.is_subtype_of(lit_a, keyof_intersection));
+    assert!(checker.is_subtype_of(lit_b, keyof_intersection));
+}
+
+#[test]
+fn test_keyof_any_is_string_number_symbol() {
+    // keyof any = string | number | symbol
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let keyof_any = interner.intern(TypeKey::KeyOf(TypeId::ANY));
+    let property_key = interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::SYMBOL]);
+
+    // keyof any should be equivalent to PropertyKey
+    assert!(checker.is_subtype_of(keyof_any, property_key));
+}
+
+#[test]
+fn test_keyof_unknown_is_never() {
+    // keyof unknown = never
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let keyof_unknown = interner.intern(TypeKey::KeyOf(TypeId::UNKNOWN));
+
+    assert!(checker.is_subtype_of(keyof_unknown, TypeId::NEVER));
+}
+
+#[test]
+fn test_keyof_never_is_string_number_symbol() {
+    // keyof never = string | number | symbol (vacuously true)
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let keyof_never = interner.intern(TypeKey::KeyOf(TypeId::NEVER));
+    let property_key = interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::SYMBOL]);
+
+    assert!(checker.is_subtype_of(keyof_never, property_key));
+}
+
+#[test]
+fn test_keyof_string_has_string_methods() {
+    // keyof string includes string method names
+    let interner = TypeInterner::new();
+
+    let keyof_string = interner.intern(TypeKey::KeyOf(TypeId::STRING));
+
+    // Should be valid type
+    assert!(keyof_string != TypeId::ERROR);
+}
+
+#[test]
+fn test_keyof_number_has_number_methods() {
+    // keyof number includes number method names
+    let interner = TypeInterner::new();
+
+    let keyof_number = interner.intern(TypeKey::KeyOf(TypeId::NUMBER));
+
+    // Should be valid type
+    assert!(keyof_number != TypeId::ERROR);
+}
+
+#[test]
+fn test_keyof_array_type() {
+    // keyof string[] includes array methods and number
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let string_array = interner.array(TypeId::STRING);
+    let keyof_array = interner.intern(TypeKey::KeyOf(string_array));
+
+    // number should be subtype of keyof array (for index access)
+    assert!(checker.is_subtype_of(TypeId::NUMBER, keyof_array));
+}
+
+#[test]
+fn test_keyof_tuple_type() {
+    // keyof [string, number] includes "0" | "1" | array methods
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let tuple = interner.tuple(vec![
         TupleElement {
             type_id: TypeId::STRING,
-            optional: false,
             name: None,
+            optional: false,
             rest: false,
         },
         TupleElement {
             type_id: TypeId::NUMBER,
-            optional: false,
             name: None,
+            optional: false,
             rest: false,
         },
     ]);
-    let wide_tuple = interner.tuple(vec![
-        TupleElement {
-            type_id: wide_first,
-            optional: false,
-            name: None,
-            rest: false,
-        },
-        TupleElement {
-            type_id: wide_second,
-            optional: false,
-            name: None,
-            rest: false,
-        },
-    ]);
-    // Narrow tuple <: wide tuple (covariant elements)
-    assert!(checker.is_subtype_of(narrow_tuple, wide_tuple));
-    assert!(!checker.is_subtype_of(wide_tuple, narrow_tuple));
-fn test_variance_function_returning_function() {
-    // () => (x: string) => void  vs  () => (x: string | number) => void
-    // Outer return is covariant, inner callback param is contravariant
-    let wide_param = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
-    // Inner function with narrow param
-    let inner_narrow = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![ParamInfo {
-            name: Some(interner.intern_string("x")),
-            type_id: TypeId::STRING,
-            optional: false,
-            rest: false,
-        }],
-        this_type: None,
-        return_type: TypeId::VOID,
-        type_predicate: None,
-        is_constructor: false,
-    });
-    // Inner function with wide param
-    let inner_wide = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![ParamInfo {
-            name: Some(interner.intern_string("x")),
-            type_id: wide_param,
-            optional: false,
-            rest: false,
-        }],
-        this_type: None,
-        return_type: TypeId::VOID,
-        type_predicate: None,
-        is_constructor: false,
-    });
-    // Factory returning narrow-param function
-    let factory_narrow = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![],
-        this_type: None,
-        return_type: inner_narrow,
-        type_predicate: None,
-        is_constructor: false,
-    });
-    // Factory returning wide-param function
-    let factory_wide = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![],
-        this_type: None,
-        return_type: inner_wide,
-        type_predicate: None,
-        is_constructor: false,
-    });
-    // Factory returning wide-param <: factory returning narrow-param
-    // Return is covariant, and wide-param callback <: narrow-param callback
-    assert!(checker.is_subtype_of(factory_wide, factory_narrow));
-    assert!(!checker.is_subtype_of(factory_narrow, factory_wide));
-fn test_variance_union_in_contravariant_position() {
-    // (x: A | B) => void  <:  (x: A) => void  (contravariance)
-    let union_ab = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
-    let fn_union_param = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![ParamInfo {
-            name: Some(interner.intern_string("x")),
-            type_id: union_ab,
-            rest: false,
-        }],
-        this_type: None,
-        return_type: TypeId::VOID,
-        type_predicate: None,
-        is_constructor: false,
-    let fn_single_param = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![ParamInfo {
-            name: Some(interner.intern_string("x")),
-            type_id: TypeId::STRING,
-            optional: false,
-            rest: false,
-        }],
-        this_type: None,
-        return_type: TypeId::VOID,
-        type_predicate: None,
-        is_constructor: false,
-    // Union param <: single param (contravariance)
-    assert!(checker.is_subtype_of(fn_union_param, fn_single_param));
-    // Single param should NOT be subtype of union param
-    assert!(!checker.is_subtype_of(fn_single_param, fn_union_param));
-fn test_variance_intersection_in_covariant_position() {
-    // () => A & B  <:  () => A  (covariance)
-    let obj_a = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("a"),
-        optional: false,
-    let obj_b = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("b"),
+
+    let keyof_tuple = interner.intern(TypeKey::KeyOf(tuple));
+    let lit_0 = interner.literal_string("0");
+    let lit_1 = interner.literal_string("1");
+
+    // "0" and "1" should be subtypes of keyof tuple
+    assert!(checker.is_subtype_of(lit_0, keyof_tuple));
+    assert!(checker.is_subtype_of(lit_1, keyof_tuple));
+}
+
+#[test]
+fn test_keyof_with_index_signature_includes_string() {
+    // keyof { [key: string]: number } includes string
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let indexed_obj = interner.object_with_index(
+        vec![],
+        Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        None,
+    );
+
+    let keyof_indexed = interner.intern(TypeKey::KeyOf(indexed_obj));
+
+    // string should be subtype of keyof { [key: string]: number }
+    assert!(checker.is_subtype_of(TypeId::STRING, keyof_indexed));
+}
+
+#[test]
+fn test_keyof_with_number_index_signature() {
+    // keyof { [key: number]: string } includes number
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let indexed_obj = interner.object_with_index(
+        vec![],
+        None,
+        Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+    );
+
+    let keyof_indexed = interner.intern(TypeKey::KeyOf(indexed_obj));
+
+    // number should be subtype of keyof { [key: number]: string }
+    assert!(checker.is_subtype_of(TypeId::NUMBER, keyof_indexed));
+}
+
+#[test]
+fn test_keyof_nested_object() {
+    // keyof { x: { y: number } } = "x" (not "x" | "y")
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let y_name = interner.intern_string("y");
+    let inner_obj = interner.object(vec![PropertyInfo {
+        name: y_name,
         type_id: TypeId::NUMBER,
         write_type: TypeId::NUMBER,
-    let intersection_ab = interner.intersection(vec![obj_a, obj_b]);
-
-    let fn_returns_intersection = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![],
-        this_type: None,
-        return_type: intersection_ab,
-        type_predicate: None,
-        is_constructor: false,
-    });
-
-    let fn_returns_a = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![],
-        this_type: None,
-        return_type: obj_a,
-        type_predicate: None,
-        is_constructor: false,
-    });
-
-    // Returns A & B <: returns A (covariance, intersection subtype of member)
-    assert!(checker.is_subtype_of(fn_returns_intersection, fn_returns_a));
-fn test_variance_array_element_unsound_covariance() {
-    // string[] <: (string | number)[] - TypeScript's unsound covariance
-    let wide_element = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
-    let narrow_array = interner.array(TypeId::STRING);
-    let wide_array = interner.array(wide_element);
-    // TypeScript allows this (unsound)
-    assert!(checker.is_subtype_of(narrow_array, wide_array));
-fn test_variance_method_bivariant_params() {
-    // Methods are bivariant in their parameters (TypeScript unsoundness)
-    let wide_type = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
-    // Object with method taking narrow param
-    let narrow_method_obj = interner.callable(CallableShape {
-        call_signatures: vec![],
-        construct_signatures: vec![],
-        properties: vec![PropertyInfo {
-            name: interner.intern_string("handle"),
-            type_id: interner.function(FunctionShape {
-                type_params: vec![],
-                params: vec![ParamInfo {
-                    name: Some(interner.intern_string("x")),
-                    type_id: TypeId::STRING,
-                    optional: false,
-                    rest: false,
-                }],
-                this_type: None,
-                return_type: TypeId::VOID,
-                type_predicate: None,
-                is_constructor: false,
-            }),
-            write_type: TypeId::VOID,
-            optional: false,
-            is_method: true,
-        }],
-    });
-    // Object with method taking wide param
-    let wide_method_obj = interner.callable(CallableShape {
-        call_signatures: vec![],
-        construct_signatures: vec![],
-        properties: vec![PropertyInfo {
-            name: interner.intern_string("handle"),
-            type_id: interner.function(FunctionShape {
-                type_params: vec![],
-                params: vec![ParamInfo {
-                    name: Some(interner.intern_string("x")),
-                    type_id: wide_type,
-                    optional: false,
-                    rest: false,
-                }],
-                this_type: None,
-                return_type: TypeId::VOID,
-                type_predicate: None,
-                is_constructor: false,
-            }),
-            write_type: TypeId::VOID,
-            optional: false,
-            is_method: true,
-        }],
-    });
-    // Methods are bivariant - both directions should work
-    assert!(checker.is_subtype_of(narrow_method_obj, wide_method_obj));
-    assert!(checker.is_subtype_of(wide_method_obj, narrow_method_obj));
-fn test_variance_function_property_contravariant() {
-    // Function properties are strictly contravariant (not bivariant like methods)
-    let wide_type = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
-    // Object with function property taking narrow param
-    let narrow_fn_obj = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("handle"),
-        type_id: interner.function(FunctionShape {
-            type_params: vec![],
-            params: vec![ParamInfo {
-                name: Some(interner.intern_string("x")),
-                type_id: TypeId::STRING,
-                optional: false,
-                rest: false,
-            }],
-            this_type: None,
-            return_type: TypeId::VOID,
-            type_predicate: None,
-            is_constructor: false,
-        }),
-        write_type: TypeId::VOID,
         optional: false,
         readonly: false,
         is_method: false,
     }]);
-    // Object with function property taking wide param
-    let wide_fn_obj = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("handle"),
-        type_id: interner.function(FunctionShape {
-            type_params: vec![],
-            params: vec![ParamInfo {
-                name: Some(interner.intern_string("x")),
-                type_id: wide_type,
-                optional: false,
-                rest: false,
-            }],
-            this_type: None,
-            return_type: TypeId::VOID,
-            type_predicate: None,
-            is_constructor: false,
-        }),
-        write_type: TypeId::VOID,
+
+    let x_name = interner.intern_string("x");
+    let outer_obj = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: inner_obj,
+        write_type: inner_obj,
         optional: false,
         readonly: false,
         is_method: false,
     }]);
-    // Wide param function <: narrow param function (contravariant)
-    assert!(checker.is_subtype_of(wide_fn_obj, narrow_fn_obj));
-fn test_variance_promise_covariant() {
-    // Promise<string> <: Promise<string | number> (covariant)
-    let wide_type = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
-    // Simulate Promise<string> as { then: (cb: (value: string) => void) => void }
-    let then_narrow = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![ParamInfo {
-            name: Some(interner.intern_string("cb")),
-            type_id: interner.function(FunctionShape {
-                type_params: vec![],
-                params: vec![ParamInfo {
-                    name: Some(interner.intern_string("value")),
-                    type_id: TypeId::STRING,
-                    optional: false,
-                    rest: false,
-                }],
-                this_type: None,
-                return_type: TypeId::VOID,
-                type_predicate: None,
-                is_constructor: false,
-            }),
-            rest: false,
-        }],
-        this_type: None,
-        return_type: TypeId::VOID,
-        type_predicate: None,
-        is_constructor: false,
-    });
-    let then_wide = interner.function(FunctionShape {
-        params: vec![ParamInfo {
-            name: Some(interner.intern_string("cb")),
-            type_id: interner.function(FunctionShape {
-                type_params: vec![],
-                params: vec![ParamInfo {
-                    name: Some(interner.intern_string("value")),
-                    type_id: wide_type,
-                    optional: false,
-                    rest: false,
-                }],
-                this_type: None,
-                return_type: TypeId::VOID,
-                type_predicate: None,
-                is_constructor: false,
-            }),
-            optional: false,
-            rest: false,
-        }],
-    let promise_narrow = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("then"),
-        type_id: then_narrow,
-        write_type: then_narrow,
-        readonly: false,
-        is_method: true,
-    let promise_wide = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("then"),
-        type_id: then_wide,
-        write_type: then_wide,
-        is_method: true,
-    // Promise<string> <: Promise<string | number> (covariant in T)
-    // then callback param is contravariant, then is contravariant in object = covariant overall
-    assert!(checker.is_subtype_of(promise_narrow, promise_wide));
-fn test_variance_triple_nested_contravariance() {
-    // Three levels of contravariance: ((f: (g: (x: T) => void) => void) => void)
-    // Three contravariants = contravariant overall
-    let wide_type = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
-    // Innermost: (x: T) => void
-    let inner_narrow = interner.function(FunctionShape {
-            name: Some(interner.intern_string("x")),
-            optional: false,
-    let inner_wide = interner.function(FunctionShape {
-            name: Some(interner.intern_string("x")),
-            type_id: wide_type,
-    // Middle: (g: innermost) => void
-    let middle_narrow = interner.function(FunctionShape {
-            name: Some(interner.intern_string("g")),
-            type_id: inner_narrow,
-    let middle_wide = interner.function(FunctionShape {
-            name: Some(interner.intern_string("g")),
-            type_id: inner_wide,
-    // Outermost: (f: middle) => void
-    let outer_narrow = interner.function(FunctionShape {
-            type_id: middle_narrow,
-    let outer_wide = interner.function(FunctionShape {
-            type_id: middle_wide,
-    // Three levels of contravariance = contravariant (in strict mode)
-    // outer_narrow <: outer_wide (narrow at innermost becomes wide at triple-contravariant)
-    // Current behavior: bivariant for callback parameters - only one direction works
-    assert!(!checker.is_subtype_of(outer_narrow, outer_wide));
-    assert!(checker.is_subtype_of(outer_wide, outer_narrow));
-fn test_variance_constructor_param_contravariant() {
-    // new (x: string | number) => T  <:  new (x: string) => T
-    let wide_type = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
-    // Instance type
-    let instance = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("value"),
-    let ctor_narrow = interner.callable(CallableShape {
-        call_signatures: vec![],
-        construct_signatures: vec![CallSignature {
-            type_params: vec![],
-            params: vec![ParamInfo {
-                name: Some(interner.intern_string("x")),
-                type_id: TypeId::STRING,
-                optional: false,
-                rest: false,
-            }],
-            this_type: None,
-            return_type: instance,
-            type_predicate: None,
-        }],
-        properties: vec![],
-    });
-    let ctor_wide = interner.callable(CallableShape {
-        call_signatures: vec![],
-        construct_signatures: vec![CallSignature {
-            type_params: vec![],
-            params: vec![ParamInfo {
-                name: Some(interner.intern_string("x")),
-                type_id: wide_type,
-                optional: false,
-                rest: false,
-            }],
-            this_type: None,
-            return_type: instance,
-            type_predicate: None,
-        }],
-        properties: vec![],
-    });
-    // Wide param constructor <: narrow param constructor (contravariant)
-    assert!(checker.is_subtype_of(ctor_wide, ctor_narrow));
-    assert!(!checker.is_subtype_of(ctor_narrow, ctor_wide));
-fn test_variance_rest_param_contravariant() {
-    // (...args: (string | number)[]) => void  <:  (...args: string[]) => void
-    let wide_type = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
-    let narrow_array = interner.array(TypeId::STRING);
-    let wide_array = interner.array(wide_type);
-    let fn_narrow_rest = interner.function(FunctionShape {
-            name: Some(interner.intern_string("args")),
-            type_id: narrow_array,
-            rest: true,
-    let fn_wide_rest = interner.function(FunctionShape {
-            name: Some(interner.intern_string("args")),
-            type_id: wide_array,
-            rest: true,
-    // Wide rest param <: narrow rest param (contravariant)
-    assert!(checker.is_subtype_of(fn_wide_rest, fn_narrow_rest));
-fn test_variance_optional_param_covariant_optionality() {
-    // (x?: string) => void  <:  (x: string) => void
-    // Optional is more permissive, can be called with fewer args
-    let fn_optional = interner.function(FunctionShape {
-            type_id: TypeId::STRING,
-            optional: true,
-    let fn_required = interner.function(FunctionShape {
-    // Optional param function <: required param function
-    // If you can call with no args, you can certainly call with one
-    assert!(checker.is_subtype_of(fn_optional, fn_required));
-// =============================================================================
-// FUNCTION TYPE TESTS - OVERLOADS
-// =============================================================================
-fn test_overload_single_signature_subtype() {
-    // Function with one signature should be subtype of callable with same signature
-    let fn_type = interner.function(FunctionShape {
-        params: vec![ParamInfo {
-            name: Some(interner.intern_string("x")),
-            type_id: TypeId::STRING,
-            optional: false,
-            rest: false,
-        }],
-        return_type: TypeId::NUMBER,
-    let callable_type = interner.callable(CallableShape {
-        call_signatures: vec![CallSignature {
-            type_params: vec![],
-            params: vec![ParamInfo {
-                name: Some(interner.intern_string("x")),
-                type_id: TypeId::STRING,
-                optional: false,
-                rest: false,
-            }],
-            this_type: None,
-            return_type: TypeId::NUMBER,
-            type_predicate: None,
-        }],
-        construct_signatures: vec![],
-        properties: vec![],
-    // Function <: callable with same signature
-    assert!(checker.is_subtype_of(fn_type, callable_type));
-fn test_overload_multiple_to_single() {
-    // Callable with multiple overloads <: callable with one matching overload
-    let multi_overload = interner.callable(CallableShape {
-        call_signatures: vec![
-            CallSignature {
-                type_params: vec![],
-                params: vec![ParamInfo {
-                    name: Some(interner.intern_string("x")),
-                    type_id: TypeId::STRING,
-                    optional: false,
-                    rest: false,
-                }],
-                this_type: None,
-                return_type: TypeId::STRING,
-                type_predicate: None,
-            },
-            CallSignature {
-                type_params: vec![],
-                params: vec![ParamInfo {
-                    name: Some(interner.intern_string("x")),
-                    type_id: TypeId::NUMBER,
-                    optional: false,
-                    rest: false,
-                }],
-                this_type: None,
-                return_type: TypeId::NUMBER,
-                type_predicate: None,
-            },
-        ],
-        construct_signatures: vec![],
-        properties: vec![],
-    });
-    let single_overload = interner.callable(CallableShape {
-        call_signatures: vec![CallSignature {
-            type_params: vec![],
-            params: vec![ParamInfo {
-                name: Some(interner.intern_string("x")),
-                type_id: TypeId::STRING,
-                optional: false,
-                rest: false,
-            }],
-            this_type: None,
-            return_type: TypeId::STRING,
-            type_predicate: None,
-        }],
-        construct_signatures: vec![],
-        properties: vec![],
-    });
-    // Multi-overload <: single overload (has matching signature)
-    assert!(checker.is_subtype_of(multi_overload, single_overload));
-fn test_overload_order_independent_matching() {
-    // Overload matching should find the best match regardless of order
-    let overloads_ab = interner.callable(CallableShape {
-        call_signatures: vec![
-            CallSignature {
-                type_params: vec![],
-                params: vec![ParamInfo {
-                    name: Some(interner.intern_string("x")),
-                    type_id: TypeId::STRING,
-                    optional: false,
-                    rest: false,
-                }],
-                this_type: None,
-                return_type: TypeId::STRING,
-                type_predicate: None,
-            },
-            CallSignature {
-                type_params: vec![],
-                params: vec![ParamInfo {
-                    name: Some(interner.intern_string("x")),
-                    type_id: TypeId::NUMBER,
-                    optional: false,
-                    rest: false,
-                }],
-                this_type: None,
-                return_type: TypeId::NUMBER,
-                type_predicate: None,
-            },
-        ],
-        properties: vec![],
-    });
 
-    let overloads_ba = interner.callable(CallableShape {
-        call_signatures: vec![
-            CallSignature {
-                type_params: vec![],
-                params: vec![ParamInfo {
-                    name: Some(interner.intern_string("x")),
-                    type_id: TypeId::NUMBER,
-                    optional: false,
-                    rest: false,
-                }],
-                this_type: None,
-                return_type: TypeId::NUMBER,
-                type_predicate: None,
-            },
-            CallSignature {
-                return_type: TypeId::STRING,
-            },
-        ],
-        construct_signatures: vec![],
-        properties: vec![],
-    // Order shouldn't matter for subtype relationship
-    assert!(checker.is_subtype_of(overloads_ab, overloads_ba));
-    assert!(checker.is_subtype_of(overloads_ba, overloads_ab));
+    let keyof_outer = interner.intern(TypeKey::KeyOf(outer_obj));
+    let lit_x = interner.literal_string("x");
+    let lit_y = interner.literal_string("y");
+
+    // "x" is a key of outer
+    assert!(checker.is_subtype_of(lit_x, keyof_outer));
+    // "y" is NOT a key of outer (it's a key of the nested object)
+    assert!(!checker.is_subtype_of(lit_y, keyof_outer));
 }
 
 #[test]
-fn test_overload_missing_signature_not_subtype() {
-    // Callable missing a required overload is not a subtype
+fn test_keyof_generic_constraint() {
+    // <K extends keyof T> constraint pattern
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
 
-    let single_overload = interner.callable(CallableShape {
-        call_signatures: vec![CallSignature {
-            type_params: vec![],
-            params: vec![ParamInfo {
-                name: Some(interner.intern_string("x")),
-                type_id: TypeId::STRING,
-                optional: false,
-                rest: false,
-            }],
-            this_type: None,
-            return_type: TypeId::STRING,
-            type_predicate: None,
-        }],
-        properties: vec![],
-    });
-
-    let two_overloads = interner.callable(CallableShape {
-        call_signatures: vec![
-            CallSignature {
-                    type_id: TypeId::STRING,
-                return_type: TypeId::STRING,
-            },
-            CallSignature {
-                type_params: vec![],
-                params: vec![ParamInfo {
-                    name: Some(interner.intern_string("x")),
-                    type_id: TypeId::NUMBER,
-                    optional: false,
-                    rest: false,
-                }],
-                this_type: None,
-                return_type: TypeId::NUMBER,
-                type_predicate: None,
-            },
-        ],
-        construct_signatures: vec![],
-        properties: vec![],
-    // Single overload should not be subtype of callable requiring two overloads
-    assert!(!checker.is_subtype_of(single_overload, two_overloads));
-fn test_overload_wider_param_satisfies_target() {
-    // Overload with wider param type can satisfy narrower target overload
-    let wide_param = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
-    let wide_overload = interner.callable(CallableShape {
-        call_signatures: vec![CallSignature {
-                type_id: wide_param,
-        }],
-        construct_signatures: vec![],
-        properties: vec![],
-    });
-    let narrow_overload = interner.callable(CallableShape {
-        call_signatures: vec![CallSignature {
-                type_id: TypeId::STRING,
-        }],
-        construct_signatures: vec![],
-        properties: vec![],
-    });
-    // Wide param <: narrow param (contravariance)
-    assert!(checker.is_subtype_of(wide_overload, narrow_overload));
-fn test_overload_constructor_subtype() {
-    // Constructor overloads should follow same rules as call overloads
-    let instance = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("value"),
-        type_id: TypeId::STRING,
-        write_type: TypeId::STRING,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-    let multi_ctor = interner.callable(CallableShape {
-        call_signatures: vec![],
-        construct_signatures: vec![
-            CallSignature {
-                    name: Some(interner.intern_string("x")),
-                return_type: instance,
-            },
-            CallSignature {
-                type_params: vec![],
-                params: vec![],
-                this_type: None,
-                return_type: instance,
-                type_predicate: None,
-            },
-        ],
-        properties: vec![],
-    });
-
-    let single_ctor = interner.callable(CallableShape {
-        call_signatures: vec![],
-        construct_signatures: vec![CallSignature {
-            type_params: vec![],
-            params: vec![ParamInfo {
-                name: Some(interner.intern_string("x")),
-                type_id: TypeId::STRING,
-                optional: false,
-                rest: false,
-            }],
-            this_type: None,
-            return_type: instance,
-            type_predicate: None,
-        properties: vec![],
-    // Multi-constructor <: single constructor (has matching)
-    assert!(checker.is_subtype_of(multi_ctor, single_ctor));
-}
-
-#[test]
-fn test_overload_with_different_arity() {
-    // Overloads with different arities
-    let interner = TypeInterner::new();
-    let mut checker = SubtypeChecker::new(&interner);
-
-    let multi_arity = interner.callable(CallableShape {
-        call_signatures: vec![
-            CallSignature {
-                type_params: vec![],
-                params: vec![],
-                this_type: None,
-                return_type: TypeId::STRING,
-                type_predicate: None,
-            },
-            CallSignature {
-                    name: Some(interner.intern_string("x")),
-                    type_id: TypeId::STRING,
-                return_type: TypeId::STRING,
-            },
-            CallSignature {
-                type_params: vec![],
-                params: vec![
-                    ParamInfo {
-                        name: Some(interner.intern_string("x")),
-                        type_id: TypeId::STRING,
-                        optional: false,
-                        rest: false,
-                    },
-                    ParamInfo {
-                        name: Some(interner.intern_string("y")),
-                        type_id: TypeId::NUMBER,
-                        optional: false,
-                        rest: false,
-                    },
-                ],
-                this_type: None,
-                return_type: TypeId::STRING,
-                type_predicate: None,
-            },
-        ],
-        construct_signatures: vec![],
-        properties: vec![],
-    let no_args = interner.callable(CallableShape {
-        call_signatures: vec![CallSignature {
-            type_params: vec![],
-            params: vec![],
-            this_type: None,
-            return_type: TypeId::STRING,
-            type_predicate: None,
-        }],
-        construct_signatures: vec![],
-        properties: vec![],
-    });
-    // Multi-arity should satisfy no-args target
-    assert!(checker.is_subtype_of(multi_arity, no_args));
-// =============================================================================
-// FUNCTION TYPE TESTS - THIS PARAMETER
-// =============================================================================
-
-fn test_this_parameter_explicit_type() {
-    // function(this: Foo, x: string): void
-    let foo_type = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("name"),
-        type_id: TypeId::STRING,
-        write_type: TypeId::STRING,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-    let fn_with_this = interner.function(FunctionShape {
-        this_type: Some(foo_type),
-    let fn_without_this = interner.function(FunctionShape {
-            type_id: TypeId::STRING,
-    // Function without this requirement <: function with this requirement
-    // (less restrictive is subtype)
-    assert!(checker.is_subtype_of(fn_without_this, fn_with_this));
-}
-
-#[test]
-fn test_this_parameter_covariant_in_method() {
-    // For methods, this is covariant (subclass method can be assigned to superclass)
-    let interner = TypeInterner::new();
-    let mut checker = SubtypeChecker::new(&interner);
-
-    let base_type = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("name"),
-        type_id: TypeId::STRING,
-        write_type: TypeId::STRING,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let derived_type = interner.object(vec![
+    let obj = interner.object(vec![
         PropertyInfo {
             name: interner.intern_string("name"),
             type_id: TypeId::STRING,
             write_type: TypeId::STRING,
+            optional: false,
             readonly: false,
             is_method: false,
         },
@@ -20255,122 +21012,35 @@ fn test_this_parameter_covariant_in_method() {
         },
     ]);
 
-    // Method on derived type
-    let derived_method = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![],
-        this_type: Some(derived_type),
-    // Method on base type
-    let base_method = interner.function(FunctionShape {
-        params: vec![],
-        this_type: Some(base_type),
-    // Base method <: derived method (covariant this)
-    assert!(checker.is_subtype_of(base_method, derived_method));
+    let keyof_obj = interner.intern(TypeKey::KeyOf(obj));
+    let lit_name = interner.literal_string("name");
+    let lit_age = interner.literal_string("age");
+    let lit_invalid = interner.literal_string("invalid");
+
+    // Valid keys satisfy the constraint
+    assert!(checker.is_subtype_of(lit_name, keyof_obj));
+    assert!(checker.is_subtype_of(lit_age, keyof_obj));
+    // Invalid key doesn't satisfy
+    assert!(!checker.is_subtype_of(lit_invalid, keyof_obj));
 }
 
 #[test]
-fn test_this_parameter_void_this() {
-    // this: void means the function doesn't use this
+fn test_keyof_mapped_type_source() {
+    // keyof used as constraint in mapped type: { [K in keyof T]: ... }
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
 
-    let fn_void_this = interner.function(FunctionShape {
-        params: vec![],
-        this_type: Some(TypeId::VOID),
-        return_type: TypeId::NUMBER,
-    let fn_any_this = interner.function(FunctionShape {
-        params: vec![],
-        this_type: Some(TypeId::ANY),
-        return_type: TypeId::NUMBER,
-        type_predicate: None,
-        is_constructor: false,
-    });
-
-    let fn_no_this = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![],
-        return_type: TypeId::NUMBER,
-    // void this and no this should be compatible
-    assert!(checker.is_subtype_of(fn_void_this, fn_no_this));
-    assert!(checker.is_subtype_of(fn_no_this, fn_void_this));
-
-    // any this is more permissive
-    assert!(checker.is_subtype_of(fn_any_this, fn_no_this));
-fn test_this_parameter_in_callable_method() {
-    // Callable with method that has this parameter
-    let obj_type = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("data"),
-    // Method with this type
-    let method_fn = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![],
-        this_type: Some(obj_type),
-        return_type: TypeId::STRING,
-        type_predicate: None,
-        is_constructor: false,
-    });
-
-    let callable_with_method = interner.callable(CallableShape {
-        construct_signatures: vec![],
-        properties: vec![PropertyInfo {
-            name: interner.intern_string("getData"),
-            type_id: method_fn,
-            write_type: method_fn,
-            optional: false,
-            readonly: false,
-            is_method: true,
-    // Plain method without this
-    let plain_method = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![],
-        this_type: None,
-        return_type: TypeId::STRING,
-        type_predicate: None,
-        is_constructor: false,
-    });
-
-    let callable_plain = interner.callable(CallableShape {
-        call_signatures: vec![],
-        construct_signatures: vec![],
-        properties: vec![PropertyInfo {
-            name: interner.intern_string("getData"),
-            type_id: plain_method,
-            write_type: plain_method,
-            optional: false,
-            readonly: false,
-            is_method: true,
-    // Both should be compatible (methods are bivariant)
-    assert!(checker.is_subtype_of(callable_with_method, callable_plain));
-fn test_this_parameter_fluent_api_pattern() {
-    // Fluent API: method returns this type
-    // Builder type with set method returning this
-    let builder_type = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("value"),
-        type_id: TypeId::STRING,
-        write_type: TypeId::STRING,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-    // Method returning the builder (this type)
-    let set_method = interner.function(FunctionShape {
-            name: Some(interner.intern_string("value")),
-            type_id: TypeId::STRING,
-            rest: false,
-        this_type: Some(builder_type),
-        return_type: builder_type,
-    // Different builder that also returns self
-    let other_builder = interner.object(vec![
+    let obj = interner.object(vec![
         PropertyInfo {
-            name: interner.intern_string("value"),
-            type_id: TypeId::STRING,
-            write_type: TypeId::STRING,
+            name: interner.intern_string("x"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
             optional: false,
             readonly: false,
             is_method: false,
         },
         PropertyInfo {
-            name: interner.intern_string("extra"),
+            name: interner.intern_string("y"),
             type_id: TypeId::NUMBER,
             write_type: TypeId::NUMBER,
             optional: false,
@@ -20379,152 +21049,23 @@ fn test_this_parameter_fluent_api_pattern() {
         },
     ]);
 
-    let other_set_method = interner.function(FunctionShape {
-            name: Some(interner.intern_string("value")),
-            type_id: TypeId::STRING,
-            rest: false,
-        this_type: Some(other_builder),
-        return_type: other_builder,
-    // Methods with different this/return types are not subtypes
-    // (unless there's a structural relationship)
-    assert!(!checker.is_subtype_of(set_method, other_set_method));
-fn test_this_parameter_unknown_this() {
-    // this: unknown is maximally restrictive
-    let fn_unknown_this = interner.function(FunctionShape {
-        params: vec![],
-        this_type: Some(TypeId::UNKNOWN),
-    let fn_string_this = interner.function(FunctionShape {
-        params: vec![],
-        this_type: Some(TypeId::STRING),
-    // unknown this should work with any this type
-    assert!(checker.is_subtype_of(fn_unknown_this, fn_string_this));
+    let keyof_obj = interner.intern(TypeKey::KeyOf(obj));
+
+    // keyof should produce valid keys for iteration
+    assert!(keyof_obj != TypeId::ERROR);
+    assert!(keyof_obj != TypeId::NEVER);
+
+    // Should be subtype of string (for string-keyed objects)
+    assert!(checker.is_subtype_of(keyof_obj, TypeId::STRING));
 }
 
 #[test]
-fn test_overload_with_call_and_construct() {
-    // Callable that can be both called and constructed
+fn test_keyof_reflexive() {
+    // keyof T <: keyof T
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
 
-    let instance = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("value"),
-        type_id: TypeId::STRING,
-        write_type: TypeId::STRING,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let dual_callable = interner.callable(CallableShape {
-        call_signatures: vec![CallSignature {
-            type_params: vec![],
-            params: vec![ParamInfo {
-                name: Some(interner.intern_string("x")),
-                type_id: TypeId::STRING,
-                optional: false,
-                rest: false,
-            }],
-            this_type: None,
-            return_type: TypeId::STRING,
-            type_predicate: None,
-        }],
-        construct_signatures: vec![CallSignature {
-            type_params: vec![],
-            params: vec![ParamInfo {
-                name: Some(interner.intern_string("x")),
-                type_id: TypeId::STRING,
-                optional: false,
-                rest: false,
-            }],
-            this_type: None,
-            return_type: instance,
-            type_predicate: None,
-        }],
-        properties: vec![],
-    });
-
-    let call_only = interner.callable(CallableShape {
-        call_signatures: vec![CallSignature {
-            type_params: vec![],
-            params: vec![ParamInfo {
-                name: Some(interner.intern_string("x")),
-                type_id: TypeId::STRING,
-                optional: false,
-                rest: false,
-            }],
-            this_type: None,
-            return_type: TypeId::STRING,
-            type_predicate: None,
-        }],
-        construct_signatures: vec![],
-        properties: vec![],
-    });
-
-    // Dual callable <: call-only (has matching call signature)
-    assert!(checker.is_subtype_of(dual_callable, call_only));
-}
-
-#[test]
-fn test_overload_rest_vs_multiple_params() {
-    // (...args: string[]) should be compatible with (a: string, b: string)
-    let interner = TypeInterner::new();
-    let mut checker = SubtypeChecker::new(&interner);
-
-    let string_array = interner.array(TypeId::STRING);
-
-    let rest_fn = interner.callable(CallableShape {
-        call_signatures: vec![CallSignature {
-            type_params: vec![],
-            params: vec![ParamInfo {
-                name: Some(interner.intern_string("args")),
-                type_id: string_array,
-                optional: false,
-                rest: true,
-            }],
-            this_type: None,
-            return_type: TypeId::VOID,
-            type_predicate: None,
-        }],
-        construct_signatures: vec![],
-        properties: vec![],
-    });
-
-    let two_params = interner.callable(CallableShape {
-        call_signatures: vec![CallSignature {
-            type_params: vec![],
-            params: vec![
-                ParamInfo {
-                    name: Some(interner.intern_string("a")),
-                    type_id: TypeId::STRING,
-                    optional: false,
-                    rest: false,
-                },
-                ParamInfo {
-                    name: Some(interner.intern_string("b")),
-                    type_id: TypeId::STRING,
-                    optional: false,
-                    rest: false,
-                },
-            ],
-            this_type: None,
-            return_type: TypeId::VOID,
-            type_predicate: None,
-        }],
-        construct_signatures: vec![],
-        properties: vec![],
-    });
-
-    // Rest params can satisfy fixed params
-    assert!(checker.is_subtype_of(rest_fn, two_params));
-}
-
-#[test]
-fn test_this_in_overload_signature() {
-    // Overload with this parameter
-    let interner = TypeInterner::new();
-    let mut checker = SubtypeChecker::new(&interner);
-
-    let obj_type = interner.object(vec![PropertyInfo {
+    let obj = interner.object(vec![PropertyInfo {
         name: interner.intern_string("x"),
         type_id: TypeId::NUMBER,
         write_type: TypeId::NUMBER,
@@ -20533,2115 +21074,64 @@ fn test_this_in_overload_signature() {
         is_method: false,
     }]);
 
-    let overload_with_this = interner.callable(CallableShape {
-        call_signatures: vec![CallSignature {
-            type_params: vec![],
-            params: vec![],
-            this_type: Some(obj_type),
-            return_type: TypeId::NUMBER,
-            type_predicate: None,
-        }],
-        construct_signatures: vec![],
-        properties: vec![],
-    });
+    let keyof_obj = interner.intern(TypeKey::KeyOf(obj));
 
-    let overload_no_this = interner.callable(CallableShape {
-        call_signatures: vec![CallSignature {
-            type_params: vec![],
-            params: vec![],
-            this_type: None,
-            return_type: TypeId::NUMBER,
-            type_predicate: None,
-        }],
-        construct_signatures: vec![],
-        properties: vec![],
-    });
-
-    // No-this is compatible with with-this (no-this is more general)
-    assert!(checker.is_subtype_of(overload_no_this, overload_with_this));
+    assert!(checker.is_subtype_of(keyof_obj, keyof_obj));
 }
 
-// =============================================================================
-// Class Type Tests (extends, implements, protected)
-// =============================================================================
-
 #[test]
-fn test_class_extends_base_simple() {
-    // class Base { x: string }
-    // class Derived extends Base { y: number }
+fn test_keyof_null_is_never() {
+    // keyof null = never
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
 
-    let x_name = interner.intern_string("x");
-    let y_name = interner.intern_string("y");
+    let keyof_null = interner.intern(TypeKey::KeyOf(TypeId::NULL));
 
-    let base = interner.object(vec![PropertyInfo {
-        name: x_name,
-        type_id: TypeId::STRING,
-        write_type: TypeId::STRING,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let derived = interner.object(vec![
-        PropertyInfo {
-            name: x_name,
-            type_id: TypeId::STRING,
-            write_type: TypeId::STRING,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-        PropertyInfo {
-            name: y_name,
-            type_id: TypeId::NUMBER,
-            write_type: TypeId::NUMBER,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-    ]);
-
-    // Derived is subtype of Base
-    assert!(checker.is_subtype_of(derived, base));
-    // Base is not subtype of Derived
-    assert!(!checker.is_subtype_of(base, derived));
+    assert!(checker.is_subtype_of(keyof_null, TypeId::NEVER));
 }
 
 #[test]
-fn test_class_implements_interface() {
-    // interface Printable { print(): void }
-    // class Document implements Printable { print(): void; title: string }
+fn test_keyof_undefined_is_never() {
+    // keyof undefined = never
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
 
-    let print_name = interner.intern_string("print");
-    let title_name = interner.intern_string("title");
+    let keyof_undefined = interner.intern(TypeKey::KeyOf(TypeId::UNDEFINED));
 
-    let print_fn = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![],
-        this_type: None,
-        return_type: TypeId::VOID,
-        type_predicate: None,
-        is_constructor: false,
-    });
-
-    let printable = interner.object(vec![PropertyInfo {
-        name: print_name,
-        type_id: print_fn,
-        write_type: print_fn,
-        optional: false,
-        readonly: false,
-        is_method: true,
-    }]);
-
-    let document = interner.object(vec![
-        PropertyInfo {
-            name: print_name,
-            type_id: print_fn,
-            write_type: print_fn,
-            optional: false,
-            readonly: false,
-            is_method: true,
-        },
-        PropertyInfo {
-            name: title_name,
-            type_id: TypeId::STRING,
-            write_type: TypeId::STRING,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-    ]);
-
-    // Document implements Printable
-    assert!(checker.is_subtype_of(document, printable));
+    assert!(checker.is_subtype_of(keyof_undefined, TypeId::NEVER));
 }
 
 #[test]
-fn test_class_with_constructor() {
-    // class Point { constructor(x: number, y: number) }
-    let interner = TypeInterner::new();
-
-    let x_name = interner.intern_string("x");
-    let y_name = interner.intern_string("y");
-
-    let ctor = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![
-            ParamInfo {
-                name: Some(x_name),
-                type_id: TypeId::NUMBER,
-                optional: false,
-                rest: false,
-            },
-            ParamInfo {
-                name: Some(y_name),
-                type_id: TypeId::NUMBER,
-                optional: false,
-                rest: false,
-            },
-        ],
-        this_type: None,
-        return_type: TypeId::VOID,
-        type_predicate: None,
-        is_constructor: true,
-    });
-
-    assert!(ctor != TypeId::ERROR);
-}
-
-#[test]
-fn test_class_static_members() {
-    // class Counter { static count: number; static increment(): void }
+fn test_keyof_void_is_never() {
+    // keyof void = never
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
 
-    let count_name = interner.intern_string("count");
-    let increment_name = interner.intern_string("increment");
+    let keyof_void = interner.intern(TypeKey::KeyOf(TypeId::VOID));
 
-    let increment_fn = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![],
-        this_type: None,
-        return_type: TypeId::VOID,
-        type_predicate: None,
-        is_constructor: false,
-    });
-
-    // Static side of the class
-    let counter_static = interner.object(vec![
-        PropertyInfo {
-            name: count_name,
-            type_id: TypeId::NUMBER,
-            write_type: TypeId::NUMBER,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-        PropertyInfo {
-            name: increment_name,
-            type_id: increment_fn,
-            write_type: increment_fn,
-            optional: false,
-            readonly: false,
-            is_method: true,
-        },
-    ]);
-
-    assert!(counter_static != TypeId::ERROR);
+    assert!(checker.is_subtype_of(keyof_void, TypeId::NEVER));
 }
 
 #[test]
-fn test_class_method_override_covariant_return() {
-    // class Base { getValue(): object }
-    // class Derived extends Base { getValue(): { x: number } }
+fn test_keyof_object_intrinsic() {
+    // keyof object includes all possible property keys
+    let interner = TypeInterner::new();
+
+    let keyof_object = interner.intern(TypeKey::KeyOf(TypeId::OBJECT));
+
+    // Should be valid
+    assert!(keyof_object != TypeId::ERROR);
+}
+
+#[test]
+fn test_keyof_symbol_keyed_object() {
+    // Objects with symbol keys in keyof result
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
 
-    let get_value_name = interner.intern_string("getValue");
-    let x_name = interner.intern_string("x");
-
-    let base_return = TypeId::OBJECT;
-    let derived_return = interner.object(vec![PropertyInfo {
-        name: x_name,
-        type_id: TypeId::NUMBER,
-        write_type: TypeId::NUMBER,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let base_method = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![],
-        this_type: None,
-        return_type: base_return,
-        type_predicate: None,
-        is_constructor: false,
-    });
-
-    let derived_method = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![],
-        this_type: None,
-        return_type: derived_return,
-        type_predicate: None,
-        is_constructor: false,
-    });
-
-    let base = interner.object(vec![PropertyInfo {
-        name: get_value_name,
-        type_id: base_method,
-        write_type: base_method,
-        optional: false,
-        readonly: false,
-        is_method: true,
-    }]);
-
-    let derived = interner.object(vec![PropertyInfo {
-        name: get_value_name,
-        type_id: derived_method,
-        write_type: derived_method,
-        optional: false,
-        readonly: false,
-        is_method: true,
-    }]);
-
-    // Derived with narrower return type is subtype of Base
-    assert!(checker.is_subtype_of(derived, base));
-}
-
-#[test]
-fn test_class_multiple_implements() {
-    // interface A { a(): void }
-    // interface B { b(): void }
-    // class C implements A, B { a(): void; b(): void }
-    let interner = TypeInterner::new();
-    let mut checker = SubtypeChecker::new(&interner);
-
-    let a_name = interner.intern_string("a");
-    let b_name = interner.intern_string("b");
-
-    let void_fn = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![],
-        this_type: None,
-        return_type: TypeId::VOID,
-        type_predicate: None,
-        is_constructor: false,
-    });
-
-    let interface_a = interner.object(vec![PropertyInfo {
-        name: a_name,
-        type_id: void_fn,
-        write_type: void_fn,
-        optional: false,
-        readonly: false,
-        is_method: true,
-    }]);
-
-    let interface_b = interner.object(vec![PropertyInfo {
-        name: b_name,
-        type_id: void_fn,
-        write_type: void_fn,
-        optional: false,
-        readonly: false,
-        is_method: true,
-    }]);
-
-    let class_c = interner.object(vec![
-        PropertyInfo {
-            name: a_name,
-            type_id: void_fn,
-            write_type: void_fn,
-            optional: false,
-            readonly: false,
-            is_method: true,
-        },
-        PropertyInfo {
-            name: b_name,
-            type_id: void_fn,
-            write_type: void_fn,
-            optional: false,
-            readonly: false,
-            is_method: true,
-        },
-    ]);
-
-    // C implements both A and B
-    assert!(checker.is_subtype_of(class_c, interface_a));
-    assert!(checker.is_subtype_of(class_c, interface_b));
-}
-
-#[test]
-fn test_class_generic_extends() {
-    // class Container<T> { value: T }
-    // class NumberContainer extends Container<number> { value: number }
-    let interner = TypeInterner::new();
-    let mut checker = SubtypeChecker::new(&interner);
-
-    let value_name = interner.intern_string("value");
-
-    let number_container = interner.object(vec![PropertyInfo {
-        name: value_name,
-        type_id: TypeId::NUMBER,
-        write_type: TypeId::NUMBER,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let string_container = interner.object(vec![PropertyInfo {
-        name: value_name,
-        type_id: TypeId::STRING,
-        write_type: TypeId::STRING,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    // Different type arguments are not subtypes of each other
-    assert!(!checker.is_subtype_of(number_container, string_container));
-    assert!(!checker.is_subtype_of(string_container, number_container));
-}
-
-#[test]
-fn test_class_with_readonly_property() {
-    // class Config { readonly setting: string }
-    let interner = TypeInterner::new();
-    let mut checker = SubtypeChecker::new(&interner);
-
-    let setting_name = interner.intern_string("setting");
-
-    let readonly_config = interner.object(vec![PropertyInfo {
-        name: setting_name,
-        type_id: TypeId::STRING,
-        write_type: TypeId::STRING,
-        optional: false,
-        readonly: true,
-        is_method: false,
-    }]);
-
-    let mutable_config = interner.object(vec![PropertyInfo {
-        name: setting_name,
-        type_id: TypeId::STRING,
-        write_type: TypeId::STRING,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    // Mutable can be assigned to readonly
-    assert!(checker.is_subtype_of(mutable_config, readonly_config));
-}
-
-#[test]
-fn test_class_diamond_inheritance() {
-    // interface A { a: string }
-    // interface B extends A { b: number }
-    // interface C extends A { c: boolean }
-    // class D implements B, C { a: string, b: number, c: boolean }
-    let interner = TypeInterner::new();
-    let mut checker = SubtypeChecker::new(&interner);
-
-    let a_name = interner.intern_string("a");
-    let b_name = interner.intern_string("b");
-    let c_name = interner.intern_string("c");
-
-    let interface_a = interner.object(vec![PropertyInfo {
-        name: a_name,
-        type_id: TypeId::STRING,
-        write_type: TypeId::STRING,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let interface_b = interner.object(vec![
-        PropertyInfo {
-            name: a_name,
-            type_id: TypeId::STRING,
-            write_type: TypeId::STRING,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-        PropertyInfo {
-            name: b_name,
-            type_id: TypeId::NUMBER,
-            write_type: TypeId::NUMBER,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-    ]);
-
-    let interface_c = interner.object(vec![
-        PropertyInfo {
-            name: a_name,
-            type_id: TypeId::STRING,
-            write_type: TypeId::STRING,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-        PropertyInfo {
-            name: c_name,
-            type_id: TypeId::BOOLEAN,
-            write_type: TypeId::BOOLEAN,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-    ]);
-
-    let class_d = interner.object(vec![
-        PropertyInfo {
-            name: a_name,
-            type_id: TypeId::STRING,
-            write_type: TypeId::STRING,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-        PropertyInfo {
-            name: b_name,
-            type_id: TypeId::NUMBER,
-            write_type: TypeId::NUMBER,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-        PropertyInfo {
-            name: c_name,
-            type_id: TypeId::BOOLEAN,
-            write_type: TypeId::BOOLEAN,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-    ]);
-
-    // D implements all interfaces in the diamond
-    assert!(checker.is_subtype_of(class_d, interface_a));
-    assert!(checker.is_subtype_of(class_d, interface_b));
-    assert!(checker.is_subtype_of(class_d, interface_c));
-}
-
-#[test]
-fn test_class_abstract_pattern() {
-    // abstract class Shape { abstract area(): number }
-    // class Circle extends Shape { area(): number; radius: number }
-    let interner = TypeInterner::new();
-    let mut checker = SubtypeChecker::new(&interner);
-
-    let area_name = interner.intern_string("area");
-    let radius_name = interner.intern_string("radius");
-
-    let area_fn = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![],
-        this_type: None,
-        return_type: TypeId::NUMBER,
-        type_predicate: None,
-        is_constructor: false,
-    });
-
-    let shape = interner.object(vec![PropertyInfo {
-        name: area_name,
-        type_id: area_fn,
-        write_type: area_fn,
-        optional: false,
-        readonly: false,
-        is_method: true,
-    }]);
-
-    let circle = interner.object(vec![
-        PropertyInfo {
-            name: area_name,
-            type_id: area_fn,
-            write_type: area_fn,
-            optional: false,
-            readonly: false,
-            is_method: true,
-        },
-        PropertyInfo {
-            name: radius_name,
-            type_id: TypeId::NUMBER,
-            write_type: TypeId::NUMBER,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-    ]);
-
-    // Circle is subtype of Shape
-    assert!(checker.is_subtype_of(circle, shape));
-}
-
-#[test]
-fn test_class_with_optional_method() {
-    // class Handler { handle?(): void }
-    let interner = TypeInterner::new();
-    let mut checker = SubtypeChecker::new(&interner);
-
-    let handle_name = interner.intern_string("handle");
-
-    let handle_fn = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![],
-        this_type: None,
-        return_type: TypeId::VOID,
-        type_predicate: None,
-        is_constructor: false,
-    });
-
-    let with_optional = interner.object(vec![PropertyInfo {
-        name: handle_name,
-        type_id: handle_fn,
-        write_type: handle_fn,
-        optional: true,
-        readonly: false,
-        is_method: true,
-    }]);
-
-    let with_required = interner.object(vec![PropertyInfo {
-        name: handle_name,
-        type_id: handle_fn,
-        write_type: handle_fn,
-        optional: false,
-        readonly: false,
-        is_method: true,
-    }]);
-
-    // Required can satisfy optional
-    assert!(checker.is_subtype_of(with_required, with_optional));
-    // Optional cannot satisfy required
-    assert!(!checker.is_subtype_of(with_optional, with_required));
-}
-
-#[test]
-fn test_class_method_with_overloads() {
-    // class Parser { parse(input: string): AST; parse(input: Buffer): AST }
-    let interner = TypeInterner::new();
-
-    let parse_name = interner.intern_string("parse");
-    let input_name = interner.intern_string("input");
-    let ast_name = interner.intern_string("AST");
-
-    let ast_type = interner.object(vec![PropertyInfo {
-        name: ast_name,
-        type_id: TypeId::STRING,
-        write_type: TypeId::STRING,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let parse_string = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![ParamInfo {
-            name: Some(input_name),
-            type_id: TypeId::STRING,
-            optional: false,
-            rest: false,
-        }],
-        this_type: None,
-        return_type: ast_type,
-        type_predicate: None,
-        is_constructor: false,
-    });
-
-    let parser = interner.object(vec![PropertyInfo {
-        name: parse_name,
-        type_id: parse_string,
-        write_type: parse_string,
-        optional: false,
-        readonly: false,
-        is_method: true,
-    }]);
-
-    assert!(parser != TypeId::ERROR);
-}
-
-#[test]
-fn test_class_getter_setter() {
-    // class Person { get name(): string; set name(v: string) }
-    let interner = TypeInterner::new();
-
-    let name_prop = interner.intern_string("name");
-
-    // Getter/setter modeled as property with read/write types
-    let person = interner.object(vec![PropertyInfo {
-        name: name_prop,
-        type_id: TypeId::STRING,       // getter return
-        write_type: TypeId::STRING,    // setter param
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    assert!(person != TypeId::ERROR);
-}
-
-#[test]
-fn test_class_extends_with_super_call() {
-    // class Animal { constructor(name: string) }
-    // class Dog extends Animal { constructor(name: string, breed: string) }
-    let interner = TypeInterner::new();
-
-    let name_name = interner.intern_string("name");
-    let breed_name = interner.intern_string("breed");
-
-    let animal_ctor = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![ParamInfo {
-            name: Some(name_name),
-            type_id: TypeId::STRING,
-            optional: false,
-            rest: false,
-        }],
-        this_type: None,
-        return_type: TypeId::VOID,
-        type_predicate: None,
-        is_constructor: true,
-    });
-
-    let dog_ctor = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![
-            ParamInfo {
-                name: Some(name_name),
-                type_id: TypeId::STRING,
-                optional: false,
-                rest: false,
-            },
-            ParamInfo {
-                name: Some(breed_name),
-                type_id: TypeId::STRING,
-                optional: false,
-                rest: false,
-            },
-        ],
-        this_type: None,
-        return_type: TypeId::VOID,
-        type_predicate: None,
-        is_constructor: true,
-    });
-
-    assert!(animal_ctor != TypeId::ERROR);
-    assert!(dog_ctor != TypeId::ERROR);
-}
-
-#[test]
-fn test_class_implements_generic_interface() {
-    // interface Comparable<T> { compareTo(other: T): number }
-    // class Person implements Comparable<Person> { compareTo(other: Person): number }
-    let interner = TypeInterner::new();
-    let mut checker = SubtypeChecker::new(&interner);
-
-    let compare_to_name = interner.intern_string("compareTo");
-    let other_name = interner.intern_string("other");
-
-    let person_type = interner.object(vec![]);
-
-    let compare_fn = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![ParamInfo {
-            name: Some(other_name),
-            type_id: person_type,
-            optional: false,
-            rest: false,
-        }],
-        this_type: None,
-        return_type: TypeId::NUMBER,
-        type_predicate: None,
-        is_constructor: false,
-    });
-
-    let comparable = interner.object(vec![PropertyInfo {
-        name: compare_to_name,
-        type_id: compare_fn,
-        write_type: compare_fn,
-        optional: false,
-        readonly: false,
-        is_method: true,
-    }]);
-
-    let person_with_compare = interner.object(vec![PropertyInfo {
-        name: compare_to_name,
-        type_id: compare_fn,
-        write_type: compare_fn,
-        optional: false,
-        readonly: false,
-        is_method: true,
-    }]);
-
-    assert!(checker.is_subtype_of(person_with_compare, comparable));
-}
-
-#[test]
-fn test_class_mixin_pattern() {
-    // Mixin: <T extends new(...args: any[]) => {}>(Base: T) => class extends Base { ... }
-    let interner = TypeInterner::new();
-
-    let mixin_name = interner.intern_string("mixin");
-    let args_name = interner.intern_string("args");
-
-    let any_array = interner.array(TypeId::ANY);
-    let empty_obj = interner.object(vec![]);
-
-    let base_ctor = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![ParamInfo {
-            name: Some(args_name),
-            type_id: any_array,
-            optional: false,
-            rest: true,
-        }],
-        this_type: None,
-        return_type: empty_obj,
-        type_predicate: None,
-        is_constructor: true,
-    });
-
-    assert!(base_ctor != TypeId::ERROR);
-}
-
-#[test]
-fn test_class_interface_extends_multiple() {
-    // interface A { a: string }
-    // interface B { b: number }
-    // interface C extends A, B { c: boolean }
-    let interner = TypeInterner::new();
-    let mut checker = SubtypeChecker::new(&interner);
-
-    let a_name = interner.intern_string("a");
-    let b_name = interner.intern_string("b");
-    let c_name = interner.intern_string("c");
-
-    let interface_a = interner.object(vec![PropertyInfo {
-        name: a_name,
-        type_id: TypeId::STRING,
-        write_type: TypeId::STRING,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let interface_b = interner.object(vec![PropertyInfo {
-        name: b_name,
-        type_id: TypeId::NUMBER,
-        write_type: TypeId::NUMBER,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let interface_c = interner.object(vec![
-        PropertyInfo {
-            name: a_name,
-            type_id: TypeId::STRING,
-            write_type: TypeId::STRING,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-        PropertyInfo {
-            name: b_name,
-            type_id: TypeId::NUMBER,
-            write_type: TypeId::NUMBER,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-        PropertyInfo {
-            name: c_name,
-            type_id: TypeId::BOOLEAN,
-            write_type: TypeId::BOOLEAN,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-    ]);
-
-    // C extends both A and B
-    assert!(checker.is_subtype_of(interface_c, interface_a));
-    assert!(checker.is_subtype_of(interface_c, interface_b));
-}
-
-#[test]
-fn test_class_method_this_return() {
-    // class Builder { setValue(v: string): this }
-    let interner = TypeInterner::new();
-
-    let set_value_name = interner.intern_string("setValue");
-    let v_name = interner.intern_string("v");
-
-    // 'this' type represented as a type parameter or special marker
-    let this_type = interner.object(vec![]); // Simplified representation
-
-    let set_value_fn = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![ParamInfo {
-            name: Some(v_name),
-            type_id: TypeId::STRING,
-            optional: false,
-            rest: false,
-        }],
-        this_type: Some(this_type),
-        return_type: this_type,
-        type_predicate: None,
-        is_constructor: false,
-    });
-
-    let builder = interner.object(vec![PropertyInfo {
-        name: set_value_name,
-        type_id: set_value_fn,
-        write_type: set_value_fn,
-        optional: false,
-        readonly: false,
-        is_method: true,
-    }]);
-
-    assert!(builder != TypeId::ERROR);
-}
-
-#[test]
-fn test_class_private_brand() {
-    // Private fields create nominal typing behavior
-    // class A { #private: string }
-    // class B { #private: string }
-    // A and B are not structurally compatible due to private brand
-    let interner = TypeInterner::new();
-
-    let private_a = interner.intern_string("#private_A");
-    let private_b = interner.intern_string("#private_B");
-
-    let class_a = interner.object(vec![PropertyInfo {
-        name: private_a,
-        type_id: TypeId::STRING,
-        write_type: TypeId::STRING,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let class_b = interner.object(vec![PropertyInfo {
-        name: private_b,
-        type_id: TypeId::STRING,
-        write_type: TypeId::STRING,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    // Different private fields - not subtypes of each other
-    let mut checker = SubtypeChecker::new(&interner);
-    assert!(!checker.is_subtype_of(class_a, class_b));
-    assert!(!checker.is_subtype_of(class_b, class_a));
-}
-
-#[test]
-fn test_class_index_signature() {
-    // class Dictionary { [key: string]: number }
-    let interner = TypeInterner::new();
-
-    let dict = interner.object_with_index(ObjectShape {
-        properties: vec![],
-        string_index: Some(IndexSignature {
-            key_type: TypeId::STRING,
-            value_type: TypeId::NUMBER,
-            readonly: false,
-        }),
-        number_index: None,
-    });
-
-    assert!(dict != TypeId::ERROR);
-}
-
-#[test]
-fn test_class_hybrid_type() {
-    // interface Counter { (start: number): string; interval: number; reset(): void }
-    let interner = TypeInterner::new();
-
-    let interval_name = interner.intern_string("interval");
-    let reset_name = interner.intern_string("reset");
-    let start_name = interner.intern_string("start");
-
-    // Callable signature
-    let _call_sig = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![ParamInfo {
-            name: Some(start_name),
-            type_id: TypeId::NUMBER,
-            optional: false,
-            rest: false,
-        }],
-        this_type: None,
-        return_type: TypeId::STRING,
-        type_predicate: None,
-        is_constructor: false,
-    });
-
-    let reset_fn = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![],
-        this_type: None,
-        return_type: TypeId::VOID,
-        type_predicate: None,
-        is_constructor: false,
-    });
-
-    // Object with properties (hybrid types combine callable + properties)
-    let counter = interner.object(vec![
-        PropertyInfo {
-            name: interval_name,
-            type_id: TypeId::NUMBER,
-            write_type: TypeId::NUMBER,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-        PropertyInfo {
-            name: reset_name,
-            type_id: reset_fn,
-            write_type: reset_fn,
-            optional: false,
-            readonly: false,
-            is_method: true,
-        },
-    ]);
-
-    assert!(counter != TypeId::ERROR);
-}
-
-// =============================================================================
-// Interface Type Tests - Extends, Merge Declarations, Excess Property Checks
-// =============================================================================
-
-#[test]
-fn test_interface_extends_single_v2() {
-    // interface Base { x: number }
-    // interface Derived extends Base { y: string }
-    let interner = TypeInterner::new();
-
-    let x_name = interner.intern_string("x");
-    let y_name = interner.intern_string("y");
-
-    let base = interner.object(vec![PropertyInfo {
-        name: x_name,
-        type_id: TypeId::NUMBER,
-        write_type: TypeId::NUMBER,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let derived = interner.object(vec![
-        PropertyInfo {
-            name: x_name,
-            type_id: TypeId::NUMBER,
-            write_type: TypeId::NUMBER,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-        PropertyInfo {
-            name: y_name,
-            type_id: TypeId::STRING,
-            write_type: TypeId::STRING,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-    ]);
-
-    let mut checker = SubtypeChecker::new(&interner);
-    assert!(checker.is_subtype_of(derived, base));
-    assert!(!checker.is_subtype_of(base, derived));
-}
-
-#[test]
-fn test_interface_extends_multiple_v2() {
-    // interface A { a: number }
-    // interface B { b: string }
-    // interface C extends A, B { c: boolean }
-    let interner = TypeInterner::new();
-
-    let a_name = interner.intern_string("a");
-    let b_name = interner.intern_string("b");
-    let c_name = interner.intern_string("c");
-
-    let iface_a = interner.object(vec![PropertyInfo {
-        name: a_name,
-        type_id: TypeId::NUMBER,
-        write_type: TypeId::NUMBER,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let iface_b = interner.object(vec![PropertyInfo {
-        name: b_name,
-        type_id: TypeId::STRING,
-        write_type: TypeId::STRING,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let iface_c = interner.object(vec![
-        PropertyInfo {
-            name: a_name,
-            type_id: TypeId::NUMBER,
-            write_type: TypeId::NUMBER,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-        PropertyInfo {
-            name: b_name,
-            type_id: TypeId::STRING,
-            write_type: TypeId::STRING,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-        PropertyInfo {
-            name: c_name,
-            type_id: TypeId::BOOLEAN,
-            write_type: TypeId::BOOLEAN,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-    ]);
-
-    let mut checker = SubtypeChecker::new(&interner);
-    assert!(checker.is_subtype_of(iface_c, iface_a));
-    assert!(checker.is_subtype_of(iface_c, iface_b));
-    assert!(!checker.is_subtype_of(iface_a, iface_c));
-    assert!(!checker.is_subtype_of(iface_b, iface_c));
-}
-
-#[test]
-fn test_interface_merge_declarations_simple() {
-    // interface Foo { x: number }
-    // interface Foo { y: string }
-    // Merged: { x: number; y: string }
-    let interner = TypeInterner::new();
-
-    let x_name = interner.intern_string("x");
-    let y_name = interner.intern_string("y");
-
-    // Merged interface
-    let merged = interner.object(vec![
-        PropertyInfo {
-            name: x_name,
-            type_id: TypeId::NUMBER,
-            write_type: TypeId::NUMBER,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-        PropertyInfo {
-            name: y_name,
-            type_id: TypeId::STRING,
-            write_type: TypeId::STRING,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-    ]);
-
-    // Each partial declaration
-    let decl1 = interner.object(vec![PropertyInfo {
-        name: x_name,
-        type_id: TypeId::NUMBER,
-        write_type: TypeId::NUMBER,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let decl2 = interner.object(vec![PropertyInfo {
-        name: y_name,
-        type_id: TypeId::STRING,
-        write_type: TypeId::STRING,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let mut checker = SubtypeChecker::new(&interner);
-    // Merged is subtype of each declaration
-    assert!(checker.is_subtype_of(merged, decl1));
-    assert!(checker.is_subtype_of(merged, decl2));
-}
-
-#[test]
-fn test_interface_merge_with_methods() {
-    // interface Foo { method(x: number): void }
-    // interface Foo { method(x: string): void }
-    // Merged: overloaded method
-    let interner = TypeInterner::new();
-
-    let method_name = interner.intern_string("method");
-    let x_name = interner.intern_string("x");
-
-    let method_number = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![ParamInfo {
-            name: Some(x_name),
-            type_id: TypeId::NUMBER,
-            optional: false,
-            rest: false,
-        }],
-        this_type: None,
-        return_type: TypeId::VOID,
-        type_predicate: None,
-        is_constructor: false,
-    });
-
-    let method_string = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![ParamInfo {
-            name: Some(x_name),
-            type_id: TypeId::STRING,
-            optional: false,
-            rest: false,
-        }],
-        this_type: None,
-        return_type: TypeId::VOID,
-        type_predicate: None,
-        is_constructor: false,
-    });
-
-    let iface_with_number = interner.object(vec![PropertyInfo {
-        name: method_name,
-        type_id: method_number,
-        write_type: method_number,
-        optional: false,
-        readonly: false,
-        is_method: true,
-    }]);
-
-    let iface_with_string = interner.object(vec![PropertyInfo {
-        name: method_name,
-        type_id: method_string,
-        write_type: method_string,
-        optional: false,
-        readonly: false,
-        is_method: true,
-    }]);
-
-    assert!(iface_with_number != TypeId::ERROR);
-    assert!(iface_with_string != TypeId::ERROR);
-}
-
-#[test]
-fn test_excess_property_check_basic() {
-    // Target: { x: number }
-    // Source: { x: number, y: string } - excess property 'y'
-    let interner = TypeInterner::new();
-
-    let x_name = interner.intern_string("x");
-    let y_name = interner.intern_string("y");
-
-    let target = interner.object(vec![PropertyInfo {
-        name: x_name,
-        type_id: TypeId::NUMBER,
-        write_type: TypeId::NUMBER,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let source_with_excess = interner.object(vec![
-        PropertyInfo {
-            name: x_name,
-            type_id: TypeId::NUMBER,
-            write_type: TypeId::NUMBER,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-        PropertyInfo {
-            name: y_name,
-            type_id: TypeId::STRING,
-            write_type: TypeId::STRING,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-    ]);
-
-    // Structurally, source is still subtype (excess props allowed in subtyping)
-    let mut checker = SubtypeChecker::new(&interner);
-    assert!(checker.is_subtype_of(source_with_excess, target));
-}
-
-#[test]
-fn test_excess_property_check_with_index_signature() {
-    // Target: { x: number; [key: string]: any }
-    // Source: { x: number, y: string } - y is allowed due to index signature
-    let interner = TypeInterner::new();
-
-    let x_name = interner.intern_string("x");
-    let y_name = interner.intern_string("y");
-
-    let target = interner.object_with_index(ObjectShape {
-        properties: vec![PropertyInfo {
-            name: x_name,
-            type_id: TypeId::NUMBER,
-            write_type: TypeId::NUMBER,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        }],
-        string_index: Some(IndexSignature {
-            key_type: TypeId::STRING,
-            value_type: TypeId::ANY,
-            readonly: false,
-        }),
-        number_index: None,
-    });
-
-    let source = interner.object(vec![
-        PropertyInfo {
-            name: x_name,
-            type_id: TypeId::NUMBER,
-            write_type: TypeId::NUMBER,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-        PropertyInfo {
-            name: y_name,
-            type_id: TypeId::STRING,
-            write_type: TypeId::STRING,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-    ]);
-
-    let mut checker = SubtypeChecker::new(&interner);
-    assert!(checker.is_subtype_of(source, target));
-}
-
-#[test]
-fn test_interface_with_optional_properties() {
-    // interface A { x: number; y?: string }
-    // interface B { x: number }
-    let interner = TypeInterner::new();
-
-    let x_name = interner.intern_string("x");
-    let y_name = interner.intern_string("y");
-
-    let with_optional = interner.object(vec![
-        PropertyInfo {
-            name: x_name,
-            type_id: TypeId::NUMBER,
-            write_type: TypeId::NUMBER,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-        PropertyInfo {
-            name: y_name,
-            type_id: TypeId::STRING,
-            write_type: TypeId::STRING,
-            optional: true,
-            readonly: false,
-            is_method: false,
-        },
-    ]);
-
-    let without_optional = interner.object(vec![PropertyInfo {
-        name: x_name,
-        type_id: TypeId::NUMBER,
-        write_type: TypeId::NUMBER,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let mut checker = SubtypeChecker::new(&interner);
-    // Without optional is subtype of with optional (missing optional is ok)
-    assert!(checker.is_subtype_of(without_optional, with_optional));
-}
-
-#[test]
-fn test_interface_extends_with_narrower_type() {
-    // interface Base { x: number | string }
-    // interface Derived extends Base { x: number } // narrower
-    let interner = TypeInterner::new();
-
-    let x_name = interner.intern_string("x");
-
-    let union_type = interner.union(vec![TypeId::NUMBER, TypeId::STRING]);
-
-    let base = interner.object(vec![PropertyInfo {
-        name: x_name,
-        type_id: union_type,
-        write_type: union_type,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let derived = interner.object(vec![PropertyInfo {
-        name: x_name,
-        type_id: TypeId::NUMBER,
-        write_type: TypeId::NUMBER,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let mut checker = SubtypeChecker::new(&interner);
-    assert!(checker.is_subtype_of(derived, base));
-    assert!(!checker.is_subtype_of(base, derived));
-}
-
-#[test]
-fn test_interface_with_readonly_properties() {
-    // interface A { readonly x: number }
-    // interface B { x: number }
-    let interner = TypeInterner::new();
-
-    let x_name = interner.intern_string("x");
-
-    let readonly_iface = interner.object(vec![PropertyInfo {
-        name: x_name,
-        type_id: TypeId::NUMBER,
-        write_type: TypeId::NUMBER,
-        optional: false,
-        readonly: true,
-        is_method: false,
-    }]);
-
-    let mutable_iface = interner.object(vec![PropertyInfo {
-        name: x_name,
-        type_id: TypeId::NUMBER,
-        write_type: TypeId::NUMBER,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let mut checker = SubtypeChecker::new(&interner);
-    // Mutable can be assigned to readonly (covariant for reads)
-    assert!(checker.is_subtype_of(mutable_iface, readonly_iface));
-}
-
-#[test]
-fn test_interface_with_call_signature() {
-    // interface Callable { (x: number): string }
-    let interner = TypeInterner::new();
-
-    let x_name = interner.intern_string("x");
-
-    let call_sig = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![ParamInfo {
-            name: Some(x_name),
-            type_id: TypeId::NUMBER,
-            optional: false,
-            rest: false,
-        }],
-        this_type: None,
-        return_type: TypeId::STRING,
-        type_predicate: None,
-        is_constructor: false,
-    });
-
-    assert!(call_sig != TypeId::ERROR);
-}
-
-#[test]
-fn test_interface_with_construct_signature() {
-    // interface Constructable { new(x: number): Object }
-    let interner = TypeInterner::new();
-
-    let x_name = interner.intern_string("x");
-
-    let construct_sig = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![ParamInfo {
-            name: Some(x_name),
-            type_id: TypeId::NUMBER,
-            optional: false,
-            rest: false,
-        }],
-        this_type: None,
-        return_type: TypeId::OBJECT,
-        type_predicate: None,
-        is_constructor: true,
-    });
-
-    assert!(construct_sig != TypeId::ERROR);
-}
-
-#[test]
-fn test_interface_extends_generic() {
-    // interface Base<T> { value: T }
-    // interface Derived<T> extends Base<T> { extra: string }
-    let interner = TypeInterner::new();
-
-    let value_name = interner.intern_string("value");
-    let extra_name = interner.intern_string("extra");
-
-    // Instantiated with number
-    let base_number = interner.object(vec![PropertyInfo {
-        name: value_name,
-        type_id: TypeId::NUMBER,
-        write_type: TypeId::NUMBER,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let derived_number = interner.object(vec![
-        PropertyInfo {
-            name: value_name,
-            type_id: TypeId::NUMBER,
-            write_type: TypeId::NUMBER,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-        PropertyInfo {
-            name: extra_name,
-            type_id: TypeId::STRING,
-            write_type: TypeId::STRING,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-    ]);
-
-    let mut checker = SubtypeChecker::new(&interner);
-    assert!(checker.is_subtype_of(derived_number, base_number));
-}
-
-#[test]
-fn test_interface_diamond_extends_v2() {
-    // interface A { a: number }
-    // interface B extends A { b: string }
-    // interface C extends A { c: boolean }
-    // interface D extends B, C { d: number }
-    let interner = TypeInterner::new();
-
-    let a_name = interner.intern_string("a");
-    let b_name = interner.intern_string("b");
-    let c_name = interner.intern_string("c");
-    let d_name = interner.intern_string("d");
-
-    let iface_a = interner.object(vec![PropertyInfo {
-        name: a_name,
-        type_id: TypeId::NUMBER,
-        write_type: TypeId::NUMBER,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let iface_d = interner.object(vec![
-        PropertyInfo {
-            name: a_name,
-            type_id: TypeId::NUMBER,
-            write_type: TypeId::NUMBER,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-        PropertyInfo {
-            name: b_name,
-            type_id: TypeId::STRING,
-            write_type: TypeId::STRING,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-        PropertyInfo {
-            name: c_name,
-            type_id: TypeId::BOOLEAN,
-            write_type: TypeId::BOOLEAN,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-        PropertyInfo {
-            name: d_name,
-            type_id: TypeId::NUMBER,
-            write_type: TypeId::NUMBER,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-    ]);
-
-    let mut checker = SubtypeChecker::new(&interner);
-    assert!(checker.is_subtype_of(iface_d, iface_a));
-}
-
-#[test]
-fn test_interface_merge_with_different_property_types_error() {
-    // interface Foo { x: number }
-    // interface Foo { x: string } // Error - incompatible types
-    // This should fail subtype check between declarations
-    let interner = TypeInterner::new();
-
-    let x_name = interner.intern_string("x");
-
-    let decl1 = interner.object(vec![PropertyInfo {
-        name: x_name,
-        type_id: TypeId::NUMBER,
-        write_type: TypeId::NUMBER,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let decl2 = interner.object(vec![PropertyInfo {
-        name: x_name,
-        type_id: TypeId::STRING,
-        write_type: TypeId::STRING,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let mut checker = SubtypeChecker::new(&interner);
-    // Neither is subtype of the other due to incompatible property types
-    assert!(!checker.is_subtype_of(decl1, decl2));
-    assert!(!checker.is_subtype_of(decl2, decl1));
-}
-
-#[test]
-fn test_interface_with_function_property() {
-    // interface A { fn: (x: number) => string }
-    let interner = TypeInterner::new();
-
-    let fn_name = interner.intern_string("fn");
-    let x_name = interner.intern_string("x");
-
-    let fn_type = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![ParamInfo {
-            name: Some(x_name),
-            type_id: TypeId::NUMBER,
-            optional: false,
-            rest: false,
-        }],
-        this_type: None,
-        return_type: TypeId::STRING,
-        type_predicate: None,
-        is_constructor: false,
-    });
-
-    let iface = interner.object(vec![PropertyInfo {
-        name: fn_name,
-        type_id: fn_type,
-        write_type: fn_type,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    assert!(iface != TypeId::ERROR);
-}
-
-#[test]
-fn test_interface_covariant_method_return() {
-    // interface Base { method(): Animal }
-    // interface Derived extends Base { method(): Dog }
-    let interner = TypeInterner::new();
-
-    let method_name = interner.intern_string("method");
-    let name_prop = interner.intern_string("name");
-    let breed_prop = interner.intern_string("breed");
-
-    // Animal: { name: string }
-    let animal = interner.object(vec![PropertyInfo {
-        name: name_prop,
-        type_id: TypeId::STRING,
-        write_type: TypeId::STRING,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    // Dog: { name: string, breed: string }
-    let dog = interner.object(vec![
-        PropertyInfo {
-            name: name_prop,
-            type_id: TypeId::STRING,
-            write_type: TypeId::STRING,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-        PropertyInfo {
-            name: breed_prop,
-            type_id: TypeId::STRING,
-            write_type: TypeId::STRING,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-    ]);
-
-    let method_returns_animal = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![],
-        this_type: None,
-        return_type: animal,
-        type_predicate: None,
-        is_constructor: false,
-    });
-
-    let method_returns_dog = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![],
-        this_type: None,
-        return_type: dog,
-        type_predicate: None,
-        is_constructor: false,
-    });
-
-    let base_iface = interner.object(vec![PropertyInfo {
-        name: method_name,
-        type_id: method_returns_animal,
-        write_type: method_returns_animal,
-        optional: false,
-        readonly: false,
-        is_method: true,
-    }]);
-
-    let derived_iface = interner.object(vec![PropertyInfo {
-        name: method_name,
-        type_id: method_returns_dog,
-        write_type: method_returns_dog,
-        optional: false,
-        readonly: false,
-        is_method: true,
-    }]);
-
-    let mut checker = SubtypeChecker::new(&interner);
-    assert!(checker.is_subtype_of(derived_iface, base_iface));
-}
-
-#[test]
-fn test_interface_contravariant_method_params() {
-    // interface Base { method(x: Dog): void }
-    // interface Derived extends Base { method(x: Animal): void } // contravariant
-    let interner = TypeInterner::new();
-
-    let method_name = interner.intern_string("method");
-    let x_name = interner.intern_string("x");
-    let name_prop = interner.intern_string("name");
-    let breed_prop = interner.intern_string("breed");
-
-    // Animal: { name: string }
-    let animal = interner.object(vec![PropertyInfo {
-        name: name_prop,
-        type_id: TypeId::STRING,
-        write_type: TypeId::STRING,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    // Dog: { name: string, breed: string }
-    let dog = interner.object(vec![
-        PropertyInfo {
-            name: name_prop,
-            type_id: TypeId::STRING,
-            write_type: TypeId::STRING,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-        PropertyInfo {
-            name: breed_prop,
-            type_id: TypeId::STRING,
-            write_type: TypeId::STRING,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-    ]);
-
-    let method_takes_dog = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![ParamInfo {
-            name: Some(x_name),
-            type_id: dog,
-            optional: false,
-            rest: false,
-        }],
-        this_type: None,
-        return_type: TypeId::VOID,
-        type_predicate: None,
-        is_constructor: false,
-    });
-
-    let method_takes_animal = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![ParamInfo {
-            name: Some(x_name),
-            type_id: animal,
-            optional: false,
-            rest: false,
-        }],
-        this_type: None,
-        return_type: TypeId::VOID,
-        type_predicate: None,
-        is_constructor: false,
-    });
-
-    let base_iface = interner.object(vec![PropertyInfo {
-        name: method_name,
-        type_id: method_takes_dog,
-        write_type: method_takes_dog,
-        optional: false,
-        readonly: false,
-        is_method: true,
-    }]);
-
-    let derived_iface = interner.object(vec![PropertyInfo {
-        name: method_name,
-        type_id: method_takes_animal,
-        write_type: method_takes_animal,
-        optional: false,
-        readonly: false,
-        is_method: true,
-    }]);
-
-    let mut checker = SubtypeChecker::new(&interner);
-    // Derived (takes Animal) is subtype of Base (takes Dog) due to contravariance
-    assert!(checker.is_subtype_of(derived_iface, base_iface));
-}
-
-#[test]
-fn test_interface_with_string_index() {
-    // interface StringMap { [key: string]: number }
-    let interner = TypeInterner::new();
-
-    let string_map = interner.object_with_index(ObjectShape {
-        properties: vec![],
-        string_index: Some(IndexSignature {
-            key_type: TypeId::STRING,
-            value_type: TypeId::NUMBER,
-            readonly: false,
-        }),
-        number_index: None,
-    });
-
-    // Object with specific property should be subtype
-    let x_name = interner.intern_string("x");
-    let specific = interner.object(vec![PropertyInfo {
-        name: x_name,
-        type_id: TypeId::NUMBER,
-        write_type: TypeId::NUMBER,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let mut checker = SubtypeChecker::new(&interner);
-    assert!(checker.is_subtype_of(specific, string_map));
-}
-
-#[test]
-fn test_interface_with_number_index() {
-    // interface NumberMap { [index: number]: string }
-    let interner = TypeInterner::new();
-
-    let number_map = interner.object_with_index(ObjectShape {
-        properties: vec![],
-        string_index: None,
-        number_index: Some(IndexSignature {
-            key_type: TypeId::NUMBER,
-            value_type: TypeId::STRING,
-            readonly: false,
-        }),
-    });
-
-    assert!(number_map != TypeId::ERROR);
-}
-
-#[test]
-fn test_interface_index_must_match_properties() {
-    // interface A { x: number; [key: string]: number }
-    // Property x must be compatible with index signature
-    let interner = TypeInterner::new();
-
-    let x_name = interner.intern_string("x");
-
-    let compatible = interner.object_with_index(ObjectShape {
-        properties: vec![PropertyInfo {
-            name: x_name,
-            type_id: TypeId::NUMBER,
-            write_type: TypeId::NUMBER,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        }],
-        string_index: Some(IndexSignature {
-            key_type: TypeId::STRING,
-            value_type: TypeId::NUMBER,
-            readonly: false,
-        }),
-        number_index: None,
-    });
-
-    assert!(compatible != TypeId::ERROR);
-}
-
-#[test]
-fn test_interface_merge_adds_properties() {
-    // interface Window { name: string }
-    // interface Window { location: string }
-    // Merged has both
-    let interner = TypeInterner::new();
-
-    let name_prop = interner.intern_string("name");
-    let location_prop = interner.intern_string("location");
-
-    let merged_window = interner.object(vec![
-        PropertyInfo {
-            name: name_prop,
-            type_id: TypeId::STRING,
-            write_type: TypeId::STRING,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-        PropertyInfo {
-            name: location_prop,
-            type_id: TypeId::STRING,
-            write_type: TypeId::STRING,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-    ]);
-
-    let only_name = interner.object(vec![PropertyInfo {
-        name: name_prop,
-        type_id: TypeId::STRING,
-        write_type: TypeId::STRING,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let mut checker = SubtypeChecker::new(&interner);
-    assert!(checker.is_subtype_of(merged_window, only_name));
-}
-
-#[test]
-fn test_interface_empty() {
-    // interface Empty {}
-    let interner = TypeInterner::new();
-
-    let empty = interner.object(vec![]);
-
-    // Everything is subtype of empty interface
-    let x_name = interner.intern_string("x");
-    let with_props = interner.object(vec![PropertyInfo {
-        name: x_name,
-        type_id: TypeId::NUMBER,
-        write_type: TypeId::NUMBER,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let mut checker = SubtypeChecker::new(&interner);
-    assert!(checker.is_subtype_of(with_props, empty));
-    assert!(checker.is_subtype_of(empty, empty));
-}
-
-#[test]
-fn test_interface_with_never_property() {
-    // interface A { x: never }
-    let interner = TypeInterner::new();
-
-    let x_name = interner.intern_string("x");
-
-    let with_never = interner.object(vec![PropertyInfo {
-        name: x_name,
-        type_id: TypeId::NEVER,
-        write_type: TypeId::NEVER,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    assert!(with_never != TypeId::ERROR);
-}
-
-#[test]
-fn test_interface_with_unknown_property() {
-    // interface A { x: unknown }
-    let interner = TypeInterner::new();
-
-    let x_name = interner.intern_string("x");
-
-    let with_unknown = interner.object(vec![PropertyInfo {
-        name: x_name,
-        type_id: TypeId::UNKNOWN,
-        write_type: TypeId::UNKNOWN,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let with_number = interner.object(vec![PropertyInfo {
-        name: x_name,
-        type_id: TypeId::NUMBER,
-        write_type: TypeId::NUMBER,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let mut checker = SubtypeChecker::new(&interner);
-    // number is subtype of unknown
-    assert!(checker.is_subtype_of(with_number, with_unknown));
-}
-
-#[test]
-fn test_interface_extends_with_additional_optional() {
-    // interface Base { x: number }
-    // interface Derived extends Base { y?: string }
-    let interner = TypeInterner::new();
-
-    let x_name = interner.intern_string("x");
-    let y_name = interner.intern_string("y");
-
-    let base = interner.object(vec![PropertyInfo {
-        name: x_name,
-        type_id: TypeId::NUMBER,
-        write_type: TypeId::NUMBER,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let derived = interner.object(vec![
-        PropertyInfo {
-            name: x_name,
-            type_id: TypeId::NUMBER,
-            write_type: TypeId::NUMBER,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-        PropertyInfo {
-            name: y_name,
-            type_id: TypeId::STRING,
-            write_type: TypeId::STRING,
-            optional: true,
-            readonly: false,
-            is_method: false,
-        },
-    ]);
-
-    let mut checker = SubtypeChecker::new(&interner);
-    assert!(checker.is_subtype_of(derived, base));
-}
-
-#[test]
-fn test_interface_recursive_property() {
-    // interface Node { next?: Node }
-    use crate::solver::types::SymbolRef;
-
-    let interner = TypeInterner::new();
-
-    let next_name = interner.intern_string("next");
-    let node_ref = interner.reference(SymbolRef(1));
-
-    let node = interner.object(vec![PropertyInfo {
-        name: next_name,
-        type_id: node_ref,
-        write_type: node_ref,
-        optional: true,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    assert!(node != TypeId::ERROR);
-}
-
-#[test]
-fn test_interface_with_tuple_property() {
-    // interface A { pair: [number, string] }
-    let interner = TypeInterner::new();
-
-    let pair_name = interner.intern_string("pair");
-    let tuple = interner.tuple(vec![TypeId::NUMBER, TypeId::STRING]);
-
-    let iface = interner.object(vec![PropertyInfo {
-        name: pair_name,
-        type_id: tuple,
-        write_type: tuple,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    assert!(iface != TypeId::ERROR);
-}
-
-#[test]
-fn test_interface_with_array_property() {
-    // interface A { items: number[] }
-    let interner = TypeInterner::new();
-
-    let items_name = interner.intern_string("items");
-    let number_array = interner.array(TypeId::NUMBER);
-
-    let iface = interner.object(vec![PropertyInfo {
-        name: items_name,
-        type_id: number_array,
-        write_type: number_array,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    assert!(iface != TypeId::ERROR);
-}
-
-#[test]
-fn test_interface_intersection_merge() {
-    // type Merged = A & B (similar to merge)
-    let interner = TypeInterner::new();
-
-    let a_name = interner.intern_string("a");
-    let b_name = interner.intern_string("b");
-
-    let iface_a = interner.object(vec![PropertyInfo {
-        name: a_name,
-        type_id: TypeId::NUMBER,
-        write_type: TypeId::NUMBER,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let iface_b = interner.object(vec![PropertyInfo {
-        name: b_name,
-        type_id: TypeId::STRING,
-        write_type: TypeId::STRING,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let intersection = interner.intersection(vec![iface_a, iface_b]);
-
-    assert!(intersection != TypeId::ERROR);
-}
-
-#[test]
-fn test_interface_with_symbol_property() {
-    // interface A { [Symbol.iterator]: () => Iterator }
-    let interner = TypeInterner::new();
-
-    let iterator_name = interner.intern_string("Symbol.iterator");
-
-    let iterator_fn = interner.function(FunctionShape {
+    // Simulated: { [Symbol.iterator]: () => Iterator }
+    let sym_iterator = interner.intern_string("Symbol.iterator");
+    let fn_iterator = interner.function(FunctionShape {
         type_params: vec![],
         params: vec![],
         this_type: None,
@@ -22650,13 +21140,17 @@ fn test_interface_with_symbol_property() {
         is_constructor: false,
     });
 
-    let iface = interner.object(vec![PropertyInfo {
-        name: iterator_name,
-        type_id: iterator_fn,
-        write_type: iterator_fn,
+    let obj = interner.object(vec![PropertyInfo {
+        name: sym_iterator,
+        type_id: fn_iterator,
+        write_type: fn_iterator,
         optional: false,
         readonly: false,
         is_method: true,
     }]);
 
-    assert!(iface != TypeId::ERROR);
+    let keyof_obj = interner.intern(TypeKey::KeyOf(obj));
+
+    // Should include the symbol key
+    assert!(keyof_obj != TypeId::NEVER);
+}
