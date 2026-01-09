@@ -26320,3 +26320,575 @@ class BoundMethods {
         output
     );
 }
+
+// =============================================================================
+// VARIADIC TUPLE PATTERNS - ES5 TRANSFORMATION TESTS
+// =============================================================================
+
+/// Test: spread in tuple types
+/// Verifies that classes using spread in tuple types transform correctly to ES5
+#[test]
+fn test_class_es5_spread_in_tuples() {
+    let source = r#"
+type Concat<T extends unknown[], U extends unknown[]> = [...T, ...U];
+type Prepend<T, U extends unknown[]> = [T, ...U];
+type Append<T extends unknown[], U> = [...T, U];
+
+class TupleConcatenator {
+    concat<T extends unknown[], U extends unknown[]>(first: T, second: U): Concat<T, U> {
+        return [...first, ...second] as Concat<T, U>;
+    }
+
+    prepend<T, U extends unknown[]>(item: T, tuple: U): Prepend<T, U> {
+        return [item, ...tuple] as Prepend<T, U>;
+    }
+
+    append<T extends unknown[], U>(tuple: T, item: U): Append<T, U> {
+        return [...tuple, item] as Append<T, U>;
+    }
+}
+
+class ArraySpreadHandler {
+    private items: unknown[] = [];
+
+    spreadAndCollect<T extends unknown[]>(...args: T): T {
+        this.items.push(...args);
+        return args;
+    }
+
+    mergeArrays<T extends unknown[], U extends unknown[]>(a: T, b: U): [...T, ...U] {
+        return [...a, ...b] as [...T, ...U];
+    }
+
+    wrapInTuple<T extends unknown[]>(items: T): [string, ...T, string] {
+        return ["start", ...items, "end"] as [string, ...T, string];
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function TupleConcatenator"),
+        "Expected TupleConcatenator function: {}",
+        output
+    );
+    assert!(
+        output.contains("TupleConcatenator.prototype.concat"),
+        "Expected concat method: {}",
+        output
+    );
+    assert!(
+        output.contains("TupleConcatenator.prototype.prepend") && output.contains("TupleConcatenator.prototype.append"),
+        "Expected prepend and append methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function ArraySpreadHandler"),
+        "Expected ArraySpreadHandler function: {}",
+        output
+    );
+    assert!(
+        output.contains("ArraySpreadHandler.prototype.spreadAndCollect"),
+        "Expected spreadAndCollect method: {}",
+        output
+    );
+    assert!(
+        output.contains("ArraySpreadHandler.prototype.mergeArrays") && output.contains("ArraySpreadHandler.prototype.wrapInTuple"),
+        "Expected mergeArrays and wrapInTuple methods: {}",
+        output
+    );
+}
+
+/// Test: labeled tuple elements
+/// Verifies that classes using labeled tuple elements transform correctly to ES5
+#[test]
+fn test_class_es5_labeled_tuple_elements() {
+    let source = r#"
+type Point2D = [x: number, y: number];
+type Point3D = [x: number, y: number, z: number];
+type NamedRange = [start: number, end: number, label: string];
+
+class PointFactory {
+    create2D(x: number, y: number): Point2D {
+        return [x, y];
+    }
+
+    create3D(x: number, y: number, z: number): Point3D {
+        return [x, y, z];
+    }
+
+    distance2D(a: Point2D, b: Point2D): number {
+        const [ax, ay] = a;
+        const [bx, by] = b;
+        return Math.sqrt((bx - ax) ** 2 + (by - ay) ** 2);
+    }
+
+    to3D(point: Point2D, z: number): Point3D {
+        return [...point, z];
+    }
+}
+
+type PersonTuple = [name: string, age: number, active: boolean];
+type ExtendedPerson = [...PersonTuple, role: string];
+
+class TupleTransformer {
+    createPerson(name: string, age: number, active: boolean): PersonTuple {
+        return [name, age, active];
+    }
+
+    extendPerson(person: PersonTuple, role: string): ExtendedPerson {
+        return [...person, role];
+    }
+
+    extractName(person: PersonTuple): string {
+        const [name] = person;
+        return name;
+    }
+
+    createRange(start: number, end: number, label: string): NamedRange {
+        return [start, end, label];
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function PointFactory"),
+        "Expected PointFactory function: {}",
+        output
+    );
+    assert!(
+        output.contains("PointFactory.prototype.create2D") && output.contains("PointFactory.prototype.create3D"),
+        "Expected create2D and create3D methods: {}",
+        output
+    );
+    assert!(
+        output.contains("PointFactory.prototype.distance2D"),
+        "Expected distance2D method: {}",
+        output
+    );
+    assert!(
+        output.contains("PointFactory.prototype.to3D"),
+        "Expected to3D method: {}",
+        output
+    );
+    assert!(
+        output.contains("function TupleTransformer"),
+        "Expected TupleTransformer function: {}",
+        output
+    );
+    assert!(
+        output.contains("TupleTransformer.prototype.createPerson") && output.contains("TupleTransformer.prototype.extendPerson"),
+        "Expected TupleTransformer methods: {}",
+        output
+    );
+}
+
+/// Test: rest elements in tuple types
+/// Verifies that classes using rest elements in tuples transform correctly to ES5
+#[test]
+fn test_class_es5_rest_elements_in_tuples() {
+    let source = r#"
+type HeadAndTail<T extends unknown[]> = T extends [infer H, ...infer R] ? [H, R] : never;
+type FirstTwo<T extends unknown[]> = T extends [infer A, infer B, ...unknown[]] ? [A, B] : never;
+type Last<T extends unknown[]> = T extends [...unknown[], infer L] ? L : never;
+
+class TupleDestructor {
+    getHead<T extends [unknown, ...unknown[]]>(tuple: T): T[0] {
+        return tuple[0];
+    }
+
+    getTail<T extends [unknown, ...unknown[]]>(tuple: T): T extends [unknown, ...infer R] ? R : never {
+        const [, ...rest] = tuple;
+        return rest as any;
+    }
+
+    getFirstTwo<T extends [unknown, unknown, ...unknown[]]>(tuple: T): [T[0], T[1]] {
+        return [tuple[0], tuple[1]];
+    }
+
+    getLast<T extends [...unknown[], unknown]>(tuple: T): T extends [...unknown[], infer L] ? L : never {
+        return tuple[tuple.length - 1] as any;
+    }
+}
+
+class RestParamHandler {
+    collectRest<H, T extends unknown[]>(head: H, ...tail: T): [H, ...T] {
+        return [head, ...tail];
+    }
+
+    processWithRest<A, B, R extends unknown[]>(a: A, b: B, ...rest: R): { first: A; second: B; rest: R } {
+        return { first: a, second: b, rest };
+    }
+
+    spreadMiddle<H, M extends unknown[], T>(head: H, middle: M, tail: T): [H, ...M, T] {
+        return [head, ...middle, tail];
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function TupleDestructor"),
+        "Expected TupleDestructor function: {}",
+        output
+    );
+    assert!(
+        output.contains("TupleDestructor.prototype.getHead") && output.contains("TupleDestructor.prototype.getTail"),
+        "Expected getHead and getTail methods: {}",
+        output
+    );
+    assert!(
+        output.contains("TupleDestructor.prototype.getFirstTwo") && output.contains("TupleDestructor.prototype.getLast"),
+        "Expected getFirstTwo and getLast methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function RestParamHandler"),
+        "Expected RestParamHandler function: {}",
+        output
+    );
+    assert!(
+        output.contains("RestParamHandler.prototype.collectRest") && output.contains("RestParamHandler.prototype.processWithRest"),
+        "Expected RestParamHandler methods: {}",
+        output
+    );
+}
+
+/// Test: tuple manipulation utilities
+/// Verifies that classes using tuple manipulation types transform correctly to ES5
+#[test]
+fn test_class_es5_tuple_manipulation() {
+    let source = r#"
+type Reverse<T extends unknown[]> = T extends [infer H, ...infer R] ? [...Reverse<R>, H] : [];
+type Length<T extends unknown[]> = T["length"];
+type Pop<T extends unknown[]> = T extends [...infer R, unknown] ? R : never;
+type Shift<T extends unknown[]> = T extends [unknown, ...infer R] ? R : never;
+
+class TupleManipulator {
+    reverse<T extends unknown[]>(tuple: T): unknown[] {
+        return [...tuple].reverse();
+    }
+
+    getLength<T extends unknown[]>(tuple: T): Length<T> {
+        return tuple.length as Length<T>;
+    }
+
+    pop<T extends unknown[]>(tuple: T): Pop<T> {
+        const result = [...tuple];
+        result.pop();
+        return result as Pop<T>;
+    }
+
+    shift<T extends unknown[]>(tuple: T): Shift<T> {
+        const [, ...rest] = tuple;
+        return rest as Shift<T>;
+    }
+}
+
+type Take<T extends unknown[], N extends number, R extends unknown[] = []> =
+    R["length"] extends N ? R : T extends [infer H, ...infer T2] ? Take<T2, N, [...R, H]> : R;
+
+class TupleSlice {
+    take<T extends unknown[]>(tuple: T, count: number): unknown[] {
+        return tuple.slice(0, count);
+    }
+
+    skip<T extends unknown[]>(tuple: T, count: number): unknown[] {
+        return tuple.slice(count);
+    }
+
+    slice<T extends unknown[]>(tuple: T, start: number, end: number): unknown[] {
+        return tuple.slice(start, end);
+    }
+
+    splitAt<T extends unknown[]>(tuple: T, index: number): [unknown[], unknown[]] {
+        return [tuple.slice(0, index), tuple.slice(index)];
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function TupleManipulator"),
+        "Expected TupleManipulator function: {}",
+        output
+    );
+    assert!(
+        output.contains("TupleManipulator.prototype.reverse") && output.contains("TupleManipulator.prototype.getLength"),
+        "Expected reverse and getLength methods: {}",
+        output
+    );
+    assert!(
+        output.contains("TupleManipulator.prototype.pop") && output.contains("TupleManipulator.prototype.shift"),
+        "Expected pop and shift methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function TupleSlice"),
+        "Expected TupleSlice function: {}",
+        output
+    );
+    assert!(
+        output.contains("TupleSlice.prototype.take") && output.contains("TupleSlice.prototype.skip"),
+        "Expected take and skip methods: {}",
+        output
+    );
+    assert!(
+        output.contains("TupleSlice.prototype.splitAt"),
+        "Expected splitAt method: {}",
+        output
+    );
+}
+
+/// Test: optional tuple elements
+/// Verifies that classes using optional tuple elements transform correctly to ES5
+#[test]
+fn test_class_es5_optional_tuple_elements() {
+    let source = r#"
+type OptionalCoords = [x: number, y: number, z?: number];
+type ConfigTuple = [name: string, value: unknown, description?: string, tags?: string[]];
+
+class CoordinateHandler {
+    create(x: number, y: number, z?: number): OptionalCoords {
+        if (z !== undefined) {
+            return [x, y, z];
+        }
+        return [x, y];
+    }
+
+    is3D(coords: OptionalCoords): boolean {
+        return coords.length === 3;
+    }
+
+    normalize(coords: OptionalCoords): [number, number, number] {
+        const [x, y, z = 0] = coords;
+        return [x, y, z];
+    }
+}
+
+class ConfigBuilder {
+    private configs: ConfigTuple[] = [];
+
+    add(name: string, value: unknown, description?: string, tags?: string[]): this {
+        if (tags !== undefined) {
+            this.configs.push([name, value, description, tags]);
+        } else if (description !== undefined) {
+            this.configs.push([name, value, description]);
+        } else {
+            this.configs.push([name, value]);
+        }
+        return this;
+    }
+
+    getByName(name: string): ConfigTuple | undefined {
+        return this.configs.find(([n]) => n === name);
+    }
+
+    toObject(): Record<string, { value: unknown; description?: string; tags?: string[] }> {
+        const result: Record<string, any> = {};
+        for (const config of this.configs) {
+            const [name, value, description, tags] = config;
+            result[name] = { value, description, tags };
+        }
+        return result;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function CoordinateHandler"),
+        "Expected CoordinateHandler function: {}",
+        output
+    );
+    assert!(
+        output.contains("CoordinateHandler.prototype.create"),
+        "Expected create method: {}",
+        output
+    );
+    assert!(
+        output.contains("CoordinateHandler.prototype.is3D") && output.contains("CoordinateHandler.prototype.normalize"),
+        "Expected is3D and normalize methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function ConfigBuilder"),
+        "Expected ConfigBuilder function: {}",
+        output
+    );
+    assert!(
+        output.contains("ConfigBuilder.prototype.add") && output.contains("ConfigBuilder.prototype.getByName"),
+        "Expected add and getByName methods: {}",
+        output
+    );
+    assert!(
+        output.contains("ConfigBuilder.prototype.toObject"),
+        "Expected toObject method: {}",
+        output
+    );
+}
+
+/// Test: combined variadic tuple patterns
+/// Verifies that classes using multiple variadic tuple patterns together transform correctly to ES5
+#[test]
+fn test_class_es5_combined_variadic_tuple_patterns() {
+    let source = r#"
+type EventArgs<T extends unknown[]> = [eventName: string, ...args: T];
+type Middleware<In extends unknown[], Out extends unknown[]> = (...args: In) => Out;
+type Pipeline<T extends unknown[]> = [...T, done: boolean];
+
+class EventEmitter<Events extends Record<string, unknown[]>> {
+    private listeners: Map<string, Function[]> = new Map();
+
+    emit<K extends keyof Events>(event: K, ...args: Events[K]): void {
+        const handlers = this.listeners.get(event as string) || [];
+        handlers.forEach(h => h(...args));
+    }
+
+    on<K extends keyof Events>(event: K, handler: (...args: Events[K]) => void): void {
+        const handlers = this.listeners.get(event as string) || [];
+        handlers.push(handler);
+        this.listeners.set(event as string, handlers);
+    }
+
+    createEventArgs<K extends keyof Events>(event: K, ...args: Events[K]): EventArgs<Events[K]> {
+        return [event as string, ...args] as EventArgs<Events[K]>;
+    }
+}
+
+class PipelineBuilder<T extends unknown[]> {
+    private steps: Function[] = [];
+
+    pipe<U extends unknown[]>(fn: Middleware<T, U>): PipelineBuilder<U> {
+        this.steps.push(fn);
+        return this as unknown as PipelineBuilder<U>;
+    }
+
+    execute(...input: T): Pipeline<T> {
+        let result: unknown[] = input;
+        for (const step of this.steps) {
+            result = step(...result);
+        }
+        return [...result, true] as Pipeline<T>;
+    }
+
+    compose<A extends unknown[], B extends unknown[], C extends unknown[]>(
+        f: Middleware<A, B>,
+        g: Middleware<B, C>
+    ): Middleware<A, C> {
+        return (...args: A) => g(...f(...args));
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function EventEmitter"),
+        "Expected EventEmitter function: {}",
+        output
+    );
+    assert!(
+        output.contains("EventEmitter.prototype.emit") && output.contains("EventEmitter.prototype.on"),
+        "Expected emit and on methods: {}",
+        output
+    );
+    assert!(
+        output.contains("EventEmitter.prototype.createEventArgs"),
+        "Expected createEventArgs method: {}",
+        output
+    );
+    assert!(
+        output.contains("function PipelineBuilder"),
+        "Expected PipelineBuilder function: {}",
+        output
+    );
+    assert!(
+        output.contains("PipelineBuilder.prototype.pipe") && output.contains("PipelineBuilder.prototype.execute"),
+        "Expected pipe and execute methods: {}",
+        output
+    );
+    assert!(
+        output.contains("PipelineBuilder.prototype.compose"),
+        "Expected compose method: {}",
+        output
+    );
+}
