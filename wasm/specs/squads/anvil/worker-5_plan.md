@@ -191,7 +191,26 @@ Steps:
 - [x] Added async computed object literal source-map coverage in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
 
 ## Ready for Merge
-Yes - Working on spread argument expansion for overload resolution
+Yes
+
+## TS2769 Overload Resolution Work (Latest)
+
+### Progress
+- TS2769 false positives: 11 -> 10 occurrences
+- Implemented spread argument expansion for tuple types in `collect_call_argument_types_with_context`
+- Works for: `declare const t1: [number, string]; foo(...t1, true);`
+- Not yet working for: function parameters `function test(t1: [number, string]) { foo(...t1, true); }`
+
+### Findings
+- Main issue: variadicTuples1.ts accounts for 10 of the TS2769 false positives
+- Root cause for function params: parameter types may not be cached as direct Tuple types when checked
+- The `cache_parameter_types` function should cache param types before body checking
+- Further investigation needed on type resolution order for parameters
+
+### Files Modified
+- `wasm/src/thin_checker.rs`: Added spread expansion in `collect_call_argument_types_with_context`
+- `wasm/src/solver/subtype.rs`: Fixed duplicate Application match arms
+- `wasm/src/lib.rs`: Fixed duplicate BindResult import
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize emitter fidelity (ES5 downleveling/source maps) before new features.
@@ -202,5 +221,3 @@ Yes - Working on spread argument expansion for overload resolution
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/anvil-5`
 - **NEVER edit**: `DIRECTOR_AGENT.md`, `SQUAD_LEAD_AGENT.md`, `MANAGER_AGENT.md`, `AGENTS.md`, `start_*.sh`
-- Implemented spread argument expansion in `wasm/src/thin_checker.rs` for tuple types in function calls.
-- Fixed duplicate match arms in `wasm/src/solver/subtype.rs`.
