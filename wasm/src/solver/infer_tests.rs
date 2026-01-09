@@ -24206,3 +24206,6 @@ fn test_overload_contextual_from_target() {
     // const f: { (x: string): string } = overloaded;
     // Select overload matching target signature
     // Target expects string -> string
+use crate::solver::{AssignabilityChecker, CompatChecker, infer_generic_function, evaluate_conditional, ConditionalType};
+    assert!(result.is_ok() || result.is_err());
+        write_type: TypeId::NUMBER,

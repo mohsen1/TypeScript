@@ -42319,3 +42319,200 @@ fn test_type_alias_record() {
 
     assert!(mapped != TypeId::ERROR);
 }
+        template: TypeId::ANY,
+        readonly_modifier: Some(MappedModifier::Add),
+        readonly_modifier: Some(MappedModifier::Remove),
+        optional_modifier: Some(MappedModifier::Remove),
+// =============================================================================
+// Nested Conditional Type Tests
+// =============================================================================
+fn test_nested_conditional_true_branch() {
+    // type NestedTrue<T> = T extends string ? (T extends "hello" ? true : false) : never
+    // NestedTrue<"hello"> should evaluate to true
+    let hello_lit = interner.literal_string("hello");
+    // Inner conditional: T extends "hello" ? true : false
+    let inner_cond = interner.conditional(ConditionalType {
+        check_type: hello_lit,
+        extends_type: hello_lit, // "hello" extends "hello"
+        true_type: interner.literal_boolean(true),
+        false_type: interner.literal_boolean(false),
+    });
+    // Outer conditional: T extends string ? inner : never
+    let outer_cond = interner.conditional(ConditionalType {
+        check_type: hello_lit,
+        extends_type: TypeId::STRING,
+        true_type: inner_cond,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    });
+
+    let result = evaluate_type(&interner, outer_cond);
+    // "hello" extends string ? ("hello" extends "hello" ? true : false) : never
+    // => "hello" extends "hello" ? true : false => true
+    assert_eq!(result, interner.literal_boolean(true));
+
+fn test_nested_conditional_middle_branch() {
+    // type NestedMiddle<T> = T extends string ? (T extends "hello" ? "match" : "string") : "other"
+    // NestedMiddle<"world"> should evaluate to "string"
+    let world_lit = interner.literal_string("world");
+    let hello_lit = interner.literal_string("hello");
+    let match_lit = interner.literal_string("match");
+    let string_lit = interner.literal_string("string");
+    let other_lit = interner.literal_string("other");
+    // Inner: T extends "hello" ? "match" : "string"
+    let inner_cond = interner.conditional(ConditionalType {
+        check_type: world_lit,
+        extends_type: hello_lit,
+        true_type: match_lit,
+        false_type: string_lit,
+        is_distributive: false,
+    });
+    // Outer: T extends string ? inner : "other"
+    let outer_cond = interner.conditional(ConditionalType {
+        check_type: world_lit,
+        extends_type: TypeId::STRING,
+        true_type: inner_cond,
+        false_type: other_lit,
+        is_distributive: false,
+    });
+    let result = evaluate_type(&interner, outer_cond);
+    // "world" extends string ? ("world" extends "hello" ? "match" : "string") : "other"
+    // => "world" extends "hello" ? "match" : "string" => "string"
+    assert_eq!(result, string_lit);
+fn test_nested_conditional_false_branch() {
+    // type NestedFalse<T> = T extends string ? "string" : (T extends number ? "number" : "other")
+    // NestedFalse<boolean> should evaluate to "other"
+    let string_lit = interner.literal_string("string");
+    let number_lit = interner.literal_string("number");
+    let other_lit = interner.literal_string("other");
+    // Inner: T extends number ? "number" : "other"
+    let inner_cond = interner.conditional(ConditionalType {
+        check_type: TypeId::BOOLEAN,
+        extends_type: TypeId::NUMBER,
+        true_type: number_lit,
+        false_type: other_lit,
+        is_distributive: false,
+    });
+    // Outer: T extends string ? "string" : inner
+    let outer_cond = interner.conditional(ConditionalType {
+        check_type: TypeId::BOOLEAN,
+        extends_type: TypeId::STRING,
+        true_type: string_lit,
+        false_type: inner_cond,
+        is_distributive: false,
+    });
+
+    let result = evaluate_type(&interner, outer_cond);
+    // boolean extends string => false => inner
+    // boolean extends number => false => "other"
+    assert_eq!(result, other_lit);
+fn test_deeply_nested_conditional_3_levels() {
+    // type Deep<T> = T extends string
+    //   ? (T extends "a" ? 1 : (T extends "b" ? 2 : 3))
+    //   : 0
+    // Deep<"b"> should evaluate to 2
+    let b_lit = interner.literal_string("b");
+    let a_lit = interner.literal_string("a");
+    let num_0 = interner.literal_number(0.0);
+    let num_1 = interner.literal_number(1.0);
+    let num_2 = interner.literal_number(2.0);
+    let num_3 = interner.literal_number(3.0);
+    // Innermost: T extends "b" ? 2 : 3
+    let innermost = interner.conditional(ConditionalType {
+        check_type: b_lit,
+        extends_type: b_lit,
+        true_type: num_2,
+        false_type: num_3,
+        is_distributive: false,
+    });
+    // Middle: T extends "a" ? 1 : innermost
+    let middle = interner.conditional(ConditionalType {
+        check_type: b_lit,
+        extends_type: a_lit,
+        true_type: num_1,
+        false_type: innermost,
+        is_distributive: false,
+    });
+    // Outer: T extends string ? middle : 0
+    let outer = interner.conditional(ConditionalType {
+        check_type: b_lit,
+        extends_type: TypeId::STRING,
+        true_type: middle,
+        false_type: num_0,
+        is_distributive: false,
+    });
+    let result = evaluate_type(&interner, outer);
+    // "b" extends string => middle
+    // "b" extends "a" => false => innermost
+    // "b" extends "b" => true => 2
+    assert_eq!(result, num_2);
+
+fn test_nested_distributive_conditional() {
+    // type Nested<T> = T extends string
+    //   ? (T extends "a" ? "found_a" : "other_string")
+    //   : "not_string"
+    // Nested<"a" | "b"> with distributive should give "found_a" | "other_string"
+    let a_lit = interner.literal_string("a");
+    let b_lit = interner.literal_string("b");
+    let found_a = interner.literal_string("found_a");
+    let other_string = interner.literal_string("other_string");
+    let _not_string = interner.literal_string("not_string");
+    let _union_ab = interner.union(vec![a_lit, b_lit]);
+    // Inner for "a": "a" extends "a" ? found_a : other_string => found_a
+    let inner_for_a = interner.conditional(ConditionalType {
+        check_type: a_lit,
+        extends_type: a_lit,
+        true_type: found_a,
+        false_type: other_string,
+        is_distributive: false,
+    });
+    // Inner for "b": "b" extends "a" ? found_a : other_string => other_string
+    let inner_for_b = interner.conditional(ConditionalType {
+        check_type: b_lit,
+        extends_type: a_lit,
+        true_type: found_a,
+        false_type: other_string,
+        is_distributive: false,
+    // Evaluate inner conditionals
+    let result_a = evaluate_type(&interner, inner_for_a);
+    let result_b = evaluate_type(&interner, inner_for_b);
+    assert_eq!(result_a, found_a);
+    assert_eq!(result_b, other_string);
+    // Union of results
+    let result_union = interner.union(vec![result_a, result_b]);
+    // Both should produce the same union
+    assert!(result_union != TypeId::ERROR);
+fn test_recursive_like_conditional_with_infer() {
+    // type Unwrap<T> = T extends Array<infer U> ? (U extends Array<infer V> ? V : U) : T
+    // This tests nested conditionals with infer patterns
+    // For a simple case: Unwrap<string[]> should give string
+    // string[] extends Array<infer U> ? ... : string[]
+    // => U = string
+    // => string extends Array<infer V> ? V : string
+    // => string (because string doesn't extend Array)
+    let _infer_u = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("U"),
+        constraint: None,
+        default: None,
+    }));
+    let _string_array = interner.array(TypeId::STRING);
+    // Inner conditional: U extends Array<infer V> ? V : U
+    // With U = STRING, this should evaluate to STRING (string doesn't extend Array<any>)
+    let infer_v = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("V"),
+        constraint: None,
+        default: None,
+    }));
+    let array_infer_v = interner.array(infer_v);
+    let inner_cond = interner.conditional(ConditionalType {
+        check_type: TypeId::STRING,
+        extends_type: array_infer_v,
+        true_type: infer_v,
+        false_type: TypeId::STRING,
+        is_distributive: false,
+    });
+
+    let result = evaluate_type(&interner, inner_cond);
+    // string extends Array<infer V> => false => STRING
+    assert_eq!(result, TypeId::STRING);
+}
