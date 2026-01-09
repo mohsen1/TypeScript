@@ -7,12 +7,13 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] Add ES5 source map tests for async generator patterns: yield*, await, for-await. Tests: `./wasm/test.sh source_map`
+(none)
 
 ## Task Queue
 (empty)
 
 ## Completed
+- [x] Added async generator ES5 source map tests (basic, yield delegation, await expressions, for-await-of, error handling, class methods, interleaved, return values, nested, comprehensive); 817 tests pass.
 - [x] Added private method ES5 source map tests (instance basic, static, accessor, inheritance, async, generator, with fields, chained calls, parameters, comprehensive); 807 tests pass.
 - [x] Added decorator composition ES5 source map tests (chained, factory, metadata, method params, accessor, multiple targets, conditional, generic, inheritance, comprehensive); 797 tests pass.
 - [x] Added class static block ES5 source map tests (basic, multiple, init order, private access, super access, static field init, computed props, async patterns, error handling, comprehensive); 787 tests pass.
