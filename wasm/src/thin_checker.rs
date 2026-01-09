@@ -8580,7 +8580,9 @@ impl<'a> ThinCheckerState<'a> {
                         let has_return = self.body_has_return_with_value(func.body);
                         let falls_through = self.function_body_falls_through(func.body);
 
-                        if has_type_annotation && requires_return && !has_return {
+                        // Only emit 2355 if function falls through without returning.
+                        // Functions that only throw (falls_through=false) shouldn't get this error.
+                        if has_type_annotation && requires_return && !has_return && falls_through {
                             use crate::checker::types::diagnostics::diagnostic_codes;
                             self.error_at_node(
                                 func.type_annotation,
@@ -13283,7 +13285,9 @@ impl<'a> ThinCheckerState<'a> {
             let has_return = self.body_has_return_with_value(method.body);
             let falls_through = self.function_body_falls_through(method.body);
 
-            if has_type_annotation && requires_return && !has_return {
+            // Only emit 2355 if method falls through without returning.
+            // Methods that only throw (falls_through=false) shouldn't get this error.
+            if has_type_annotation && requires_return && !has_return && falls_through {
                 self.error_at_node(
                     method.type_annotation,
                     "A function whose declared type is neither 'undefined', 'void', nor 'any' must return a value.",
@@ -13449,7 +13453,9 @@ impl<'a> ThinCheckerState<'a> {
                 let requires_return = self.requires_return_value(return_type);
                 let has_return = self.body_has_return_with_value(accessor.body);
                 let falls_through = self.function_body_falls_through(accessor.body);
-                if has_type_annotation && requires_return && !has_return {
+                // Only emit 2355 if getter falls through without returning.
+                // Getters that only throw (falls_through=false) shouldn't get this error.
+                if has_type_annotation && requires_return && !has_return && falls_through {
                     self.error_at_node(
                         accessor.type_annotation,
                         "A function whose declared type is neither 'undefined', 'void', nor 'any' must return a value.",
