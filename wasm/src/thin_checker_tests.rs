@@ -1687,6 +1687,160 @@ const a: A = new B();
 }
 
 #[test]
+fn test_private_protected_property_access_errors() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Foo {
+    private x = 1;
+    protected y = 2;
+}
+const f = new Foo();
+f.x;
+f.y;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        codes.contains(&diagnostic_codes::PROPERTY_IS_PRIVATE),
+        "Expected error 2341 for private property access, got: {:?}",
+        codes
+    );
+    assert!(
+        codes.contains(&diagnostic_codes::PROPERTY_IS_PROTECTED),
+        "Expected error 2445 for protected property access, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_private_protected_property_access_ok() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Base {
+    protected z = 3;
+}
+class Derived extends Base {
+    test() { return this.z; }
+}
+class Baz {
+    private w = 4;
+    getW() { return this.w; }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Unexpected diagnostics: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_protected_access_requires_derived_instance() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Base {
+    protected y = 2;
+}
+class Derived extends Base {
+    test(b: Base, d: Derived) {
+        b.y;
+        d.y;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let protected_errors = codes
+        .iter()
+        .filter(|&&code| code == diagnostic_codes::PROPERTY_IS_PROTECTED)
+        .count();
+    assert_eq!(
+        protected_errors, 1,
+        "Expected one error 2445 for protected access on base instance, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_protected_static_access_requires_derived_constructor() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Base {
+    protected static s = 1;
+}
+class Derived extends Base {
+    static test() {
+        Base.s;
+        Derived.s;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let protected_errors = codes
+        .iter()
+        .filter(|&&code| code == diagnostic_codes::PROPERTY_IS_PROTECTED)
+        .count();
+    assert_eq!(
+        protected_errors, 1,
+        "Expected one error 2445 for protected static access on base constructor, got: {:?}",
+        codes
+    );
+}
+
+#[test]
 fn test_abstract_property_in_constructor_2715() {
     // Error 2715: Abstract property 'prop' in class 'AbstractClass' cannot be accessed in the constructor.
     use crate::thin_parser::ThinParserState;
@@ -3841,6 +3995,61 @@ const f = (flag: boolean) => {
         }
         _ => panic!("Expected f to be Function type, got {:?}", f_key),
     }
+}
+
+#[test]
+fn test_missing_return_and_implicit_any_diagnostics() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// @noImplicitAny: true
+function noReturn(): number {
+    console.log("oops");
+}
+
+function maybeReturn(flag: boolean): number {
+    if (flag) {
+        return 1;
+    }
+}
+
+function allReturn(flag: boolean): number {
+    if (flag) {
+        return 1;
+    }
+    return 2;
+}
+
+function voidReturn(): void {
+    console.log("ok");
+}
+
+function implicitAny(x) {
+    return x;
+}
+
+const anon = () => { return null; };
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count = |code| codes.iter().filter(|&&c| c == code).count();
+
+    assert_eq!(count(2355), 1, "Expected one 2355 error, got codes: {:?}", codes);
+    assert_eq!(count(2366), 1, "Expected one 2366 error, got codes: {:?}", codes);
+    assert_eq!(count(7006), 1, "Expected one 7006 error, got codes: {:?}", codes);
+    assert_eq!(count(7010), 1, "Expected one 7010 error, got codes: {:?}", codes);
+    assert_eq!(count(7011), 1, "Expected one 7011 error, got codes: {:?}", codes);
 }
 
 #[test]
