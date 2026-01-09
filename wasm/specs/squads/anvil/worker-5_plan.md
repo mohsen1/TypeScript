@@ -14,6 +14,7 @@ Priority: 5
 
 
 ## Completed
+- [x] Fixed merge conflicts from origin/rust sync: binder.rs can_merge_flags and CallableShape missing fields in thin_checker.rs. Added test documenting never-returning call limitation. Commit: `bb137e9631d`.
 - [x] Fixed TS2355 false positives for throw-only functions. Added `falls_through` check to TS2355 condition for functions, methods, and getters. Functions that only throw no longer incorrectly trigger "must return a value". Added tests `test_throw_only_function_no_2355` and `test_infinite_loop_no_2355`. Commit: `3eea80b3d93`.
 - [x] Added block scoping tests for loop var collection and closure capture in `wasm/src/transforms/block_scoping_es5_tests.rs`; wired test module in `wasm/src/transforms/block_scoping_es5.rs`; `./wasm/test.sh block_scoping_es5_tests` failed (Docker socket EOF).
 - [x] Added await detection for array/object literal elements (computed names, spreads) in `wasm/src/transforms/async_es5.rs`; added computed object literal await test in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (PASS).
@@ -186,10 +187,15 @@ Yes
 
 ## Resume Notes
 - Branch: `worker/anvil-5`
-- Last commit: `3eea80b3d93` (`[wasm] checker: fix TS2355 false positives for throw-only functions`)
+- Last commit: `bb137e9631d` (`[wasm] checker: fix merge conflicts and add never-returning call test`)
 - Docker: working
-- Tests: `./wasm/test.sh throw_only` and `./wasm/test.sh infinite_loop` both PASS
+- Tests: All TS2355 tests PASS
 - Stashed work: `enum_es5_tests.rs` was stashed (incomplete) when new assignment arrived
+- TS2355 status:
+  - Fixed: throw-only functions (commit `3eea80b3d93`)
+  - Fixed: infinite loops without break (commit `3eea80b3d93`)
+  - Documented: never-returning calls limitation (test added, needs type integration for fix)
+- Merge work: Fixed binder.rs conflict and CallableShape missing fields from origin/rust merge
 - Next step: awaiting new assignment from EM
 
 ## TS2769 Overload Resolution Work (Latest)
