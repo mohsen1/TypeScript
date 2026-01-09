@@ -5765,6 +5765,353 @@ fn test_parity_es5_arrow_multi_params() {
     );
 }
 
+/// Parity test for ES5 arrow with typed params and inference.
+/// Arrow with explicit param types and inferred return type.
+#[test]
+fn test_parity_es5_arrow_typed_params_inference() {
+    let source = r#"
+interface Point { x: number; y: number }
+const distance = (p1: Point, p2: Point) => Math.sqrt((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2);
+const origin: Point = { x: 0, y: 0 };
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify arrow is converted to function
+    assert!(
+        output.contains("function"),
+        "ES5 output should contain function keyword: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface"),
+        "ES5 output should erase interface: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": Point"),
+        "ES5 output should erase Point type annotations: {}",
+        output
+    );
+    // No arrow syntax
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should not contain arrow syntax: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 arrow with default params and complex types.
+/// Arrow with default values that have type annotations.
+#[test]
+fn test_parity_es5_arrow_defaults_complex() {
+    let source = r#"
+type Options = { timeout: number; retries: number };
+const fetchData = (url: string, options: Options = { timeout: 3000, retries: 3 }) => fetch(url);
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify arrow is converted to function
+    assert!(
+        output.contains("function"),
+        "ES5 output should contain function keyword: {}",
+        output
+    );
+    // Type alias should be erased
+    assert!(
+        !output.contains("type Options"),
+        "ES5 output should erase type alias: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": Options"),
+        "ES5 output should erase Options type annotation: {}",
+        output
+    );
+    assert!(
+        !output.contains(": string"),
+        "ES5 output should erase string type annotation: {}",
+        output
+    );
+    // Default values should be preserved
+    assert!(
+        output.contains("3000") && output.contains("retries"),
+        "ES5 output should preserve default values: {}",
+        output
+    );
+    // No arrow syntax
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should not contain arrow syntax: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 arrow with rest params and tuple types.
+/// Arrow with rest parameter that has a tuple type annotation.
+#[test]
+fn test_parity_es5_arrow_rest_tuple() {
+    let source = r#"
+type NumTuple = [number, number, number];
+const sum = (...nums: NumTuple) => nums.reduce((a, b) => a + b, 0);
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify arrow is converted to function
+    assert!(
+        output.contains("function"),
+        "ES5 output should contain function keyword: {}",
+        output
+    );
+    // Type alias should be erased
+    assert!(
+        !output.contains("type NumTuple"),
+        "ES5 output should erase type alias: {}",
+        output
+    );
+    // Tuple type annotation should be erased
+    assert!(
+        !output.contains(": NumTuple"),
+        "ES5 output should erase tuple type annotation: {}",
+        output
+    );
+    // No arrow syntax in outer function
+    assert!(
+        !output.contains("sum = (") || !output.contains("=>"),
+        "ES5 output should convert outer arrow: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 generic arrow functions.
+/// Arrow function with generic type parameters.
+#[test]
+fn test_parity_es5_arrow_generic() {
+    let source = r#"
+const identity = <T>(value: T): T => value;
+const mapArray = <T, U>(arr: T[], fn: (item: T) => U): U[] => arr.map(fn);
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify arrow is converted to function
+    assert!(
+        output.contains("function"),
+        "ES5 output should contain function keyword: {}",
+        output
+    );
+    // Generic type parameters should be erased
+    assert!(
+        !output.contains("<T>") && !output.contains("<T, U>"),
+        "ES5 output should erase generic type parameters: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": T") && !output.contains(": U"),
+        "ES5 output should erase generic type annotations: {}",
+        output
+    );
+    assert!(
+        !output.contains("T[]") && !output.contains("U[]"),
+        "ES5 output should erase array type annotations: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 arrow with nested destructuring params.
+/// Arrow with deeply nested destructuring in parameters.
+#[test]
+fn test_parity_es5_arrow_nested_destructuring() {
+    let source = r#"
+interface User { name: string; address: { city: string; zip: number } }
+const getCity = ({ address: { city } }: User): string => city;
+const getData = ([first, [second, third]]: [number, [string, boolean]]) => first;
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify arrow is converted to function
+    assert!(
+        output.contains("function"),
+        "ES5 output should contain function keyword: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface"),
+        "ES5 output should erase interface: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": User"),
+        "ES5 output should erase User type annotation: {}",
+        output
+    );
+    assert!(
+        !output.contains(": string") && !output.contains(": number") && !output.contains(": boolean"),
+        "ES5 output should erase primitive type annotations: {}",
+        output
+    );
+    // No arrow syntax
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should not contain arrow syntax: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 arrow returning arrow (curried function).
+/// Arrow function that returns another arrow function.
+#[test]
+fn test_parity_es5_arrow_returning_arrow() {
+    let source = r#"
+type Fn<A, B> = (a: A) => B;
+const curry = <A, B, C>(fn: (a: A, b: B) => C): Fn<A, Fn<B, C>> => (a: A) => (b: B) => fn(a, b);
+const add = (x: number) => (y: number) => x + y;
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify arrows are converted to functions
+    assert!(
+        output.contains("function"),
+        "ES5 output should contain function keyword: {}",
+        output
+    );
+    // Type alias should be erased
+    assert!(
+        !output.contains("type Fn"),
+        "ES5 output should erase type alias: {}",
+        output
+    );
+    // Generic type parameters should be erased
+    assert!(
+        !output.contains("<A, B, C>") && !output.contains("<A, B>"),
+        "ES5 output should erase generic type parameters: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number"),
+        "ES5 output should erase number type annotations: {}",
+        output
+    );
+    assert!(
+        !output.contains(": Fn"),
+        "ES5 output should erase Fn type annotations: {}",
+        output
+    );
+    // No arrow syntax
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should not contain arrow syntax: {}",
+        output
+    );
+}
+
 /// Parity test for ES5 getter-only accessor with return type.
 /// get prop(): Type should downlevel and erase type.
 #[test]
