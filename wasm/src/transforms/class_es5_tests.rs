@@ -24257,57 +24257,72 @@ class StateMachine<S extends string, E extends string> {
 }
 
 // ============================================================================
-// BRANDED TYPE PATTERN TESTS
+// mapped type class pattern tests
 // ============================================================================
 
-/// Test ES5 class with nominal types using brand pattern
 #[test]
-fn test_class_es5_branded_nominal_types() {
+fn test_class_es5_partial_class_fields() {
+    // Test Partial<T> mapped type patterns in classes
     let source = r#"
-// Nominal types using brand pattern
-type UserId = string & { readonly __brand: unique symbol };
-type OrderId = string & { readonly __brand: unique symbol };
-type ProductId = string & { readonly __brand: unique symbol };
+interface UserConfig {
+    name: string;
+    email: string;
+    age: number;
+    theme: string;
+}
 
-class UserIdFactory {
-    private static counter = 0;
+class ConfigBuilder {
+    private config: Partial<UserConfig> = {};
 
-    static create(): UserId {
-        return `user_${++this.counter}` as UserId;
+    setName(name: string): this {
+        this.config.name = name;
+        return this;
     }
 
-    static validate(id: string): id is UserId {
-        return id.startsWith("user_");
+    setEmail(email: string): this {
+        this.config.email = email;
+        return this;
+    }
+
+    setAge(age: number): this {
+        this.config.age = age;
+        return this;
+    }
+
+    setTheme(theme: string): this {
+        this.config.theme = theme;
+        return this;
+    }
+
+    build(): UserConfig {
+        if (!this.config.name || !this.config.email ||
+            this.config.age === undefined || !this.config.theme) {
+            throw new Error("Missing required fields");
+        }
+        return this.config as UserConfig;
+    }
+
+    getPartial(): Partial<UserConfig> {
+        return { ...this.config };
     }
 }
 
-class OrderService {
-    private orders: Map<OrderId, { userId: UserId; items: ProductId[] }> = new Map();
-
-    createOrder(userId: UserId, items: ProductId[]): OrderId {
-        const orderId = `order_${Date.now()}` as OrderId;
-        this.orders.set(orderId, { userId, items });
-        return orderId;
+class UpdateHandler<T> {
+    update(original: T, changes: Partial<T>): T {
+        return { ...original, ...changes };
     }
 
-    getOrder(orderId: OrderId): { userId: UserId; items: ProductId[] } | undefined {
-        return this.orders.get(orderId);
-    }
-}
-
-class EntityIdManager<T extends string & { readonly __brand: unique symbol }> {
-    private ids: Set<T> = new Set();
-
-    register(id: T): void {
-        this.ids.add(id);
+    merge(items: Partial<T>[]): Partial<T> {
+        return items.reduce((acc, item) => ({ ...acc, ...item }), {});
     }
 
-    has(id: T): boolean {
-        return this.ids.has(id);
-    }
-
-    all(): T[] {
-        return Array.from(this.ids);
+    hasChanges(original: T, changes: Partial<T>): boolean {
+        for (const key in changes) {
+            if (original[key] !== changes[key]) {
+                return true;
+            }
+        }
+        return false;
     }
 }
 "#;
@@ -24326,81 +24341,97 @@ class EntityIdManager<T extends string & { readonly __brand: unique symbol }> {
 
     let output = printer.get_output().to_string();
 
-    // Classes should be converted
     assert!(
-        output.contains("UserIdFactory") && output.contains("OrderService") && output.contains("EntityIdManager"),
-        "Expected nominal type classes: {}",
+        output.contains("function ConfigBuilder"),
+        "Expected ConfigBuilder function: {}",
         output
     );
-
-    // Type aliases should be stripped
     assert!(
-        !output.contains("type UserId") && !output.contains("type OrderId") && !output.contains("type ProductId"),
-        "Expected type aliases to be stripped: {}",
+        output.contains("ConfigBuilder.prototype.setName") && output.contains("ConfigBuilder.prototype.setEmail"),
+        "Expected ConfigBuilder setter methods: {}",
         output
     );
-
-    // Brand annotations should be stripped
     assert!(
-        !output.contains("__brand") && !output.contains("unique symbol"),
-        "Expected brand type annotations to be stripped: {}",
+        output.contains("ConfigBuilder.prototype.build") && output.contains("ConfigBuilder.prototype.getPartial"),
+        "Expected ConfigBuilder build methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function UpdateHandler"),
+        "Expected UpdateHandler function: {}",
+        output
+    );
+    assert!(
+        output.contains("UpdateHandler.prototype.update") && output.contains("UpdateHandler.prototype.merge"),
+        "Expected UpdateHandler methods: {}",
         output
     );
 }
 
-/// Test ES5 class with opaque types
 #[test]
-fn test_class_es5_branded_opaque_types() {
+fn test_class_es5_required_class_fields() {
+    // Test Required<T> mapped type patterns in classes
     let source = r#"
-// Opaque type pattern using module augmentation
-declare const OpaqueTag: unique symbol;
-type Opaque<T, Token> = T & { readonly [OpaqueTag]: Token };
+interface OptionalSettings {
+    debug?: boolean;
+    verbose?: boolean;
+    timeout?: number;
+    maxRetries?: number;
+}
 
-type Email = Opaque<string, "Email">;
-type URL = Opaque<string, "URL">;
-type PositiveNumber = Opaque<number, "PositiveNumber">;
-
-class EmailValidator {
-    private static emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-    static validate(input: string): Email | null {
-        if (this.emailRegex.test(input)) {
-            return input as Email;
-        }
-        return null;
+class SettingsValidator {
+    validate(settings: OptionalSettings): Required<OptionalSettings> {
+        return {
+            debug: settings.debug ?? false,
+            verbose: settings.verbose ?? false,
+            timeout: settings.timeout ?? 5000,
+            maxRetries: settings.maxRetries ?? 3
+        };
     }
 
-    static unsafeCreate(input: string): Email {
-        return input as Email;
+    isComplete(settings: OptionalSettings): settings is Required<OptionalSettings> {
+        return settings.debug !== undefined &&
+               settings.verbose !== undefined &&
+               settings.timeout !== undefined &&
+               settings.maxRetries !== undefined;
+    }
+
+    fillDefaults<T>(obj: Partial<T>, defaults: Required<T>): Required<T> {
+        const result = { ...defaults };
+        for (const key in obj) {
+            if (obj[key] !== undefined) {
+                (result as any)[key] = obj[key];
+            }
+        }
+        return result;
     }
 }
 
-class UrlParser {
-    static parse(input: string): URL | null {
-        try {
-            new globalThis.URL(input);
-            return input as URL;
-        } catch {
-            return null;
-        }
-    }
-
-    static getHost(url: URL): string {
-        return new globalThis.URL(url).host;
-    }
+interface FormFields {
+    username?: string;
+    password?: string;
+    email?: string;
 }
 
-class NumericValidator {
-    static positive(n: number): PositiveNumber | null {
-        return n > 0 ? (n as PositiveNumber) : null;
+class FormValidator {
+    private requiredFields: (keyof FormFields)[] = ["username", "password"];
+
+    validate(fields: FormFields): { valid: boolean; missing: string[] } {
+        const missing: string[] = [];
+        for (const field of this.requiredFields) {
+            if (fields[field] === undefined || fields[field] === "") {
+                missing.push(field);
+            }
+        }
+        return { valid: missing.length === 0, missing };
     }
 
-    static multiply(a: PositiveNumber, b: PositiveNumber): PositiveNumber {
-        return (a * b) as PositiveNumber;
-    }
-
-    static add(a: PositiveNumber, b: PositiveNumber): PositiveNumber {
-        return (a + b) as PositiveNumber;
+    toRequired(fields: FormFields): Required<FormFields> {
+        return {
+            username: fields.username ?? "",
+            password: fields.password ?? "",
+            email: fields.email ?? ""
+        };
     }
 }
 "#;
@@ -24419,88 +24450,111 @@ class NumericValidator {
 
     let output = printer.get_output().to_string();
 
-    // Classes should be converted
     assert!(
-        output.contains("EmailValidator") && output.contains("UrlParser") && output.contains("NumericValidator"),
-        "Expected opaque type classes: {}",
+        output.contains("function SettingsValidator"),
+        "Expected SettingsValidator function: {}",
         output
     );
-
-    // Opaque type definitions should be stripped
     assert!(
-        !output.contains("type Opaque") && !output.contains("type Email =") && !output.contains("type URL ="),
-        "Expected opaque type definitions to be stripped: {}",
+        output.contains("SettingsValidator.prototype.validate") && output.contains("SettingsValidator.prototype.isComplete"),
+        "Expected SettingsValidator methods: {}",
         output
     );
-
-    // Declare statement should be stripped
     assert!(
-        !output.contains("declare const OpaqueTag"),
-        "Expected declare statement to be stripped: {}",
+        output.contains("SettingsValidator.prototype.fillDefaults"),
+        "Expected fillDefaults method: {}",
+        output
+    );
+    assert!(
+        output.contains("function FormValidator"),
+        "Expected FormValidator function: {}",
+        output
+    );
+    assert!(
+        output.contains("FormValidator.prototype.validate") && output.contains("FormValidator.prototype.toRequired"),
+        "Expected FormValidator methods: {}",
         output
     );
 }
 
-/// Test ES5 class with type branding utilities
 #[test]
-fn test_class_es5_branded_type_branding() {
+fn test_class_es5_readonly_class_members() {
+    // Test Readonly<T> mapped type patterns in classes
     let source = r#"
-// Type branding utilities
-interface Brand<B> {
-    readonly __brand: B;
+interface MutableState {
+    count: number;
+    items: string[];
+    config: { enabled: boolean };
 }
 
-type Branded<T, B> = T & Brand<B>;
+class StateManager {
+    private state: MutableState = {
+        count: 0,
+        items: [],
+        config: { enabled: true }
+    };
 
-type Celsius = Branded<number, "Celsius">;
-type Fahrenheit = Branded<number, "Fahrenheit">;
-type Kelvin = Branded<number, "Kelvin">;
-
-class TemperatureConverter {
-    static toCelsius(f: Fahrenheit): Celsius {
-        return ((f - 32) * 5 / 9) as Celsius;
+    getState(): Readonly<MutableState> {
+        return this.state;
     }
 
-    static toFahrenheit(c: Celsius): Fahrenheit {
-        return ((c * 9 / 5) + 32) as Fahrenheit;
+    getItems(): ReadonlyArray<string> {
+        return this.state.items;
     }
 
-    static toKelvin(c: Celsius): Kelvin {
-        return (c + 273.15) as Kelvin;
+    freeze<T extends object>(obj: T): Readonly<T> {
+        return Object.freeze({ ...obj });
     }
 
-    static celsiusFromKelvin(k: Kelvin): Celsius {
-        return (k - 273.15) as Celsius;
-    }
-}
-
-class TemperatureStore {
-    private celsius: Celsius[] = [];
-    private fahrenheit: Fahrenheit[] = [];
-
-    addCelsius(temp: Celsius): void {
-        this.celsius.push(temp);
-    }
-
-    addFahrenheit(temp: Fahrenheit): void {
-        this.fahrenheit.push(temp);
-    }
-
-    getAllInCelsius(): Celsius[] {
-        const converted = this.fahrenheit.map(f => TemperatureConverter.toCelsius(f));
-        return [...this.celsius, ...converted];
+    deepFreeze<T extends object>(obj: T): Readonly<T> {
+        const result = { ...obj };
+        for (const key in result) {
+            const value = (result as any)[key];
+            if (typeof value === "object" && value !== null) {
+                (result as any)[key] = this.deepFreeze(value);
+            }
+        }
+        return Object.freeze(result) as Readonly<T>;
     }
 }
 
-class BrandedFactory<T, B extends string> {
-    constructor(private readonly brand: B) {}
+class ImmutableRecord<T extends object> {
+    private data: Readonly<T>;
 
-    create(value: T): Branded<T, B> {
-        return value as Branded<T, B>;
+    constructor(initial: T) {
+        this.data = Object.freeze({ ...initial });
     }
 
-    isBranded(value: unknown): value is Branded<T, B> {
-        return typeof value === typeof ({} as T);
+    get(): Readonly<T> {
+        return this.data;
+    }
+
+    with(changes: Partial<T>): ImmutableRecord<T> {
+        return new ImmutableRecord({ ...this.data, ...changes } as T);
+    }
+
+    getProperty<K extends keyof T>(key: K): T[K] {
+        return this.data[key];
+    }
+}
+
+class ReadonlyCollection<T> {
+    private items: ReadonlyArray<T>;
+
+    constructor(items: T[]) {
+        this.items = Object.freeze([...items]);
+    }
+
+    get(index: number): T | undefined {
+        return this.items[index];
+    }
+
+    map<U>(fn: (item: T) => U): ReadonlyCollection<U> {
+        return new ReadonlyCollection(this.items.map(fn));
+    }
+
+    toArray(): ReadonlyArray<T> {
+        return this.items;
     }
 }
 "#;
@@ -24519,93 +24573,110 @@ class BrandedFactory<T, B extends string> {
 
     let output = printer.get_output().to_string();
 
-    // Classes should be converted
     assert!(
-        output.contains("TemperatureConverter") && output.contains("TemperatureStore") && output.contains("BrandedFactory"),
-        "Expected branded type classes: {}",
+        output.contains("function StateManager"),
+        "Expected StateManager function: {}",
         output
     );
-
-    // Interface and type definitions should be stripped
     assert!(
-        !output.contains("interface Brand") && !output.contains("type Branded") && !output.contains("type Celsius"),
-        "Expected interface and type definitions to be stripped: {}",
+        output.contains("StateManager.prototype.getState") && output.contains("StateManager.prototype.freeze"),
+        "Expected StateManager methods: {}",
         output
     );
-
-    // Brand property should be stripped
     assert!(
-        !output.contains("__brand"),
-        "Expected __brand property to be stripped: {}",
+        output.contains("function ImmutableRecord"),
+        "Expected ImmutableRecord function: {}",
+        output
+    );
+    assert!(
+        output.contains("ImmutableRecord.prototype.get") && output.contains("ImmutableRecord.prototype.with"),
+        "Expected ImmutableRecord methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function ReadonlyCollection"),
+        "Expected ReadonlyCollection function: {}",
         output
     );
 }
 
-/// Test ES5 class with unique symbol types
 #[test]
-fn test_class_es5_branded_unique_symbol() {
+fn test_class_es5_pick_omit_patterns() {
+    // Test Pick<T, K> and Omit<T, K> mapped type patterns
     let source = r#"
-// Unique symbol types for nominal typing
-declare const UserIdSymbol: unique symbol;
-declare const SessionIdSymbol: unique symbol;
-declare const TokenSymbol: unique symbol;
+interface FullUser {
+    id: string;
+    username: string;
+    email: string;
+    password: string;
+    createdAt: Date;
+    updatedAt: Date;
+    isAdmin: boolean;
+}
 
-type UserId = string & { readonly [UserIdSymbol]: never };
-type SessionId = string & { readonly [SessionIdSymbol]: never };
-type AuthToken = string & { readonly [TokenSymbol]: never };
+type PublicUser = Pick<FullUser, "id" | "username" | "email">;
+type UserCredentials = Pick<FullUser, "username" | "password">;
+type UserWithoutDates = Omit<FullUser, "createdAt" | "updatedAt">;
 
-class AuthenticationService {
-    private sessions: Map<SessionId, { userId: UserId; token: AuthToken }> = new Map();
-
-    createSession(userId: UserId): { sessionId: SessionId; token: AuthToken } {
-        const sessionId = `sess_${Date.now()}` as SessionId;
-        const token = `tok_${Math.random().toString(36)}` as AuthToken;
-        this.sessions.set(sessionId, { userId, token });
-        return { sessionId, token };
+class UserTransformer {
+    toPublic(user: FullUser): PublicUser {
+        return {
+            id: user.id,
+            username: user.username,
+            email: user.email
+        };
     }
 
-    validateToken(sessionId: SessionId, token: AuthToken): UserId | null {
-        const session = this.sessions.get(sessionId);
-        if (session && session.token === token) {
-            return session.userId;
+    toCredentials(user: FullUser): UserCredentials {
+        return {
+            username: user.username,
+            password: user.password
+        };
+    }
+
+    omitDates(user: FullUser): UserWithoutDates {
+        const { createdAt, updatedAt, ...rest } = user;
+        return rest;
+    }
+
+    pick<T, K extends keyof T>(obj: T, keys: K[]): Pick<T, K> {
+        const result = {} as Pick<T, K>;
+        for (const key of keys) {
+            result[key] = obj[key];
         }
-        return null;
+        return result;
     }
 
-    revokeSession(sessionId: SessionId): boolean {
-        return this.sessions.delete(sessionId);
+    omit<T, K extends keyof T>(obj: T, keys: K[]): Omit<T, K> {
+        const result = { ...obj };
+        for (const key of keys) {
+            delete (result as any)[key];
+        }
+        return result as Omit<T, K>;
     }
 }
 
-class SymbolBrandedId<S extends symbol> {
-    private value: string & { readonly [K in S]: never };
+class DataProjector<T> {
+    private data: T;
 
-    constructor(value: string) {
-        this.value = value as string & { readonly [K in S]: never };
+    constructor(data: T) {
+        this.data = data;
     }
 
-    toString(): string {
-        return this.value;
-    }
-
-    equals(other: SymbolBrandedId<S>): boolean {
-        return this.value === other.value;
-    }
-}
-
-class UserIdGenerator {
-    private static readonly prefix = "usr_";
-    private counter = 0;
-
-    generate(): UserId {
-        return `${UserIdGenerator.prefix}${++this.counter}` as UserId;
-    }
-
-    parse(input: string): UserId | null {
-        if (input.startsWith(UserIdGenerator.prefix)) {
-            return input as UserId;
+    select<K extends keyof T>(...keys: K[]): Pick<T, K> {
+        const result = {} as Pick<T, K>;
+        for (const key of keys) {
+            result[key] = this.data[key];
         }
-        return null;
+        return result;
+    }
+
+    exclude<K extends keyof T>(...keys: K[]): Omit<T, K> {
+        const result = { ...this.data };
+        for (const key of keys) {
+            delete (result as any)[key];
+        }
+        return result as Omit<T, K>;
     }
 }
 "#;
@@ -24624,24 +24695,297 @@ class UserIdGenerator {
 
     let output = printer.get_output().to_string();
 
-    // Classes should be converted
     assert!(
-        output.contains("AuthenticationService") && output.contains("SymbolBrandedId") && output.contains("UserIdGenerator"),
-        "Expected unique symbol type classes: {}",
+        output.contains("function UserTransformer"),
+        "Expected UserTransformer function: {}",
         output
     );
-
-    // Declare statements should be stripped
     assert!(
-        !output.contains("declare const UserIdSymbol") && !output.contains("declare const SessionIdSymbol"),
-        "Expected declare statements to be stripped: {}",
+        output.contains("UserTransformer.prototype.toPublic") && output.contains("UserTransformer.prototype.toCredentials"),
+        "Expected UserTransformer projection methods: {}",
         output
     );
-
-    // Type aliases should be stripped
     assert!(
-        !output.contains("type UserId =") && !output.contains("type SessionId =") && !output.contains("type AuthToken ="),
-        "Expected type aliases to be stripped: {}",
+        output.contains("UserTransformer.prototype.pick") && output.contains("UserTransformer.prototype.omit"),
+        "Expected pick and omit utility methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function DataProjector"),
+        "Expected DataProjector function: {}",
+        output
+    );
+    assert!(
+        output.contains("DataProjector.prototype.select") && output.contains("DataProjector.prototype.exclude"),
+        "Expected DataProjector methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_record_patterns() {
+    // Test Record<K, V> mapped type patterns
+    let source = r#"
+type StatusCode = "ok" | "error" | "pending" | "cancelled";
+type StatusInfo = { label: string; color: string };
+
+class StatusRegistry {
+    private statuses: Record<StatusCode, StatusInfo> = {
+        ok: { label: "OK", color: "green" },
+        error: { label: "Error", color: "red" },
+        pending: { label: "Pending", color: "yellow" },
+        cancelled: { label: "Cancelled", color: "gray" }
+    };
+
+    getStatus(code: StatusCode): StatusInfo {
+        return this.statuses[code];
+    }
+
+    getAllStatuses(): Record<StatusCode, StatusInfo> {
+        return { ...this.statuses };
+    }
+
+    updateStatus(code: StatusCode, info: Partial<StatusInfo>): void {
+        this.statuses[code] = { ...this.statuses[code], ...info };
+    }
+}
+
+class DictionaryBuilder<V> {
+    private dict: Record<string, V> = {};
+
+    set(key: string, value: V): this {
+        this.dict[key] = value;
+        return this;
+    }
+
+    get(key: string): V | undefined {
+        return this.dict[key];
+    }
+
+    has(key: string): boolean {
+        return key in this.dict;
+    }
+
+    keys(): string[] {
+        return Object.keys(this.dict);
+    }
+
+    values(): V[] {
+        return Object.values(this.dict);
+    }
+
+    entries(): [string, V][] {
+        return Object.entries(this.dict);
+    }
+
+    toRecord(): Record<string, V> {
+        return { ...this.dict };
+    }
+}
+
+class IndexedStore<T> {
+    private store: Record<number, T> = {};
+    private nextId: number = 0;
+
+    add(item: T): number {
+        const id = this.nextId++;
+        this.store[id] = item;
+        return id;
+    }
+
+    get(id: number): T | undefined {
+        return this.store[id];
+    }
+
+    remove(id: number): boolean {
+        if (id in this.store) {
+            delete this.store[id];
+            return true;
+        }
+        return false;
+    }
+
+    getAll(): Record<number, T> {
+        return { ...this.store };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function StatusRegistry"),
+        "Expected StatusRegistry function: {}",
+        output
+    );
+    assert!(
+        output.contains("StatusRegistry.prototype.getStatus") && output.contains("StatusRegistry.prototype.getAllStatuses"),
+        "Expected StatusRegistry methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function DictionaryBuilder"),
+        "Expected DictionaryBuilder function: {}",
+        output
+    );
+    assert!(
+        output.contains("DictionaryBuilder.prototype.set") && output.contains("DictionaryBuilder.prototype.get"),
+        "Expected DictionaryBuilder methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function IndexedStore"),
+        "Expected IndexedStore function: {}",
+        output
+    );
+    assert!(
+        output.contains("IndexedStore.prototype.add") && output.contains("IndexedStore.prototype.remove"),
+        "Expected IndexedStore methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_combined_mapped_types() {
+    // Test combined mapped type patterns
+    let source = r#"
+interface Entity {
+    id: string;
+    name: string;
+    description?: string;
+    tags: string[];
+    metadata: Record<string, unknown>;
+}
+
+type CreateEntity = Omit<Entity, "id">;
+type UpdateEntity = Partial<Omit<Entity, "id">>;
+type EntitySummary = Pick<Entity, "id" | "name">;
+type ReadonlyEntity = Readonly<Entity>;
+
+class EntityService {
+    private entities: Map<string, Entity> = new Map();
+
+    create(data: CreateEntity): Entity {
+        const id = Math.random().toString(36).substr(2, 9);
+        const entity: Entity = { id, ...data };
+        this.entities.set(id, entity);
+        return entity;
+    }
+
+    update(id: string, changes: UpdateEntity): Entity | undefined {
+        const entity = this.entities.get(id);
+        if (!entity) return undefined;
+        const updated = { ...entity, ...changes };
+        this.entities.set(id, updated);
+        return updated;
+    }
+
+    getSummary(id: string): EntitySummary | undefined {
+        const entity = this.entities.get(id);
+        if (!entity) return undefined;
+        return { id: entity.id, name: entity.name };
+    }
+
+    getReadonly(id: string): ReadonlyEntity | undefined {
+        const entity = this.entities.get(id);
+        if (!entity) return undefined;
+        return Object.freeze({ ...entity });
+    }
+
+    list(): EntitySummary[] {
+        return Array.from(this.entities.values()).map(e => ({
+            id: e.id,
+            name: e.name
+        }));
+    }
+}
+
+type DeepPartial<T> = {
+    [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
+};
+
+type DeepReadonly<T> = {
+    readonly [P in keyof T]: T[P] extends object ? DeepReadonly<T[P]> : T[P];
+};
+
+class DeepTransformer<T extends object> {
+    makeDeepPartial(obj: T): DeepPartial<T> {
+        const result: any = {};
+        for (const key in obj) {
+            const value = obj[key];
+            if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+                result[key] = this.makeDeepPartial(value as any);
+            } else {
+                result[key] = value;
+            }
+        }
+        return result;
+    }
+
+    makeDeepReadonly(obj: T): DeepReadonly<T> {
+        const result: any = {};
+        for (const key in obj) {
+            const value = obj[key];
+            if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+                result[key] = this.makeDeepReadonly(value as any);
+            } else {
+                result[key] = value;
+            }
+        }
+        return Object.freeze(result);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function EntityService"),
+        "Expected EntityService function: {}",
+        output
+    );
+    assert!(
+        output.contains("EntityService.prototype.create") && output.contains("EntityService.prototype.update"),
+        "Expected EntityService CRUD methods: {}",
+        output
+    );
+    assert!(
+        output.contains("EntityService.prototype.getSummary") && output.contains("EntityService.prototype.getReadonly"),
+        "Expected EntityService projection methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function DeepTransformer"),
+        "Expected DeepTransformer function: {}",
+        output
+    );
+    assert!(
+        output.contains("DeepTransformer.prototype.makeDeepPartial") && output.contains("DeepTransformer.prototype.makeDeepReadonly"),
+        "Expected DeepTransformer methods: {}",
         output
     );
 }
