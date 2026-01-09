@@ -7,12 +7,15 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] Add ES5 parity tests for private method patterns: private async methods, private generator methods, private accessors. Tests: `./wasm/test.sh emitter_parity`
+- [ ] Add ES5 enum patterns parity tests: const enums, computed members, reverse mappings, string enums. Tests: `./wasm/test.sh emitter_parity`
 
 ## Task Queue
-(empty)
+- [ ] Add ES5 import/export patterns parity tests: re-exports, barrel files, type-only imports
 
 ## Completed
+- [x] Added ES5 computed property patterns parity tests (method-call, function-call, typed) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (282 tests).
+- [x] Added ES5 class expression patterns parity tests (return, argument, extends-computed, implements, array, iife) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (279 tests).
+- [x] Added ES5 private method patterns parity tests (async-method-complex, generator-method, accessor-complex) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (273 tests).
 - [x] Added ES5 class static block patterns parity tests (async, private-access, init-order, super) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (270 tests).
 - [x] Added ES5 for-await-of patterns parity tests (class-method, error-handling, nested-destructuring) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (266 tests).
 - [x] Added ES5 generator function patterns parity tests (typed-yields, delegation, async-await, class-method-this, try-finally, complex-return) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (263 tests).

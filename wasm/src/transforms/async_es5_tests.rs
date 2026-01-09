@@ -9814,3 +9814,315 @@ fn test_async_error_pattern_ignores_nested_async() {
     );
     assert!(!result, "Should not detect await inside nested async in error handling");
 }
+
+// ============================================================================
+// ASYNC ITERATION PATTERN TESTS
+// ============================================================================
+
+// Tests for async iteration patterns: for-of with await, async iterables,
+// iterator protocol, for-of with break/continue, nested async iteration.
+
+#[test]
+fn test_async_iteration_pattern_for_of_await_body() {
+    let result = async_for_of_loop_contains_await(
+        "async function foo() { for (const x of items) { await process(x); } }",
+    );
+    assert!(result, "Should detect await in for-of body");
+}
+
+#[test]
+fn test_async_iteration_pattern_for_of_await_expression() {
+    let result = async_for_of_loop_contains_await(
+        "async function foo() { for (const x of await getItems()) { console.log(x); } }",
+    );
+    assert!(result, "Should detect await in for-of iterable expression");
+}
+
+#[test]
+fn test_async_iteration_pattern_for_of_async_generator() {
+    let result = async_for_of_loop_contains_await(
+        "async function foo() { for (const val of items) { await asyncGenerator(val); } }",
+    );
+    assert!(result, "Should detect await with async generator in body");
+}
+
+#[test]
+fn test_async_iteration_pattern_for_of_break() {
+    let result = async_for_of_loop_contains_await(
+        "async function foo() { for (const x of items) { if (x.done) break; await handle(x); } }",
+    );
+    assert!(result, "Should detect await in for-of with break");
+}
+
+#[test]
+fn test_async_iteration_pattern_for_of_continue() {
+    let result = async_for_of_loop_contains_await(
+        "async function foo() { for (const x of items) { if (x.skip) continue; await handle(x); } }",
+    );
+    assert!(result, "Should detect await in for-of with continue");
+}
+
+#[test]
+fn test_async_iteration_pattern_for_of_nested() {
+    let result = async_for_of_loop_contains_await(
+        "async function foo() { for (const outer of items) { for (const inner of outer) { await process(inner); } } }",
+    );
+    assert!(result, "Should detect await in nested for-of loops");
+}
+
+#[test]
+fn test_async_iteration_pattern_for_of_destructure() {
+    let result = async_for_of_loop_contains_await(
+        "async function foo() { for (const { value } of items) { await process(value); } }",
+    );
+    assert!(result, "Should detect await in for-of with destructuring");
+}
+
+#[test]
+fn test_async_iteration_pattern_for_of_array_destructure() {
+    let result = async_for_of_loop_contains_await(
+        "async function foo() { for (const [first, second] of pairs) { await log(first); } }",
+    );
+    assert!(result, "Should detect await in for-of with array destructuring");
+}
+
+#[test]
+fn test_async_iteration_pattern_for_of_try_catch() {
+    let result = async_for_of_loop_contains_await(
+        "async function foo() { try { for (const x of items) { await process(x); } } catch (e) { } }",
+    );
+    assert!(result, "Should detect await in for-of inside try block");
+}
+
+#[test]
+fn test_async_iteration_pattern_for_of_return() {
+    let result = async_for_of_loop_contains_await(
+        "async function foo() { for (const x of items) { if (x.match) return await transform(x); } }",
+    );
+    assert!(result, "Should detect await in for-of with early return");
+}
+
+#[test]
+fn test_async_iteration_pattern_no_await() {
+    let result = async_for_of_loop_contains_await(
+        "async function foo() { for (const x of syncArray) { console.log(x); } }",
+    );
+    assert!(!result, "Should not detect await in regular for-of loop");
+}
+
+#[test]
+fn test_async_iteration_pattern_ignores_nested_async() {
+    let result = async_for_of_loop_contains_await(
+        "async function foo() { for (const x of arr) { const handler = async () => await process(x); } }",
+    );
+    assert!(!result, "Should not detect await inside nested async in iteration");
+}
+
+// ============================================================================
+// ASYNC CLASS PATTERN TESTS
+// ============================================================================
+
+// Tests for async class patterns: async constructor simulation, async static
+// initialization, async factory methods, async singleton pattern, async
+// dependency injection, async lifecycle hooks.
+
+#[test]
+fn test_async_class_pattern_constructor_simulation() {
+    // Simulating async constructor via static factory
+    let result = async_static_method_contains_await(
+        "class Foo { static async create() { const instance = new Foo(); await instance.init(); return instance; } }",
+    );
+    assert!(result, "Should detect await in async constructor simulation");
+}
+
+#[test]
+fn test_async_class_pattern_static_init() {
+    let result = async_static_method_contains_await(
+        "class Config { static async initialize() { Config.settings = await loadSettings(); } }",
+    );
+    assert!(result, "Should detect await in static initialization");
+}
+
+#[test]
+fn test_async_class_pattern_factory_method() {
+    let result = async_static_method_contains_await(
+        "class UserFactory { static async createUser(data: any) { return await UserFactory.build(data); } }",
+    );
+    assert!(result, "Should detect await in async factory method");
+}
+
+#[test]
+fn test_async_class_pattern_singleton() {
+    let result = async_static_method_contains_await(
+        "class Singleton { static async getInstance() { if (!Singleton.instance) { Singleton.instance = await Singleton.create(); } return Singleton.instance; } }",
+    );
+    assert!(result, "Should detect await in async singleton pattern");
+}
+
+#[test]
+fn test_async_class_pattern_dependency_injection() {
+    let result = async_class_method_extra_contains_await(
+        "class Service { async configure(deps: any) { this.db = await deps.getDatabase(); this.cache = await deps.getCache(); } }",
+    );
+    assert!(result, "Should detect await in async dependency injection");
+}
+
+#[test]
+fn test_async_class_pattern_lifecycle_init() {
+    let result = async_class_method_extra_contains_await(
+        "class Component { async onInit() { await this.loadData(); await this.render(); } }",
+    );
+    assert!(result, "Should detect await in async lifecycle init hook");
+}
+
+#[test]
+fn test_async_class_pattern_lifecycle_destroy() {
+    let result = async_class_method_extra_contains_await(
+        "class Component { async onDestroy() { await this.cleanup(); await this.saveState(); } }",
+    );
+    assert!(result, "Should detect await in async lifecycle destroy hook");
+}
+
+#[test]
+fn test_async_class_pattern_builder() {
+    let result = async_class_method_extra_contains_await(
+        "class Builder { async build() { await this.validate(); return await this.construct(); } }",
+    );
+    assert!(result, "Should detect await in async builder pattern");
+}
+
+#[test]
+fn test_async_class_pattern_repository() {
+    let result = async_class_method_extra_contains_await(
+        "class Repository { async findById(id: string) { return await this.db.query(id); } }",
+    );
+    assert!(result, "Should detect await in async repository pattern");
+}
+
+#[test]
+fn test_async_class_pattern_service_layer() {
+    let result = async_class_method_extra_contains_await(
+        "class UserService { async getUser(id: string) { const user = await this.repo.find(id); return await this.transform(user); } }",
+    );
+    assert!(result, "Should detect await in async service layer pattern");
+}
+
+#[test]
+fn test_async_class_pattern_no_await() {
+    let result = async_class_method_extra_contains_await(
+        "class Foo { async getValue() { return this.cachedValue; } }",
+    );
+    assert!(!result, "Should not detect await when class method has no await");
+}
+
+#[test]
+fn test_async_class_pattern_ignores_nested_async() {
+    let result = async_class_method_extra_contains_await(
+        "class Foo { async setup() { const loader = async () => await loadData(); } }",
+    );
+    assert!(!result, "Should not detect await inside nested async in class");
+}
+
+// ============================================================================
+// ASYNC DECORATOR PATTERN TESTS
+// ============================================================================
+
+// Tests for async decorator patterns: async method decorators, async class
+// decorators, async property decorators, decorator composition with async.
+
+#[test]
+fn test_async_decorator_pattern_method_basic() {
+    let result = async_method_decorator_contains_await(
+        "class Foo { @log async getData() { return await fetch('/api'); } }",
+    );
+    assert!(result, "Should detect await in decorated async method");
+}
+
+#[test]
+fn test_async_decorator_pattern_method_multiple() {
+    let result = async_method_decorator_contains_await(
+        "class Foo { @log @cache async getData() { return await fetch('/api'); } }",
+    );
+    assert!(result, "Should detect await in method with multiple decorators");
+}
+
+#[test]
+fn test_async_decorator_pattern_method_with_params() {
+    let result = async_method_decorator_contains_await(
+        "class Foo { @timeout async fetchData(id: string) { return await api.get(id); } }",
+    );
+    assert!(result, "Should detect await in decorated method with params");
+}
+
+#[test]
+fn test_async_decorator_pattern_static_method() {
+    let result = async_method_decorator_contains_await(
+        "class Foo { @memoize static async getInstance() { return await Foo.create(); } }",
+    );
+    assert!(result, "Should detect await in decorated static async method");
+}
+
+#[test]
+fn test_async_decorator_pattern_class_with_async_method() {
+    let result = async_method_decorator_contains_await(
+        "@injectable class Service { async init() { await this.configure(); } }",
+    );
+    assert!(result, "Should detect await in async method of decorated class");
+}
+
+#[test]
+fn test_async_decorator_pattern_property_initializer() {
+    let result = async_field_initializer_contains_await(
+        "class Foo { @observable data = async () => await loadData(); }",
+    );
+    assert!(result, "Should detect await in decorated property with async initializer");
+}
+
+#[test]
+fn test_async_decorator_pattern_accessor_simulation() {
+    // Getters can't be async, but we can simulate with a method
+    let result = async_method_decorator_contains_await(
+        "class Foo { @computed async getValue() { return await this.compute(); } }",
+    );
+    assert!(result, "Should detect await in decorated getter simulation method");
+}
+
+#[test]
+fn test_async_decorator_pattern_composition() {
+    let result = async_method_decorator_contains_await(
+        "class Foo { @retry @timeout @log async fetchWithRetry() { return await fetch('/api'); } }",
+    );
+    assert!(result, "Should detect await with decorator composition");
+}
+
+#[test]
+fn test_async_decorator_pattern_factory() {
+    let result = async_method_decorator_contains_await(
+        "class Foo { @inject async process() { return await this.service.run(); } }",
+    );
+    assert!(result, "Should detect await in method with factory decorator");
+}
+
+#[test]
+fn test_async_decorator_pattern_validation() {
+    let result = async_method_decorator_contains_await(
+        "class Foo { @validate async save(data: any) { await this.repo.save(data); } }",
+    );
+    assert!(result, "Should detect await in method with validation decorator");
+}
+
+#[test]
+fn test_async_decorator_pattern_no_await() {
+    let result = async_method_decorator_contains_await(
+        "class Foo { @log async getValue() { return this.cached; } }",
+    );
+    assert!(!result, "Should not detect await when decorated method has no await");
+}
+
+#[test]
+fn test_async_decorator_pattern_ignores_nested_async() {
+    let result = async_method_decorator_contains_await(
+        "class Foo { @log async setup() { const loader = async () => await inner(); } }",
+    );
+    assert!(!result, "Should not detect await inside nested async in decorated method");
+}
