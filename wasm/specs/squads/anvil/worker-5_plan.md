@@ -7,10 +7,10 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-None - awaiting next task
+- [ ] Add async ES5 tests for async module patterns: dynamic import with await, top-level await simulation, module-scoped async. Tests: `./wasm/test.sh async_es5_tests`
 
 ## Task Queue
-- [ ] Add async ES5 tests for async module patterns: dynamic import with await, top-level await simulation
+- [ ] Add async ES5 tests for async resource management patterns: using declarations, async dispose
 
 ## Completed
 - [x] Added 12 async decorator pattern tests (method basic, method multiple, method with params, static method, class with async method, property initializer, accessor simulation, composition, factory, validation, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (616 tests PASS).
