@@ -16773,3 +16773,196 @@ class Car extends Vehicle {
         output
     );
 }
+
+/// Parity test for ES5 class decorator chaining.
+/// Multiple class decorators should be applied in reverse order.
+#[test]
+fn test_parity_es5_decorator_class_chaining() {
+    let source = r#"function first<T extends { new(...args: any[]): {} }>(target: T) {
+    return class extends target {
+        first = true;
+    };
+}
+
+function second<T extends { new(...args: any[]): {} }>(target: T) {
+    return class extends target {
+        second = true;
+    };
+}
+
+@first
+@second
+class Example {
+    value: number = 42;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Class and decorator functions should be present
+    assert!(
+        output.contains("Example") && output.contains("first") && output.contains("second"),
+        "Output should contain class and decorators: {}",
+        output
+    );
+    // No @ decorator syntax
+    assert!(
+        !output.contains("@first") && !output.contains("@second"),
+        "ES5 output should not contain @ decorator syntax: {}",
+        output
+    );
+    // Type parameters should be erased
+    assert!(
+        !output.contains("<T extends"),
+        "Type parameters should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 method decorator with descriptor.
+/// Method decorators should receive property descriptor.
+#[test]
+fn test_parity_es5_decorator_method_descriptor() {
+    let source = r#"function log(target: any, key: string, descriptor: PropertyDescriptor) {
+    const original = descriptor.value;
+    descriptor.value = function(...args: any[]) {
+        console.log(`Calling ${key}`);
+        return original.apply(this, args);
+    };
+    return descriptor;
+}
+
+class Calculator {
+    @log
+    add(a: number, b: number): number {
+        return a + b;
+    }
+
+    @log
+    multiply(a: number, b: number): number {
+        return a * b;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Class and methods should be present
+    assert!(
+        output.contains("Calculator") && output.contains("add") && output.contains("multiply"),
+        "Output should contain class and methods: {}",
+        output
+    );
+    // Decorator function should be present
+    assert!(
+        output.contains("log"),
+        "Output should contain log decorator: {}",
+        output
+    );
+    // No @ decorator syntax
+    assert!(
+        !output.contains("@log"),
+        "ES5 output should not contain @ decorator syntax: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number") && !output.contains(": PropertyDescriptor"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 parameter decorator with injection.
+/// Parameter decorators for dependency injection pattern.
+#[test]
+fn test_parity_es5_decorator_parameter_injection() {
+    let source = r#"function inject(token: string) {
+    return function(target: any, key: string | symbol, index: number) {
+        const existing = Reflect.getMetadata("inject", target, key) || [];
+        existing.push({ index, token });
+        Reflect.defineMetadata("inject", existing, target, key);
+    };
+}
+
+class UserService {
+    constructor(
+        @inject("Database") private db: any,
+        @inject("Logger") private logger: any
+    ) {}
+
+    getUser(@inject("UserId") id: string): any {
+        return this.db.find(id);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Class and decorator should be present
+    assert!(
+        output.contains("UserService") && output.contains("inject"),
+        "Output should contain class and decorator: {}",
+        output
+    );
+    // No @ decorator syntax
+    assert!(
+        !output.contains("@inject"),
+        "ES5 output should not contain @ decorator syntax: {}",
+        output
+    );
+    // Private modifier should be erased
+    assert!(
+        !output.contains("private db") && !output.contains("private logger"),
+        "Private modifier should be erased: {}",
+        output
+    );
+}
