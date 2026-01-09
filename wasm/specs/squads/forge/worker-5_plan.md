@@ -115,6 +115,8 @@ Priority: 5
 - Result: PASS (1 test run, 4960 skipped).
 - Tests: `./wasm/test.sh`
 - Result: FAIL (Docker permission denied to `/Users/mohsenazimi/.orbstack/run/docker.sock`).
+- Tests: `./wasm/test.sh thin_checker_tests`
+- Result: FAIL (exit 137 after ~160s, no additional output).
 
 ### Distributive Conditional Type Stress Tests Added
 Added 40 comprehensive stress tests in `evaluate_tests.rs` covering:
@@ -164,6 +166,7 @@ Added 40 comprehensive stress tests in `evaluate_tests.rs` covering:
 
 ## Completed
 - [x] **Redux/Lodash Generics Fix**: Cross-file type param resolution for Application expansion; allow mapped keys with `symbol` in unions; treat `any[K]` index access as `any` to satisfy ReducersMapObject constraints and unblock redux test.
+- [x] Added `@noImplicitAny: false` regression test to ensure implicit-any diagnostics are suppressed in `thin_checker_tests.rs`.
 - [x] **Circular Reference Analysis for Worker 1**: Investigated SymbolId(0) circular reference issue with type predicates. Root cause identified below.
 - [x] Added type predicate circular reference repro tests in `wasm/src/thin_checker_tests.rs`: `test_type_predicate_self_referential_guard` and `test_type_predicate_interface_self_reference`.
 - [x] Added detailed doc comment on `get_type_of_symbol` in `thin_checker.rs:2769-2804` explaining the circular reference issue, call chain, why interfaces work but functions don't, and fix approaches for Worker 1.
