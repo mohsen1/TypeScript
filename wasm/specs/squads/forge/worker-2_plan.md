@@ -9,12 +9,45 @@ Priority: 2
 ## Current Assignment
 - [x] ReturnType/Parameters edge case tests (per GOALS.md W2/Pane4 assignment)
 - [x] Distributive conditional type stress tests (per GOALS.md objective #2)
+- [x] Context-sensitive typing tests (generic function call inference, contextual parameter types)
+- [x] Function return type inference tests for conditional types
+- [x] Variadic tuple type tests
 
 ## Task Queue
 - [ ] Implement TypeResolver for TypeEvaluator to resolve Refs inside Mapped/Conditional types
 - [ ] This would enable full evaluation of complex patterns like `{ [K in keyof R]: ExtractAction<R[K]> }[keyof R]`
 
 ## Completed
+- [x] Added 28 variadic tuple type tests including:
+  - Basic rest element at end/start/middle positions
+  - Inference from spread calls and contexts
+  - Concat, Push, Unshift type operations
+  - First/Last/Tail/Init extraction patterns
+  - Function apply and curry patterns
+  - Zip, flatten, partial application patterns
+  - Labeled elements, optional before rest
+  - Union elements in variadic tuples
+- [x] Added 24 function return type inference tests for conditional types including:
+  - Basic conditional return type evaluation (true/false branches)
+  - Distributive conditional types with unions
+  - Infer keyword for extracting return/param types
+  - Never absorption and any special cases
+  - Literal type and object structural subtyping conditionals
+  - Tuple/array element inference, Promise unwrap
+  - Generic inference context integration
+  - Constructor/InstanceType inference patterns
+- [x] Added 24 context-sensitive typing tests including:
+  - Generic function call inference (single/multiple args, different type params)
+  - Contextual callback parameter and return types
+  - Inference from return context
+  - Object/array literal contexts
+  - Generic method chains
+  - Constraint handling and violations
+  - Tuple element contexts
+  - Promise.then, reduce, constructor patterns
+  - Spread operators, nested generic calls
+  - Event handler and JSX prop typing
+  - Constraint propagation between type params
 - [x] Added 18 distributive conditional type stress tests including:
   - Large union distribution, nested conditionals
   - Never absorption, all-never results
@@ -70,6 +103,10 @@ Solution options:
 
 Worker 2 branch now contains:
 - 28 new utility type edge case tests (ReturnType, Parameters, InstanceType, etc.)
+- 18 distributive conditional type stress tests
+- 24 context-sensitive typing tests (generic inference, contextual typing)
+- 24 function return type inference tests for conditional types
+- 28 variadic tuple type tests
 - No modifications to evaluate.rs or other core files
 - Pure test additions that can be safely merged
 
