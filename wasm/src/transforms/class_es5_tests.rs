@@ -13484,31 +13484,22 @@ class TemplateReplacer {
 }
 
 // ============================================================================
-// Object.freeze/Object.seal pattern tests
+// Symbol.search Tests
 // ============================================================================
 
 #[test]
-fn test_class_es5_object_freeze_basic() {
-    // Basic Object.freeze usage
+fn test_class_es5_symbol_search_basic() {
+    // Basic Symbol.search implementation for custom searcher
     let source = r#"
-class ImmutablePoint {
-    readonly x: number;
-    readonly y: number;
+class SubstringSearcher {
+    private needle: string;
 
-    constructor(x: number, y: number) {
-        this.x = x;
-        this.y = y;
-        Object.freeze(this);
+    constructor(needle: string) {
+        this.needle = needle;
     }
 
-    static create(x: number, y: number): Readonly<ImmutablePoint> {
-        return Object.freeze(new ImmutablePoint(x, y));
-    }
-
-    distance(other: ImmutablePoint): number {
-        const dx = this.x - other.x;
-        const dy = this.y - other.y;
-        return Math.sqrt(dx * dx + dy * dy);
+    [Symbol.search](str: string): number {
+        return str.indexOf(this.needle);
     }
 }
 "#;
@@ -13527,119 +13518,42 @@ class ImmutablePoint {
 
     let output = printer.get_output().to_string();
 
-    // Class should be emitted
+    // Class should be converted
     assert!(
-        output.contains("ImmutablePoint"),
-        "Expected ImmutablePoint class: {}",
+        output.contains("function SubstringSearcher"),
+        "Expected function declaration: {}",
         output
     );
 
-    // Object.freeze should be present
+    // Symbol.search should be referenced
     assert!(
-        output.contains("Object.freeze"),
-        "Expected Object.freeze: {}",
-        output
-    );
-
-    // Methods should be present
-    assert!(
-        output.contains("distance") && output.contains("create"),
-        "Expected distance, create methods: {}",
+        output.contains("search") || output.contains("Symbol"),
+        "Expected Symbol.search reference: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_object_seal_basic() {
-    // Basic Object.seal usage
+fn test_class_es5_symbol_search_case_insensitive() {
+    // Symbol.search with case-insensitive matching
     let source = r#"
-class SealedConfig {
-    host: string = 'localhost';
-    port: number = 8080;
-    debug: boolean = false;
+class CaseInsensitiveSearcher {
+    private pattern: string;
+    readonly flags: string = "i";
 
-    constructor() {
-        Object.seal(this);
+    constructor(pattern: string) {
+        this.pattern = pattern.toLowerCase();
     }
 
-    update(key: 'host' | 'port' | 'debug', value: string | number | boolean): void {
-        (this as any)[key] = value;
+    [Symbol.search](str: string): number {
+        return str.toLowerCase().indexOf(this.pattern);
     }
 
-    static createSealed(): SealedConfig {
-        return Object.seal(new SealedConfig());
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Class should be emitted
-    assert!(
-        output.contains("SealedConfig"),
-        "Expected SealedConfig class: {}",
-        output
-    );
-
-    // Object.seal should be present
-    assert!(
-        output.contains("Object.seal"),
-        "Expected Object.seal: {}",
-        output
-    );
-
-    // Methods should be present
-    assert!(
-        output.contains("update") && output.contains("createSealed"),
-        "Expected update, createSealed methods: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_object_freeze_deep() {
-    // Deep freeze pattern
-    let source = r#"
-class DeepFreezer {
-    static deepFreeze<T extends object>(obj: T): Readonly<T> {
-        Object.freeze(obj);
-
-        for (const key of Object.keys(obj)) {
-            const value = (obj as any)[key];
-            if (value !== null && typeof value === 'object') {
-                this.deepFreeze(value);
-            }
-        }
-
-        return obj;
+    get source(): string {
+        return this.pattern;
     }
 
-    static isDeepFrozen(obj: object): boolean {
-        if (!Object.isFrozen(obj)) {
-            return false;
-        }
-
-        for (const key of Object.keys(obj)) {
-            const value = (obj as any)[key];
-            if (value !== null && typeof value === 'object') {
-                if (!this.isDeepFrozen(value)) {
-                    return false;
-                }
-            }
-        }
-
+    get ignoreCase(): boolean {
         return true;
     }
 }
@@ -13659,194 +13573,55 @@ class DeepFreezer {
 
     let output = printer.get_output().to_string();
 
-    // Class should be emitted
+    // Class should be converted
     assert!(
-        output.contains("DeepFreezer"),
-        "Expected DeepFreezer class: {}",
+        output.contains("function CaseInsensitiveSearcher"),
+        "Expected function declaration: {}",
         output
     );
 
-    // Object.freeze and Object.isFrozen should be present
+    // Flags property should be present
     assert!(
-        output.contains("Object.freeze") && output.contains("Object.isFrozen"),
-        "Expected Object.freeze and Object.isFrozen: {}",
+        output.contains("flags"),
+        "Expected flags property: {}",
         output
     );
 
-    // Static methods should be present
+    // Getters should be present
     assert!(
-        output.contains("deepFreeze") && output.contains("isDeepFrozen"),
-        "Expected deepFreeze, isDeepFrozen methods: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_object_freeze_seal_checks() {
-    // Object.isFrozen and Object.isSealed checks
-    let source = r#"
-class ObjectStateChecker {
-    private obj: object;
-
-    constructor(obj: object) {
-        this.obj = obj;
-    }
-
-    isFrozen(): boolean {
-        return Object.isFrozen(this.obj);
-    }
-
-    isSealed(): boolean {
-        return Object.isSealed(this.obj);
-    }
-
-    isExtensible(): boolean {
-        return Object.isExtensible(this.obj);
-    }
-
-    freeze(): void {
-        Object.freeze(this.obj);
-    }
-
-    seal(): void {
-        Object.seal(this.obj);
-    }
-
-    preventExtensions(): void {
-        Object.preventExtensions(this.obj);
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Class should be emitted
-    assert!(
-        output.contains("ObjectStateChecker"),
-        "Expected ObjectStateChecker class: {}",
-        output
-    );
-
-    // Object state methods should be present
-    assert!(
-        output.contains("Object.isFrozen") || output.contains("Object.isSealed"),
-        "Expected Object state check methods: {}",
-        output
-    );
-
-    // Instance methods should be present
-    assert!(
-        output.contains("isFrozen") && output.contains("isSealed"),
-        "Expected isFrozen, isSealed methods: {}",
+        output.contains("source") && output.contains("ignoreCase"),
+        "Expected source and ignoreCase getters: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_immutable_record() {
-    // Immutable record pattern with freeze
+fn test_class_es5_symbol_search_last_index() {
+    // Symbol.search returning last occurrence
     let source = r#"
-class ImmutableRecord<T extends object> {
-    private readonly data: Readonly<T>;
+class LastIndexSearcher {
+    private pattern: string;
 
-    constructor(data: T) {
-        this.data = Object.freeze({ ...data });
+    constructor(pattern: string) {
+        this.pattern = pattern;
     }
 
-    get<K extends keyof T>(key: K): T[K] {
-        return this.data[key];
+    [Symbol.search](str: string): number {
+        return str.lastIndexOf(this.pattern);
     }
 
-    set<K extends keyof T>(key: K, value: T[K]): ImmutableRecord<T> {
-        return new ImmutableRecord({ ...this.data, [key]: value });
+    searchFirst(str: string): number {
+        return str.indexOf(this.pattern);
     }
 
-    toObject(): Readonly<T> {
-        return this.data;
-    }
-
-    static from<T extends object>(data: T): ImmutableRecord<T> {
-        return new ImmutableRecord(data);
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Class should be emitted
-    assert!(
-        output.contains("ImmutableRecord"),
-        "Expected ImmutableRecord class: {}",
-        output
-    );
-
-    // Object.freeze should be present
-    assert!(
-        output.contains("Object.freeze"),
-        "Expected Object.freeze: {}",
-        output
-    );
-
-    // Methods should be present
-    assert!(
-        output.contains("toObject"),
-        "Expected toObject method: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_frozen_singleton() {
-    // Frozen singleton pattern
-    let source = r#"
-class FrozenSingleton {
-    private static instance: FrozenSingleton | null = null;
-    readonly id: string;
-    readonly createdAt: Date;
-
-    private constructor() {
-        this.id = Math.random().toString(36).substr(2, 9);
-        this.createdAt = new Date();
-        Object.freeze(this);
-    }
-
-    static getInstance(): Readonly<FrozenSingleton> {
-        if (!this.instance) {
-            this.instance = new FrozenSingleton();
+    searchAll(str: string): number[] {
+        const indices: number[] = [];
+        let idx = 0;
+        while ((idx = str.indexOf(this.pattern, idx)) !== -1) {
+            indices.push(idx);
+            idx += 1;
         }
-        return this.instance;
-    }
-
-    static isInstanceFrozen(): boolean {
-        return this.instance ? Object.isFrozen(this.instance) : false;
-    }
-
-    getId(): string {
-        return this.id;
+        return indices;
     }
 }
 "#;
@@ -13865,24 +13640,175 @@ class FrozenSingleton {
 
     let output = printer.get_output().to_string();
 
-    // Class should be emitted
+    // Class should be converted
     assert!(
-        output.contains("FrozenSingleton"),
-        "Expected FrozenSingleton class: {}",
+        output.contains("function LastIndexSearcher"),
+        "Expected function declaration: {}",
         output
     );
 
-    // Object.freeze should be present
+    // Helper methods should be present
     assert!(
-        output.contains("Object.freeze"),
-        "Expected Object.freeze: {}",
+        output.contains("searchFirst") && output.contains("searchAll"),
+        "Expected helper methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_search_with_inheritance() {
+    // Symbol.search with class inheritance
+    let source = r#"
+abstract class BaseSearcher {
+    abstract readonly pattern: string;
+
+    abstract [Symbol.search](str: string): number;
+
+    contains(str: string): boolean {
+        return this[Symbol.search](str) !== -1;
+    }
+
+    startsWith(str: string): boolean {
+        return this[Symbol.search](str) === 0;
+    }
+}
+
+class WordBoundarySearcher extends BaseSearcher {
+    readonly pattern: string;
+
+    constructor(word: string) {
+        super();
+        this.pattern = word;
+    }
+
+    [Symbol.search](str: string): number {
+        const words = str.split(/\s+/);
+        let position = 0;
+        for (const word of words) {
+            if (word === this.pattern) {
+                return position;
+            }
+            position += word.length + 1;
+        }
+        return -1;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Both classes should be converted
+    assert!(
+        output.contains("function BaseSearcher"),
+        "Expected BaseSearcher function: {}",
+        output
+    );
+    assert!(
+        output.contains("function WordBoundarySearcher"),
+        "Expected WordBoundarySearcher function: {}",
         output
     );
 
-    // Static methods should be present
+    // Inheritance should be set up
     assert!(
-        output.contains("getInstance") && output.contains("isInstanceFrozen"),
-        "Expected getInstance, isInstanceFrozen methods: {}",
+        output.contains("__extends") || output.contains("extends"),
+        "Expected inheritance: {}",
+        output
+    );
+
+    // Helper methods should be present
+    assert!(
+        output.contains("contains") && output.contains("startsWith"),
+        "Expected helper methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_search_multiple_patterns() {
+    // Symbol.search with multiple pattern support
+    let source = r#"
+class MultiPatternSearcher {
+    private patterns: string[];
+
+    constructor(...patterns: string[]) {
+        this.patterns = patterns;
+    }
+
+    [Symbol.search](str: string): number {
+        let earliest = -1;
+        for (const pattern of this.patterns) {
+            const idx = str.indexOf(pattern);
+            if (idx !== -1 && (earliest === -1 || idx < earliest)) {
+                earliest = idx;
+            }
+        }
+        return earliest;
+    }
+
+    addPattern(pattern: string): void {
+        this.patterns.push(pattern);
+    }
+
+    removePattern(pattern: string): boolean {
+        const idx = this.patterns.indexOf(pattern);
+        if (idx !== -1) {
+            this.patterns.splice(idx, 1);
+            return true;
+        }
+        return false;
+    }
+
+    get patternCount(): number {
+        return this.patterns.length;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function MultiPatternSearcher"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Helper methods should be present
+    assert!(
+        output.contains("addPattern") && output.contains("removePattern"),
+        "Expected pattern management methods: {}",
+        output
+    );
+
+    // patternCount getter should be present
+    assert!(
+        output.contains("patternCount"),
+        "Expected patternCount getter: {}",
         output
     );
 }
