@@ -16757,3 +16757,324 @@ class AppConfig {
         output
     );
 }
+
+// ============================================================================
+// Accessor Keyword (Auto-Accessors) Pattern Tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_accessor_keyword_basic() {
+    // Basic accessor keyword usage
+    let source = r#"
+class Person {
+    accessor name: string = "";
+    accessor age: number = 0;
+
+    constructor(name: string, age: number) {
+        this.name = name;
+        this.age = age;
+    }
+
+    greet(): string {
+        return `Hello, I'm ${this.name} and I'm ${this.age} years old`;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function Person"),
+        "Expected Person function: {}",
+        output
+    );
+
+    // Accessor should be transformed (defineProperty or getter/setter)
+    assert!(
+        output.contains("name") && output.contains("age"),
+        "Expected accessor fields: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("greet"),
+        "Expected greet method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_accessor_keyword_with_inheritance() {
+    // Accessor keyword with class inheritance
+    let source = r#"
+class BaseEntity {
+    accessor id: string = "";
+    accessor createdAt: Date = new Date();
+
+    constructor(id: string) {
+        this.id = id;
+    }
+}
+
+class User extends BaseEntity {
+    accessor email: string = "";
+    accessor isActive: boolean = true;
+
+    constructor(id: string, email: string) {
+        super(id);
+        this.email = email;
+    }
+
+    deactivate(): void {
+        this.isActive = false;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("function BaseEntity") && output.contains("function User"),
+        "Expected class functions: {}",
+        output
+    );
+
+    // Inheritance should work
+    assert!(
+        output.contains("_super.call") || output.contains("BaseEntity.call"),
+        "Expected super call: {}",
+        output
+    );
+
+    // Accessors should be present
+    assert!(
+        output.contains("id") && output.contains("email"),
+        "Expected accessor fields: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_accessor_keyword_private() {
+    // Private accessor keyword
+    let source = r#"
+class SecureStorage {
+    accessor #data: Map<string, any> = new Map();
+    accessor #encryptionKey: string = "";
+
+    constructor(key: string) {
+        this.#encryptionKey = key;
+    }
+
+    set(key: string, value: any): void {
+        this.#data.set(key, this.encrypt(value));
+    }
+
+    get(key: string): any {
+        const encrypted = this.#data.get(key);
+        return encrypted ? this.decrypt(encrypted) : undefined;
+    }
+
+    private encrypt(value: any): string {
+        return JSON.stringify(value) + this.#encryptionKey;
+    }
+
+    private decrypt(encrypted: string): any {
+        const data = encrypted.slice(0, -this.#encryptionKey.length);
+        return JSON.parse(data);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function SecureStorage"),
+        "Expected SecureStorage function: {}",
+        output
+    );
+
+    // Public methods should be present
+    assert!(
+        output.contains("set") && output.contains("get"),
+        "Expected set/get methods: {}",
+        output
+    );
+
+    // Private methods should be present
+    assert!(
+        output.contains("encrypt") && output.contains("decrypt"),
+        "Expected encrypt/decrypt methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_accessor_keyword_static() {
+    // Static accessor keyword
+    let source = r#"
+class Configuration {
+    static accessor debug: boolean = false;
+    static accessor logLevel: string = "info";
+    static accessor maxRetries: number = 3;
+
+    static enableDebug(): void {
+        Configuration.debug = true;
+        Configuration.logLevel = "debug";
+    }
+
+    static disableDebug(): void {
+        Configuration.debug = false;
+        Configuration.logLevel = "info";
+    }
+
+    static isDebugEnabled(): boolean {
+        return Configuration.debug;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function Configuration"),
+        "Expected Configuration function: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("enableDebug") && output.contains("disableDebug"),
+        "Expected static methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("isDebugEnabled"),
+        "Expected isDebugEnabled method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_accessor_keyword_reactive() {
+    // Accessor keyword for reactive pattern
+    let source = r#"
+class ReactiveValue<T> {
+    accessor value: T;
+    private listeners: Array<(value: T) => void> = [];
+
+    constructor(initialValue: T) {
+        this.value = initialValue;
+    }
+
+    subscribe(listener: (value: T) => void): () => void {
+        this.listeners.push(listener);
+        return () => {
+            const index = this.listeners.indexOf(listener);
+            if (index > -1) {
+                this.listeners.splice(index, 1);
+            }
+        };
+    }
+
+    update(newValue: T): void {
+        this.value = newValue;
+        this.notifyListeners();
+    }
+
+    private notifyListeners(): void {
+        for (const listener of this.listeners) {
+            listener(this.value);
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function ReactiveValue"),
+        "Expected ReactiveValue function: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("subscribe") && output.contains("update"),
+        "Expected subscribe/update methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("notifyListeners"),
+        "Expected notifyListeners method: {}",
+        output
+    );
+}

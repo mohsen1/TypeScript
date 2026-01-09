@@ -8314,3 +8314,183 @@ fn test_async_class_inheritance_conditional() {
         output
     );
 }
+
+// ============================================================================
+// Async/await in for-of loop pattern tests
+// ============================================================================
+
+fn parse_and_emit_async_for_of_loop(source: &str) -> String {
+    use crate::parser::syntax_kind_ext;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &stmt_idx in &source_file.statements.nodes {
+                if let Some(stmt_node) = parser.arena.get(stmt_idx) {
+                    if stmt_node.kind == syntax_kind_ext::FUNCTION_DECLARATION {
+                        if let Some(func_data) = parser.arena.get_function(stmt_node) {
+                            let emitter = AsyncES5Emitter::new(&parser.arena);
+                            let has_await = emitter.body_contains_await(func_data.body);
+                            let mut emitter = AsyncES5Emitter::new(&parser.arena);
+                            if has_await {
+                                return emitter.emit_generator_body_with_await(func_data.body);
+                            } else {
+                                return emitter.emit_simple_generator_body(func_data.body);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    String::new()
+}
+
+fn async_for_of_loop_contains_await(source: &str) -> bool {
+    use crate::parser::syntax_kind_ext;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &stmt_idx in &source_file.statements.nodes {
+                if let Some(stmt_node) = parser.arena.get(stmt_idx) {
+                    if stmt_node.kind == syntax_kind_ext::FUNCTION_DECLARATION {
+                        if let Some(func_data) = parser.arena.get_function(stmt_node) {
+                            let emitter = AsyncES5Emitter::new(&parser.arena);
+                            return emitter.body_contains_await(func_data.body);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+#[test]
+fn test_async_for_of_loop_basic() {
+    let output = parse_and_emit_async_for_of_loop(
+        "async function foo(items: any[]) { for (const item of items) { await process(item); } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Async for-of loop should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_for_of_loop_with_result() {
+    let output = parse_and_emit_async_for_of_loop(
+        "async function foo(items: any[]) { const results = []; for (const item of items) { results.push(await transform(item)); } return results; }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Async for-of with results should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_for_of_loop_no_await() {
+    let result = async_for_of_loop_contains_await(
+        "async function foo(items: any[]) { for (const item of items) { process(item); } }",
+    );
+    assert!(!result, "Should not detect await when for-of has no await");
+}
+
+#[test]
+fn test_async_for_of_loop_body_contains_await() {
+    let result = async_for_of_loop_contains_await(
+        "async function foo(items: any[]) { for (const item of items) { await process(item); } }",
+    );
+    assert!(result, "Should detect await in for-of loop body");
+}
+
+#[test]
+fn test_async_for_of_loop_body_no_await() {
+    let result = async_for_of_loop_contains_await(
+        "async function foo(items: any[]) { for (const item of items) { console.log(item); } }",
+    );
+    assert!(!result, "Should not detect await when for-of body has no await");
+}
+
+#[test]
+fn test_async_for_of_loop_ignores_nested_async() {
+    let result = async_for_of_loop_contains_await(
+        "async function foo(items: any[]) { for (const item of items) { const inner = async () => { await x; }; } }",
+    );
+    assert!(!result, "Should not detect await inside nested async in for-of");
+}
+
+#[test]
+fn test_async_for_of_loop_with_break() {
+    let output = parse_and_emit_async_for_of_loop(
+        "async function foo(items: any[]) { for (const item of items) { if (await check(item)) { break; } } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Async for-of with break should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_for_of_loop_with_continue() {
+    let output = parse_and_emit_async_for_of_loop(
+        "async function foo(items: any[]) { for (const item of items) { if (!await validate(item)) { continue; } await process(item); } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Async for-of with continue should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_for_of_loop_destructuring() {
+    let output = parse_and_emit_async_for_of_loop(
+        "async function foo(items: any[]) { for (const [key, value] of items) { await save(key, value); } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Async for-of with destructuring should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_for_of_loop_nested() {
+    let output = parse_and_emit_async_for_of_loop(
+        "async function foo(matrix: any[][]) { for (const row of matrix) { for (const cell of row) { await process(cell); } } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Nested async for-of loops should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_for_of_loop_with_try_catch() {
+    let output = parse_and_emit_async_for_of_loop(
+        "async function foo(items: any[]) { for (const item of items) { try { await process(item); } catch (e) { console.error(e); } } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Async for-of with try/catch should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_for_of_loop_conditional() {
+    let output = parse_and_emit_async_for_of_loop(
+        "async function foo(items: any[], shouldProcess: boolean) { for (const item of items) { if (shouldProcess) { await process(item); } } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Conditional async for-of should have switch or yield: {}",
+        output
+    );
+}
