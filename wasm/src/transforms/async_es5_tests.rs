@@ -11450,3 +11450,104 @@ fn test_async_pool_ignores_nested_async() {
     );
     assert!(!result, "Should not detect await inside nested async in pool function");
 }
+
+// ============================================================================
+// ASYNC SCHEDULER PATTERN TESTS
+// Tests for scheduler patterns: priority queue, delay, throttle, debounce
+// ============================================================================
+
+#[test]
+fn test_async_scheduler_priority() {
+    let result = async_error_propagation_contains_await(
+        "async function prioritySchedule() { return await scheduler.schedulePriority(task, priority); }",
+    );
+    assert!(result, "Should detect await in priority queue scheduling");
+}
+
+#[test]
+fn test_async_scheduler_delay() {
+    let result = async_error_propagation_contains_await(
+        "async function delayExec() { return await scheduler.delay(1000); }",
+    );
+    assert!(result, "Should detect await in delayed execution");
+}
+
+#[test]
+fn test_async_scheduler_throttle() {
+    let result = async_error_propagation_contains_await(
+        "async function throttled() { return await throttle(fn, 100)(); }",
+    );
+    assert!(result, "Should detect await in throttle pattern");
+}
+
+#[test]
+fn test_async_scheduler_debounce() {
+    let result = async_error_propagation_contains_await(
+        "async function debounced() { return await debounce(fn, 100)(); }",
+    );
+    assert!(result, "Should detect await in debounce pattern");
+}
+
+#[test]
+fn test_async_scheduler_schedule() {
+    let result = async_error_propagation_contains_await(
+        "async function schedule() { await scheduler.schedule(task, delay); }",
+    );
+    assert!(result, "Should detect await in schedule task");
+}
+
+#[test]
+fn test_async_scheduler_cancel() {
+    let result = async_error_propagation_contains_await(
+        "async function cancel() { await scheduler.cancel(taskId); }",
+    );
+    assert!(result, "Should detect await in cancel scheduled task");
+}
+
+#[test]
+fn test_async_scheduler_interval() {
+    let result = async_error_propagation_contains_await(
+        "async function interval() { await scheduler.setInterval(task, 1000); }",
+    );
+    assert!(result, "Should detect await in interval execution");
+}
+
+#[test]
+fn test_async_scheduler_cron() {
+    let result = async_error_propagation_contains_await(
+        "async function cronJob() { await scheduler.cron(expression, task); }",
+    );
+    assert!(result, "Should detect await in cron-like scheduling");
+}
+
+#[test]
+fn test_async_scheduler_immediate() {
+    let result = async_error_propagation_contains_await(
+        "async function immediate() { return await scheduler.immediate(task); }",
+    );
+    assert!(result, "Should detect await in immediate execution");
+}
+
+#[test]
+fn test_async_scheduler_next_tick() {
+    let result = async_error_propagation_contains_await(
+        "async function nextTick() { await scheduler.nextTick(); }",
+    );
+    assert!(result, "Should detect await in next tick scheduling");
+}
+
+#[test]
+fn test_async_scheduler_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function syncScheduler() { return scheduler.getPending(); }",
+    );
+    assert!(!result, "Should not detect await when scheduler access is sync");
+}
+
+#[test]
+fn test_async_scheduler_ignores_nested_async() {
+    let result = async_error_propagation_contains_await(
+        "async function outer() { const job = async () => await scheduler.schedule(); }",
+    );
+    assert!(!result, "Should not detect await inside nested async in scheduler function");
+}
