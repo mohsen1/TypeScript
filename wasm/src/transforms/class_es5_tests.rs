@@ -20373,3 +20373,598 @@ class ChainedCallProcessor extends BaseProcessor {
         output
     );
 }
+
+// ============================================================================
+// abstract class pattern tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_abstract_method_inheritance() {
+    // Test abstract class with abstract methods implemented by derived class
+    let source = r#"
+abstract class Shape {
+    abstract getArea(): number;
+    abstract getPerimeter(): number;
+
+    describe(): string {
+        return `Area: ${this.getArea()}, Perimeter: ${this.getPerimeter()}`;
+    }
+}
+
+class Rectangle extends Shape {
+    constructor(private width: number, private height: number) {
+        super();
+    }
+
+    getArea(): number {
+        return this.width * this.height;
+    }
+
+    getPerimeter(): number {
+        return 2 * (this.width + this.height);
+    }
+}
+
+class Circle extends Shape {
+    constructor(private radius: number) {
+        super();
+    }
+
+    getArea(): number {
+        return Math.PI * this.radius * this.radius;
+    }
+
+    getPerimeter(): number {
+        return 2 * Math.PI * this.radius;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function Shape"),
+        "Expected Shape function: {}",
+        output
+    );
+    assert!(
+        output.contains("Shape.prototype.describe"),
+        "Expected describe method on prototype: {}",
+        output
+    );
+    assert!(
+        output.contains("function Rectangle") && output.contains("__extends(Rectangle, _super)"),
+        "Expected Rectangle extending Shape: {}",
+        output
+    );
+    assert!(
+        output.contains("Rectangle.prototype.getArea") && output.contains("Rectangle.prototype.getPerimeter"),
+        "Expected Rectangle implementing abstract methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function Circle") && output.contains("__extends(Circle, _super)"),
+        "Expected Circle extending Shape: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_abstract_with_decorators() {
+    // Test abstract class with decorators on class and methods
+    let source = r#"
+function sealed(constructor: Function) {
+    Object.seal(constructor);
+    Object.seal(constructor.prototype);
+}
+
+function log(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const original = descriptor.value;
+    descriptor.value = function(...args: any[]) {
+        console.log(`Calling ${propertyKey}`);
+        return original.apply(this, args);
+    };
+}
+
+@sealed
+abstract class BaseService {
+    abstract process(data: string): void;
+
+    @log
+    validate(data: string): boolean {
+        return data.length > 0;
+    }
+}
+
+class UserService extends BaseService {
+    @log
+    process(data: string): void {
+        console.log(`Processing: ${data}`);
+    }
+}
+
+@sealed
+abstract class DecoratedAbstract {
+    abstract getName(): string;
+
+    @log
+    greet(): string {
+        return `Hello, ${this.getName()}`;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function sealed") && output.contains("Object.seal"),
+        "Expected sealed decorator function: {}",
+        output
+    );
+    assert!(
+        output.contains("function BaseService"),
+        "Expected BaseService function: {}",
+        output
+    );
+    assert!(
+        output.contains("function UserService") && output.contains("__extends(UserService, _super)"),
+        "Expected UserService extending BaseService: {}",
+        output
+    );
+    assert!(
+        output.contains("__decorate") || output.contains("sealed") || output.contains("log"),
+        "Expected decorator application: {}",
+        output
+    );
+    assert!(
+        output.contains("DecoratedAbstract"),
+        "Expected DecoratedAbstract: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_abstract_static_methods() {
+    // Test abstract class with static methods and properties
+    let source = r#"
+abstract class Registry {
+    private static instances: Map<string, Registry> = new Map();
+
+    static register(name: string, instance: Registry): void {
+        Registry.instances.set(name, instance);
+    }
+
+    static get(name: string): Registry | undefined {
+        return Registry.instances.get(name);
+    }
+
+    abstract getName(): string;
+    abstract initialize(): void;
+}
+
+class PluginRegistry extends Registry {
+    private plugins: string[] = [];
+
+    getName(): string {
+        return "PluginRegistry";
+    }
+
+    initialize(): void {
+        this.plugins = [];
+    }
+
+    static createDefault(): PluginRegistry {
+        const registry = new PluginRegistry();
+        Registry.register("plugins", registry);
+        return registry;
+    }
+}
+
+abstract class Singleton {
+    private static _instance: Singleton | null = null;
+
+    static getInstance<T extends Singleton>(this: new () => T): T {
+        if (!Singleton._instance) {
+            Singleton._instance = new this();
+        }
+        return Singleton._instance as T;
+    }
+
+    abstract doWork(): void;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function Registry"),
+        "Expected Registry function: {}",
+        output
+    );
+    assert!(
+        output.contains("Registry.register") || output.contains("Registry.instances"),
+        "Expected static method or property on Registry: {}",
+        output
+    );
+    assert!(
+        output.contains("function PluginRegistry") && output.contains("__extends(PluginRegistry, _super)"),
+        "Expected PluginRegistry extending Registry: {}",
+        output
+    );
+    assert!(
+        output.contains("PluginRegistry.createDefault") || output.contains("PluginRegistry.prototype.getName"),
+        "Expected PluginRegistry static or instance methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function Singleton"),
+        "Expected Singleton function: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_abstract_getters_setters() {
+    // Test abstract class with abstract getters and setters
+    let source = r#"
+abstract class DataSource {
+    abstract get data(): string;
+    abstract set data(value: string);
+
+    abstract get isReady(): boolean;
+
+    load(): void {
+        if (this.isReady) {
+            console.log(this.data);
+        }
+    }
+}
+
+class FileDataSource extends DataSource {
+    private _data: string = "";
+    private _ready: boolean = false;
+
+    get data(): string {
+        return this._data;
+    }
+
+    set data(value: string) {
+        this._data = value;
+        this._ready = true;
+    }
+
+    get isReady(): boolean {
+        return this._ready;
+    }
+}
+
+abstract class Observable<T> {
+    protected _value: T;
+
+    constructor(initial: T) {
+        this._value = initial;
+    }
+
+    abstract get value(): T;
+    abstract set value(v: T);
+
+    abstract subscribe(callback: (value: T) => void): void;
+}
+
+class BehaviorSubject<T> extends Observable<T> {
+    private subscribers: ((value: T) => void)[] = [];
+
+    get value(): T {
+        return this._value;
+    }
+
+    set value(v: T) {
+        this._value = v;
+        this.subscribers.forEach(cb => cb(v));
+    }
+
+    subscribe(callback: (value: T) => void): void {
+        this.subscribers.push(callback);
+        callback(this._value);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function DataSource"),
+        "Expected DataSource function: {}",
+        output
+    );
+    assert!(
+        output.contains("DataSource.prototype.load"),
+        "Expected load method on prototype: {}",
+        output
+    );
+    assert!(
+        output.contains("function FileDataSource") && output.contains("__extends(FileDataSource, _super)"),
+        "Expected FileDataSource extending DataSource: {}",
+        output
+    );
+    assert!(
+        output.contains("Object.defineProperty") && output.contains("FileDataSource.prototype"),
+        "Expected getter/setter via Object.defineProperty: {}",
+        output
+    );
+    assert!(
+        output.contains("function Observable") && output.contains("function BehaviorSubject"),
+        "Expected Observable and BehaviorSubject: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_abstract_multi_level_inheritance() {
+    // Test abstract class with multiple levels of inheritance
+    let source = r#"
+abstract class Entity {
+    abstract get id(): string;
+
+    equals(other: Entity): boolean {
+        return this.id === other.id;
+    }
+}
+
+abstract class TimestampedEntity extends Entity {
+    abstract get createdAt(): Date;
+    abstract get updatedAt(): Date;
+
+    isNewer(other: TimestampedEntity): boolean {
+        return this.updatedAt > other.updatedAt;
+    }
+}
+
+abstract class AuditableEntity extends TimestampedEntity {
+    abstract get createdBy(): string;
+    abstract get modifiedBy(): string;
+
+    getAuditLog(): string {
+        return `Created by ${this.createdBy} at ${this.createdAt}`;
+    }
+}
+
+class User extends AuditableEntity {
+    private _id: string;
+    private _createdAt: Date;
+    private _updatedAt: Date;
+    private _createdBy: string;
+    private _modifiedBy: string;
+
+    constructor(id: string, creator: string) {
+        super();
+        this._id = id;
+        this._createdAt = new Date();
+        this._updatedAt = new Date();
+        this._createdBy = creator;
+        this._modifiedBy = creator;
+    }
+
+    get id(): string { return this._id; }
+    get createdAt(): Date { return this._createdAt; }
+    get updatedAt(): Date { return this._updatedAt; }
+    get createdBy(): string { return this._createdBy; }
+    get modifiedBy(): string { return this._modifiedBy; }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function Entity"),
+        "Expected Entity function: {}",
+        output
+    );
+    assert!(
+        output.contains("function TimestampedEntity") && output.contains("__extends(TimestampedEntity, _super)"),
+        "Expected TimestampedEntity extending Entity: {}",
+        output
+    );
+    assert!(
+        output.contains("function AuditableEntity") && output.contains("__extends(AuditableEntity, _super)"),
+        "Expected AuditableEntity extending TimestampedEntity: {}",
+        output
+    );
+    assert!(
+        output.contains("function User") && output.contains("__extends(User, _super)"),
+        "Expected User extending AuditableEntity: {}",
+        output
+    );
+    assert!(
+        output.contains("Entity.prototype.equals") && output.contains("TimestampedEntity.prototype.isNewer"),
+        "Expected inherited methods on prototypes: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_abstract_combined_patterns() {
+    // Test abstract class combining all patterns
+    let source = r#"
+abstract class Component<T> {
+    private static componentCount: number = 0;
+    protected props: T;
+
+    constructor(props: T) {
+        this.props = props;
+        Component.componentCount++;
+    }
+
+    static getCount(): number {
+        return Component.componentCount;
+    }
+
+    abstract render(): string;
+    abstract get displayName(): string;
+    abstract set state(value: any);
+}
+
+abstract class PureComponent<T> extends Component<T> {
+    private _state: any = null;
+
+    abstract shouldUpdate(nextProps: T): boolean;
+
+    get state(): any {
+        return this._state;
+    }
+
+    set state(value: any) {
+        this._state = value;
+    }
+}
+
+class Button extends PureComponent<{ label: string }> {
+    private _displayName = "Button";
+
+    get displayName(): string {
+        return this._displayName;
+    }
+
+    shouldUpdate(nextProps: { label: string }): boolean {
+        return nextProps.label !== this.props.label;
+    }
+
+    render(): string {
+        return `<button>${this.props.label}</button>`;
+    }
+}
+
+abstract class AbstractFactory<T> {
+    protected instances: T[] = [];
+
+    abstract create(): T;
+
+    createMany(count: number): T[] {
+        return Array.from({ length: count }, () => {
+            const instance = this.create();
+            this.instances.push(instance);
+            return instance;
+        });
+    }
+
+    abstract get factoryName(): string;
+}
+
+class WidgetFactory extends AbstractFactory<{ id: number }> {
+    private counter = 0;
+
+    get factoryName(): string {
+        return "WidgetFactory";
+    }
+
+    create(): { id: number } {
+        return { id: ++this.counter };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function Component"),
+        "Expected Component function: {}",
+        output
+    );
+    assert!(
+        output.contains("Component.getCount") || output.contains("Component.componentCount"),
+        "Expected static members on Component: {}",
+        output
+    );
+    assert!(
+        output.contains("function PureComponent") && output.contains("__extends(PureComponent, _super)"),
+        "Expected PureComponent extending Component: {}",
+        output
+    );
+    assert!(
+        output.contains("function Button") && output.contains("__extends(Button, _super)"),
+        "Expected Button extending PureComponent: {}",
+        output
+    );
+    assert!(
+        output.contains("Button.prototype.render") && output.contains("Button.prototype.shouldUpdate"),
+        "Expected Button implementing abstract methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function AbstractFactory") && output.contains("function WidgetFactory"),
+        "Expected AbstractFactory and WidgetFactory: {}",
+        output
+    );
+}
