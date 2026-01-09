@@ -17162,3 +17162,148 @@ async function iterate(): Promise<void> {
         output
     );
 }
+
+/// Parity test for ES5 dynamic import.
+/// Dynamic import() expressions should be preserved or polyfilled.
+#[test]
+fn test_parity_es5_dynamic_import() {
+    let source = r#"async function loadModule(name: string): Promise<any> {
+    const module = await import(`./modules/${name}`);
+    return module.default;
+}
+
+async function conditionalLoad(condition: boolean): Promise<void> {
+    if (condition) {
+        const { helper } = await import('./helpers');
+        helper();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::CommonJS;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions should be present
+    assert!(
+        output.contains("loadModule") && output.contains("conditionalLoad"),
+        "Output should contain functions: {}",
+        output
+    );
+    // Should have async helpers
+    assert!(
+        output.contains("__awaiter"),
+        "ES5 output should use __awaiter helper: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": Promise") && !output.contains(": boolean"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 top-level await simulation.
+/// Top-level await in async IIFE pattern.
+#[test]
+fn test_parity_es5_top_level_await_iife() {
+    let source = r#"const config = await import('./config');
+const data: string = await fetch('/api/data').then(r => r.text());
+
+export async function initialize(): Promise<void> {
+    console.log(config, data);
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::CommonJS;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Variables and function should be present
+    assert!(
+        output.contains("config") && output.contains("data") && output.contains("initialize"),
+        "Output should contain variables and function: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": Promise"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 import.meta usage.
+/// import.meta should be handled appropriately for target.
+#[test]
+fn test_parity_es5_import_meta() {
+    let source = r#"const currentUrl: string = import.meta.url;
+const baseDir: string = new URL('.', import.meta.url).pathname;
+
+function getModulePath(): string {
+    return import.meta.url;
+}
+
+export { currentUrl, baseDir, getModulePath };
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::CommonJS;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Variables and function should be present
+    assert!(
+        output.contains("currentUrl") && output.contains("baseDir") && output.contains("getModulePath"),
+        "Output should contain variables and function: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
