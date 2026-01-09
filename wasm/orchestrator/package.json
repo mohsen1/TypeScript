@@ -5,12 +5,17 @@
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "zang-org": "dist/cli.js"
+    "zang-org": "dist/cli.js",
+    "zang-notify": "dist/notify-cli.js",
+    "zang-watcher": "dist/watcher-cli.js"
   },
   "scripts": {
     "build": "tsc",
     "start": "node dist/cli.js",
     "dev": "tsx src/cli.ts",
+    "watcher": "tsx src/watcher-cli.ts",
+    "notify": "tsx src/notify-cli.ts",
+    "test:notify": "bash test-notify/run-test.sh --dry-run",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
