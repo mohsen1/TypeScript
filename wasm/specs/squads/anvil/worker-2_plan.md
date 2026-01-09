@@ -7,12 +7,14 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] Add ES5 private field accessor parity tests in `wasm/src/emitter_parity_tests.rs`. Run `./wasm/test.sh emitter_parity`.
+- [ ] Add ES5 computed property parity tests in `wasm/src/emitter_parity_tests.rs`. Run `./wasm/test.sh emitter_parity`.
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 class static block parity tests (try-catch, loop-init, conditional, derived-class) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (172 tests).
+- [x] Added ES5 private field accessor parity tests (getter, setter, pair, static) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (168 tests).
 - [x] Added ES5 async super call parity tests (basic, with-args, static, with-await) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (164 tests).
 - [x] Added ES5 static initialization order parity tests (properties, blocks, interleaved, derived) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (160 tests).
 - [x] Added ES5 generator function parity tests (return-value, multiple-yields, try-catch, expression) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (156 tests).

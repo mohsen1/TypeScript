@@ -65,10 +65,10 @@ Phase 8 - Conformance, Convergence, and Hardening: Type-system correctness in th
    - Distributive conditional types over unions
    - Key Files: `solver/evaluate.rs`, `solver/evaluate_tests.rs`
 
-3. **Fix Failing Tests**
-   - `test_conditional_infer_function_optional_param_distributive` - FAILING
-   - `test_conditional_infer_function_optional_param_non_distributive_union_input` - FAILING
-   - `compile_class_with_generic_constructor` - FAILING
+3. **Fix Failing Tests** - ALL FIXED ✅
+   - `test_conditional_infer_function_optional_param_distributive` - ✅ FIXED
+   - `test_conditional_infer_function_optional_param_non_distributive_union_input` - ✅ FIXED
+   - `compile_class_with_generic_constructor` - ✅ FIXED
 
 4. **Template Literal Types**
    - Context: Template literal inference and pattern matching
@@ -96,20 +96,22 @@ Per Project Direction: **Autocratic Scheduling + Bisect-on-Merge**
 - PRs that regress ANY existing baseline are auto-rejected
 
 ## Squad Status
-- Last EM Report: 2026-01-09 - EM session complete
-- Redux Baseline: 4 diagnostics (stable, target: 0)
+- Last EM Report: 2026-01-09 - EM session active
+- Redux Baseline: **2 diagnostics** (improved from 4, target: 0)
 - Workers Active: 5/5
 - Current Focus: Generic Inference + Conditional Types + Fix failing tests
 - Direction: Solver hardening per new directive
 - Session Merges:
   - forge-3: try_expand_type_arg fix
+  - forge-3: generic class type expansion fix
+  - forge-3: InferSubstitutor Function type support (Redux 4→2!)
   - forge-5-track: 33 edge case tests for evaluate
 - Blocked Commits:
   - forge-2: Removes Ref/TypeQuery handling (regression)
-  - forge-5: Merge conflicts in thin_checker.rs
+  - forge-5: Large diff with 25k deletions, risky
 - Worker Assignments:
-  - W1/Pane3: test_conditional_infer_function_optional_param_distributive
-  - W2/Pane4: Eager type argument resolution
-  - W3/Pane5: compile_class_with_generic_constructor
-  - W4/Pane6: Running tests
-  - W5/Pane7: test_conditional_infer_function_optional_param_non_distributive_union_input
+  - W1/Pane3: Inference from usage patterns (infer.rs)
+  - W2/Pane4: test_conditional_infer_function_optional_param_distributive
+  - W3/Pane5: test_conditional_infer_function_optional_param_non_distributive_union_input
+  - W4/Pane6: Fix match_infer_pattern for function parameter inference
+  - W5/Pane7: Distributive conditional type stress tests
