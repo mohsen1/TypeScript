@@ -7,22 +7,7 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-Add ES5 mapped type expression source map tests
-
-Per GOALS.md Objective 2: Source map validation
-
-Steps:
-1. Add 6 ES5 mapped type expression source map tests to `wasm/src/source_map_tests.rs`:
-   - Partial<T> mapped type
-   - Required<T> mapped type
-   - Readonly<T> mapped type
-   - Pick<T, K> mapped type
-   - Record<K, T> mapped type
-   - Combined mapped type patterns
-2. Run `./wasm/test.sh source_map` to verify all tests pass
-3. Commit with message: `[wasm] source_map: add mapped type expression tests`
-4. Push to `origin/worker/anvil-3`
-5. Update this plan file and push
+(awaiting next task from EM-Anvil)
 
 **Sync instructions**: Use squad/anvil (not origin/rust):
 ```
@@ -33,6 +18,7 @@ git fetch origin && git reset --hard origin/squad/anvil
 (empty - will receive new tasks from EM after completing current assignment)
 
 ## Completed
+- [x] Added mapped type expression ES5 source map tests (Partial, Required, Readonly, Pick, Record, comprehensive); 899 tests pass.
 - [x] Added import/export alias ES5 source map tests (named import alias, named export alias, re-export alias, default import alias, namespace import alias, comprehensive); 893 tests pass.
 - [x] Added conditional type expression ES5 source map tests (infer keyword, distributive, nested, function return, union, comprehensive); 887 tests pass.
 - [x] Added type parameter constraint ES5 source map tests (generic function, generic class, generic interface, multiple params, union constraints, comprehensive); 881 tests pass.
