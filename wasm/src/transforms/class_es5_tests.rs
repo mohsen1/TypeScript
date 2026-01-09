@@ -43078,3 +43078,857 @@ class SecureResource extends Lockable(DisposableMixin(Resource)) {
         output
     );
 }
+
+// =============================================================================
+// SYMBOL.SPECIES PATTERNS
+// =============================================================================
+
+/// Test basic Symbol.species getter
+#[test]
+fn test_class_es5_symbol_species_basic_getter() {
+    let source = r#"
+class MyArray<T> {
+    private items: T[];
+
+    constructor(items: T[] = []) {
+        this.items = items;
+    }
+
+    static get [Symbol.species](): typeof MyArray {
+        return MyArray;
+    }
+
+    push(item: T): void {
+        this.items.push(item);
+    }
+
+    pop(): T | undefined {
+        return this.items.pop();
+    }
+
+    map<U>(fn: (item: T) => U): MyArray<U> {
+        const Constructor = (this.constructor as any)[Symbol.species] || MyArray;
+        return new Constructor(this.items.map(fn));
+    }
+
+    filter(fn: (item: T) => boolean): MyArray<T> {
+        const Constructor = (this.constructor as any)[Symbol.species] || MyArray;
+        return new Constructor(this.items.filter(fn));
+    }
+
+    getItems(): T[] {
+        return this.items;
+    }
+}
+
+class MySet<T> {
+    private values: Set<T>;
+
+    constructor(values?: Iterable<T>) {
+        this.values = new Set(values);
+    }
+
+    static get [Symbol.species](): typeof MySet {
+        return MySet;
+    }
+
+    add(value: T): this {
+        this.values.add(value);
+        return this;
+    }
+
+    delete(value: T): boolean {
+        return this.values.delete(value);
+    }
+
+    has(value: T): boolean {
+        return this.values.has(value);
+    }
+
+    size(): number {
+        return this.values.size;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // MyArray class
+    assert!(
+        output.contains("MyArray"),
+        "Expected MyArray class: {}",
+        output
+    );
+
+    // MySet class
+    assert!(
+        output.contains("MySet"),
+        "Expected MySet class: {}",
+        output
+    );
+
+    // Symbol.species should be present
+    assert!(
+        output.contains("Symbol.species") || output.contains("[Symbol.species]"),
+        "Expected Symbol.species: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("push") && output.contains("pop") && output.contains("map") && output.contains("filter"),
+        "Expected MyArray methods: {}",
+        output
+    );
+
+    // MySet methods
+    assert!(
+        output.contains("add") && output.contains("delete") && output.contains("has"),
+        "Expected MySet methods: {}",
+        output
+    );
+}
+
+/// Test Symbol.species in derived class inheritance chain
+#[test]
+fn test_class_es5_symbol_species_inheritance_chain() {
+    let source = r#"
+class BaseCollection<T> {
+    protected items: T[];
+
+    constructor(items: T[] = []) {
+        this.items = items;
+    }
+
+    static get [Symbol.species](): typeof BaseCollection {
+        return BaseCollection;
+    }
+
+    getItems(): T[] {
+        return this.items;
+    }
+
+    size(): number {
+        return this.items.length;
+    }
+}
+
+class ExtendedCollection<T> extends BaseCollection<T> {
+    private name: string;
+
+    constructor(name: string, items: T[] = []) {
+        super(items);
+        this.name = name;
+    }
+
+    static get [Symbol.species](): typeof ExtendedCollection {
+        return ExtendedCollection;
+    }
+
+    getName(): string {
+        return this.name;
+    }
+
+    clone(): ExtendedCollection<T> {
+        const Constructor = (this.constructor as any)[Symbol.species] || ExtendedCollection;
+        return new Constructor(this.name, [...this.items]);
+    }
+}
+
+class TrackedCollection<T> extends ExtendedCollection<T> {
+    private operations: string[];
+
+    constructor(name: string, items: T[] = []) {
+        super(name, items);
+        this.operations = [];
+    }
+
+    static get [Symbol.species](): typeof TrackedCollection {
+        return TrackedCollection;
+    }
+
+    addItem(item: T): void {
+        this.items.push(item);
+        this.operations.push("add");
+    }
+
+    removeItem(): T | undefined {
+        this.operations.push("remove");
+        return this.items.pop();
+    }
+
+    getOperations(): string[] {
+        return this.operations;
+    }
+
+    clearOperations(): void {
+        this.operations = [];
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // BaseCollection class
+    assert!(
+        output.contains("function BaseCollection") || output.contains("BaseCollection"),
+        "Expected BaseCollection class: {}",
+        output
+    );
+
+    // ExtendedCollection class
+    assert!(
+        output.contains("ExtendedCollection"),
+        "Expected ExtendedCollection class: {}",
+        output
+    );
+
+    // TrackedCollection class
+    assert!(
+        output.contains("TrackedCollection"),
+        "Expected TrackedCollection class: {}",
+        output
+    );
+
+    // Should have __extends pattern
+    assert!(
+        output.contains("__extends") || output.contains("extendStatics"),
+        "Expected __extends helper: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("getItems") && output.contains("size"),
+        "Expected BaseCollection methods: {}",
+        output
+    );
+
+    // TrackedCollection methods
+    assert!(
+        output.contains("addItem") && output.contains("removeItem") && output.contains("getOperations"),
+        "Expected TrackedCollection methods: {}",
+        output
+    );
+}
+
+/// Test Symbol.species with custom constructor
+#[test]
+fn test_class_es5_symbol_species_custom_constructor() {
+    let source = r#"
+class CustomArray<T> {
+    private data: T[];
+    private readonly maxLength: number;
+
+    constructor(maxLength: number = 100) {
+        this.data = [];
+        this.maxLength = maxLength;
+    }
+
+    static get [Symbol.species](): { new(maxLength?: number): CustomArray<any> } {
+        return class extends CustomArray<any> {
+            constructor(maxLength: number = 50) {
+                super(maxLength);
+            }
+        };
+    }
+
+    push(item: T): boolean {
+        if (this.data.length >= this.maxLength) {
+            return false;
+        }
+        this.data.push(item);
+        return true;
+    }
+
+    slice(start?: number, end?: number): CustomArray<T> {
+        const Species = (this.constructor as any)[Symbol.species] || CustomArray;
+        const result = new Species(this.maxLength);
+        const sliced = this.data.slice(start, end);
+        sliced.forEach(item => result.push(item));
+        return result;
+    }
+
+    getMaxLength(): number {
+        return this.maxLength;
+    }
+
+    getLength(): number {
+        return this.data.length;
+    }
+
+    getData(): T[] {
+        return this.data;
+    }
+}
+
+class TypedBuffer {
+    private buffer: number[];
+    private readonly type: string;
+
+    constructor(type: string = "default") {
+        this.buffer = [];
+        this.type = type;
+    }
+
+    static get [Symbol.species](): typeof TypedBuffer {
+        return TypedBuffer;
+    }
+
+    write(value: number): void {
+        this.buffer.push(value);
+    }
+
+    read(): number | undefined {
+        return this.buffer.shift();
+    }
+
+    getType(): string {
+        return this.type;
+    }
+
+    getSize(): number {
+        return this.buffer.length;
+    }
+
+    clear(): void {
+        this.buffer = [];
+    }
+
+    clone(): TypedBuffer {
+        const Species = (this.constructor as any)[Symbol.species] || TypedBuffer;
+        const copy = new Species(this.type);
+        this.buffer.forEach(v => copy.write(v));
+        return copy;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // CustomArray class
+    assert!(
+        output.contains("CustomArray"),
+        "Expected CustomArray class: {}",
+        output
+    );
+
+    // TypedBuffer class
+    assert!(
+        output.contains("TypedBuffer"),
+        "Expected TypedBuffer class: {}",
+        output
+    );
+
+    // CustomArray methods
+    assert!(
+        output.contains("push") && output.contains("slice") && output.contains("getMaxLength"),
+        "Expected CustomArray methods: {}",
+        output
+    );
+
+    // TypedBuffer methods
+    assert!(
+        output.contains("write") && output.contains("read") && output.contains("clone"),
+        "Expected TypedBuffer methods: {}",
+        output
+    );
+}
+
+/// Test Symbol.species in Array subclass
+#[test]
+fn test_class_es5_symbol_species_array_subclass() {
+    let source = r#"
+class ObservableArray<T> extends Array<T> {
+    private listeners: Array<(items: T[]) => void>;
+
+    constructor(...items: T[]) {
+        super(...items);
+        this.listeners = [];
+    }
+
+    static get [Symbol.species](): typeof Array {
+        return Array;
+    }
+
+    subscribe(listener: (items: T[]) => void): void {
+        this.listeners.push(listener);
+    }
+
+    unsubscribe(listener: (items: T[]) => void): void {
+        const index = this.listeners.indexOf(listener);
+        if (index > -1) {
+            this.listeners.splice(index, 1);
+        }
+    }
+
+    notify(): void {
+        this.listeners.forEach(fn => fn([...this]));
+    }
+
+    pushAndNotify(...items: T[]): number {
+        const result = this.push(...items);
+        this.notify();
+        return result;
+    }
+
+    popAndNotify(): T | undefined {
+        const result = this.pop();
+        this.notify();
+        return result;
+    }
+}
+
+class ValidatedArray<T> extends Array<T> {
+    private validator: (item: T) => boolean;
+
+    constructor(validator: (item: T) => boolean, ...items: T[]) {
+        super(...items.filter(validator));
+        this.validator = validator;
+    }
+
+    static get [Symbol.species](): typeof Array {
+        return Array;
+    }
+
+    pushValid(item: T): boolean {
+        if (this.validator(item)) {
+            this.push(item);
+            return true;
+        }
+        return false;
+    }
+
+    getValidator(): (item: T) => boolean {
+        return this.validator;
+    }
+
+    setValidator(validator: (item: T) => boolean): void {
+        this.validator = validator;
+    }
+
+    revalidate(): T[] {
+        const invalid: T[] = [];
+        for (let i = this.length - 1; i >= 0; i--) {
+            if (!this.validator(this[i])) {
+                invalid.push(this.splice(i, 1)[0]);
+            }
+        }
+        return invalid;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // ObservableArray class
+    assert!(
+        output.contains("ObservableArray"),
+        "Expected ObservableArray class: {}",
+        output
+    );
+
+    // ValidatedArray class
+    assert!(
+        output.contains("ValidatedArray"),
+        "Expected ValidatedArray class: {}",
+        output
+    );
+
+    // ObservableArray methods
+    assert!(
+        output.contains("subscribe") && output.contains("unsubscribe") && output.contains("notify"),
+        "Expected ObservableArray methods: {}",
+        output
+    );
+
+    // ValidatedArray methods
+    assert!(
+        output.contains("pushValid") && output.contains("getValidator") && output.contains("revalidate"),
+        "Expected ValidatedArray methods: {}",
+        output
+    );
+}
+
+/// Test Symbol.species in Promise subclass
+#[test]
+fn test_class_es5_symbol_species_promise_subclass() {
+    let source = r#"
+class TrackedPromise<T> extends Promise<T> {
+    private startTime: number;
+    private endTime: number | null;
+
+    constructor(executor: (resolve: (value: T) => void, reject: (reason?: any) => void) => void) {
+        super((resolve, reject) => {
+            this.startTime = Date.now();
+            executor(
+                (value) => {
+                    this.endTime = Date.now();
+                    resolve(value);
+                },
+                (reason) => {
+                    this.endTime = Date.now();
+                    reject(reason);
+                }
+            );
+        });
+        this.startTime = Date.now();
+        this.endTime = null;
+    }
+
+    static get [Symbol.species](): typeof Promise {
+        return Promise;
+    }
+
+    getDuration(): number | null {
+        if (this.endTime === null) {
+            return null;
+        }
+        return this.endTime - this.startTime;
+    }
+
+    getStartTime(): number {
+        return this.startTime;
+    }
+
+    getEndTime(): number | null {
+        return this.endTime;
+    }
+}
+
+class RetryablePromise<T> extends Promise<T> {
+    private retryCount: number;
+    private maxRetries: number;
+
+    constructor(
+        executor: (resolve: (value: T) => void, reject: (reason?: any) => void) => void,
+        maxRetries: number = 3
+    ) {
+        super(executor);
+        this.retryCount = 0;
+        this.maxRetries = maxRetries;
+    }
+
+    static get [Symbol.species](): typeof Promise {
+        return Promise;
+    }
+
+    getRetryCount(): number {
+        return this.retryCount;
+    }
+
+    getMaxRetries(): number {
+        return this.maxRetries;
+    }
+
+    incrementRetry(): boolean {
+        if (this.retryCount < this.maxRetries) {
+            this.retryCount++;
+            return true;
+        }
+        return false;
+    }
+
+    resetRetries(): void {
+        this.retryCount = 0;
+    }
+
+    canRetry(): boolean {
+        return this.retryCount < this.maxRetries;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // TrackedPromise class
+    assert!(
+        output.contains("TrackedPromise"),
+        "Expected TrackedPromise class: {}",
+        output
+    );
+
+    // RetryablePromise class
+    assert!(
+        output.contains("RetryablePromise"),
+        "Expected RetryablePromise class: {}",
+        output
+    );
+
+    // TrackedPromise methods
+    assert!(
+        output.contains("getDuration") && output.contains("getStartTime") && output.contains("getEndTime"),
+        "Expected TrackedPromise methods: {}",
+        output
+    );
+
+    // RetryablePromise methods
+    assert!(
+        output.contains("getRetryCount") && output.contains("getMaxRetries") && output.contains("canRetry"),
+        "Expected RetryablePromise methods: {}",
+        output
+    );
+}
+
+/// Test combined Symbol.species patterns
+#[test]
+fn test_class_es5_symbol_species_combined() {
+    let source = r#"
+class BaseStream<T> {
+    protected data: T[];
+
+    constructor(data: T[] = []) {
+        this.data = data;
+    }
+
+    static get [Symbol.species](): typeof BaseStream {
+        return BaseStream;
+    }
+
+    map<U>(fn: (item: T) => U): BaseStream<U> {
+        const Species = (this.constructor as any)[Symbol.species] || BaseStream;
+        return new Species(this.data.map(fn));
+    }
+
+    filter(fn: (item: T) => boolean): BaseStream<T> {
+        const Species = (this.constructor as any)[Symbol.species] || BaseStream;
+        return new Species(this.data.filter(fn));
+    }
+
+    toArray(): T[] {
+        return [...this.data];
+    }
+
+    size(): number {
+        return this.data.length;
+    }
+}
+
+class TransformableStream<T> extends BaseStream<T> {
+    private transforms: Array<(item: T) => T>;
+
+    constructor(data: T[] = []) {
+        super(data);
+        this.transforms = [];
+    }
+
+    static get [Symbol.species](): typeof TransformableStream {
+        return TransformableStream;
+    }
+
+    addTransform(transform: (item: T) => T): this {
+        this.transforms.push(transform);
+        return this;
+    }
+
+    applyTransforms(): TransformableStream<T> {
+        const Species = (this.constructor as any)[Symbol.species] || TransformableStream;
+        let result = this.data;
+        for (const transform of this.transforms) {
+            result = result.map(transform);
+        }
+        return new Species(result);
+    }
+
+    getTransformCount(): number {
+        return this.transforms.length;
+    }
+
+    clearTransforms(): void {
+        this.transforms = [];
+    }
+}
+
+class BufferedStream<T> extends TransformableStream<T> {
+    private buffer: T[];
+    private bufferSize: number;
+
+    constructor(data: T[] = [], bufferSize: number = 10) {
+        super(data);
+        this.buffer = [];
+        this.bufferSize = bufferSize;
+    }
+
+    static get [Symbol.species](): typeof BufferedStream {
+        return BufferedStream;
+    }
+
+    write(item: T): boolean {
+        if (this.buffer.length >= this.bufferSize) {
+            return false;
+        }
+        this.buffer.push(item);
+        return true;
+    }
+
+    flush(): T[] {
+        const items = [...this.buffer];
+        this.buffer = [];
+        return items;
+    }
+
+    getBufferSize(): number {
+        return this.bufferSize;
+    }
+
+    getBufferLength(): number {
+        return this.buffer.length;
+    }
+
+    isBufferFull(): boolean {
+        return this.buffer.length >= this.bufferSize;
+    }
+
+    setBufferSize(size: number): void {
+        this.bufferSize = size;
+    }
+}
+
+// Factory function using Symbol.species
+function createDerivedStream<T, S extends BaseStream<T>>(
+    source: S,
+    filterFn: (item: T) => boolean
+): BaseStream<T> {
+    return source.filter(filterFn);
+}
+
+const stream = new BufferedStream<number>([1, 2, 3, 4, 5], 20);
+const filtered = createDerivedStream(stream, n => n > 2);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // BaseStream class
+    assert!(
+        output.contains("function BaseStream") || output.contains("BaseStream"),
+        "Expected BaseStream class: {}",
+        output
+    );
+
+    // TransformableStream class
+    assert!(
+        output.contains("TransformableStream"),
+        "Expected TransformableStream class: {}",
+        output
+    );
+
+    // BufferedStream class
+    assert!(
+        output.contains("BufferedStream"),
+        "Expected BufferedStream class: {}",
+        output
+    );
+
+    // Factory function
+    assert!(
+        output.contains("function createDerivedStream") || output.contains("createDerivedStream"),
+        "Expected createDerivedStream function: {}",
+        output
+    );
+
+    // BaseStream methods
+    assert!(
+        output.contains("map") && output.contains("filter") && output.contains("toArray"),
+        "Expected BaseStream methods: {}",
+        output
+    );
+
+    // TransformableStream methods
+    assert!(
+        output.contains("addTransform") && output.contains("applyTransforms") && output.contains("getTransformCount"),
+        "Expected TransformableStream methods: {}",
+        output
+    );
+
+    // BufferedStream methods
+    assert!(
+        output.contains("write") && output.contains("flush") && output.contains("isBufferFull"),
+        "Expected BufferedStream methods: {}",
+        output
+    );
+
+    // Variables
+    assert!(
+        output.contains("stream") && output.contains("filtered"),
+        "Expected stream and filtered variables: {}",
+        output
+    );
+}
