@@ -2205,13 +2205,7 @@ impl ThinParserState {
 
         // Handle index signatures: [key: Type]: ValueType
         if self.is_token(SyntaxKind::OpenBracketToken) && self.look_ahead_is_index_signature() {
-            let readonly = modifiers.as_ref().map_or(false, |mods| {
-                mods.nodes.iter().any(|&idx| {
-                    self.arena.nodes.get(idx.0 as usize)
-                        .map_or(false, |node| node.kind == SyntaxKind::ReadonlyKeyword as u16)
-                })
-            });
-            return self.parse_index_signature_with_readonly(readonly, start_pos);
+            return self.parse_index_signature_with_modifiers(modifiers, start_pos);
         }
 
         // Handle methods and properties
@@ -2661,7 +2655,14 @@ impl ThinParserState {
             // Check if it's an index signature: [key: string]: value
             // vs computed property name: [Symbol.iterator](): type
             if self.look_ahead_is_index_signature() {
-                return self.parse_index_signature_with_readonly(readonly, start_pos);
+                // Build modifiers list if readonly was present
+                let modifiers = if readonly {
+                    let mod_idx = self.arena.create_modifier(SyntaxKind::ReadonlyKeyword, start_pos);
+                    Some(self.make_node_list(vec![mod_idx]))
+                } else {
+                    None
+                };
+                return self.parse_index_signature_with_modifiers(modifiers, start_pos);
             } else {
                 // Computed property name
                 self.parse_property_name()
@@ -2826,11 +2827,11 @@ impl ThinParserState {
 
     /// Parse index signature: [key: string]: value
     fn parse_index_signature(&mut self) -> NodeIndex {
-        self.parse_index_signature_with_readonly(false, self.token_pos())
+        self.parse_index_signature_with_modifiers(None, self.token_pos())
     }
 
-    /// Parse index signature with optional readonly modifier: readonly [key: string]: value
-    fn parse_index_signature_with_readonly(&mut self, readonly: bool, start_pos: u32) -> NodeIndex {
+    /// Parse index signature with modifiers (static, readonly, etc.): static [key: string]: value
+    fn parse_index_signature_with_modifiers(&mut self, modifiers: Option<NodeList>, start_pos: u32) -> NodeIndex {
         self.parse_expected(SyntaxKind::OpenBracketToken);
 
         // Parse parameter
@@ -2849,14 +2850,6 @@ impl ThinParserState {
             self.parse_type()
         } else {
             NodeIndex::NONE
-        };
-
-        // Build modifiers list if readonly was present
-        let modifiers = if readonly {
-            let mod_idx = self.arena.create_modifier(SyntaxKind::ReadonlyKeyword, start_pos);
-            Some(self.make_node_list(vec![mod_idx]))
-        } else {
-            None
         };
 
         let param_end = self.token_end();
