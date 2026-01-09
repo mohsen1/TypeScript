@@ -7,10 +7,10 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-(awaiting assignment)
+- [ ] Add ES5 template literal patterns parity tests: tagged templates, template spans, nested templates, raw strings. Tests: `./wasm/test.sh emitter_parity`
 
 ## Task Queue
-(empty)
+- [ ] Add ES5 class accessor patterns parity tests: auto-accessors, computed accessors, inherited accessors
 
 ## Completed
 - [x] Added ES5 module patterns parity tests (dynamic-import, top-level-await, import-meta) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (305 tests).
