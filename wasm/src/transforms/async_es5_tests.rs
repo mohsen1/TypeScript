@@ -13815,3 +13815,53 @@ fn test_async_disposepat_combined() {
     );
     assert!(result, "Should detect await in combined async disposable patterns");
 }
+
+// ASYNC WEAKREF PATTERN TESTS
+
+#[test]
+fn test_async_weakref_deref() {
+    let result = async_error_propagation_contains_await(
+        "async function get() { const obj = ref.deref(); return await process(obj); }",
+    );
+    assert!(result, "Should detect await in basic async WeakRef deref");
+}
+
+#[test]
+fn test_async_weakref_cache() {
+    let result = async_error_propagation_contains_await(
+        "async function cached() { const val = cache.get(key); if (!val) return await fetch(key); return val; }",
+    );
+    assert!(result, "Should detect await in async WeakRef cache pattern");
+}
+
+#[test]
+fn test_async_weakref_finalization() {
+    let result = async_error_propagation_contains_await(
+        "async function cleanup() { return await registry.cleanupSome(); }",
+    );
+    assert!(result, "Should detect await in async FinalizationRegistry callback");
+}
+
+#[test]
+fn test_async_weakref_retry() {
+    let result = async_error_propagation_contains_await(
+        "async function getWithRetry() { let obj = ref.deref(); if (!obj) obj = await recreate(); return obj; }",
+    );
+    assert!(result, "Should detect await in async WeakRef with retry");
+}
+
+#[test]
+fn test_async_weakref_cleanup() {
+    let result = async_error_propagation_contains_await(
+        "async function clean() { await finalize(); ref = null; }",
+    );
+    assert!(result, "Should detect await in async WeakRef cleanup");
+}
+
+#[test]
+fn test_async_weakref_combined() {
+    let result = async_error_propagation_contains_await(
+        "async function manage() { const obj = ref.deref(); if (obj) return await obj.process(); return await fallback(); }",
+    );
+    assert!(result, "Should detect await in combined async WeakRef patterns");
+}
