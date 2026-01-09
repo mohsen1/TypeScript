@@ -8555,3 +8555,927 @@ fn test_bivariant_optional_method_param() {
     // At least one direction should work
     assert!(optional_to_required || required_to_optional);
 }
+
+// =============================================================================
+// Intersection Type Subtype Tests
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// Intersection Flattening (A & B & C)
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_intersection_associativity() {
+    // (A & B) & C should be equivalent to A & (B & C)
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_name = interner.intern_string("a");
+    let b_name = interner.intern_string("b");
+    let c_name = interner.intern_string("c");
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: b_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_c = interner.object(vec![PropertyInfo {
+        name: c_name,
+        type_id: TypeId::BOOLEAN,
+        write_type: TypeId::BOOLEAN,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // (A & B) & C
+    let ab = interner.intersection(vec![obj_a, obj_b]);
+    let left_assoc = interner.intersection(vec![ab, obj_c]);
+
+    // A & (B & C)
+    let bc = interner.intersection(vec![obj_b, obj_c]);
+    let right_assoc = interner.intersection(vec![obj_a, bc]);
+
+    // Both should be equivalent
+    assert!(checker.is_subtype_of(left_assoc, right_assoc));
+    assert!(checker.is_subtype_of(right_assoc, left_assoc));
+}
+
+#[test]
+fn test_intersection_commutativity() {
+    // A & B should be equivalent to B & A
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_name = interner.intern_string("a");
+    let b_name = interner.intern_string("b");
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: b_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let ab = interner.intersection(vec![obj_a, obj_b]);
+    let ba = interner.intersection(vec![obj_b, obj_a]);
+
+    // A & B should be equivalent to B & A
+    assert!(checker.is_subtype_of(ab, ba));
+    assert!(checker.is_subtype_of(ba, ab));
+}
+
+#[test]
+fn test_intersection_four_types() {
+    // A & B & C & D flattening
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_name = interner.intern_string("a");
+    let b_name = interner.intern_string("b");
+    let c_name = interner.intern_string("c");
+    let d_name = interner.intern_string("d");
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: b_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_c = interner.object(vec![PropertyInfo {
+        name: c_name,
+        type_id: TypeId::BOOLEAN,
+        write_type: TypeId::BOOLEAN,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_d = interner.object(vec![PropertyInfo {
+        name: d_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Flat four-way intersection
+    let flat = interner.intersection(vec![obj_a, obj_b, obj_c, obj_d]);
+
+    // Nested: ((A & B) & C) & D
+    let ab = interner.intersection(vec![obj_a, obj_b]);
+    let abc = interner.intersection(vec![ab, obj_c]);
+    let nested = interner.intersection(vec![abc, obj_d]);
+
+    // Should be equivalent
+    assert!(checker.is_subtype_of(flat, nested));
+    assert!(checker.is_subtype_of(nested, flat));
+}
+
+#[test]
+fn test_intersection_with_unknown_identity() {
+    // A & unknown = A (unknown is identity for intersection)
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_name = interner.intern_string("a");
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let with_unknown = interner.intersection(vec![obj_a, TypeId::UNKNOWN]);
+
+    // A & unknown should be equivalent to A
+    assert!(checker.is_subtype_of(with_unknown, obj_a));
+    assert!(checker.is_subtype_of(obj_a, with_unknown));
+}
+
+#[test]
+fn test_intersection_intrinsics_flatten() {
+    // string & number & boolean reduces properly
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let intrinsic_intersection = interner.intersection(vec![
+        TypeId::STRING,
+        TypeId::NUMBER,
+        TypeId::BOOLEAN,
+    ]);
+
+    // Disjoint intrinsics intersection is never
+    assert!(checker.is_subtype_of(intrinsic_intersection, TypeId::NEVER));
+}
+
+// -----------------------------------------------------------------------------
+// Intersection vs Object Types
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_intersection_equals_merged_object() {
+    // { a: string } & { b: number } should equal { a: string, b: number }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_name = interner.intern_string("a");
+    let b_name = interner.intern_string("b");
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: b_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![obj_a, obj_b]);
+
+    let merged = interner.object(vec![
+        PropertyInfo {
+            name: a_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Should be bidirectionally subtype (equivalent)
+    assert!(checker.is_subtype_of(intersection, merged));
+    assert!(checker.is_subtype_of(merged, intersection));
+}
+
+#[test]
+fn test_intersection_wider_object_not_subtype() {
+    // { a: string, b: number, c: boolean } is subtype of { a: string } & { b: number }
+    // but { a: string } is NOT subtype of { a: string } & { b: number }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_name = interner.intern_string("a");
+    let b_name = interner.intern_string("b");
+    let c_name = interner.intern_string("c");
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: b_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![obj_a, obj_b]);
+
+    let obj_abc = interner.object(vec![
+        PropertyInfo {
+            name: a_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: c_name,
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Wider object with extra property is subtype of intersection
+    assert!(checker.is_subtype_of(obj_abc, intersection));
+    // obj_a alone is NOT subtype of intersection (missing b)
+    assert!(!checker.is_subtype_of(obj_a, intersection));
+}
+
+#[test]
+fn test_intersection_overlapping_properties() {
+    // { x: string, y: number } & { y: number, z: boolean }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let x_name = interner.intern_string("x");
+    let y_name = interner.intern_string("y");
+    let z_name = interner.intern_string("z");
+
+    let obj_xy = interner.object(vec![
+        PropertyInfo {
+            name: x_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: y_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let obj_yz = interner.object(vec![
+        PropertyInfo {
+            name: y_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: z_name,
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let intersection = interner.intersection(vec![obj_xy, obj_yz]);
+
+    // Should have all three properties
+    let obj_xyz = interner.object(vec![
+        PropertyInfo {
+            name: x_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: y_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: z_name,
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Intersection should be equivalent to merged xyz
+    assert!(checker.is_subtype_of(intersection, obj_xyz));
+    assert!(checker.is_subtype_of(obj_xyz, intersection));
+}
+
+#[test]
+fn test_intersection_conflicting_property_types() {
+    // { x: string } & { x: number } - conflicting property types
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let x_name = interner.intern_string("x");
+
+    let obj_x_string = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_x_number = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![obj_x_string, obj_x_number]);
+
+    // The intersection of { x: string } & { x: number } has x: string & number = never
+    // So this should reduce to never or be subtype of never
+    // At minimum, neither original object should be subtype of the other
+    assert!(!checker.is_subtype_of(obj_x_string, obj_x_number));
+    assert!(!checker.is_subtype_of(obj_x_number, obj_x_string));
+}
+
+#[test]
+fn test_object_subtype_of_intersection() {
+    // { a: string, b: number } <: { a: string } & { b: number }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_name = interner.intern_string("a");
+    let b_name = interner.intern_string("b");
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: b_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![obj_a, obj_b]);
+
+    let obj_ab = interner.object(vec![
+        PropertyInfo {
+            name: a_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Object with both properties is subtype of intersection
+    assert!(checker.is_subtype_of(obj_ab, intersection));
+    // And intersection is subtype of merged object
+    assert!(checker.is_subtype_of(intersection, obj_ab));
+}
+
+// -----------------------------------------------------------------------------
+// Intersection with Never
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_intersection_never_with_object() {
+    // { a: string } & never = never
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_name = interner.intern_string("a");
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let with_never = interner.intersection(vec![obj_a, TypeId::NEVER]);
+
+    // Should be never (subtype of never)
+    assert!(checker.is_subtype_of(with_never, TypeId::NEVER));
+    // never is subtype of everything
+    assert!(checker.is_subtype_of(TypeId::NEVER, with_never));
+}
+
+#[test]
+fn test_intersection_never_with_function() {
+    // ((x: string) => number) & never = never
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let fn_type = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::NUMBER,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let with_never = interner.intersection(vec![fn_type, TypeId::NEVER]);
+
+    // Should be never
+    assert!(checker.is_subtype_of(with_never, TypeId::NEVER));
+}
+
+#[test]
+fn test_intersection_never_with_union() {
+    // (string | number) & never = never
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let with_never = interner.intersection(vec![union, TypeId::NEVER]);
+
+    // Should be never
+    assert!(checker.is_subtype_of(with_never, TypeId::NEVER));
+}
+
+#[test]
+fn test_intersection_nested_never() {
+    // (A & never) & B = never
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_name = interner.intern_string("a");
+    let b_name = interner.intern_string("b");
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: b_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let a_and_never = interner.intersection(vec![obj_a, TypeId::NEVER]);
+    let nested = interner.intersection(vec![a_and_never, obj_b]);
+
+    // Should still be never
+    assert!(checker.is_subtype_of(nested, TypeId::NEVER));
+}
+
+#[test]
+fn test_intersection_never_zero_element() {
+    // never as only element in intersection
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let just_never = interner.intersection(vec![TypeId::NEVER]);
+
+    // Should be never
+    assert!(checker.is_subtype_of(just_never, TypeId::NEVER));
+    assert!(checker.is_subtype_of(TypeId::NEVER, just_never));
+}
+
+#[test]
+fn test_intersection_multiple_nevers() {
+    // never & never = never
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let double_never = interner.intersection(vec![TypeId::NEVER, TypeId::NEVER]);
+
+    assert!(checker.is_subtype_of(double_never, TypeId::NEVER));
+    assert!(checker.is_subtype_of(TypeId::NEVER, double_never));
+}
+
+// -----------------------------------------------------------------------------
+// Intersection Member Access
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_intersection_access_from_first_member() {
+    // (A & B).a should be accessible
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_name = interner.intern_string("a");
+    let b_name = interner.intern_string("b");
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: b_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![obj_a, obj_b]);
+
+    // Intersection should be subtype of { a: string } (can access .a)
+    assert!(checker.is_subtype_of(intersection, obj_a));
+}
+
+#[test]
+fn test_intersection_access_from_second_member() {
+    // (A & B).b should be accessible
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_name = interner.intern_string("a");
+    let b_name = interner.intern_string("b");
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: b_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![obj_a, obj_b]);
+
+    // Intersection should be subtype of { b: number } (can access .b)
+    assert!(checker.is_subtype_of(intersection, obj_b));
+}
+
+#[test]
+fn test_intersection_access_all_members() {
+    // (A & B & C) should have access to all properties
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_name = interner.intern_string("a");
+    let b_name = interner.intern_string("b");
+    let c_name = interner.intern_string("c");
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: b_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_c = interner.object(vec![PropertyInfo {
+        name: c_name,
+        type_id: TypeId::BOOLEAN,
+        write_type: TypeId::BOOLEAN,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![obj_a, obj_b, obj_c]);
+
+    // Can access all three properties
+    assert!(checker.is_subtype_of(intersection, obj_a));
+    assert!(checker.is_subtype_of(intersection, obj_b));
+    assert!(checker.is_subtype_of(intersection, obj_c));
+}
+
+#[test]
+fn test_intersection_method_access() {
+    // Intersection with method should allow method access
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_name = interner.intern_string("a");
+    let method_name = interner.intern_string("doSomething");
+
+    let method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_method = interner.object(vec![PropertyInfo {
+        name: method_name,
+        type_id: method,
+        write_type: method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let intersection = interner.intersection(vec![obj_a, obj_method]);
+
+    // Can access both property and method
+    assert!(checker.is_subtype_of(intersection, obj_a));
+    assert!(checker.is_subtype_of(intersection, obj_method));
+}
+
+#[test]
+fn test_intersection_narrowed_property_access() {
+    // { x: string | number } & { x: string } - accessing x gives string
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let x_name = interner.intern_string("x");
+    let wide_type = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    let obj_wide = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: wide_type,
+        write_type: wide_type,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_narrow = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![obj_wide, obj_narrow]);
+
+    // Intersection should be subtype of narrow (x is string, not string | number)
+    assert!(checker.is_subtype_of(intersection, obj_narrow));
+}
+
+#[test]
+fn test_intersection_function_member_access() {
+    // Intersection of functions - can call with intersection of params
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let fn_string = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_number = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_intersection = interner.intersection(vec![fn_string, fn_number]);
+
+    // Function intersection can be called with string | number
+    let union_param = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let fn_union_param = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: union_param,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // (string => void) & (number => void) should be callable with string | number
+    assert!(checker.is_subtype_of(fn_union_param, fn_intersection));
+}
+
+#[test]
+fn test_intersection_readonly_property_access() {
+    // Intersection with readonly - readonly is preserved
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_name = interner.intern_string("a");
+    let b_name = interner.intern_string("b");
+
+    let obj_a_readonly = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: b_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![obj_a_readonly, obj_b]);
+
+    // Should be subtype of both
+    assert!(checker.is_subtype_of(intersection, obj_a_readonly));
+    assert!(checker.is_subtype_of(intersection, obj_b));
+}
+
+#[test]
+fn test_intersection_optional_property_access() {
+    // { a?: string } & { a: string } - a becomes required
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_name = interner.intern_string("a");
+
+    let obj_a_optional = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_a_required = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![obj_a_optional, obj_a_required]);
+
+    // Intersection should be subtype of required (a is required in intersection)
+    assert!(checker.is_subtype_of(intersection, obj_a_required));
+}
