@@ -22784,3 +22784,741 @@ export type PipelineStage = (input: any) => any | Promise<any>;
         output
     );
 }
+
+// ============================================================================
+// type guard pattern tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_user_defined_type_guards() {
+    // Test user-defined type guard functions in classes
+    let source = r#"
+interface Cat {
+    meow(): void;
+    purr(): void;
+}
+
+interface Dog {
+    bark(): void;
+    fetch(): void;
+}
+
+type Animal = Cat | Dog;
+
+class AnimalValidator {
+    isCat(animal: Animal): animal is Cat {
+        return "meow" in animal;
+    }
+
+    isDog(animal: Animal): animal is Dog {
+        return "bark" in animal;
+    }
+
+    processAnimal(animal: Animal): string {
+        if (this.isCat(animal)) {
+            animal.meow();
+            return "cat";
+        } else if (this.isDog(animal)) {
+            animal.bark();
+            return "dog";
+        }
+        return "unknown";
+    }
+}
+
+class TypeChecker<T> {
+    private validators: Map<string, (value: unknown) => value is T> = new Map();
+
+    register(name: string, validator: (value: unknown) => value is T): void {
+        this.validators.set(name, validator);
+    }
+
+    check(name: string, value: unknown): value is T {
+        const validator = this.validators.get(name);
+        return validator ? validator(value) : false;
+    }
+}
+
+function isString(value: unknown): value is string {
+    return typeof value === "string";
+}
+
+function isNumber(value: unknown): value is number {
+    return typeof value === "number";
+}
+
+class DataProcessor {
+    processValue(value: unknown): string {
+        if (isString(value)) {
+            return value.toUpperCase();
+        }
+        if (isNumber(value)) {
+            return value.toFixed(2);
+        }
+        return String(value);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function AnimalValidator"),
+        "Expected AnimalValidator function: {}",
+        output
+    );
+    assert!(
+        output.contains("AnimalValidator.prototype.isCat") && output.contains("AnimalValidator.prototype.isDog"),
+        "Expected type guard methods: {}",
+        output
+    );
+    assert!(
+        output.contains("AnimalValidator.prototype.processAnimal"),
+        "Expected processAnimal method: {}",
+        output
+    );
+    assert!(
+        output.contains("function TypeChecker") && output.contains("function DataProcessor"),
+        "Expected TypeChecker and DataProcessor: {}",
+        output
+    );
+    assert!(
+        output.contains("function isString") && output.contains("function isNumber"),
+        "Expected standalone type guard functions: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_in_operator_guards() {
+    // Test 'in' operator type guards
+    let source = r#"
+interface HttpResponse {
+    status: number;
+    data: any;
+}
+
+interface HttpError {
+    status: number;
+    error: string;
+    message: string;
+}
+
+type HttpResult = HttpResponse | HttpError;
+
+class HttpClient {
+    private baseUrl: string;
+
+    constructor(baseUrl: string) {
+        this.baseUrl = baseUrl;
+    }
+
+    isError(result: HttpResult): result is HttpError {
+        return "error" in result;
+    }
+
+    async handleResponse(result: HttpResult): Promise<any> {
+        if ("error" in result) {
+            throw new Error(result.message);
+        }
+        return result.data;
+    }
+
+    processResult(result: HttpResult): string {
+        if ("message" in result && "error" in result) {
+            return `Error: ${result.error} - ${result.message}`;
+        }
+        return `Success: ${JSON.stringify(result.data)}`;
+    }
+}
+
+interface AdminUser {
+    role: "admin";
+    permissions: string[];
+}
+
+interface RegularUser {
+    role: "user";
+    email: string;
+}
+
+type User = AdminUser | RegularUser;
+
+class UserService {
+    isAdmin(user: User): user is AdminUser {
+        return "permissions" in user && user.role === "admin";
+    }
+
+    getPermissions(user: User): string[] {
+        if ("permissions" in user) {
+            return user.permissions;
+        }
+        return [];
+    }
+
+    getUserInfo(user: User): string {
+        if ("email" in user) {
+            return `User: ${user.email}`;
+        }
+        return `Admin with ${user.permissions.length} permissions`;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function HttpClient"),
+        "Expected HttpClient function: {}",
+        output
+    );
+    assert!(
+        output.contains("HttpClient.prototype.isError") && output.contains("HttpClient.prototype.handleResponse"),
+        "Expected HttpClient methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function UserService"),
+        "Expected UserService function: {}",
+        output
+    );
+    assert!(
+        output.contains("UserService.prototype.isAdmin") && output.contains("UserService.prototype.getPermissions"),
+        "Expected UserService type guard methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_typeof_guards() {
+    // Test typeof type guards
+    let source = r#"
+type Primitive = string | number | boolean | null | undefined;
+
+class PrimitiveHandler {
+    handleValue(value: Primitive): string {
+        if (typeof value === "string") {
+            return `String: ${value.toUpperCase()}`;
+        }
+        if (typeof value === "number") {
+            return `Number: ${value.toFixed(2)}`;
+        }
+        if (typeof value === "boolean") {
+            return `Boolean: ${value ? "true" : "false"}`;
+        }
+        if (value === null) {
+            return "Null value";
+        }
+        return "Undefined value";
+    }
+
+    isStringOrNumber(value: unknown): value is string | number {
+        return typeof value === "string" || typeof value === "number";
+    }
+
+    processInput(input: unknown): string {
+        if (typeof input === "function") {
+            return `Function: ${input.name || "anonymous"}`;
+        }
+        if (typeof input === "object" && input !== null) {
+            return `Object: ${Object.keys(input).length} keys`;
+        }
+        if (typeof input === "symbol") {
+            return `Symbol: ${input.toString()}`;
+        }
+        return this.handleValue(input as Primitive);
+    }
+}
+
+class ConfigParser {
+    private config: Record<string, unknown> = {};
+
+    set(key: string, value: unknown): void {
+        this.config[key] = value;
+    }
+
+    getString(key: string): string | undefined {
+        const value = this.config[key];
+        if (typeof value === "string") {
+            return value;
+        }
+        return undefined;
+    }
+
+    getNumber(key: string): number | undefined {
+        const value = this.config[key];
+        if (typeof value === "number") {
+            return value;
+        }
+        return undefined;
+    }
+
+    getBoolean(key: string): boolean | undefined {
+        const value = this.config[key];
+        if (typeof value === "boolean") {
+            return value;
+        }
+        return undefined;
+    }
+
+    getObject<T extends object>(key: string): T | undefined {
+        const value = this.config[key];
+        if (typeof value === "object" && value !== null) {
+            return value as T;
+        }
+        return undefined;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function PrimitiveHandler"),
+        "Expected PrimitiveHandler function: {}",
+        output
+    );
+    assert!(
+        output.contains("PrimitiveHandler.prototype.handleValue") && output.contains("typeof"),
+        "Expected handleValue with typeof checks: {}",
+        output
+    );
+    assert!(
+        output.contains("function ConfigParser"),
+        "Expected ConfigParser function: {}",
+        output
+    );
+    assert!(
+        output.contains("ConfigParser.prototype.getString") && output.contains("ConfigParser.prototype.getNumber"),
+        "Expected ConfigParser getter methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_instanceof_guards() {
+    // Test instanceof type guards
+    let source = r#"
+class BaseError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = "BaseError";
+    }
+}
+
+class ValidationError extends BaseError {
+    constructor(public field: string, message: string) {
+        super(message);
+        this.name = "ValidationError";
+    }
+}
+
+class NetworkError extends BaseError {
+    constructor(public statusCode: number, message: string) {
+        super(message);
+        this.name = "NetworkError";
+    }
+}
+
+class ErrorHandler {
+    handle(error: unknown): string {
+        if (error instanceof ValidationError) {
+            return `Validation failed for ${error.field}: ${error.message}`;
+        }
+        if (error instanceof NetworkError) {
+            return `Network error ${error.statusCode}: ${error.message}`;
+        }
+        if (error instanceof BaseError) {
+            return `Base error: ${error.message}`;
+        }
+        if (error instanceof Error) {
+            return `Error: ${error.message}`;
+        }
+        return `Unknown error: ${String(error)}`;
+    }
+
+    isRecoverable(error: unknown): boolean {
+        if (error instanceof NetworkError) {
+            return error.statusCode >= 500;
+        }
+        return error instanceof ValidationError;
+    }
+}
+
+class Shape {}
+
+class Circle extends Shape {
+    constructor(public radius: number) {
+        super();
+    }
+
+    getArea(): number {
+        return Math.PI * this.radius * this.radius;
+    }
+}
+
+class Rectangle extends Shape {
+    constructor(public width: number, public height: number) {
+        super();
+    }
+
+    getArea(): number {
+        return this.width * this.height;
+    }
+}
+
+class ShapeCalculator {
+    calculateArea(shape: Shape): number {
+        if (shape instanceof Circle) {
+            return shape.getArea();
+        }
+        if (shape instanceof Rectangle) {
+            return shape.getArea();
+        }
+        return 0;
+    }
+
+    describe(shape: Shape): string {
+        if (shape instanceof Circle) {
+            return `Circle with radius ${shape.radius}`;
+        }
+        if (shape instanceof Rectangle) {
+            return `Rectangle ${shape.width}x${shape.height}`;
+        }
+        return "Unknown shape";
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function BaseError") && output.contains("__extends(BaseError, _super)"),
+        "Expected BaseError extending Error: {}",
+        output
+    );
+    assert!(
+        output.contains("function ValidationError") && output.contains("function NetworkError"),
+        "Expected error subclasses: {}",
+        output
+    );
+    assert!(
+        output.contains("function ErrorHandler") && output.contains("instanceof"),
+        "Expected ErrorHandler with instanceof: {}",
+        output
+    );
+    assert!(
+        output.contains("function Circle") && output.contains("function Rectangle"),
+        "Expected Shape subclasses: {}",
+        output
+    );
+    assert!(
+        output.contains("function ShapeCalculator"),
+        "Expected ShapeCalculator: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_discriminated_unions() {
+    // Test discriminated union type guards
+    let source = r#"
+interface LoadingState {
+    kind: "loading";
+}
+
+interface SuccessState {
+    kind: "success";
+    data: any;
+}
+
+interface ErrorState {
+    kind: "error";
+    error: string;
+}
+
+type RequestState = LoadingState | SuccessState | ErrorState;
+
+class StateManager {
+    private state: RequestState = { kind: "loading" };
+
+    isLoading(): boolean {
+        return this.state.kind === "loading";
+    }
+
+    isSuccess(): boolean {
+        return this.state.kind === "success";
+    }
+
+    isError(): boolean {
+        return this.state.kind === "error";
+    }
+
+    getData(): any | undefined {
+        if (this.state.kind === "success") {
+            return this.state.data;
+        }
+        return undefined;
+    }
+
+    getError(): string | undefined {
+        if (this.state.kind === "error") {
+            return this.state.error;
+        }
+        return undefined;
+    }
+
+    render(): string {
+        switch (this.state.kind) {
+            case "loading":
+                return "Loading...";
+            case "success":
+                return `Data: ${JSON.stringify(this.state.data)}`;
+            case "error":
+                return `Error: ${this.state.error}`;
+        }
+    }
+}
+
+type Action =
+    | { type: "INCREMENT"; amount: number }
+    | { type: "DECREMENT"; amount: number }
+    | { type: "RESET" }
+    | { type: "SET"; value: number };
+
+class Counter {
+    private value: number = 0;
+
+    dispatch(action: Action): void {
+        switch (action.type) {
+            case "INCREMENT":
+                this.value += action.amount;
+                break;
+            case "DECREMENT":
+                this.value -= action.amount;
+                break;
+            case "RESET":
+                this.value = 0;
+                break;
+            case "SET":
+                this.value = action.value;
+                break;
+        }
+    }
+
+    getValue(): number {
+        return this.value;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function StateManager"),
+        "Expected StateManager function: {}",
+        output
+    );
+    assert!(
+        output.contains("StateManager.prototype.isLoading") && output.contains("StateManager.prototype.isSuccess"),
+        "Expected StateManager state check methods: {}",
+        output
+    );
+    assert!(
+        output.contains("StateManager.prototype.render") && (output.contains("switch") || output.contains("case")),
+        "Expected render method with switch: {}",
+        output
+    );
+    assert!(
+        output.contains("function Counter"),
+        "Expected Counter function: {}",
+        output
+    );
+    assert!(
+        output.contains("Counter.prototype.dispatch"),
+        "Expected dispatch method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_assertion_functions() {
+    // Test assertion functions in classes
+    let source = r#"
+class Assertions {
+    assertDefined<T>(value: T | undefined | null, message?: string): asserts value is T {
+        if (value === undefined || value === null) {
+            throw new Error(message ?? "Value is not defined");
+        }
+    }
+
+    assertString(value: unknown, message?: string): asserts value is string {
+        if (typeof value !== "string") {
+            throw new Error(message ?? "Value is not a string");
+        }
+    }
+
+    assertNumber(value: unknown, message?: string): asserts value is number {
+        if (typeof value !== "number" || isNaN(value)) {
+            throw new Error(message ?? "Value is not a valid number");
+        }
+    }
+
+    assertArray<T>(value: unknown, message?: string): asserts value is T[] {
+        if (!Array.isArray(value)) {
+            throw new Error(message ?? "Value is not an array");
+        }
+    }
+}
+
+class SafeProcessor {
+    private assertions = new Assertions();
+
+    processString(input: unknown): string {
+        this.assertions.assertString(input);
+        return input.toUpperCase();
+    }
+
+    processNumber(input: unknown): number {
+        this.assertions.assertNumber(input);
+        return input * 2;
+    }
+
+    processArray<T>(input: unknown): T[] {
+        this.assertions.assertArray<T>(input);
+        return input.slice();
+    }
+}
+
+function assertNonNull<T>(value: T | null | undefined): asserts value is T {
+    if (value === null || value === undefined) {
+        throw new Error("Value cannot be null or undefined");
+    }
+}
+
+class DataValidator {
+    private data: Record<string, unknown> = {};
+
+    set(key: string, value: unknown): void {
+        this.data[key] = value;
+    }
+
+    getRequired(key: string): unknown {
+        const value = this.data[key];
+        assertNonNull(value);
+        return value;
+    }
+
+    assertHasKey(key: string): asserts this is { data: Record<string, unknown> & Record<typeof key, unknown> } {
+        if (!(key in this.data)) {
+            throw new Error(`Key "${key}" is required`);
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function Assertions"),
+        "Expected Assertions function: {}",
+        output
+    );
+    assert!(
+        output.contains("Assertions.prototype.assertDefined") && output.contains("Assertions.prototype.assertString"),
+        "Expected assertion methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function SafeProcessor"),
+        "Expected SafeProcessor function: {}",
+        output
+    );
+    assert!(
+        output.contains("SafeProcessor.prototype.processString") && output.contains("SafeProcessor.prototype.processNumber"),
+        "Expected SafeProcessor methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function assertNonNull"),
+        "Expected standalone assertion function: {}",
+        output
+    );
+    assert!(
+        output.contains("function DataValidator"),
+        "Expected DataValidator function: {}",
+        output
+    );
+}
