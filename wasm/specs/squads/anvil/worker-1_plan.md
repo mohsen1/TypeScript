@@ -6,10 +6,19 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-(awaiting next task from EM-Anvil)
+- Idle; last completed task: TS2322 false positives fix (committed/pushed; Ready for Merge: Yes).
+- Awaiting next task from EM-Anvil.
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
+
+## Resume Checklist
+- Sync before work: `git fetch origin && git merge origin/rust --no-edit`
+- Confirm branch: `git rev-parse --abbrev-ref HEAD` (should be `worker/anvil-1`)
+- Review last work: TS2322 TypeQuery resolution (see Notes for files/tests/samples)
+- If continuing TS2322: re-scan with `node wasm/differential-test/find-ts2322.mjs`
+- Conformance (if needed): `bash wasm/differential-test/run-conformance.sh --max=500`
+- Notify manager on status: `.notify/notify.sh ready|merge|blocked|task "..."` (after any significant work)
 
 ## Completed
 - [x] Added ES5 tests for dependency injection patterns (6 tests): basic constructor injection, property injection, factory pattern, singleton pattern, scoped injection, combined DI patterns. Ran `./wasm/test.sh class_es5_tests` (all 548 pass).
