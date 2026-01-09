@@ -7,12 +7,13 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- [ ] Add async method with destructuring tests in `wasm/src/transforms/async_es5_tests.rs`. Run `./wasm/test.sh async_es5_tests`.
+- [ ] (awaiting assignment)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added 12 async destructuring tests (array, object, no await, nested, body_contains_await, body_no_await, ignores nested async, with defaults, try/catch, with rest, renamed, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (304 tests PASS).
 - [x] Added 12 async spread operator tests (array literal, object literal, function call, no await, body_contains_await, body_no_await, ignores nested async, multiple arrays, try/catch, nested objects, rest params, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (292 tests PASS).
 - [x] Added 12 async logical assignment tests (||=, &&=, ??=, no await, body_contains_await, body_no_await, ignores nested async, chained, try/catch, property access, element access, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (280 tests PASS).
 - [x] Added 12 async nullish coalescing tests (basic, with await result, no await, chained, body_contains_await, body_no_await, ignores nested async, in assignment, try/catch, with function call, with object literal, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (268 tests PASS).
