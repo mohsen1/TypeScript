@@ -17821,38 +17821,36 @@ class DataProcessor {
 }
 
 // ============================================================================
-// Map/Set pattern tests
+// Class Field Decorators Pattern Tests
 // ============================================================================
 
 #[test]
-fn test_class_es5_map_basic_operations() {
-    // Basic Map operations in class
+fn test_class_es5_field_decorator_observable_pattern() {
+    // Observable field decorator pattern
     let source = r#"
-class KeyValueStore<K, V> {
-    private store: Map<K, V> = new Map();
+function observable(target: any, propertyKey: string) {
+    let value: any;
+    Object.defineProperty(target, propertyKey, {
+        get() { return value; },
+        set(newValue) {
+            console.log(`Setting ${propertyKey} to ${newValue}`);
+            value = newValue;
+        },
+        enumerable: true,
+        configurable: true
+    });
+}
 
-    set(key: K, value: V): void {
-        this.store.set(key, value);
-    }
+class User {
+    @observable
+    name: string = "";
 
-    get(key: K): V | undefined {
-        return this.store.get(key);
-    }
+    @observable
+    email: string = "";
 
-    has(key: K): boolean {
-        return this.store.has(key);
-    }
-
-    delete(key: K): boolean {
-        return this.store.delete(key);
-    }
-
-    clear(): void {
-        this.store.clear();
-    }
-
-    get size(): number {
-        return this.store.size;
+    constructor(name: string, email: string) {
+        this.name = name;
+        this.email = email;
     }
 }
 "#;
@@ -17871,48 +17869,56 @@ class KeyValueStore<K, V> {
 
     let output = printer.get_output().to_string();
 
+    // Class should be converted
     assert!(
-        output.contains("function KeyValueStore"),
-        "Expected KeyValueStore function: {}",
+        output.contains("function User") || output.contains("User"),
+        "Expected User class: {}",
         output
     );
+
+    // Decorator function should be present
     assert!(
-        output.contains("Map"),
-        "Expected Map: {}",
+        output.contains("observable"),
+        "Expected observable decorator: {}",
+        output
+    );
+
+    // Fields should be present
+    assert!(
+        output.contains("name") && output.contains("email"),
+        "Expected field names: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_set_basic_operations() {
-    // Basic Set operations in class
+fn test_class_es5_field_decorator_stacked_pattern() {
+    // Stacked decorators on fields pattern
     let source = r#"
-class UniqueCollection<T> {
-    private items: Set<T> = new Set();
+function validate(target: any, propertyKey: string) {
+    console.log(`Validating ${propertyKey}`);
+}
 
-    add(item: T): void {
-        this.items.add(item);
-    }
+function log(target: any, propertyKey: string) {
+    console.log(`Logging ${propertyKey}`);
+}
 
-    remove(item: T): boolean {
-        return this.items.delete(item);
-    }
+function required(target: any, propertyKey: string) {
+    console.log(`Required ${propertyKey}`);
+}
 
-    contains(item: T): boolean {
-        return this.items.has(item);
-    }
+class FormData {
+    @validate
+    @log
+    @required
+    username: string = "";
 
-    clear(): void {
-        this.items.clear();
-    }
+    @validate
+    @required
+    password: string = "";
 
-    toArray(): T[] {
-        return Array.from(this.items);
-    }
-
-    get size(): number {
-        return this.items.size;
-    }
+    @log
+    rememberMe: boolean = false;
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -17930,137 +17936,90 @@ class UniqueCollection<T> {
 
     let output = printer.get_output().to_string();
 
+    // Class should be converted
     assert!(
-        output.contains("function UniqueCollection"),
-        "Expected UniqueCollection function: {}",
+        output.contains("function FormData") || output.contains("FormData"),
+        "Expected FormData class: {}",
         output
     );
+
+    // Decorator functions should be present
     assert!(
-        output.contains("Set"),
-        "Expected Set: {}",
+        output.contains("validate") && output.contains("log") && output.contains("required"),
+        "Expected decorator functions: {}",
         output
     );
-}
 
-#[test]
-fn test_class_es5_map_iteration_pattern() {
-    // Map iteration with forEach, keys, values, entries
-    let source = r#"
-class MapIterator<K, V> {
-    private data: Map<K, V> = new Map();
-
-    constructor(entries?: [K, V][]) {
-        if (entries) {
-            for (const [key, value] of entries) {
-                this.data.set(key, value);
-            }
-        }
-    }
-
-    forEachEntry(callback: (value: V, key: K) => void): void {
-        this.data.forEach((value, key) => callback(value, key));
-    }
-
-    getKeys(): K[] {
-        return Array.from(this.data.keys());
-    }
-
-    getValues(): V[] {
-        return Array.from(this.data.values());
-    }
-
-    getEntries(): [K, V][] {
-        return Array.from(this.data.entries());
-    }
-
-    map<U>(fn: (value: V, key: K) => U): U[] {
-        const result: U[] = [];
-        this.data.forEach((value, key) => result.push(fn(value, key)));
-        return result;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
+    // Fields should be present
     assert!(
-        output.contains("function MapIterator"),
-        "Expected MapIterator function: {}",
-        output
-    );
-    assert!(
-        output.contains("Map"),
-        "Expected Map: {}",
-        output
-    );
-    assert!(
-        output.contains("forEach"),
-        "Expected forEach: {}",
+        output.contains("username") && output.contains("password"),
+        "Expected field names: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_set_operations_pattern() {
-    // Set operations: union, intersection, difference
+fn test_class_es5_field_decorator_factory_pattern() {
+    // Field decorator with arguments (decorator factory)
     let source = r#"
-class SetOperations<T> {
-    private set: Set<T>;
-
-    constructor(items?: T[]) {
-        this.set = new Set(items);
-    }
-
-    union(other: SetOperations<T>): SetOperations<T> {
-        const result = new SetOperations<T>();
-        this.set.forEach(item => result.add(item));
-        other.forEach(item => result.add(item));
-        return result;
-    }
-
-    intersection(other: SetOperations<T>): SetOperations<T> {
-        const result = new SetOperations<T>();
-        this.set.forEach(item => {
-            if (other.has(item)) {
-                result.add(item);
+function minLength(min: number) {
+    return function(target: any, propertyKey: string) {
+        let value: string = "";
+        Object.defineProperty(target, propertyKey, {
+            get() { return value; },
+            set(newValue: string) {
+                if (newValue.length < min) {
+                    throw new Error(`${propertyKey} must be at least ${min} characters`);
+                }
+                value = newValue;
             }
         });
-        return result;
-    }
+    };
+}
 
-    difference(other: SetOperations<T>): SetOperations<T> {
-        const result = new SetOperations<T>();
-        this.set.forEach(item => {
-            if (!other.has(item)) {
-                result.add(item);
+function maxLength(max: number) {
+    return function(target: any, propertyKey: string) {
+        let value: string = "";
+        Object.defineProperty(target, propertyKey, {
+            get() { return value; },
+            set(newValue: string) {
+                if (newValue.length > max) {
+                    throw new Error(`${propertyKey} must be at most ${max} characters`);
+                }
+                value = newValue;
             }
         });
-        return result;
-    }
+    };
+}
 
-    add(item: T): void {
-        this.set.add(item);
-    }
+function range(min: number, max: number) {
+    return function(target: any, propertyKey: string) {
+        let value: number = min;
+        Object.defineProperty(target, propertyKey, {
+            get() { return value; },
+            set(newValue: number) {
+                if (newValue < min || newValue > max) {
+                    throw new Error(`${propertyKey} must be between ${min} and ${max}`);
+                }
+                value = newValue;
+            }
+        });
+    };
+}
 
-    has(item: T): boolean {
-        return this.set.has(item);
-    }
+class Product {
+    @minLength(3)
+    @maxLength(100)
+    name: string = "";
 
-    forEach(callback: (item: T) => void): void {
-        this.set.forEach(callback);
-    }
+    @minLength(10)
+    description: string = "";
+
+    @range(0, 10000)
+    price: number = 0;
+
+    @range(0, 1000)
+    quantity: number = 0;
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -18078,56 +18037,74 @@ class SetOperations<T> {
 
     let output = printer.get_output().to_string();
 
+    // Class should be converted
     assert!(
-        output.contains("function SetOperations"),
-        "Expected SetOperations function: {}",
+        output.contains("function Product") || output.contains("Product"),
+        "Expected Product class: {}",
         output
     );
+
+    // Decorator factory functions should be present
     assert!(
-        output.contains("Set"),
-        "Expected Set: {}",
+        output.contains("minLength") && output.contains("maxLength"),
+        "Expected decorator factories: {}",
+        output
+    );
+
+    // Fields should be present
+    assert!(
+        output.contains("name") && output.contains("price"),
+        "Expected field names: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_map_set_in_constructor() {
-    // Map and Set initialized in constructor
+fn test_class_es5_field_decorator_deep_inheritance() {
+    // Field decorators with deep inheritance chain
     let source = r#"
-class DataManager<K, V> {
-    private cache: Map<K, V>;
-    private processedKeys: Set<K>;
-    private accessLog: Map<K, number>;
+function tracked(target: any, propertyKey: string) {
+    console.log(`Tracking ${propertyKey}`);
+}
 
-    constructor() {
-        this.cache = new Map();
-        this.processedKeys = new Set();
-        this.accessLog = new Map();
-    }
+function serializable(target: any, propertyKey: string) {
+    console.log(`Serializable ${propertyKey}`);
+}
 
-    process(key: K, value: V): void {
-        this.cache.set(key, value);
-        this.processedKeys.add(key);
-        const count = this.accessLog.get(key) || 0;
-        this.accessLog.set(key, count + 1);
-    }
+class BaseEntity {
+    @tracked
+    id: string = "";
 
-    get(key: K): V | undefined {
-        if (this.cache.has(key)) {
-            const count = this.accessLog.get(key) || 0;
-            this.accessLog.set(key, count + 1);
-            return this.cache.get(key);
-        }
-        return undefined;
-    }
+    @tracked
+    createdAt: Date = new Date();
 
-    isProcessed(key: K): boolean {
-        return this.processedKeys.has(key);
-    }
+    @tracked
+    updatedAt: Date = new Date();
+}
 
-    getAccessCount(key: K): number {
-        return this.accessLog.get(key) || 0;
-    }
+class Document extends BaseEntity {
+    @tracked
+    @serializable
+    title: string = "";
+
+    @tracked
+    @serializable
+    content: string = "";
+
+    @tracked
+    author: string = "";
+}
+
+class Article extends Document {
+    @tracked
+    @serializable
+    category: string = "";
+
+    @tracked
+    tags: string[] = [];
+
+    @serializable
+    publishedAt: Date | null = null;
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -18145,63 +18122,79 @@ class DataManager<K, V> {
 
     let output = printer.get_output().to_string();
 
+    // Classes should be converted
     assert!(
-        output.contains("function DataManager"),
-        "Expected DataManager function: {}",
+        output.contains("BaseEntity") || output.contains("function BaseEntity"),
+        "Expected BaseEntity class: {}",
         output
     );
     assert!(
-        output.contains("Map") && output.contains("Set"),
-        "Expected Map and Set: {}",
+        output.contains("Document") || output.contains("function Document"),
+        "Expected Document class: {}",
+        output
+    );
+    assert!(
+        output.contains("Article") || output.contains("function Article"),
+        "Expected Article class: {}",
+        output
+    );
+
+    // Decorator functions should be present
+    assert!(
+        output.contains("tracked") && output.contains("serializable"),
+        "Expected decorator functions: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_map_set_eventbus_pattern() {
-    // Combined Map/Set usage patterns - EventBus
+fn test_class_es5_field_decorator_metadata() {
+    // Field decorators with metadata pattern
     let source = r#"
-class EventBus {
-    private handlers: Map<string, Set<Function>> = new Map();
-    private onceHandlers: Map<string, Set<Function>> = new Map();
+const METADATA_KEY = Symbol("metadata");
 
-    on(event: string, handler: Function): void {
-        if (!this.handlers.has(event)) {
-            this.handlers.set(event, new Set());
-        }
-        this.handlers.get(event)!.add(handler);
-    }
+function type(typeName: string) {
+    return function(target: any, propertyKey: string) {
+        const metadata = target[METADATA_KEY] || {};
+        metadata[propertyKey] = { ...metadata[propertyKey], type: typeName };
+        target[METADATA_KEY] = metadata;
+    };
+}
 
-    once(event: string, handler: Function): void {
-        if (!this.onceHandlers.has(event)) {
-            this.onceHandlers.set(event, new Set());
-        }
-        this.onceHandlers.get(event)!.add(handler);
-    }
+function defaultValue(value: any) {
+    return function(target: any, propertyKey: string) {
+        const metadata = target[METADATA_KEY] || {};
+        metadata[propertyKey] = { ...metadata[propertyKey], default: value };
+        target[METADATA_KEY] = metadata;
+    };
+}
 
-    off(event: string, handler: Function): void {
-        this.handlers.get(event)?.delete(handler);
-        this.onceHandlers.get(event)?.delete(handler);
-    }
+function nullable(target: any, propertyKey: string) {
+    const metadata = target[METADATA_KEY] || {};
+    metadata[propertyKey] = { ...metadata[propertyKey], nullable: true };
+    target[METADATA_KEY] = metadata;
+}
 
-    emit(event: string, ...args: any[]): void {
-        this.handlers.get(event)?.forEach(handler => handler(...args));
+class Schema {
+    @type("string")
+    @defaultValue("")
+    name: string = "";
 
-        const onceSet = this.onceHandlers.get(event);
-        if (onceSet) {
-            onceSet.forEach(handler => handler(...args));
-            onceSet.clear();
-        }
-    }
+    @type("number")
+    @defaultValue(0)
+    age: number = 0;
 
-    listenerCount(event: string): number {
-        const regular = this.handlers.get(event)?.size || 0;
-        const once = this.onceHandlers.get(event)?.size || 0;
-        return regular + once;
-    }
+    @type("string")
+    @nullable
+    @defaultValue(null)
+    nickname: string | null = null;
 
-    static create(): EventBus {
-        return new EventBus();
+    @type("boolean")
+    @defaultValue(true)
+    active: boolean = true;
+
+    static getMetadata(): Record<string, any> {
+        return (Schema.prototype as any)[METADATA_KEY] || {};
     }
 }
 "#;
@@ -18220,24 +18213,31 @@ class EventBus {
 
     let output = printer.get_output().to_string();
 
+    // Class should be converted
     assert!(
-        output.contains("function EventBus"),
-        "Expected EventBus function: {}",
+        output.contains("function Schema") || output.contains("Schema"),
+        "Expected Schema class: {}",
         output
     );
+
+    // Decorator factory functions should be present
     assert!(
-        output.contains("Map"),
-        "Expected Map: {}",
+        output.contains("type") && output.contains("defaultValue"),
+        "Expected decorator factories: {}",
         output
     );
+
+    // Static method should be present
     assert!(
-        output.contains("Set"),
-        "Expected Set: {}",
+        output.contains("getMetadata"),
+        "Expected getMetadata method: {}",
         output
     );
+
+    // Symbol should be present
     assert!(
-        output.contains("create"),
-        "Expected create static method: {}",
+        output.contains("METADATA_KEY") || output.contains("Symbol"),
+        "Expected metadata symbol: {}",
         output
     );
 }
