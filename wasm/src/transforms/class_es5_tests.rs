@@ -20968,3 +20968,621 @@ class WidgetFactory extends AbstractFactory<{ id: number }> {
         output
     );
 }
+
+// ============================================================================
+// namespace merging pattern tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_namespace_class_augmentation() {
+    // Test class with namespace augmentation (declaration merging)
+    let source = r#"
+class Calculator {
+    add(a: number, b: number): number {
+        return a + b;
+    }
+
+    subtract(a: number, b: number): number {
+        return a - b;
+    }
+}
+
+namespace Calculator {
+    export const VERSION = "1.0.0";
+    export const MAX_VALUE = 1000000;
+
+    export function isValidInput(n: number): boolean {
+        return !isNaN(n) && isFinite(n) && n <= MAX_VALUE;
+    }
+
+    export function createDefault(): Calculator {
+        return new Calculator();
+    }
+}
+
+class Logger {
+    log(message: string): void {
+        console.log(message);
+    }
+}
+
+namespace Logger {
+    export enum Level {
+        DEBUG,
+        INFO,
+        WARN,
+        ERROR
+    }
+
+    export interface Options {
+        level: Level;
+        prefix?: string;
+    }
+
+    export function create(options: Options): Logger {
+        return new Logger();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function Calculator"),
+        "Expected Calculator function: {}",
+        output
+    );
+    assert!(
+        output.contains("Calculator.prototype.add") && output.contains("Calculator.prototype.subtract"),
+        "Expected Calculator methods on prototype: {}",
+        output
+    );
+    assert!(
+        output.contains("Calculator.VERSION") || output.contains("Calculator.MAX_VALUE") || output.contains("Calculator.isValidInput"),
+        "Expected namespace members on Calculator: {}",
+        output
+    );
+    assert!(
+        output.contains("function Logger"),
+        "Expected Logger function: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_namespace_with_interface() {
+    // Test namespace containing interface declarations
+    let source = r#"
+namespace Validation {
+    export interface StringValidator {
+        isValid(s: string): boolean;
+    }
+
+    export interface NumberValidator {
+        isValid(n: number): boolean;
+    }
+
+    export class RegexValidator implements StringValidator {
+        constructor(private pattern: RegExp) {}
+
+        isValid(s: string): boolean {
+            return this.pattern.test(s);
+        }
+    }
+
+    export class RangeValidator implements NumberValidator {
+        constructor(private min: number, private max: number) {}
+
+        isValid(n: number): boolean {
+            return n >= this.min && n <= this.max;
+        }
+    }
+}
+
+namespace Forms {
+    export interface FormField {
+        name: string;
+        value: any;
+        validator?: Validation.StringValidator;
+    }
+
+    export interface FormConfig {
+        fields: FormField[];
+        onSubmit: (data: Record<string, any>) => void;
+    }
+
+    export class Form {
+        private fields: FormField[] = [];
+
+        constructor(config: FormConfig) {
+            this.fields = config.fields;
+        }
+
+        validate(): boolean {
+            return this.fields.every(field =>
+                !field.validator || field.validator.isValid(String(field.value))
+            );
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("Validation") || output.contains("var Validation"),
+        "Expected Validation namespace: {}",
+        output
+    );
+    assert!(
+        output.contains("RegexValidator") && output.contains("RangeValidator"),
+        "Expected validator classes: {}",
+        output
+    );
+    assert!(
+        output.contains("Forms") || output.contains("var Forms"),
+        "Expected Forms namespace: {}",
+        output
+    );
+    assert!(
+        output.contains("Form") && output.contains("validate"),
+        "Expected Form class with validate method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_namespace_with_enum() {
+    // Test namespace containing enum declarations
+    let source = r#"
+namespace HttpClient {
+    export enum Method {
+        GET = "GET",
+        POST = "POST",
+        PUT = "PUT",
+        DELETE = "DELETE",
+        PATCH = "PATCH"
+    }
+
+    export enum StatusCode {
+        OK = 200,
+        CREATED = 201,
+        BAD_REQUEST = 400,
+        UNAUTHORIZED = 401,
+        NOT_FOUND = 404,
+        INTERNAL_ERROR = 500
+    }
+
+    export class Request {
+        constructor(
+            public url: string,
+            public method: Method = Method.GET,
+            public body?: any
+        ) {}
+
+        send(): Promise<Response> {
+            return fetch(this.url, {
+                method: this.method,
+                body: this.body ? JSON.stringify(this.body) : undefined
+            });
+        }
+    }
+
+    export class Response {
+        constructor(
+            public status: StatusCode,
+            public data: any
+        ) {}
+
+        isSuccess(): boolean {
+            return this.status >= 200 && this.status < 300;
+        }
+    }
+}
+
+namespace Database {
+    export const enum QueryType {
+        SELECT,
+        INSERT,
+        UPDATE,
+        DELETE
+    }
+
+    export class Query {
+        constructor(private type: QueryType, private table: string) {}
+
+        getType(): QueryType {
+            return this.type;
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("HttpClient") || output.contains("var HttpClient"),
+        "Expected HttpClient namespace: {}",
+        output
+    );
+    assert!(
+        output.contains("Method") || output.contains("\"GET\"") || output.contains("\"POST\""),
+        "Expected Method enum values: {}",
+        output
+    );
+    assert!(
+        output.contains("StatusCode") || output.contains("200") || output.contains("404"),
+        "Expected StatusCode enum values: {}",
+        output
+    );
+    assert!(
+        output.contains("Request") && output.contains("Response"),
+        "Expected Request and Response classes: {}",
+        output
+    );
+    assert!(
+        output.contains("Database") || output.contains("Query"),
+        "Expected Database namespace with Query: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_namespace_with_function() {
+    // Test function with namespace augmentation
+    let source = r#"
+function greet(name: string): string {
+    return `Hello, ${name}!`;
+}
+
+namespace greet {
+    export const defaultName = "World";
+    export const separator = ", ";
+
+    export function formal(name: string): string {
+        return `Good day, ${name}.`;
+    }
+
+    export function casual(name: string): string {
+        return `Hey ${name}!`;
+    }
+
+    export function multiple(...names: string[]): string {
+        return names.map(n => greet(n)).join(separator);
+    }
+}
+
+function createFactory<T>(name: string): T {
+    return {} as T;
+}
+
+namespace createFactory {
+    export interface FactoryOptions {
+        singleton?: boolean;
+        lazy?: boolean;
+    }
+
+    export function withOptions<T>(name: string, options: FactoryOptions): T {
+        return createFactory<T>(name);
+    }
+
+    export class Registry {
+        private factories: Map<string, any> = new Map();
+
+        register<T>(name: string, factory: () => T): void {
+            this.factories.set(name, factory);
+        }
+
+        get<T>(name: string): T | undefined {
+            const factory = this.factories.get(name);
+            return factory ? factory() : undefined;
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function greet"),
+        "Expected greet function: {}",
+        output
+    );
+    assert!(
+        output.contains("greet.defaultName") || output.contains("greet.formal") || output.contains("greet.casual"),
+        "Expected namespace members on greet: {}",
+        output
+    );
+    assert!(
+        output.contains("function createFactory"),
+        "Expected createFactory function: {}",
+        output
+    );
+    assert!(
+        output.contains("createFactory.withOptions") || output.contains("createFactory.Registry") || output.contains("Registry"),
+        "Expected namespace members on createFactory: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_nested_namespaces() {
+    // Test nested namespace declarations
+    let source = r#"
+namespace App {
+    export namespace Models {
+        export class User {
+            constructor(public id: string, public name: string) {}
+
+            toJSON(): object {
+                return { id: this.id, name: this.name };
+            }
+        }
+
+        export class Product {
+            constructor(public sku: string, public price: number) {}
+
+            getFormattedPrice(): string {
+                return `$${this.price.toFixed(2)}`;
+            }
+        }
+    }
+
+    export namespace Services {
+        export class UserService {
+            private users: Models.User[] = [];
+
+            add(user: Models.User): void {
+                this.users.push(user);
+            }
+
+            findById(id: string): Models.User | undefined {
+                return this.users.find(u => u.id === id);
+            }
+        }
+
+        export class ProductService {
+            private products: Models.Product[] = [];
+
+            add(product: Models.Product): void {
+                this.products.push(product);
+            }
+
+            findBySku(sku: string): Models.Product | undefined {
+                return this.products.find(p => p.sku === sku);
+            }
+        }
+    }
+
+    export namespace Utils {
+        export namespace Formatters {
+            export function currency(amount: number): string {
+                return `$${amount.toFixed(2)}`;
+            }
+
+            export function date(d: Date): string {
+                return d.toISOString();
+            }
+        }
+
+        export namespace Validators {
+            export function isEmail(s: string): boolean {
+                return s.includes("@");
+            }
+
+            export function isPositive(n: number): boolean {
+                return n > 0;
+            }
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("App") || output.contains("var App"),
+        "Expected App namespace: {}",
+        output
+    );
+    assert!(
+        output.contains("Models") || output.contains("App.Models"),
+        "Expected Models namespace: {}",
+        output
+    );
+    assert!(
+        output.contains("User") && output.contains("Product"),
+        "Expected User and Product classes: {}",
+        output
+    );
+    assert!(
+        output.contains("Services") || output.contains("UserService") || output.contains("ProductService"),
+        "Expected Services namespace with classes: {}",
+        output
+    );
+    assert!(
+        output.contains("Utils") || output.contains("Formatters") || output.contains("Validators"),
+        "Expected Utils with nested namespaces: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_namespace_exports() {
+    // Test namespace with various export patterns
+    let source = r#"
+namespace Exports {
+    // Private (not exported)
+    class InternalHelper {
+        static process(data: string): string {
+            return data.trim();
+        }
+    }
+
+    const internalConfig = { debug: false };
+
+    // Exported class
+    export class PublicApi {
+        private helper = InternalHelper;
+
+        process(data: string): string {
+            return this.helper.process(data);
+        }
+    }
+
+    // Exported constant
+    export const VERSION = "2.0.0";
+
+    // Exported function using internal
+    export function initialize(): PublicApi {
+        if (internalConfig.debug) {
+            console.log("Initializing...");
+        }
+        return new PublicApi();
+    }
+
+    // Re-export pattern
+    export { InternalHelper as Helper };
+}
+
+namespace Library {
+    export abstract class BaseComponent {
+        abstract render(): string;
+    }
+
+    export class Button extends BaseComponent {
+        constructor(private label: string) {
+            super();
+        }
+
+        render(): string {
+            return `<button>${this.label}</button>`;
+        }
+    }
+
+    export class Input extends BaseComponent {
+        constructor(private placeholder: string) {
+            super();
+        }
+
+        render(): string {
+            return `<input placeholder="${this.placeholder}" />`;
+        }
+    }
+
+    // Export type alias (erased at runtime)
+    export type ComponentType = typeof BaseComponent;
+
+    // Export namespace member
+    export const components = {
+        Button,
+        Input
+    };
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("Exports") || output.contains("var Exports"),
+        "Expected Exports namespace: {}",
+        output
+    );
+    assert!(
+        output.contains("PublicApi") && output.contains("VERSION"),
+        "Expected exported PublicApi and VERSION: {}",
+        output
+    );
+    assert!(
+        output.contains("initialize"),
+        "Expected initialize function: {}",
+        output
+    );
+    assert!(
+        output.contains("Library") || output.contains("var Library"),
+        "Expected Library namespace: {}",
+        output
+    );
+    assert!(
+        output.contains("BaseComponent") && output.contains("Button") && output.contains("Input"),
+        "Expected Library components: {}",
+        output
+    );
+    assert!(
+        output.contains("components"),
+        "Expected components export: {}",
+        output
+    );
+}
