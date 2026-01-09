@@ -7252,3 +7252,198 @@ const Rectangle = class {
         output
     );
 }
+
+// ============================================================================
+// ES5 GENERATOR FUNCTION PARITY TESTS (ADDITIONAL)
+// ============================================================================
+
+#[test]
+fn test_parity_es5_generator_return_value() {
+    let source = r#"
+function* countdown(start: number): Generator<number, string, unknown> {
+    for (let i = start; i > 0; i--) {
+        yield i;
+    }
+    return "done";
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the countdown function
+    assert!(
+        output.contains("countdown"),
+        "Output should contain countdown function: {}",
+        output
+    );
+    // Generator type annotation should be erased
+    assert!(
+        !output.contains("Generator<"),
+        "Generator type should be erased: {}",
+        output
+    );
+    // Parameter type should be erased
+    assert!(
+        !output.contains(": number"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_generator_multiple_yields() {
+    let source = r#"
+function* multiYield(): Generator<string> {
+    yield "first";
+    yield "second";
+    yield "third";
+    yield "fourth";
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the function name
+    assert!(
+        output.contains("multiYield"),
+        "Output should contain multiYield function: {}",
+        output
+    );
+    // Generator type should be erased
+    assert!(
+        !output.contains("Generator<"),
+        "Generator type should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_generator_try_catch() {
+    let source = r#"
+function* safeGenerator(): Generator<number> {
+    try {
+        yield 1;
+        yield 2;
+    } catch (e: unknown) {
+        yield -1;
+    } finally {
+        yield 0;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the function name
+    assert!(
+        output.contains("safeGenerator"),
+        "Output should contain safeGenerator function: {}",
+        output
+    );
+    // Catch param type annotation should be erased
+    assert!(
+        !output.contains(": unknown"),
+        "Catch param type should be erased: {}",
+        output
+    );
+    // Generator type should be erased
+    assert!(
+        !output.contains("Generator<"),
+        "Generator type should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_generator_expression() {
+    let source = r#"
+const gen = function* (limit: number): Generator<number> {
+    for (let i = 0; i < limit; i++) {
+        yield i * 2;
+    }
+};
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the variable name
+    assert!(
+        output.contains("gen"),
+        "Output should contain gen variable: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number") && !output.contains("Generator<"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}

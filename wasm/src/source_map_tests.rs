@@ -27697,3 +27697,724 @@ manager.processWithResource("test", async (data) => {
         "expected mappings to reference source file"
     );
 }
+
+// ============================================================================
+// Switch-Case ES5 Source Map Tests
+// ============================================================================
+
+#[test]
+fn test_source_map_switch_basic() {
+    // Test basic switch with cases
+    let source = r#"function getDay(n: number): string {
+    switch (n) {
+        case 0:
+            return "Sunday";
+        case 1:
+            return "Monday";
+        case 2:
+            return "Tuesday";
+        case 3:
+            return "Wednesday";
+        case 4:
+            return "Thursday";
+        case 5:
+            return "Friday";
+        case 6:
+            return "Saturday";
+    }
+    return "Unknown";
+}
+
+console.log(getDay(3));"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("getDay") || output.contains("switch"),
+        "expected output to contain function name or switch. output: {output}"
+    );
+    assert!(
+        output.contains("case"),
+        "expected output to contain case. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for basic switch"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_switch_default() {
+    // Test switch with default case
+    let source = r#"function classify(value: number): string {
+    switch (value) {
+        case 1:
+            return "one";
+        case 2:
+            return "two";
+        case 3:
+            return "three";
+        default:
+            return "other";
+    }
+}
+
+console.log(classify(5));"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("classify") || output.contains("switch"),
+        "expected output to contain function name. output: {output}"
+    );
+    assert!(
+        output.contains("default"),
+        "expected output to contain default. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for switch with default"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_switch_fallthrough() {
+    // Test switch with fall-through cases
+    let source = r#"function isWeekend(day: string): boolean {
+    switch (day) {
+        case "Saturday":
+        case "Sunday":
+            return true;
+        case "Monday":
+        case "Tuesday":
+        case "Wednesday":
+        case "Thursday":
+        case "Friday":
+            return false;
+        default:
+            throw new Error("Invalid day");
+    }
+}
+
+console.log(isWeekend("Saturday"));"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("isWeekend") || output.contains("switch"),
+        "expected output to contain function name. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for switch with fall-through"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_switch_break() {
+    // Test switch with break statements
+    let source = r#"function process(action: string): void {
+    let result = "";
+    switch (action) {
+        case "start":
+            result = "Starting...";
+            console.log(result);
+            break;
+        case "stop":
+            result = "Stopping...";
+            console.log(result);
+            break;
+        case "pause":
+            result = "Pausing...";
+            console.log(result);
+            break;
+        default:
+            result = "Unknown action";
+            console.log(result);
+            break;
+    }
+}
+
+process("start");"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("process") || output.contains("switch"),
+        "expected output to contain function name. output: {output}"
+    );
+    assert!(
+        output.contains("break"),
+        "expected output to contain break. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for switch with break"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_switch_return() {
+    // Test switch with return statements
+    let source = r#"function getColor(code: number): string {
+    switch (code) {
+        case 0: return "black";
+        case 1: return "red";
+        case 2: return "green";
+        case 3: return "yellow";
+        case 4: return "blue";
+        case 5: return "magenta";
+        case 6: return "cyan";
+        case 7: return "white";
+        default: return "unknown";
+    }
+}
+
+const colors = [0, 1, 2, 3].map(getColor);
+console.log(colors);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("getColor") || output.contains("switch"),
+        "expected output to contain function name. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for switch with return"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_switch_nested() {
+    // Test nested switch statements
+    let source = r#"function classify(category: string, subcategory: number): string {
+    switch (category) {
+        case "animal":
+            switch (subcategory) {
+                case 1: return "dog";
+                case 2: return "cat";
+                default: return "unknown animal";
+            }
+        case "plant":
+            switch (subcategory) {
+                case 1: return "tree";
+                case 2: return "flower";
+                default: return "unknown plant";
+            }
+        default:
+            return "unknown category";
+    }
+}
+
+console.log(classify("animal", 1));"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("classify") || output.contains("switch"),
+        "expected output to contain function name. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for nested switch"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_switch_in_function() {
+    // Test switch inside various function types
+    let source = r#"const handler = (event: string) => {
+    switch (event) {
+        case "click":
+            return "clicked";
+        case "hover":
+            return "hovered";
+        default:
+            return "unknown event";
+    }
+};
+
+const asyncHandler = async (event: string): Promise<string> => {
+    switch (event) {
+        case "load":
+            return await Promise.resolve("loaded");
+        case "error":
+            return await Promise.resolve("errored");
+        default:
+            return "unknown";
+    }
+};
+
+console.log(handler("click"));
+asyncHandler("load").then(console.log);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("handler") || output.contains("switch"),
+        "expected output to contain variable name or switch. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for switch in function"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_switch_expression_cases() {
+    // Test switch with expression cases
+    let source = r#"const MODE_READ = 1;
+const MODE_WRITE = 2;
+const MODE_EXECUTE = 4;
+
+function checkPermission(mode: number): string {
+    switch (mode) {
+        case MODE_READ:
+            return "read";
+        case MODE_WRITE:
+            return "write";
+        case MODE_EXECUTE:
+            return "execute";
+        case MODE_READ | MODE_WRITE:
+            return "read-write";
+        case MODE_READ | MODE_EXECUTE:
+            return "read-execute";
+        default:
+            return "unknown";
+    }
+}
+
+console.log(checkPermission(MODE_READ | MODE_WRITE));"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("checkPermission") || output.contains("switch"),
+        "expected output to contain function name. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for switch with expression cases"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_switch_class_method() {
+    // Test switch in class method
+    let source = r#"class StateMachine {
+    private state: string = "idle";
+
+    transition(action: string): void {
+        switch (this.state) {
+            case "idle":
+                if (action === "start") {
+                    this.state = "running";
+                }
+                break;
+            case "running":
+                switch (action) {
+                    case "pause":
+                        this.state = "paused";
+                        break;
+                    case "stop":
+                        this.state = "stopped";
+                        break;
+                }
+                break;
+            case "paused":
+                if (action === "resume") {
+                    this.state = "running";
+                }
+                break;
+            default:
+                console.log("Unknown state");
+        }
+    }
+
+    getState(): string {
+        return this.state;
+    }
+}
+
+const machine = new StateMachine();
+machine.transition("start");
+console.log(machine.getState());"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("StateMachine") || output.contains("transition"),
+        "expected output to contain class or method name. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for switch in class method"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_switch_combined() {
+    // Test combined switch patterns
+    let source = r#"enum HttpStatus {
+    OK = 200,
+    Created = 201,
+    BadRequest = 400,
+    NotFound = 404,
+    InternalError = 500
+}
+
+interface Response {
+    status: HttpStatus;
+    message: string;
+}
+
+class HttpHandler {
+    handleResponse(response: Response): string {
+        switch (response.status) {
+            case HttpStatus.OK:
+            case HttpStatus.Created:
+                return this.handleSuccess(response);
+            case HttpStatus.BadRequest:
+                return this.handleClientError(response);
+            case HttpStatus.NotFound:
+                return this.handleNotFound();
+            case HttpStatus.InternalError:
+                return this.handleServerError();
+            default:
+                return this.handleUnknown(response.status);
+        }
+    }
+
+    private handleSuccess(response: Response): string {
+        switch (response.status) {
+            case HttpStatus.OK:
+                return "OK: " + response.message;
+            case HttpStatus.Created:
+                return "Created: " + response.message;
+            default:
+                return "Success";
+        }
+    }
+
+    private handleClientError(response: Response): string {
+        return "Client Error: " + response.message;
+    }
+
+    private handleNotFound(): string {
+        return "Not Found";
+    }
+
+    private handleServerError(): string {
+        return "Internal Server Error";
+    }
+
+    private handleUnknown(status: HttpStatus): string {
+        return "Unknown status: " + status;
+    }
+}
+
+const handler = new HttpHandler();
+console.log(handler.handleResponse({ status: HttpStatus.OK, message: "Success" }));"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("HttpHandler") || output.contains("handleResponse"),
+        "expected output to contain class or method name. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for combined switch patterns"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}

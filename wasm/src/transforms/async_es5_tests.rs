@@ -5619,3 +5619,196 @@ fn test_async_spread_conditional() {
         output
     );
 }
+
+// ============================================================================
+// ASYNC DESTRUCTURING TESTS
+// ============================================================================
+
+fn parse_and_emit_async_destructuring(source: &str) -> String {
+    use crate::parser::syntax_kind_ext;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &stmt_idx in &source_file.statements.nodes {
+                if let Some(stmt_node) = parser.arena.get(stmt_idx) {
+                    if stmt_node.kind == syntax_kind_ext::FUNCTION_DECLARATION {
+                        if let Some(func_data) = parser.arena.get_function(stmt_node) {
+                            let emitter = AsyncES5Emitter::new(&parser.arena);
+                            let has_await = emitter.body_contains_await(func_data.body);
+                            let mut emitter = AsyncES5Emitter::new(&parser.arena);
+                            if has_await {
+                                return emitter.emit_generator_body_with_await(func_data.body);
+                            } else {
+                                return emitter.emit_simple_generator_body(func_data.body);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    String::new()
+}
+
+fn destructuring_contains_await(source: &str) -> bool {
+    use crate::parser::syntax_kind_ext;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &stmt_idx in &source_file.statements.nodes {
+                if let Some(stmt_node) = parser.arena.get(stmt_idx) {
+                    if stmt_node.kind == syntax_kind_ext::FUNCTION_DECLARATION {
+                        if let Some(func_data) = parser.arena.get_function(stmt_node) {
+                            let emitter = AsyncES5Emitter::new(&parser.arena);
+                            return emitter.body_contains_await(func_data.body);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+#[test]
+fn test_async_destructuring_array() {
+    let output = parse_and_emit_async_destructuring(
+        "async function foo() { const data = await getData(); const [a, b] = data; return a + b; }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Array destructuring after await should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_destructuring_object() {
+    let output = parse_and_emit_async_destructuring(
+        "async function foo() { const result = await getResult(); const { x, y } = result; return x + y; }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Object destructuring after await should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_destructuring_no_await() {
+    let output = parse_and_emit_async_destructuring(
+        "async function foo(arr: number[]) { const [a, b] = arr; return a + b; }",
+    );
+    assert!(
+        output.contains("[2 /*return*/"),
+        "Sync destructuring should have return: {}",
+        output
+    );
+    assert!(
+        !output.contains("switch"),
+        "No await should skip switch: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_destructuring_nested() {
+    let output = parse_and_emit_async_destructuring(
+        "async function foo() { const data = await getData(); const { user: { name, age } } = data; return name; }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Nested destructuring should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_destructuring_body_contains_await() {
+    assert!(
+        destructuring_contains_await(
+            "async function foo() { await init(); const [a] = [1]; return a; }"
+        ),
+        "Should detect await with destructuring"
+    );
+}
+
+#[test]
+fn test_async_destructuring_body_no_await() {
+    assert!(
+        !destructuring_contains_await(
+            "async function foo(arr: number[]) { const [a, b] = arr; return a; }"
+        ),
+        "Should not detect await when none present"
+    );
+}
+
+#[test]
+fn test_async_destructuring_ignores_nested_async() {
+    assert!(
+        !destructuring_contains_await(
+            "async function foo(arr: any[]) { const fn = async () => { const [a] = await x; }; return 1; }"
+        ),
+        "Should ignore await in nested async"
+    );
+}
+
+#[test]
+fn test_async_destructuring_with_defaults() {
+    let output = parse_and_emit_async_destructuring(
+        "async function foo() { const data = await getData(); const { x = 0, y = 0 } = data; return x + y; }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Destructuring with defaults should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_destructuring_with_try_catch() {
+    assert!(
+        destructuring_contains_await(
+            "async function foo() { try { await riskyOp(); } catch (e) { return 0; } }"
+        ),
+        "Should detect await in try block with destructuring"
+    );
+}
+
+#[test]
+fn test_async_destructuring_with_rest() {
+    let output = parse_and_emit_async_destructuring(
+        "async function foo() { const data = await getData(); const [first, ...rest] = data; return rest; }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Destructuring with rest should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_destructuring_renamed() {
+    let output = parse_and_emit_async_destructuring(
+        "async function foo() { const data = await getData(); const { oldName: newName } = data; return newName; }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Destructuring with rename should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_destructuring_conditional() {
+    let output = parse_and_emit_async_destructuring(
+        "async function foo(cond: boolean) { if (cond) { await process(); } const [a, b] = getData(); return a; }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Conditional destructuring should have switch or yield: {}",
+        output
+    );
+}
