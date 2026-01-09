@@ -7,12 +7,13 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- [ ] Add async ES5 tests for async iteration patterns: for-await-of with generators, async from sync iterables, async iterator protocol, for-await-of with break/continue, nested async iteration. Tests: `./wasm/test.sh async_es5_tests`
+None - awaiting next task
 
 ## Task Queue
 - [ ] Add async ES5 tests for async class patterns: async constructor simulation, async static initialization
 
 ## Completed
+- [x] Added 12 async iteration pattern tests (for-of await body, await expression, async generator, break, continue, nested, destructure, array destructure, try/catch, return, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (592 tests PASS).
 - [x] Added 12 async error handling pattern tests (try/catch basic, try/finally basic, try/catch/finally, await in catch, await in finally, nested try, rethrow, rethrow wrapped, finally with return, promise reject, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (580 tests PASS).
 - [x] Added 12 async method pattern tests (getter simulation, static basic, static factory, super call, super property, private field read, private field write, class factory, chaining, no await, ignores nested async, multiple awaits) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (568 tests PASS).
 - [x] Added 12 async arrow function pattern tests (with sync callback, nested async ignored, await before nested, await after nested, Promise.all, iife call, then chain, method call, spread, destructure, optional chain, nullish assign) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (556 tests PASS).

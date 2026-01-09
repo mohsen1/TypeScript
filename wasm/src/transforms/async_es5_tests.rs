@@ -9814,3 +9814,106 @@ fn test_async_error_pattern_ignores_nested_async() {
     );
     assert!(!result, "Should not detect await inside nested async in error handling");
 }
+
+// ============================================================================
+// ASYNC ITERATION PATTERN TESTS
+// ============================================================================
+
+// Tests for async iteration patterns: for-of with await, async iterables,
+// iterator protocol, for-of with break/continue, nested async iteration.
+
+#[test]
+fn test_async_iteration_pattern_for_of_await_body() {
+    let result = async_for_of_loop_contains_await(
+        "async function foo() { for (const x of items) { await process(x); } }",
+    );
+    assert!(result, "Should detect await in for-of body");
+}
+
+#[test]
+fn test_async_iteration_pattern_for_of_await_expression() {
+    let result = async_for_of_loop_contains_await(
+        "async function foo() { for (const x of await getItems()) { console.log(x); } }",
+    );
+    assert!(result, "Should detect await in for-of iterable expression");
+}
+
+#[test]
+fn test_async_iteration_pattern_for_of_async_generator() {
+    let result = async_for_of_loop_contains_await(
+        "async function foo() { for (const val of items) { await asyncGenerator(val); } }",
+    );
+    assert!(result, "Should detect await with async generator in body");
+}
+
+#[test]
+fn test_async_iteration_pattern_for_of_break() {
+    let result = async_for_of_loop_contains_await(
+        "async function foo() { for (const x of items) { if (x.done) break; await handle(x); } }",
+    );
+    assert!(result, "Should detect await in for-of with break");
+}
+
+#[test]
+fn test_async_iteration_pattern_for_of_continue() {
+    let result = async_for_of_loop_contains_await(
+        "async function foo() { for (const x of items) { if (x.skip) continue; await handle(x); } }",
+    );
+    assert!(result, "Should detect await in for-of with continue");
+}
+
+#[test]
+fn test_async_iteration_pattern_for_of_nested() {
+    let result = async_for_of_loop_contains_await(
+        "async function foo() { for (const outer of items) { for (const inner of outer) { await process(inner); } } }",
+    );
+    assert!(result, "Should detect await in nested for-of loops");
+}
+
+#[test]
+fn test_async_iteration_pattern_for_of_destructure() {
+    let result = async_for_of_loop_contains_await(
+        "async function foo() { for (const { value } of items) { await process(value); } }",
+    );
+    assert!(result, "Should detect await in for-of with destructuring");
+}
+
+#[test]
+fn test_async_iteration_pattern_for_of_array_destructure() {
+    let result = async_for_of_loop_contains_await(
+        "async function foo() { for (const [first, second] of pairs) { await log(first); } }",
+    );
+    assert!(result, "Should detect await in for-of with array destructuring");
+}
+
+#[test]
+fn test_async_iteration_pattern_for_of_try_catch() {
+    let result = async_for_of_loop_contains_await(
+        "async function foo() { try { for (const x of items) { await process(x); } } catch (e) { } }",
+    );
+    assert!(result, "Should detect await in for-of inside try block");
+}
+
+#[test]
+fn test_async_iteration_pattern_for_of_return() {
+    let result = async_for_of_loop_contains_await(
+        "async function foo() { for (const x of items) { if (x.match) return await transform(x); } }",
+    );
+    assert!(result, "Should detect await in for-of with early return");
+}
+
+#[test]
+fn test_async_iteration_pattern_no_await() {
+    let result = async_for_of_loop_contains_await(
+        "async function foo() { for (const x of syncArray) { console.log(x); } }",
+    );
+    assert!(!result, "Should not detect await in regular for-of loop");
+}
+
+#[test]
+fn test_async_iteration_pattern_ignores_nested_async() {
+    let result = async_for_of_loop_contains_await(
+        "async function foo() { for (const x of arr) { const handler = async () => await process(x); } }",
+    );
+    assert!(!result, "Should not detect await inside nested async in iteration");
+}
