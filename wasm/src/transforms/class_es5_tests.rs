@@ -18648,3 +18648,430 @@ class TreeNode<T> {
         output
     );
 }
+
+// ============================================================================
+// AsyncIterator/AsyncIterable pattern tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_async_iterator_basic() {
+    // Basic async iterator with Symbol.asyncIterator
+    let source = r#"
+class AsyncRange {
+    private start: number;
+    private end: number;
+    private delay: number;
+
+    constructor(start: number, end: number, delay: number = 100) {
+        this.start = start;
+        this.end = end;
+        this.delay = delay;
+    }
+
+    async *[Symbol.asyncIterator](): AsyncIterator<number> {
+        for (let i = this.start; i <= this.end; i++) {
+            await this.sleep(this.delay);
+            yield i;
+        }
+    }
+
+    private sleep(ms: number): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function AsyncRange"),
+        "Expected AsyncRange function: {}",
+        output
+    );
+    assert!(
+        output.contains("Symbol.asyncIterator"),
+        "Expected Symbol.asyncIterator: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_for_await_of_pattern() {
+    // Class using for-await-of with async iterables
+    let source = r#"
+class AsyncDataProcessor<T> {
+    private source: AsyncIterable<T>;
+
+    constructor(source: AsyncIterable<T>) {
+        this.source = source;
+    }
+
+    async collectAll(): Promise<T[]> {
+        const result: T[] = [];
+        for await (const item of this.source) {
+            result.push(item);
+        }
+        return result;
+    }
+
+    async processEach(processor: (item: T) => Promise<void>): Promise<void> {
+        for await (const item of this.source) {
+            await processor(item);
+        }
+    }
+
+    async find(predicate: (item: T) => boolean): Promise<T | undefined> {
+        for await (const item of this.source) {
+            if (predicate(item)) {
+                return item;
+            }
+        }
+        return undefined;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function AsyncDataProcessor"),
+        "Expected AsyncDataProcessor function: {}",
+        output
+    );
+    assert!(
+        output.contains("collectAll") && output.contains("processEach"),
+        "Expected async methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_async_generator_iterable() {
+    // Async generator as iterable class
+    let source = r#"
+class AsyncQueue<T> {
+    private items: T[] = [];
+    private resolvers: ((value: T) => void)[] = [];
+
+    enqueue(item: T): void {
+        if (this.resolvers.length > 0) {
+            const resolve = this.resolvers.shift()!;
+            resolve(item);
+        } else {
+            this.items.push(item);
+        }
+    }
+
+    private dequeue(): Promise<T> {
+        if (this.items.length > 0) {
+            return Promise.resolve(this.items.shift()!);
+        }
+        return new Promise(resolve => this.resolvers.push(resolve));
+    }
+
+    async *[Symbol.asyncIterator](): AsyncIterator<T> {
+        while (true) {
+            yield await this.dequeue();
+        }
+    }
+
+    async take(count: number): Promise<T[]> {
+        const result: T[] = [];
+        let i = 0;
+        for await (const item of this) {
+            result.push(item);
+            i++;
+            if (i >= count) break;
+        }
+        return result;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function AsyncQueue"),
+        "Expected AsyncQueue function: {}",
+        output
+    );
+    assert!(
+        output.contains("Symbol.asyncIterator"),
+        "Expected Symbol.asyncIterator: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_async_iterator_protocol() {
+    // Manual async iterator protocol implementation
+    let source = r#"
+class PaginatedFetcher<T> {
+    private baseUrl: string;
+    private pageSize: number;
+
+    constructor(baseUrl: string, pageSize: number = 10) {
+        this.baseUrl = baseUrl;
+        this.pageSize = pageSize;
+    }
+
+    [Symbol.asyncIterator](): AsyncIterator<T[]> {
+        let page = 0;
+        const self = this;
+
+        return {
+            async next(): Promise<IteratorResult<T[]>> {
+                const data = await self.fetchPage(page);
+                if (data.length === 0) {
+                    return { done: true, value: undefined };
+                }
+                page++;
+                return { done: false, value: data };
+            }
+        };
+    }
+
+    private async fetchPage(page: number): Promise<T[]> {
+        const response = await fetch(`${this.baseUrl}?page=${page}&size=${this.pageSize}`);
+        return response.json();
+    }
+
+    async getAllPages(): Promise<T[][]> {
+        const pages: T[][] = [];
+        for await (const page of this) {
+            pages.push(page);
+        }
+        return pages;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function PaginatedFetcher"),
+        "Expected PaginatedFetcher function: {}",
+        output
+    );
+    assert!(
+        output.contains("Symbol.asyncIterator"),
+        "Expected Symbol.asyncIterator: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_async_iterator_in_constructor() {
+    // Async iterator patterns used in constructor and methods
+    let source = r#"
+class AsyncStreamProcessor {
+    private stream: AsyncIterable<string>;
+    private buffer: string[] = [];
+
+    constructor(stream: AsyncIterable<string>) {
+        this.stream = stream;
+    }
+
+    async *[Symbol.asyncIterator](): AsyncIterator<string> {
+        for await (const chunk of this.stream) {
+            yield chunk.toUpperCase();
+        }
+    }
+
+    async bufferAll(): Promise<string[]> {
+        for await (const item of this) {
+            this.buffer.push(item);
+        }
+        return this.buffer;
+    }
+
+    async *filter(predicate: (s: string) => boolean): AsyncIterator<string> {
+        for await (const item of this) {
+            if (predicate(item)) {
+                yield item;
+            }
+        }
+    }
+
+    async *map<U>(fn: (s: string) => U): AsyncIterator<U> {
+        for await (const item of this) {
+            yield fn(item);
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function AsyncStreamProcessor"),
+        "Expected AsyncStreamProcessor function: {}",
+        output
+    );
+    assert!(
+        output.contains("Symbol.asyncIterator"),
+        "Expected Symbol.asyncIterator: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_async_iterator_combined() {
+    // Combined async iterator patterns with multiple generators
+    let source = r#"
+class AsyncEventStream<T> {
+    private listeners: Set<(event: T) => void> = new Set();
+    private queue: T[] = [];
+    private waiters: ((event: T) => void)[] = [];
+
+    emit(event: T): void {
+        for (const listener of this.listeners) {
+            listener(event);
+        }
+        if (this.waiters.length > 0) {
+            const waiter = this.waiters.shift()!;
+            waiter(event);
+        } else {
+            this.queue.push(event);
+        }
+    }
+
+    private nextEvent(): Promise<T> {
+        if (this.queue.length > 0) {
+            return Promise.resolve(this.queue.shift()!);
+        }
+        return new Promise(resolve => this.waiters.push(resolve));
+    }
+
+    async *[Symbol.asyncIterator](): AsyncIterator<T> {
+        while (true) {
+            yield await this.nextEvent();
+        }
+    }
+
+    async *takeUntil(predicate: (event: T) => boolean): AsyncIterator<T> {
+        for await (const event of this) {
+            yield event;
+            if (predicate(event)) {
+                break;
+            }
+        }
+    }
+
+    async *debounce(ms: number): AsyncIterator<T> {
+        let lastEvent: T | undefined;
+        let timeout: any;
+
+        for await (const event of this) {
+            lastEvent = event;
+            clearTimeout(timeout);
+            await new Promise<void>(resolve => {
+                timeout = setTimeout(resolve, ms);
+            });
+            if (lastEvent === event) {
+                yield event;
+            }
+        }
+    }
+
+    static create<U>(): AsyncEventStream<U> {
+        return new AsyncEventStream<U>();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function AsyncEventStream"),
+        "Expected AsyncEventStream function: {}",
+        output
+    );
+    assert!(
+        output.contains("Symbol.asyncIterator"),
+        "Expected Symbol.asyncIterator: {}",
+        output
+    );
+    assert!(
+        output.contains("takeUntil") && output.contains("debounce"),
+        "Expected async generator methods: {}",
+        output
+    );
+    assert!(
+        output.contains("create"),
+        "Expected create static method: {}",
+        output
+    );
+}
