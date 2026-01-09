@@ -33071,3 +33071,359 @@ class Color {
         output
     );
 }
+
+// ============================================================================
+// GENERIC CONSTRAINT PATTERN TESTS
+// ============================================================================
+
+/// Test ES5 class downleveling with generic extends constraint patterns
+#[test]
+fn test_class_es5_generic_constraint_extends() {
+    let source = r#"
+interface Entity {
+    id: string;
+    createdAt: Date;
+}
+
+interface Nameable {
+    name: string;
+}
+
+class Repository<T extends Entity> {
+    private items: Map<string, T> = new Map();
+
+    save(item: T): T {
+        this.items.set(item.id, item);
+        return item;
+    }
+
+    findById(id: string): T | undefined {
+        return this.items.get(id);
+    }
+
+    findAll(): T[] {
+        return Array.from(this.items.values());
+    }
+
+    deleteById(id: string): boolean {
+        return this.items.delete(id);
+    }
+}
+
+class NamedRepository<T extends Entity & Nameable> extends Repository<T> {
+    findByName(name: string): T | undefined {
+        for (const item of this.findAll()) {
+            if (item.name === name) return item;
+        }
+        return undefined;
+    }
+
+    findAllByNamePrefix(prefix: string): T[] {
+        return this.findAll().filter(item => item.name.startsWith(prefix));
+    }
+}
+
+class ComparableCollection<T extends { compareTo(other: T): number }> {
+    private items: T[] = [];
+
+    add(item: T): void {
+        this.items.push(item);
+    }
+
+    sort(): T[] {
+        return [...this.items].sort((a, b) => a.compareTo(b));
+    }
+
+    min(): T | undefined {
+        if (this.items.length === 0) return undefined;
+        return this.sort()[0];
+    }
+
+    max(): T | undefined {
+        if (this.items.length === 0) return undefined;
+        const sorted = this.sort();
+        return sorted[sorted.length - 1];
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Repository") && output.contains("NamedRepository") && output.contains("ComparableCollection"),
+        "Expected generic extends constraint classes: {}",
+        output
+    );
+
+    // Repository methods
+    assert!(
+        output.contains("save") && output.contains("findById") && output.contains("findAll"),
+        "Expected Repository methods: {}",
+        output
+    );
+
+    // NamedRepository methods
+    assert!(
+        output.contains("findByName") && output.contains("findAllByNamePrefix"),
+        "Expected NamedRepository methods: {}",
+        output
+    );
+
+    // ComparableCollection methods
+    assert!(
+        output.contains("sort") && output.contains("min") && output.contains("max"),
+        "Expected ComparableCollection methods: {}",
+        output
+    );
+}
+
+/// Test ES5 class downleveling with generic keyof constraint patterns
+#[test]
+fn test_class_es5_generic_constraint_keyof() {
+    let source = r#"
+class PropertyAccessor<T, K extends keyof T> {
+    private obj: T;
+    private key: K;
+
+    constructor(obj: T, key: K) {
+        this.obj = obj;
+        this.key = key;
+    }
+
+    get(): T[K] {
+        return this.obj[this.key];
+    }
+
+    set(value: T[K]): void {
+        this.obj[this.key] = value;
+    }
+}
+
+class ObjectMapper<T extends object> {
+    private source: T;
+
+    constructor(source: T) {
+        this.source = source;
+    }
+
+    pick<K extends keyof T>(...keys: K[]): Pick<T, K> {
+        const result = {} as Pick<T, K>;
+        for (const key of keys) {
+            result[key] = this.source[key];
+        }
+        return result;
+    }
+
+    omit<K extends keyof T>(...keys: K[]): Omit<T, K> {
+        const result = { ...this.source } as any;
+        for (const key of keys) {
+            delete result[key];
+        }
+        return result;
+    }
+
+    getProperty<K extends keyof T>(key: K): T[K] {
+        return this.source[key];
+    }
+}
+
+class FormBuilder<T extends Record<string, any>> {
+    private values: Partial<T> = {};
+    private errors: Partial<Record<keyof T, string>> = {};
+
+    setValue<K extends keyof T>(key: K, value: T[K]): void {
+        this.values[key] = value;
+    }
+
+    getValue<K extends keyof T>(key: K): T[K] | undefined {
+        return this.values[key];
+    }
+
+    setError<K extends keyof T>(key: K, error: string): void {
+        this.errors[key] = error;
+    }
+
+    getError<K extends keyof T>(key: K): string | undefined {
+        return this.errors[key];
+    }
+
+    getValues(): Partial<T> {
+        return { ...this.values };
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("PropertyAccessor") && output.contains("ObjectMapper") && output.contains("FormBuilder"),
+        "Expected generic keyof constraint classes: {}",
+        output
+    );
+
+    // PropertyAccessor methods
+    assert!(
+        output.contains("get") && output.contains("set"),
+        "Expected PropertyAccessor methods: {}",
+        output
+    );
+
+    // ObjectMapper methods
+    assert!(
+        output.contains("pick") && output.contains("omit") && output.contains("getProperty"),
+        "Expected ObjectMapper methods: {}",
+        output
+    );
+
+    // FormBuilder methods
+    assert!(
+        output.contains("setValue") && output.contains("getValue") && output.contains("getValues"),
+        "Expected FormBuilder methods: {}",
+        output
+    );
+}
+
+/// Test ES5 class downleveling with generic conditional type constraint patterns
+#[test]
+fn test_class_es5_generic_constraint_conditional() {
+    let source = r#"
+type IsArray<T> = T extends any[] ? true : false;
+type UnwrapPromise<T> = T extends Promise<infer U> ? U : T;
+type ElementType<T> = T extends (infer E)[] ? E : never;
+
+class TypeChecker<T> {
+    private value: T;
+
+    constructor(value: T) {
+        this.value = value;
+    }
+
+    isArray(): boolean {
+        return Array.isArray(this.value);
+    }
+
+    getValue(): T {
+        return this.value;
+    }
+
+    map<U>(fn: (value: T) => U): TypeChecker<U> {
+        return new TypeChecker(fn(this.value));
+    }
+}
+
+class AsyncHandler<T> {
+    private promise: Promise<T>;
+
+    constructor(promise: Promise<T>) {
+        this.promise = promise;
+    }
+
+    async unwrap(): Promise<T> {
+        return this.promise;
+    }
+
+    map<U>(fn: (value: T) => U): AsyncHandler<U> {
+        return new AsyncHandler(this.promise.then(fn));
+    }
+
+    flatMap<U>(fn: (value: T) => Promise<U>): AsyncHandler<U> {
+        return new AsyncHandler(this.promise.then(fn));
+    }
+}
+
+class ArrayProcessor<T extends any[]> {
+    private array: T;
+
+    constructor(array: T) {
+        this.array = array;
+    }
+
+    first(): T[number] | undefined {
+        return this.array[0];
+    }
+
+    last(): T[number] | undefined {
+        return this.array[this.array.length - 1];
+    }
+
+    map<U>(fn: (item: T[number]) => U): U[] {
+        return this.array.map(fn);
+    }
+
+    filter(predicate: (item: T[number]) => boolean): T[number][] {
+        return this.array.filter(predicate);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("TypeChecker") && output.contains("AsyncHandler") && output.contains("ArrayProcessor"),
+        "Expected generic conditional constraint classes: {}",
+        output
+    );
+
+    // TypeChecker methods
+    assert!(
+        output.contains("isArray") && output.contains("getValue"),
+        "Expected TypeChecker methods: {}",
+        output
+    );
+
+    // AsyncHandler methods
+    assert!(
+        output.contains("unwrap") && output.contains("flatMap"),
+        "Expected AsyncHandler methods: {}",
+        output
+    );
+
+    // ArrayProcessor methods
+    assert!(
+        output.contains("first") && output.contains("last") && output.contains("filter"),
+        "Expected ArrayProcessor methods: {}",
+        output
+    );
+}
