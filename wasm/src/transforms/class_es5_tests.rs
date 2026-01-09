@@ -10173,3 +10173,414 @@ class RevocableAccess<T extends object> {
         output
     );
 }
+
+// ============================================================================
+// WeakRef and FinalizationRegistry Tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_weakref_basic() {
+    // Basic WeakRef usage in class
+    let source = r#"
+class WeakReference<T extends object> {
+    private ref: WeakRef<T>;
+
+    constructor(target: T) {
+        this.ref = new WeakRef(target);
+    }
+
+    get(): T | undefined {
+        return this.ref.deref();
+    }
+
+    isAlive(): boolean {
+        return this.ref.deref() !== undefined;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("WeakReference"),
+        "Expected WeakReference class: {}",
+        output
+    );
+
+    // WeakRef should be present
+    assert!(
+        output.contains("WeakRef"),
+        "Expected WeakRef: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("get") && output.contains("isAlive"),
+        "Expected get and isAlive methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_weakref_with_deref() {
+    // WeakRef with conditional deref usage
+    let source = r#"
+class ObjectTracker<T extends object> {
+    private weakRefs: WeakRef<T>[] = [];
+
+    track(obj: T): void {
+        this.weakRefs.push(new WeakRef(obj));
+    }
+
+    getAlive(): T[] {
+        const alive: T[] = [];
+        for (const ref of this.weakRefs) {
+            const obj = ref.deref();
+            if (obj !== undefined) {
+                alive.push(obj);
+            }
+        }
+        return alive;
+    }
+
+    cleanup(): void {
+        this.weakRefs = this.weakRefs.filter(ref => ref.deref() !== undefined);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("ObjectTracker"),
+        "Expected ObjectTracker class: {}",
+        output
+    );
+
+    // WeakRef should be present
+    assert!(
+        output.contains("WeakRef"),
+        "Expected WeakRef: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("track") && output.contains("getAlive") && output.contains("cleanup"),
+        "Expected track, getAlive, cleanup methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_finalization_registry_basic() {
+    // Basic FinalizationRegistry usage
+    let source = r#"
+class ResourceManager {
+    private registry: FinalizationRegistry<string>;
+    private resources: Map<string, object> = new Map();
+
+    constructor() {
+        this.registry = new FinalizationRegistry((id: string) => {
+            console.log("Resource cleaned up:", id);
+            this.resources.delete(id);
+        });
+    }
+
+    register(id: string, resource: object): void {
+        this.resources.set(id, resource);
+        this.registry.register(resource, id);
+    }
+
+    getCount(): number {
+        return this.resources.size;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("ResourceManager"),
+        "Expected ResourceManager class: {}",
+        output
+    );
+
+    // FinalizationRegistry should be present
+    assert!(
+        output.contains("FinalizationRegistry"),
+        "Expected FinalizationRegistry: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("register") && output.contains("getCount"),
+        "Expected register and getCount methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_finalization_registry_with_unregister() {
+    // FinalizationRegistry with unregister token
+    let source = r#"
+class ManagedResource {
+    private registry: FinalizationRegistry<string>;
+    private tokens: Map<string, object> = new Map();
+
+    constructor() {
+        this.registry = new FinalizationRegistry((heldValue: string) => {
+            console.log("Releasing:", heldValue);
+        });
+    }
+
+    acquire(id: string, resource: object): object {
+        const token = { id };
+        this.tokens.set(id, token);
+        this.registry.register(resource, id, token);
+        return resource;
+    }
+
+    release(id: string): boolean {
+        const token = this.tokens.get(id);
+        if (token) {
+            this.registry.unregister(token);
+            this.tokens.delete(id);
+            return true;
+        }
+        return false;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("ManagedResource"),
+        "Expected ManagedResource class: {}",
+        output
+    );
+
+    // FinalizationRegistry should be present
+    assert!(
+        output.contains("FinalizationRegistry"),
+        "Expected FinalizationRegistry: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("acquire") && output.contains("release"),
+        "Expected acquire and release methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_weakref_cache_pattern() {
+    // WeakRef-based cache pattern
+    let source = r#"
+class WeakCache<K extends object, V> {
+    private cache: Map<K, WeakRef<V & object>> = new Map();
+
+    set(key: K, value: V & object): void {
+        this.cache.set(key, new WeakRef(value));
+    }
+
+    get(key: K): V | undefined {
+        const ref = this.cache.get(key);
+        if (ref) {
+            const value = ref.deref();
+            if (value === undefined) {
+                this.cache.delete(key);
+            }
+            return value;
+        }
+        return undefined;
+    }
+
+    has(key: K): boolean {
+        const ref = this.cache.get(key);
+        if (ref && ref.deref() !== undefined) {
+            return true;
+        }
+        this.cache.delete(key);
+        return false;
+    }
+
+    clear(): void {
+        this.cache.clear();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("WeakCache"),
+        "Expected WeakCache class: {}",
+        output
+    );
+
+    // WeakRef should be present
+    assert!(
+        output.contains("WeakRef"),
+        "Expected WeakRef: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("set") && output.contains("has") && output.contains("clear"),
+        "Expected set, has, clear methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_weakref_finalization_combined() {
+    // Combined WeakRef and FinalizationRegistry pattern
+    let source = r#"
+class SubscriptionManager<T extends object> {
+    private subscriptions: Map<string, WeakRef<T>> = new Map();
+    private registry: FinalizationRegistry<string>;
+
+    constructor() {
+        this.registry = new FinalizationRegistry((id: string) => {
+            this.subscriptions.delete(id);
+            console.log("Subscription auto-removed:", id);
+        });
+    }
+
+    subscribe(id: string, subscriber: T): void {
+        this.subscriptions.set(id, new WeakRef(subscriber));
+        this.registry.register(subscriber, id);
+    }
+
+    notify(message: string): void {
+        for (const [id, ref] of this.subscriptions) {
+            const subscriber = ref.deref();
+            if (subscriber) {
+                console.log("Notifying", id, ":", message);
+            }
+        }
+    }
+
+    unsubscribe(id: string): boolean {
+        return this.subscriptions.delete(id);
+    }
+
+    getActiveCount(): number {
+        let count = 0;
+        for (const ref of this.subscriptions.values()) {
+            if (ref.deref() !== undefined) {
+                count++;
+            }
+        }
+        return count;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("SubscriptionManager"),
+        "Expected SubscriptionManager class: {}",
+        output
+    );
+
+    // Both WeakRef and FinalizationRegistry should be present
+    assert!(
+        output.contains("WeakRef") && output.contains("FinalizationRegistry"),
+        "Expected WeakRef and FinalizationRegistry: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("subscribe") && output.contains("notify") && output.contains("unsubscribe"),
+        "Expected subscribe, notify, unsubscribe methods: {}",
+        output
+    );
+}
