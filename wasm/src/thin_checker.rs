@@ -6230,6 +6230,18 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Get type parameters for a symbol (for generic type aliases and interfaces).
     fn get_type_params_for_symbol(&mut self, sym_id: SymbolId) -> Vec<crate::solver::TypeParamInfo> {
+        if let Some(symbol_arena) = self.ctx.binder.symbol_arenas.get(&sym_id) {
+            if !std::ptr::eq(symbol_arena.as_ref(), self.ctx.arena) {
+                let mut checker = ThinCheckerState::new(
+                    symbol_arena.as_ref(),
+                    self.ctx.binder,
+                    self.ctx.types,
+                    self.ctx.file_name.clone(),
+                );
+                return checker.get_type_params_for_symbol(sym_id);
+            }
+        }
+
         let Some(symbol) = self.ctx.binder.get_symbol(sym_id) else {
             return Vec::new();
         };
