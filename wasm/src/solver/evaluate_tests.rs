@@ -41366,3 +41366,5 @@ fn test_keyof_nested_keyof() {
 
     // String literal unions extend string, so keyof should give string apparent members
     assert!(keyof_keyof != TypeId::ERROR);
+fn test_distributive_exclude_utility_stress() {
+fn test_distributive_extract_utility_stress() {
