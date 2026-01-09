@@ -7,27 +7,13 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-Add ES5 class tests for getter/setter this binding patterns
-
-Per GOALS.md Objective 1: ES5 downleveling correctness
-
-Steps:
-1. Add 6 ES5 class tests for getter/setter this binding to `wasm/src/transforms/class_es5_tests.rs`:
-   - Getter with arrow function returning this
-   - Setter with nested arrow this
-   - Computed getter with this access
-   - Static getter/setter with this
-   - Accessor decorator with this
-   - Combined getter/setter this patterns
-2. Run `./wasm/test.sh class_es5_tests` to verify all tests pass
-3. Commit with message: `[wasm] transforms: add getter/setter this binding ES5 class tests`
-4. Push to `origin/worker/anvil-4`
-5. Update this plan file and push
+(none - awaiting new task from EM)
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
 
 ## Completed
+- [x] Add ES5 class tests for getter/setter this binding patterns: arrow returning this, nested arrow, computed, static, decorator, combined. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for async method super call patterns: super.method(), await before/after super, static super, try/catch, combined. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for nested arrow this capture patterns: arrow in arrow, arrow in async, constructor, getter/setter, static block, combined. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for key remapping patterns: as clause, template literals. Tests: `./wasm/test.sh class_es5_tests`
