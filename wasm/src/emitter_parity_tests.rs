@@ -6301,3 +6301,177 @@ class Container {
         output
     );
 }
+
+/// Parity test for ES5 async generator with try/catch.
+/// Async generator with error handling should be lowered properly.
+#[test]
+fn test_parity_es5_async_generator_try_catch() {
+    let source = r#"async function* safeFetch(urls: string[]): AsyncGenerator<string> {
+    for (const url of urls) {
+        try {
+            yield await fetch(url);
+        } catch (e: unknown) {
+            yield "error";
+        }
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify function exists
+    assert!(
+        output.contains("safeFetch"),
+        "Output should define safeFetch function: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string[]") && !output.contains("AsyncGenerator<") && !output.contains(": unknown"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 static async generator method.
+/// Static async generator methods should be lowered properly.
+#[test]
+fn test_parity_es5_async_generator_static() {
+    let source = r#"class StreamFactory {
+    static async *createStream(): AsyncGenerator<number> {
+        yield 1;
+        yield 2;
+        yield 3;
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify class exists
+    assert!(
+        output.contains("StreamFactory"),
+        "Output should define StreamFactory class: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains("AsyncGenerator<number>"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 async generator with multiple yields.
+/// Async generator with multiple sequential yields should be lowered properly.
+#[test]
+fn test_parity_es5_async_generator_multi_yield() {
+    let source = r#"async function* countdown(start: number): AsyncGenerator<number> {
+    yield start;
+    yield start - 1;
+    yield start - 2;
+    yield 0;
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify function exists
+    assert!(
+        output.contains("countdown"),
+        "Output should define countdown function: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number") && !output.contains("AsyncGenerator<"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 async generator with yield delegation.
+/// Async generator using yield* should be lowered properly.
+#[test]
+fn test_parity_es5_async_generator_yield_star() {
+    let source = r#"async function* concat(a: AsyncGenerator<number>, b: AsyncGenerator<number>): AsyncGenerator<number> {
+    yield* a;
+    yield* b;
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify function exists
+    assert!(
+        output.contains("concat"),
+        "Output should define concat function: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains("AsyncGenerator<number>"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
