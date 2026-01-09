@@ -1,33 +1,39 @@
 #!/usr/bin/env node
 /**
- * ask-gemini.js
+ * ask-gemini.mjs
  *
  * Uses yek to serialize codebase content and sends it to Gemini 3 Pro
  * with 1 million token context for answering complex codebase questions.
  *
  * Usage:
- *   ./scripts/ask-gemini.js "How does the type checker work?"
- *   ./scripts/ask-gemini.js --tokens=500k "Explain the binder logic"
- *   ./scripts/ask-gemini.js --dirs="src/compiler/" "What is the emit algorithm?"
- *   ./scripts/ask-gemini.js --review wasm/src/emitter.rs  # Code review mode
+ *   ./scripts/ask-gemini.mjs "How does the type checker work?"
+ *   ./scripts/ask-gemini.mjs --tokens=500k "Explain the binder logic"
+ *   ./scripts/ask-gemini.mjs --dirs="src/compiler/" "What is the emit algorithm?"
+ *   ./scripts/ask-gemini.mjs --review wasm/src/emitter.rs  # Code review mode
  *
  * Environment:
- *   GEMINI_API_KEY - Required. Fetched from .env.local or environment.
+ *   GOOGLE_API_KEY - Required. Fetched from .env.local or environment.
  */
 
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import readline from "node:readline";
+import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
+import { Command } from "commander";
+import chalk from "chalk";
+import dotenv from "dotenv";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const REPO_ROOT = path.resolve(__dirname, "..");
 
+// Load environment variables
+dotenv.config({ path: path.join(REPO_ROOT, ".env.local") });
+
 // Gemini 3 Pro Preview configuration
-const GEMINI_MODEL = "gemini-3-pro-preview";
-const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models";
+const DEFAULT_MODEL = "gemini-3-pro-preview";
+const API_URL = "https://aiplatform.googleapis.com/v1/publishers/google/models";
 
 // Default configuration - only wasm directory (Rust migration focus)
 // Using 800k to stay safely under Gemini's 1M token limit (yek uses OpenAI tokenizer)
@@ -236,36 +242,39 @@ function loadEnvFile(filePath) {
 }
 
 function getApiKey() {
-  // Check environment first (both GEMINI_API_KEY and GOOGLE_API_KEY)
-  if (process.env.GEMINI_API_KEY) {
-    return process.env.GEMINI_API_KEY;
+  // Check environment first (Vertex AI Express API key)
+  if (process.env.GCP_VERTEX_EXPRESS_API_KEY) {
+    return process.env.GCP_VERTEX_EXPRESS_API_KEY;
   }
   if (process.env.GOOGLE_API_KEY) {
     return process.env.GOOGLE_API_KEY;
   }
-
-  // Load from .dev.vars (Wrangler local secrets)
-  const devVars = loadEnvFile(path.join(REPO_ROOT, ".dev.vars"));
-  if (devVars.GOOGLE_API_KEY) {
-    return devVars.GOOGLE_API_KEY;
+  if (process.env.GEMINI_API_KEY) {
+    return process.env.GEMINI_API_KEY;
   }
 
   // Load from .env.local
   const envLocal = loadEnvFile(path.join(REPO_ROOT, ".env.local"));
-  if (envLocal.GEMINI_API_KEY) {
-    return envLocal.GEMINI_API_KEY;
+  if (envLocal.GCP_VERTEX_EXPRESS_API_KEY) {
+    return envLocal.GCP_VERTEX_EXPRESS_API_KEY;
   }
   if (envLocal.GOOGLE_API_KEY) {
     return envLocal.GOOGLE_API_KEY;
   }
+  if (envLocal.GEMINI_API_KEY) {
+    return envLocal.GEMINI_API_KEY;
+  }
 
   // Try .env as fallback
   const envFile = loadEnvFile(path.join(REPO_ROOT, ".env"));
-  if (envFile.GEMINI_API_KEY) {
-    return envFile.GEMINI_API_KEY;
+  if (envFile.GCP_VERTEX_EXPRESS_API_KEY) {
+    return envFile.GCP_VERTEX_EXPRESS_API_KEY;
   }
   if (envFile.GOOGLE_API_KEY) {
     return envFile.GOOGLE_API_KEY;
+  }
+  if (envFile.GEMINI_API_KEY) {
+    return envFile.GEMINI_API_KEY;
   }
 
   return null;
@@ -347,7 +356,8 @@ ${colors.cyan}CODE REVIEW MODE:${colors.reset}
   - Cross-references against TypeScript implementation for correctness
 
 ${colors.cyan}ENVIRONMENT:${colors.reset}
-  GOOGLE_API_KEY      API key (loaded from .env.local or environment)
+  GCP_VERTEX_EXPRESS_API_KEY  API key from Vertex AI Express Mode
+  GOOGLE_API_KEY              Fallback API key (loaded from .env.local or environment)
 `);
 }
 
@@ -381,7 +391,7 @@ function runYek(tokens, dirs) {
 }
 
 async function askGeminiStream(apiKey, codebaseContext, question, systemPrompt = null) {
-  const url = `${GEMINI_API_URL}/${GEMINI_MODEL}:streamGenerateContent?alt=sse`;
+  const url = `${API_URL}/${DEFAULT_MODEL}:streamGenerateContent?key=${apiKey}&alt=sse`;
 
   // Read architecture doc dynamically
   const architectureDoc = fs.readFileSync(path.join(REPO_ROOT, "wasm/specs/WASM_ARCHITECTURE.md"), "utf8");
@@ -433,13 +443,22 @@ ${question}
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-goog-api-key": apiKey,
     },
     body: JSON.stringify(requestBody),
   });
 
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`API error (${response.status}): ${errorText}`);
+  }
+
+  if (!response.body) {
+    throw new Error("No response body from API");
+  }
+
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
+  let buffer = "";
   let fullResponse = "";
 
   process.stdout.write(`\n${colors.green}${colors.bright}Answer:${colors.reset}\n\n`);
@@ -448,24 +467,26 @@ ${question}
     const { done, value } = await reader.read();
     if (done) break;
 
-    const chunk = decoder.decode(value, { stream: true });
-    const lines = chunk.split("\n");
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
 
     for (const line of lines) {
-      if (line.startsWith("data: ")) {
-        const jsonStr = line.slice(6);
-        if (jsonStr.trim() === "[DONE]") continue;
+      const trimmed = line.trim();
+      if (!trimmed || trimmed === "[DONE]") continue;
 
-        try {
-          const data = JSON.parse(jsonStr);
-          const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (text) {
-            process.stdout.write(text);
-            fullResponse += text;
-          }
-        } catch {
-          // Skip malformed JSON chunks
+      const jsonStr = trimmed.startsWith("data: ") ? trimmed.slice(6) : trimmed;
+      if (jsonStr === "[DONE]") continue;
+
+      try {
+        const data = JSON.parse(jsonStr);
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) {
+          process.stdout.write(text);
+          fullResponse += text;
         }
+      } catch {
+        // Skip malformed JSON chunks
       }
     }
   }
@@ -475,7 +496,7 @@ ${question}
 }
 
 async function askGemini(apiKey, codebaseContext, question, systemPrompt = null) {
-  const url = `${GEMINI_API_URL}/${GEMINI_MODEL}:generateContent`;
+  const url = `${API_URL}/${DEFAULT_MODEL}:generateContent?key=${apiKey}`;
 
   // Read architecture doc dynamically
   const architectureDoc = fs.readFileSync(path.join(REPO_ROOT, "wasm/specs/WASM_ARCHITECTURE.md"), "utf8");
@@ -680,8 +701,8 @@ async function main() {
   // Check for API key
   const apiKey = getApiKey();
   if (!apiKey) {
-    log("\nError: GOOGLE_API_KEY not found.", colors.red);
-    log("Set GOOGLE_API_KEY in .env.local or as environment variable", colors.yellow);
+    log("\nError: GCP_VERTEX_EXPRESS_API_KEY not found.", colors.red);
+    log("Set GCP_VERTEX_EXPRESS_API_KEY in .env.local or as environment variable", colors.yellow);
     process.exit(1);
   }
 
