@@ -970,6 +970,363 @@ fn test_parity_es5_method_shorthand() {
     );
 }
 
+#[test]
+fn test_parity_es5_shorthand_method_definitions() {
+    let source = r#"
+interface Calculator {
+    add(a: number, b: number): number;
+    subtract(a: number, b: number): number;
+}
+
+const calc: Calculator = {
+    add(a: number, b: number): number {
+        return a + b;
+    },
+    subtract(a: number, b: number): number {
+        return a - b;
+    },
+    multiply(x: number, y: number) {
+        return x * y;
+    }
+};
+
+class MathOps {
+    static create(): Calculator {
+        return {
+            add(a, b) { return a + b; },
+            subtract(a, b) { return a - b; }
+        };
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Methods should be expanded to function expressions
+    assert!(
+        output.contains("add: function") || output.contains("add:function"),
+        "Method shorthand should be expanded: {}",
+        output
+    );
+    assert!(
+        output.contains("subtract: function") || output.contains("subtract:function"),
+        "Method shorthand should be expanded: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number"),
+        "Type annotations should be erased: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("MathOps"),
+        "Class should be present: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_shorthand_method_computed() {
+    let source = r#"
+const methodName = "process";
+const prefix = "handle";
+
+type Handler = {
+    [key: string]: () => void;
+};
+
+const handlers: Handler = {
+    [methodName]() {
+        console.log("processing");
+    },
+    [`${prefix}Click`]() {
+        console.log("clicked");
+    },
+    [prefix + "Submit"]() {
+        console.log("submitted");
+    }
+};
+
+class DynamicMethods {
+    static readonly ACTION = "execute";
+
+    [DynamicMethods.ACTION](): void {
+        console.log("executing");
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain method name and prefix variables
+    assert!(
+        output.contains("methodName") && output.contains("prefix"),
+        "Output should contain methodName and prefix: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("DynamicMethods"),
+        "Class should be present: {}",
+        output
+    );
+    // Type alias should be erased
+    assert!(
+        !output.contains("type Handler"),
+        "Type alias should be erased: {}",
+        output
+    );
+    // readonly should be erased
+    assert!(
+        !output.contains("readonly"),
+        "readonly should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_shorthand_method_async() {
+    let source = r#"
+interface AsyncService {
+    fetch(): Promise<string>;
+    save(data: string): Promise<void>;
+}
+
+const service: AsyncService = {
+    async fetch(): Promise<string> {
+        return "data";
+    },
+    async save(data: string): Promise<void> {
+        console.log(data);
+    }
+};
+
+const api = {
+    async getData<T>(id: number): Promise<T | null> {
+        return null;
+    },
+    async postData(payload: object) {
+        return { success: true };
+    }
+};
+
+class AsyncHandler {
+    async process(): Promise<void> {
+        await this.validate();
+    }
+
+    private async validate(): Promise<boolean> {
+        return true;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Async should be transformed (no async keyword in ES5)
+    assert!(
+        !output.contains("async fetch") && !output.contains("async save"),
+        "async keyword should be transformed: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Promise type annotations should be erased
+    assert!(
+        !output.contains("Promise<"),
+        "Promise type should be erased: {}",
+        output
+    );
+    // Generic type should be erased
+    assert!(
+        !output.contains("<T>"),
+        "Generic type should be erased: {}",
+        output
+    );
+    // private keyword should be erased
+    assert!(
+        !output.contains("private"),
+        "private keyword should be erased: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("AsyncHandler"),
+        "Class should be present: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_shorthand_method_generator() {
+    let source = r#"
+interface Iterable<T> {
+    values(): Generator<T>;
+}
+
+const collection = {
+    items: [1, 2, 3] as number[],
+    *values(): Generator<number> {
+        for (const item of this.items) {
+            yield item;
+        }
+    },
+    *[Symbol.iterator]() {
+        yield* this.items;
+    }
+};
+
+const multi = {
+    *range(start: number, end: number): Generator<number> {
+        for (let i = start; i <= end; i++) {
+            yield i;
+        }
+    },
+    *infinite() {
+        let i = 0;
+        while (true) {
+            yield i++;
+        }
+    }
+};
+
+class GeneratorContainer<T> {
+    private data: T[] = [];
+
+    *iterate(): Generator<T> {
+        for (const item of this.data) {
+            yield item;
+        }
+    }
+
+    static *countdown(from: number): Generator<number> {
+        while (from >= 0) {
+            yield from--;
+        }
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Generator type should be erased
+    assert!(
+        !output.contains("Generator<"),
+        "Generator type should be erased: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface Iterable"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Generic class parameter should be erased
+    assert!(
+        !output.contains("GeneratorContainer<T>"),
+        "Generic parameter should be erased: {}",
+        output
+    );
+    // private keyword should be erased
+    assert!(
+        !output.contains("private"),
+        "private keyword should be erased: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number[]") && !output.contains(": T[]"),
+        "Type annotations should be erased: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("GeneratorContainer"),
+        "Class should be present: {}",
+        output
+    );
+}
+
 /// Parity test for ES5 default parameters.
 /// Default parameters should be downleveled to undefined checks.
 #[test]
