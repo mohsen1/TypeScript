@@ -7,12 +7,13 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] Add ES5 method decorator parity tests in `wasm/src/emitter_parity_tests.rs`. Run `./wasm/test.sh emitter_parity`.
+- [ ] (empty)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 method decorator parity tests (multiple, factory, static, async) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (120 tests).
 - [x] Added ES5 class decorator parity tests (multiple, factory, generic, extends) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (116 tests).
 - [x] Added ES5 private class method parity tests (multi params, static, async, chain) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (112 tests).
 - [x] Added ES5 class static block parity tests (this ref, multiple, typed var, function call) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (108 tests).
