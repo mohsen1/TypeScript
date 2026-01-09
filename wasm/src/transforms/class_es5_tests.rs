@@ -13157,3 +13157,404 @@ class DataStream<T> {
         output
     );
 }
+
+// ============================================================================
+// Object.entries/Object.values pattern tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_object_entries_basic() {
+    // Basic Object.entries usage
+    let source = r#"
+class ConfigParser {
+    private config: Record<string, string> = {};
+
+    parse(input: Record<string, string>): void {
+        for (const [key, value] of Object.entries(input)) {
+            this.config[key] = value;
+        }
+    }
+
+    getEntries(): [string, string][] {
+        return Object.entries(this.config);
+    }
+
+    getKeys(): string[] {
+        return Object.entries(this.config).map(([key]) => key);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("ConfigParser"),
+        "Expected ConfigParser class: {}",
+        output
+    );
+
+    // Object.entries should be present
+    assert!(
+        output.contains("Object.entries"),
+        "Expected Object.entries: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("parse") && output.contains("getEntries"),
+        "Expected parse, getEntries methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_object_values_basic() {
+    // Basic Object.values usage
+    let source = r#"
+class DataAggregator {
+    private data: Record<string, number> = {};
+
+    add(key: string, value: number): void {
+        this.data[key] = value;
+    }
+
+    getValues(): number[] {
+        return Object.values(this.data);
+    }
+
+    getSum(): number {
+        return Object.values(this.data).reduce((acc, val) => acc + val, 0);
+    }
+
+    getMax(): number {
+        const values = Object.values(this.data);
+        return values.length > 0 ? Math.max(...values) : 0;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("DataAggregator"),
+        "Expected DataAggregator class: {}",
+        output
+    );
+
+    // Object.values should be present
+    assert!(
+        output.contains("Object.values"),
+        "Expected Object.values: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("getValues") && output.contains("getSum"),
+        "Expected getValues, getSum methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_object_entries_with_type() {
+    // Object.entries with typed object
+    let source = r#"
+interface User {
+    name: string;
+    age: number;
+    email: string;
+}
+
+class UserSerializer {
+    serialize(user: User): string {
+        return Object.entries(user)
+            .map(([key, value]) => `${key}=${value}`)
+            .join('&');
+    }
+
+    toMap(user: User): Map<string, string | number> {
+        const map = new Map<string, string | number>();
+        for (const [key, value] of Object.entries(user)) {
+            map.set(key, value);
+        }
+        return map;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("UserSerializer"),
+        "Expected UserSerializer class: {}",
+        output
+    );
+
+    // Object.entries should be present
+    assert!(
+        output.contains("Object.entries"),
+        "Expected Object.entries: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("serialize") && output.contains("toMap"),
+        "Expected serialize, toMap methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_object_entries_values_static() {
+    // Object.entries/values in static methods
+    let source = r#"
+class ObjectUtils {
+    static countValues<T>(obj: Record<string, T>): number {
+        return Object.values(obj).length;
+    }
+
+    static filterEntries<T>(
+        obj: Record<string, T>,
+        predicate: (key: string, value: T) => boolean
+    ): Record<string, T> {
+        const result: Record<string, T> = {};
+        for (const [key, value] of Object.entries(obj)) {
+            if (predicate(key, value)) {
+                result[key] = value;
+            }
+        }
+        return result;
+    }
+
+    static mapValues<T, U>(
+        obj: Record<string, T>,
+        mapper: (value: T) => U
+    ): Record<string, U> {
+        const result: Record<string, U> = {};
+        for (const [key, value] of Object.entries(obj)) {
+            result[key] = mapper(value);
+        }
+        return result;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("ObjectUtils"),
+        "Expected ObjectUtils class: {}",
+        output
+    );
+
+    // Object.entries and Object.values should be present
+    assert!(
+        output.contains("Object.entries") && output.contains("Object.values"),
+        "Expected Object.entries and Object.values: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("countValues") && output.contains("filterEntries"),
+        "Expected countValues, filterEntries methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_object_entries_in_constructor() {
+    // Object.entries used in constructor
+    let source = r#"
+class EnvironmentConfig {
+    private envVars: Map<string, string> = new Map();
+
+    constructor(env: Record<string, string>) {
+        for (const [key, value] of Object.entries(env)) {
+            if (key.startsWith('APP_')) {
+                this.envVars.set(key, value);
+            }
+        }
+    }
+
+    get(key: string): string | undefined {
+        return this.envVars.get(key);
+    }
+
+    getAll(): Record<string, string> {
+        const result: Record<string, string> = {};
+        this.envVars.forEach((value, key) => {
+            result[key] = value;
+        });
+        return result;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("EnvironmentConfig"),
+        "Expected EnvironmentConfig class: {}",
+        output
+    );
+
+    // Object.entries should be present
+    assert!(
+        output.contains("Object.entries"),
+        "Expected Object.entries: {}",
+        output
+    );
+
+    // Constructor should be present
+    assert!(
+        output.contains("function EnvironmentConfig"),
+        "Expected EnvironmentConfig constructor: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_object_entries_values_combined() {
+    // Combined Object.entries and Object.values usage
+    let source = r#"
+class FormValidator {
+    private rules: Record<string, (value: string) => boolean> = {};
+    private errors: Record<string, string> = {};
+
+    addRule(field: string, validator: (value: string) => boolean): void {
+        this.rules[field] = validator;
+    }
+
+    validate(data: Record<string, string>): boolean {
+        this.errors = {};
+        let isValid = true;
+
+        for (const [field, validator] of Object.entries(this.rules)) {
+            const value = data[field] || '';
+            if (!validator(value)) {
+                this.errors[field] = `Invalid ${field}`;
+                isValid = false;
+            }
+        }
+
+        return isValid;
+    }
+
+    getErrors(): string[] {
+        return Object.values(this.errors);
+    }
+
+    hasErrors(): boolean {
+        return Object.values(this.errors).length > 0;
+    }
+
+    getErrorCount(): number {
+        return Object.entries(this.errors).length;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("FormValidator"),
+        "Expected FormValidator class: {}",
+        output
+    );
+
+    // Object.entries and Object.values should be present
+    assert!(
+        output.contains("Object.entries") && output.contains("Object.values"),
+        "Expected Object.entries and Object.values: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("validate") && output.contains("getErrors") && output.contains("hasErrors"),
+        "Expected validate, getErrors, hasErrors methods: {}",
+        output
+    );
+}
