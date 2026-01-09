@@ -25390,3 +25390,744 @@ fn test_never_filtering_nonnullable() {
     // Result should be string
     assert!(result != TypeId::ERROR);
 }
+
+// ============================================================================
+// Awaited Utility Type Tests
+// ============================================================================
+// Awaited<T> recursively unwraps Promise-like types.
+// Using simplified Promise pattern: { then: (onfulfilled: (value: T) => any) => any }
+
+#[test]
+fn test_awaited_basic_promise() {
+    // Awaited<Promise<string>> = string
+    let interner = TypeInterner::new();
+
+    let then_name = interner.intern_string("then");
+
+    // Promise<string> simplified as { then: string }
+    let promise_string = interner.object(vec![PropertyInfo {
+        name: then_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    // Using infer pattern: T extends { then: infer U } ? U : T
+    let infer_name = interner.intern_string("U");
+    let infer_u = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let pattern = interner.object(vec![PropertyInfo {
+        name: then_name,
+        type_id: infer_u,
+        write_type: infer_u,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let cond = ConditionalType {
+        check_type: promise_string,
+        extends_type: pattern,
+        true_type: infer_u,
+        false_type: promise_string,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Should extract string from Promise<string>
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_awaited_promise_number() {
+    // Awaited<Promise<number>> = number
+    let interner = TypeInterner::new();
+
+    let then_name = interner.intern_string("then");
+
+    let promise_number = interner.object(vec![PropertyInfo {
+        name: then_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let infer_name = interner.intern_string("U");
+    let infer_u = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let pattern = interner.object(vec![PropertyInfo {
+        name: then_name,
+        type_id: infer_u,
+        write_type: infer_u,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let cond = ConditionalType {
+        check_type: promise_number,
+        extends_type: pattern,
+        true_type: infer_u,
+        false_type: promise_number,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_awaited_nested_promise() {
+    // Awaited<Promise<Promise<string>>> = string (recursive unwrap)
+    let interner = TypeInterner::new();
+
+    let then_name = interner.intern_string("then");
+
+    // Inner: Promise<string> = { then: string }
+    let inner_promise = interner.object(vec![PropertyInfo {
+        name: then_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    // Outer: Promise<Promise<string>> = { then: Promise<string> }
+    let outer_promise = interner.object(vec![PropertyInfo {
+        name: then_name,
+        type_id: inner_promise,
+        write_type: inner_promise,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    // First unwrap: extracts Promise<string>
+    let infer_name = interner.intern_string("U");
+    let infer_u = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let pattern = interner.object(vec![PropertyInfo {
+        name: then_name,
+        type_id: infer_u,
+        write_type: infer_u,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let cond1 = ConditionalType {
+        check_type: outer_promise,
+        extends_type: pattern,
+        true_type: infer_u,
+        false_type: outer_promise,
+        is_distributive: false,
+    };
+
+    let first_unwrap = evaluate_conditional(&interner, &cond1);
+    // First unwrap gives Promise<string>
+    assert_eq!(first_unwrap, inner_promise);
+
+    // Second unwrap: extracts string
+    let cond2 = ConditionalType {
+        check_type: first_unwrap,
+        extends_type: pattern,
+        true_type: infer_u,
+        false_type: first_unwrap,
+        is_distributive: false,
+    };
+
+    let second_unwrap = evaluate_conditional(&interner, &cond2);
+    assert_eq!(second_unwrap, TypeId::STRING);
+}
+
+#[test]
+fn test_awaited_string_passthrough() {
+    // Awaited<string> = string (non-Promise passes through)
+    let interner = TypeInterner::new();
+
+    let then_name = interner.intern_string("then");
+
+    let infer_name = interner.intern_string("U");
+    let infer_u = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let pattern = interner.object(vec![PropertyInfo {
+        name: then_name,
+        type_id: infer_u,
+        write_type: infer_u,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    // string doesn't have 'then' property, so doesn't match pattern
+    let cond = ConditionalType {
+        check_type: TypeId::STRING,
+        extends_type: pattern,
+        true_type: infer_u,
+        false_type: TypeId::STRING, // Returns string as-is
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // string doesn't extend { then: infer U }, returns false branch
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_awaited_number_passthrough() {
+    // Awaited<number> = number
+    let interner = TypeInterner::new();
+
+    let then_name = interner.intern_string("then");
+
+    let infer_name = interner.intern_string("U");
+    let infer_u = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let pattern = interner.object(vec![PropertyInfo {
+        name: then_name,
+        type_id: infer_u,
+        write_type: infer_u,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let cond = ConditionalType {
+        check_type: TypeId::NUMBER,
+        extends_type: pattern,
+        true_type: infer_u,
+        false_type: TypeId::NUMBER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_awaited_null_undefined_passthrough() {
+    // Awaited<null> = null, Awaited<undefined> = undefined
+    let interner = TypeInterner::new();
+
+    let then_name = interner.intern_string("then");
+
+    let infer_name = interner.intern_string("U");
+    let infer_u = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let pattern = interner.object(vec![PropertyInfo {
+        name: then_name,
+        type_id: infer_u,
+        write_type: infer_u,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    // null passthrough
+    let cond_null = ConditionalType {
+        check_type: TypeId::NULL,
+        extends_type: pattern,
+        true_type: infer_u,
+        false_type: TypeId::NULL,
+        is_distributive: false,
+    };
+    let result_null = evaluate_conditional(&interner, &cond_null);
+    assert_eq!(result_null, TypeId::NULL);
+
+    // undefined passthrough
+    let cond_undef = ConditionalType {
+        check_type: TypeId::UNDEFINED,
+        extends_type: pattern,
+        true_type: infer_u,
+        false_type: TypeId::UNDEFINED,
+        is_distributive: false,
+    };
+    let result_undef = evaluate_conditional(&interner, &cond_undef);
+    assert_eq!(result_undef, TypeId::UNDEFINED);
+}
+
+#[test]
+fn test_awaited_promise_union_distributive() {
+    // Awaited<Promise<string> | Promise<number>> = string | number
+    // With distributive conditional, each member is processed
+    let interner = TypeInterner::new();
+
+    let then_name = interner.intern_string("then");
+
+    let promise_string = interner.object(vec![PropertyInfo {
+        name: then_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let promise_number = interner.object(vec![PropertyInfo {
+        name: then_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let infer_name = interner.intern_string("U");
+    let infer_u = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let pattern = interner.object(vec![PropertyInfo {
+        name: then_name,
+        type_id: infer_u,
+        write_type: infer_u,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    // Process each union member
+    let cond_string = ConditionalType {
+        check_type: promise_string,
+        extends_type: pattern,
+        true_type: infer_u,
+        false_type: promise_string,
+        is_distributive: false,
+    };
+    let result_string = evaluate_conditional(&interner, &cond_string);
+    assert_eq!(result_string, TypeId::STRING);
+
+    let cond_number = ConditionalType {
+        check_type: promise_number,
+        extends_type: pattern,
+        true_type: infer_u,
+        false_type: promise_number,
+        is_distributive: false,
+    };
+    let result_number = evaluate_conditional(&interner, &cond_number);
+    assert_eq!(result_number, TypeId::NUMBER);
+
+    // Combined result would be string | number
+    let awaited_union = interner.union(vec![result_string, result_number]);
+    match interner.lookup(awaited_union) {
+        Some(TypeKey::Union(list_id)) => {
+            let members = interner.type_list(list_id);
+            assert_eq!(members.len(), 2);
+        }
+        _ => panic!("Expected Union type"),
+    }
+}
+
+#[test]
+fn test_awaited_mixed_promise_union() {
+    // Awaited<Promise<string> | number> = string | number
+    let interner = TypeInterner::new();
+
+    let then_name = interner.intern_string("then");
+
+    let promise_string = interner.object(vec![PropertyInfo {
+        name: then_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let infer_name = interner.intern_string("U");
+    let infer_u = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let pattern = interner.object(vec![PropertyInfo {
+        name: then_name,
+        type_id: infer_u,
+        write_type: infer_u,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    // Promise<string> -> string
+    let cond_promise = ConditionalType {
+        check_type: promise_string,
+        extends_type: pattern,
+        true_type: infer_u,
+        false_type: promise_string,
+        is_distributive: false,
+    };
+    let result_promise = evaluate_conditional(&interner, &cond_promise);
+    assert_eq!(result_promise, TypeId::STRING);
+
+    // number -> number (passthrough)
+    let cond_number = ConditionalType {
+        check_type: TypeId::NUMBER,
+        extends_type: pattern,
+        true_type: infer_u,
+        false_type: TypeId::NUMBER,
+        is_distributive: false,
+    };
+    let result_number = evaluate_conditional(&interner, &cond_number);
+    assert_eq!(result_number, TypeId::NUMBER);
+
+    // Combined: string | number
+    let mixed_result = interner.union(vec![result_promise, result_number]);
+    match interner.lookup(mixed_result) {
+        Some(TypeKey::Union(list_id)) => {
+            let members = interner.type_list(list_id);
+            assert_eq!(members.len(), 2);
+        }
+        _ => panic!("Expected Union type"),
+    }
+}
+
+#[test]
+fn test_awaited_promise_void() {
+    // Awaited<Promise<void>> = void
+    let interner = TypeInterner::new();
+
+    let then_name = interner.intern_string("then");
+
+    let promise_void = interner.object(vec![PropertyInfo {
+        name: then_name,
+        type_id: TypeId::VOID,
+        write_type: TypeId::VOID,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let infer_name = interner.intern_string("U");
+    let infer_u = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let pattern = interner.object(vec![PropertyInfo {
+        name: then_name,
+        type_id: infer_u,
+        write_type: infer_u,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let cond = ConditionalType {
+        check_type: promise_void,
+        extends_type: pattern,
+        true_type: infer_u,
+        false_type: promise_void,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, TypeId::VOID);
+}
+
+#[test]
+fn test_awaited_promise_never() {
+    // Awaited<Promise<never>> = never
+    let interner = TypeInterner::new();
+
+    let then_name = interner.intern_string("then");
+
+    let promise_never = interner.object(vec![PropertyInfo {
+        name: then_name,
+        type_id: TypeId::NEVER,
+        write_type: TypeId::NEVER,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let infer_name = interner.intern_string("U");
+    let infer_u = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let pattern = interner.object(vec![PropertyInfo {
+        name: then_name,
+        type_id: infer_u,
+        write_type: infer_u,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let cond = ConditionalType {
+        check_type: promise_never,
+        extends_type: pattern,
+        true_type: infer_u,
+        false_type: promise_never,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_awaited_promise_any() {
+    // Awaited<Promise<any>> = any
+    let interner = TypeInterner::new();
+
+    let then_name = interner.intern_string("then");
+
+    let promise_any = interner.object(vec![PropertyInfo {
+        name: then_name,
+        type_id: TypeId::ANY,
+        write_type: TypeId::ANY,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let infer_name = interner.intern_string("U");
+    let infer_u = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let pattern = interner.object(vec![PropertyInfo {
+        name: then_name,
+        type_id: infer_u,
+        write_type: infer_u,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let cond = ConditionalType {
+        check_type: promise_any,
+        extends_type: pattern,
+        true_type: infer_u,
+        false_type: promise_any,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, TypeId::ANY);
+}
+
+#[test]
+fn test_awaited_promise_object() {
+    // Awaited<Promise<{ value: number }>> = { value: number }
+    let interner = TypeInterner::new();
+
+    let then_name = interner.intern_string("then");
+    let value_name = interner.intern_string("value");
+
+    let inner_obj = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let promise_obj = interner.object(vec![PropertyInfo {
+        name: then_name,
+        type_id: inner_obj,
+        write_type: inner_obj,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let infer_name = interner.intern_string("U");
+    let infer_u = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let pattern = interner.object(vec![PropertyInfo {
+        name: then_name,
+        type_id: infer_u,
+        write_type: infer_u,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let cond = ConditionalType {
+        check_type: promise_obj,
+        extends_type: pattern,
+        true_type: infer_u,
+        false_type: promise_obj,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, inner_obj);
+}
+
+#[test]
+fn test_awaited_promise_array() {
+    // Awaited<Promise<string[]>> = string[]
+    let interner = TypeInterner::new();
+
+    let then_name = interner.intern_string("then");
+    let string_array = interner.array(TypeId::STRING);
+
+    let promise_array = interner.object(vec![PropertyInfo {
+        name: then_name,
+        type_id: string_array,
+        write_type: string_array,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let infer_name = interner.intern_string("U");
+    let infer_u = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let pattern = interner.object(vec![PropertyInfo {
+        name: then_name,
+        type_id: infer_u,
+        write_type: infer_u,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let cond = ConditionalType {
+        check_type: promise_array,
+        extends_type: pattern,
+        true_type: infer_u,
+        false_type: promise_array,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, string_array);
+}
+
+#[test]
+fn test_awaited_triple_nested() {
+    // Awaited<Promise<Promise<Promise<boolean>>>> = boolean
+    let interner = TypeInterner::new();
+
+    let then_name = interner.intern_string("then");
+
+    // Level 1: Promise<boolean>
+    let level1 = interner.object(vec![PropertyInfo {
+        name: then_name,
+        type_id: TypeId::BOOLEAN,
+        write_type: TypeId::BOOLEAN,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    // Level 2: Promise<Promise<boolean>>
+    let level2 = interner.object(vec![PropertyInfo {
+        name: then_name,
+        type_id: level1,
+        write_type: level1,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    // Level 3: Promise<Promise<Promise<boolean>>>
+    let level3 = interner.object(vec![PropertyInfo {
+        name: then_name,
+        type_id: level2,
+        write_type: level2,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let infer_name = interner.intern_string("U");
+    let infer_u = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let pattern = interner.object(vec![PropertyInfo {
+        name: then_name,
+        type_id: infer_u,
+        write_type: infer_u,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    // First unwrap
+    let cond1 = ConditionalType {
+        check_type: level3,
+        extends_type: pattern,
+        true_type: infer_u,
+        false_type: level3,
+        is_distributive: false,
+    };
+    let unwrap1 = evaluate_conditional(&interner, &cond1);
+    assert_eq!(unwrap1, level2);
+
+    // Second unwrap
+    let cond2 = ConditionalType {
+        check_type: unwrap1,
+        extends_type: pattern,
+        true_type: infer_u,
+        false_type: unwrap1,
+        is_distributive: false,
+    };
+    let unwrap2 = evaluate_conditional(&interner, &cond2);
+    assert_eq!(unwrap2, level1);
+
+    // Third unwrap
+    let cond3 = ConditionalType {
+        check_type: unwrap2,
+        extends_type: pattern,
+        true_type: infer_u,
+        false_type: unwrap2,
+        is_distributive: false,
+    };
+    let unwrap3 = evaluate_conditional(&interner, &cond3);
+    assert_eq!(unwrap3, TypeId::BOOLEAN);
+}
