@@ -245,6 +245,16 @@ origin/worker/<squad>-<N>  <- Individual worker branches
 
 ## Communication via Tmux
 
+### Send Message to EM (Recommended)
+Use the send-prompt script - it handles timing automatically:
+```bash
+# To EM-Forge (director window, pane 1)
+.notify/send-prompt.sh zang-org:director.1 "your message"
+
+# To EM-Anvil (director window, pane 2)
+.notify/send-prompt.sh zang-org:director.2 "your message"
+```
+
 ### Check EM Status
 EMs are in the director window (pane 1 = EM-Forge, pane 2 = EM-Anvil):
 ```bash
@@ -255,17 +265,17 @@ tmux capture-pane -p -t zang-org:director.1 -S -100
 tmux capture-pane -p -t zang-org:director.2 -S -100
 ```
 
-### Send Message to EM
+### Manual Send (if script fails)
 ```bash
 # To EM-Forge (director window, pane 1)
 tmux send-keys -t zang-org:director.1 "your message"
 sleep 1
-tmux send-keys -t zang-org:director.1 C-m
+tmux send-keys -t zang-org:director.1 Enter
 
 # To EM-Anvil (director window, pane 2)
 tmux send-keys -t zang-org:director.2 "your message"
 sleep 1
-tmux send-keys -t zang-org:director.2 C-m
+tmux send-keys -t zang-org:director.2 Enter
 ```
 
 ### Cancel EM Operation (if needed)
@@ -282,6 +292,24 @@ Escalate or coordinate when:
 - A critical objective is blocked across squads
 - Project Direction changes significantly
 - Risk identified that affects multiple squads
+- **Both EMs are trying to fix the same build error** (see below)
+
+### Arbiter Role: Prevent Duplicate EM Work
+
+**CRITICAL**: If you notice both EMs working on the same issue (e.g., both fixing build errors):
+1. **Immediately tell one to stop**: Pick the EM who started later or is less suited for the task
+2. **Be decisive**: "STOP - EM-Forge is handling build errors. Focus on your squad's workers instead."
+3. **Assign clear ownership**: "EM-Forge owns shared build fixes. EM-Anvil owns output/transform issues."
+
+Example intervention:
+```bash
+.notify/send-prompt.sh zang-org:director.2 "STOP fixing build errors - EM-Forge is already handling them. Focus on checking your workers and assigning tasks."
+```
+
+Watch for these duplicate-work signals:
+- Both EMs mention the same error message
+- Both EMs editing the same file
+- Both EMs saying "fixing build" at the same time
 
 ## 🔔 Notification System (CRITICAL)
 

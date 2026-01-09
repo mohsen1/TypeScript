@@ -134,16 +134,34 @@ git merge origin/rust --no-edit
 
 **If the build fails:**
 1. **STOP all other work** - don't assign tasks to workers
-2. **Fix the build yourself** - this is YOUR job as EM
-3. **Commit to your EM branch**: `git push origin em/<squad>`
-4. **Notify Director** to merge your fix into rust
-5. **Only then** resume normal worker management
+2. **Check if the other EM is already fixing it** - read the other EM's pane first!
+   ```bash
+   # If you're Forge, check Anvil:
+   tmux capture-pane -p -t zang-org:director.2 -S -50
+   # If you're Anvil, check Forge:
+   tmux capture-pane -p -t zang-org:director.1 -S -50
+   ```
+3. **If the other EM is fixing it**: WAIT. Do not start fixing.
+4. **If no one is fixing it yet**: Fix it yourself
+5. **Commit to your EM branch**: `git push origin em/<squad>`
+6. **Notify Director** to merge your fix into rust
+7. **Only then** resume normal worker management
+
+**CRITICAL: Coordination Rule for Build Failures**
+- Build errors that affect BOTH squads (like shared files in `types/`, `solver/`) should be fixed by ONE EM only
+- Before starting a fix, notify Director: `.notify/notify.sh status "Starting fix for build error in X"`
+- If you see the other EM already working on a build fix, DO NOT duplicate their work
+- Focus on your squad-specific issues (files in your squad's focus area)
 
 **Common blockers you should fix:**
 - Missing method errors (add the stub/implementation)
 - Import errors (fix the import path)
 - Type mismatches from recent changes (update the types)
 - Merge conflicts in squad branch (resolve them)
+
+**Let Director handle:**
+- Cross-squad conflicts in shared files
+- Build errors when both EMs claim to be fixing
 
 ### 1. Check & Unblock Workers (High Priority)
 After build is healthy, check all worker panes for prompts or stalls:
@@ -322,6 +340,17 @@ tmux send-keys -t zang-org:<squad>.<pane> C-m
 
 ## Communication via Tmux
 
+### Send Prompt to Worker (Recommended)
+Use the send-prompt script - it handles the timing requirements automatically:
+```bash
+.notify/send-prompt.sh zang-org:<squad>.<pane> "your directive here"
+```
+
+Example:
+```bash
+.notify/send-prompt.sh zang-org:forge.0 "Your task: implement feature X in solver/infer.rs"
+```
+
 ### Cancel Worker's Current Operation
 If a worker is stuck in a long operation or going down the wrong path, you can cancel it:
 ```bash
@@ -329,7 +358,7 @@ tmux send-keys -t zang-org:<squad>.<pane> Escape
 ```
 This sends Escape to the worker's codex session, which cancels the current generation/operation.
 
-### Send Message to Worker
+### Manual Send (if script fails)
 ```bash
 # Cancel any running generation first (optional, if they seem stuck)
 tmux send-keys -t zang-org:<squad>.<pane> Escape
@@ -338,7 +367,7 @@ sleep 1
 # Then send directive
 tmux send-keys -t zang-org:<squad>.<pane> "your message"
 sleep 1
-tmux send-keys -t zang-org:<squad>.<pane> C-m
+tmux send-keys -t zang-org:<squad>.<pane> Enter
 ```
 
 ### Read Worker Pane
