@@ -9797,28 +9797,25 @@ class Callable {
     );
 }
 
-// =============================================================================
-// Iterator Protocol Tests
-// =============================================================================
+// ============================================================================
+// Proxy Pattern Tests
+// ============================================================================
 
 #[test]
-fn test_class_es5_iterator_protocol_basic() {
-    // Basic iterator implementation with Symbol.iterator
+fn test_class_es5_proxy_basic() {
+    // Basic Proxy usage in class method
     let source = r#"
-class Range {
-    constructor(private start: number, private end: number) {}
+class ProxyWrapper<T extends object> {
+    private target: T;
+    private proxy: T;
 
-    [Symbol.iterator](): Iterator<number> {
-        let current = this.start;
-        const end = this.end;
-        return {
-            next(): IteratorResult<number> {
-                if (current <= end) {
-                    return { value: current++, done: false };
-                }
-                return { value: undefined, done: true };
-            }
-        };
+    constructor(target: T) {
+        this.target = target;
+        this.proxy = new Proxy(target, {});
+    }
+
+    getProxy(): T {
+        return this.proxy;
     }
 }
 "#;
@@ -9837,54 +9834,56 @@ class Range {
 
     let output = printer.get_output().to_string();
 
-    // Class should be present
+    // Class should be emitted
     assert!(
-        output.contains("Range"),
-        "Expected Range class: {}",
+        output.contains("ProxyWrapper"),
+        "Expected ProxyWrapper class: {}",
         output
     );
 
-    // Symbol.iterator should be present
+    // Proxy usage should be present
     assert!(
-        output.contains("Symbol.iterator") || output.contains("iterator"),
-        "Expected iterator symbol: {}",
+        output.contains("Proxy"),
+        "Expected Proxy usage: {}",
         output
     );
 
-    // Iterator pattern should return an object
+    // Method should be present
     assert!(
-        output.contains("return {") || output.contains("return{"),
-        "Expected iterator return pattern: {}",
+        output.contains("getProxy"),
+        "Expected getProxy method: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_iterator_protocol_iterable_class() {
-    // Class implementing Iterable interface
+fn test_class_es5_proxy_handler_traps() {
+    // Proxy with get/set handler traps
     let source = r#"
-class Collection<T> {
-    private items: T[] = [];
+class ObservableObject {
+    private data: Record<string, any> = {};
+    private listeners: Array<(key: string, value: any) => void> = [];
 
-    add(item: T): void {
-        this.items.push(item);
-    }
-
-    [Symbol.iterator](): Iterator<T> {
-        let index = 0;
-        const items = this.items;
-        return {
-            next(): IteratorResult<T> {
-                if (index < items.length) {
-                    return { value: items[index++], done: false };
-                }
-                return { value: undefined, done: true };
+    createProxy(): Record<string, any> {
+        const self = this;
+        return new Proxy(this.data, {
+            get(target, prop: string) {
+                return target[prop];
+            },
+            set(target, prop: string, value) {
+                target[prop] = value;
+                self.notify(prop, value);
+                return true;
             }
-        };
+        });
     }
 
-    size(): number {
-        return this.items.length;
+    notify(key: string, value: any): void {
+        this.listeners.forEach(fn => fn(key, value));
+    }
+
+    subscribe(fn: (key: string, value: any) => void): void {
+        this.listeners.push(fn);
     }
 }
 "#;
@@ -9903,182 +9902,42 @@ class Collection<T> {
 
     let output = printer.get_output().to_string();
 
-    // Class should be present
+    // Class should be emitted
     assert!(
-        output.contains("Collection"),
-        "Expected Collection class: {}",
+        output.contains("ObservableObject"),
+        "Expected ObservableObject class: {}",
+        output
+    );
+
+    // Proxy should be present
+    assert!(
+        output.contains("Proxy"),
+        "Expected Proxy: {}",
         output
     );
 
     // Methods should be present
     assert!(
-        output.contains("add") && output.contains("size"),
-        "Expected add and size methods: {}",
-        output
-    );
-
-    // Iterator pattern should be present
-    assert!(
-        output.contains("Symbol.iterator") || output.contains("iterator"),
-        "Expected iterator pattern: {}",
+        output.contains("createProxy") && output.contains("notify") && output.contains("subscribe"),
+        "Expected createProxy, notify, subscribe methods: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_iterator_protocol_generator_method() {
-    // Generator method as iterator
+fn test_class_es5_proxy_apply_trap() {
+    // Proxy with apply trap for function wrapping
     let source = r#"
-class NumberSequence {
-    constructor(private values: number[]) {}
-
-    *[Symbol.iterator](): Generator<number> {
-        for (const value of this.values) {
-            yield value;
-        }
-    }
-
-    *doubled(): Generator<number> {
-        for (const value of this.values) {
-            yield value * 2;
-        }
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Class should be present
-    assert!(
-        output.contains("NumberSequence"),
-        "Expected NumberSequence class: {}",
-        output
-    );
-
-    // Generator method should be present
-    assert!(
-        output.contains("doubled"),
-        "Expected doubled method: {}",
-        output
-    );
-
-    // Generator helpers or yield patterns should be present
-    assert!(
-        output.contains("__generator") || output.contains("yield") || output.contains("return"),
-        "Expected generator pattern: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_iterator_protocol_async_iterator() {
-    // Async iterator with Symbol.asyncIterator
-    let source = r#"
-class AsyncDataSource {
-    private data: string[] = ["a", "b", "c"];
-
-    async *[Symbol.asyncIterator](): AsyncGenerator<string> {
-        for (const item of this.data) {
-            await Promise.resolve();
-            yield item;
-        }
-    }
-
-    async fetchNext(): Promise<string | undefined> {
-        return this.data.shift();
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Class should be present
-    assert!(
-        output.contains("AsyncDataSource"),
-        "Expected AsyncDataSource class: {}",
-        output
-    );
-
-    // Async iterator symbol should be referenced
-    assert!(
-        output.contains("asyncIterator") || output.contains("Symbol"),
-        "Expected asyncIterator reference: {}",
-        output
-    );
-
-    // Async method should be present
-    assert!(
-        output.contains("fetchNext"),
-        "Expected fetchNext method: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_iterator_protocol_with_inheritance() {
-    // Iterator protocol with inheritance
-    let source = r#"
-abstract class BaseIterator<T> {
-    protected items: T[] = [];
-
-    abstract [Symbol.iterator](): Iterator<T>;
-
-    add(item: T): void {
-        this.items.push(item);
-    }
-}
-
-class ForwardIterator<T> extends BaseIterator<T> {
-    [Symbol.iterator](): Iterator<T> {
-        let index = 0;
-        const items = this.items;
-        return {
-            next(): IteratorResult<T> {
-                if (index < items.length) {
-                    return { value: items[index++], done: false };
-                }
-                return { value: undefined, done: true };
+class FunctionWrapper {
+    wrap<T extends (...args: any[]) => any>(fn: T): T {
+        return new Proxy(fn, {
+            apply(target, thisArg, args) {
+                console.log("Calling function with args:", args);
+                const result = Reflect.apply(target, thisArg, args);
+                console.log("Result:", result);
+                return result;
             }
-        };
-    }
-}
-
-class ReverseIterator<T> extends BaseIterator<T> {
-    [Symbol.iterator](): Iterator<T> {
-        let index = this.items.length - 1;
-        const items = this.items;
-        return {
-            next(): IteratorResult<T> {
-                if (index >= 0) {
-                    return { value: items[index--], done: false };
-                }
-                return { value: undefined, done: true };
-            }
-        };
+        }) as T;
     }
 }
 "#;
@@ -10097,31 +9956,220 @@ class ReverseIterator<T> extends BaseIterator<T> {
 
     let output = printer.get_output().to_string();
 
-    // Classes should be present
+    // Class should be emitted
     assert!(
-        output.contains("BaseIterator") && output.contains("ForwardIterator") && output.contains("ReverseIterator"),
-        "Expected iterator classes: {}",
+        output.contains("FunctionWrapper"),
+        "Expected FunctionWrapper class: {}",
         output
     );
 
-    // Inheritance should be present
+    // wrap method should be present
     assert!(
-        output.contains("__extends") || output.contains("prototype"),
-        "Expected inheritance pattern: {}",
+        output.contains("wrap"),
+        "Expected wrap method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_proxy_factory() {
+    // Static factory method returning proxied instance
+    let source = r#"
+class ValidatedModel {
+    name: string = "";
+    age: number = 0;
+
+    static create(): ValidatedModel {
+        const instance = new ValidatedModel();
+        return new Proxy(instance, {
+            set(target, prop: keyof ValidatedModel, value) {
+                if (prop === "age" && typeof value === "number" && value < 0) {
+                    throw new Error("Age cannot be negative");
+                }
+                (target as any)[prop] = value;
+                return true;
+            }
+        });
+    }
+
+    toJSON(): object {
+        return { name: this.name, age: this.age };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("ValidatedModel"),
+        "Expected ValidatedModel class: {}",
         output
     );
 
-    // Add method should be present
+    // Static method create should be present
     assert!(
-        output.contains("add"),
-        "Expected add method: {}",
+        output.contains("create"),
+        "Expected create static method: {}",
         output
     );
 
-    // Iterator symbol should be present
+    // Proxy should be present
     assert!(
-        output.contains("Symbol.iterator") || output.contains("iterator"),
-        "Expected iterator symbol: {}",
+        output.contains("Proxy"),
+        "Expected Proxy: {}",
+        output
+    );
+
+    // Instance method should be present
+    assert!(
+        output.contains("toJSON"),
+        "Expected toJSON method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_proxy_with_reflect() {
+    // Proxy using Reflect API for default behavior
+    let source = r#"
+class LoggingProxy<T extends object> {
+    private logs: string[] = [];
+
+    createLoggingProxy(target: T): T {
+        const logs = this.logs;
+        return new Proxy(target, {
+            get(target, prop, receiver) {
+                logs.push("get " + String(prop));
+                return Reflect.get(target, prop, receiver);
+            },
+            set(target, prop, value, receiver) {
+                logs.push("set " + String(prop));
+                return Reflect.set(target, prop, value, receiver);
+            },
+            deleteProperty(target, prop) {
+                logs.push("delete " + String(prop));
+                return Reflect.deleteProperty(target, prop);
+            }
+        });
+    }
+
+    getLogs(): string[] {
+        return this.logs;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("LoggingProxy"),
+        "Expected LoggingProxy class: {}",
+        output
+    );
+
+    // Proxy should be present
+    assert!(
+        output.contains("Proxy"),
+        "Expected Proxy: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("createLoggingProxy") && output.contains("getLogs"),
+        "Expected createLoggingProxy and getLogs methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_proxy_revocable() {
+    // Revocable proxy pattern
+    let source = r#"
+class RevocableAccess<T extends object> {
+    private revoke: (() => void) | null = null;
+
+    createRevocable(target: T): T {
+        const { proxy, revoke } = Proxy.revocable(target, {
+            get(target, prop, receiver) {
+                return Reflect.get(target, prop, receiver);
+            }
+        });
+        this.revoke = revoke;
+        return proxy;
+    }
+
+    revokeAccess(): void {
+        if (this.revoke) {
+            this.revoke();
+            this.revoke = null;
+        }
+    }
+
+    isRevoked(): boolean {
+        return this.revoke === null;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("RevocableAccess"),
+        "Expected RevocableAccess class: {}",
+        output
+    );
+
+    // Proxy.revocable should be present
+    assert!(
+        output.contains("Proxy"),
+        "Expected Proxy: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("createRevocable") && output.contains("revokeAccess") && output.contains("isRevoked"),
+        "Expected createRevocable, revokeAccess, isRevoked methods: {}",
         output
     );
 }
