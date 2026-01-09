@@ -6,10 +6,23 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-None - awaiting task from EM-Anvil
+Add ES5 class tests for triple-slash directive patterns: reference, amd-module
+
+Steps:
+1. Add 6 ES5 class tests covering triple-slash directive patterns to `wasm/src/transforms/class_es5_tests.rs`:
+   - `/// <reference path="...">` directive
+   - `/// <reference types="...">` directive
+   - `/// <amd-module name="...">` directive
+   - `/// <reference lib="...">` directive
+   - Multiple directives in a file
+   - Combined directive patterns with classes
+2. Run `./wasm/test.sh class_es5_tests` to verify all tests pass
+3. Commit with message: `[wasm] transforms: add triple-slash directive patterns ES5 class tests`
+4. Push to `origin/worker/anvil-1`
+5. Update this plan file and push
 
 ## Task Queue
-- [ ] Add ES5 class tests for triple-slash directive patterns: reference, amd-module
+(empty - this is Worker 1's final assigned task)
 
 ## Completed
 - [x] Added ES5 tests for export assignment patterns (6 tests): basic export =, export = with namespace, import = require, export = with interface, export = function, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 470 pass).
