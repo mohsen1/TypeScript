@@ -1934,6 +1934,11 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
 
     /// Helper to evaluate keyof or pass through union constraint
     fn evaluate_keyof_or_constraint(&self, constraint: TypeId) -> TypeId {
+        if let Some(TypeKey::Conditional(cond_id)) = self.interner.lookup(constraint) {
+            let cond = self.interner.conditional_type(cond_id);
+            return self.evaluate_conditional(cond.as_ref());
+        }
+
         // If constraint is already a union of literals, return it
         if let Some(TypeKey::Union(_)) = self.interner.lookup(constraint) {
             return constraint;
@@ -2002,6 +2007,10 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             }
             TypeKey::Intrinsic(IntrinsicKind::Number) => {
                 keys.has_number = true;
+                Some(keys)
+            }
+            TypeKey::Intrinsic(IntrinsicKind::Never) => {
+                // Mapped over `never` yields an empty object.
                 Some(keys)
             }
             // Can't extract literals from other types

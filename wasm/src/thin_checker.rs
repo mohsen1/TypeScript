@@ -598,6 +598,11 @@ impl<'a> ThinCheckerState<'a> {
                         && self.lookup_type_parameter(name).is_none()
                         && self.resolve_identifier_symbol(type_name_idx).is_none()
                     {
+                        if let Some(type_id) =
+                            self.resolve_builtin_utility_type_reference(name, &type_ref.type_arguments)
+                        {
+                            return type_id;
+                        }
                         self.error_cannot_find_name_at(name, type_name_idx);
                         return TypeId::ERROR;
                     }
@@ -734,6 +739,59 @@ impl<'a> ThinCheckerState<'a> {
             return Some(type_id);
         }
         None
+    }
+
+    fn resolve_builtin_utility_type_reference(
+        &mut self,
+        name: &str,
+        type_args: &Option<crate::parser::NodeList>,
+    ) -> Option<TypeId> {
+        use crate::solver::{ConditionalType, MappedType, TypeKey, TypeParamInfo};
+
+        let args = type_args.as_ref()?;
+        if args.nodes.len() != 2 {
+            return None;
+        }
+
+        match name {
+            "Exclude" => {
+                let check_type = self.get_type_from_type_node(args.nodes[0]);
+                let extends_type = self.get_type_from_type_node(args.nodes[1]);
+                if check_type == TypeId::ERROR || extends_type == TypeId::ERROR {
+                    return Some(TypeId::ERROR);
+                }
+                Some(self.ctx.types.conditional(ConditionalType {
+                    check_type,
+                    extends_type,
+                    true_type: TypeId::NEVER,
+                    false_type: check_type,
+                    is_distributive: true,
+                }))
+            }
+            "Pick" => {
+                let base_type = self.get_type_from_type_node(args.nodes[0]);
+                let key_type = self.get_type_from_type_node(args.nodes[1]);
+                if base_type == TypeId::ERROR || key_type == TypeId::ERROR {
+                    return Some(TypeId::ERROR);
+                }
+                let type_param = TypeParamInfo {
+                    name: self.ctx.types.intern_string("__pick_key"),
+                    constraint: Some(key_type),
+                    default: None,
+                };
+                let param_type = self.ctx.types.intern(TypeKey::TypeParameter(type_param.clone()));
+                let template = self.ctx.types.intern(TypeKey::IndexAccess(base_type, param_type));
+                Some(self.ctx.types.mapped(MappedType {
+                    type_param,
+                    constraint: key_type,
+                    name_type: None,
+                    template,
+                    readonly_modifier: None,
+                    optional_modifier: None,
+                }))
+            }
+            _ => None,
+        }
     }
 
     /// Resolve a type by name from lib file contexts.
@@ -1107,6 +1165,31 @@ impl<'a> ThinCheckerState<'a> {
             }
 
             return self.ctx.types.union(member_types);
+        }
+
+        TypeId::ANY
+    }
+
+    /// Get type from an intersection type node (A & B).
+    fn get_type_from_intersection_type(&mut self, idx: NodeIndex) -> TypeId {
+        let Some(node) = self.ctx.arena.get(idx) else {
+            return TypeId::ANY;
+        };
+
+        if let Some(composite) = self.ctx.arena.get_composite_type(node) {
+            let mut member_types = Vec::new();
+            for &type_idx in &composite.types.nodes {
+                member_types.push(self.get_type_from_type_node(type_idx));
+            }
+
+            if member_types.is_empty() {
+                return TypeId::UNKNOWN;
+            }
+            if member_types.len() == 1 {
+                return member_types[0];
+            }
+
+            return self.ctx.types.intersection(member_types);
         }
 
         TypeId::ANY
@@ -7099,6 +7182,11 @@ impl<'a> ThinCheckerState<'a> {
                 // Handle union types specially to ensure nested typeof expressions
                 // are resolved via binder (for abstract class detection)
                 return self.get_type_from_union_type(idx);
+            }
+            if node.kind == syntax_kind_ext::INTERSECTION_TYPE {
+                // Handle intersection types specially so nested type references
+                // still run through checker resolution (e.g., built-in utility fallbacks).
+                return self.get_type_from_intersection_type(idx);
             }
             if node.kind == syntax_kind_ext::TYPE_LITERAL {
                 // Type literals should use checker resolution so type parameters resolve correctly.
