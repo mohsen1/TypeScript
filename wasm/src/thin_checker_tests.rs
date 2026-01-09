@@ -11348,3 +11348,138 @@ const makeRequest: (req: API.Request) => API.Response = handleRequest;
         checker.ctx.diagnostics
     );
 }
+
+#[test]
+fn test_use_before_assignment_basic_flow() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function foo() {
+    let x: number;
+    return x;
+}
+
+function bar(flag: boolean) {
+    let x: number;
+    if (flag) { x = 1; }
+    return x;
+}
+
+function baz(flag: boolean) {
+    let x: number;
+    if (flag) { x = 1; } else { x = 2; }
+    return x;
+}
+
+function qux() {
+    let x: number;
+    x = 5;
+    return x;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let count = checker
+        .ctx
+        .diagnostics
+        .iter()
+        .filter(|diag| diag.code == diagnostic_codes::VARIABLE_USED_BEFORE_ASSIGNED)
+        .count();
+    assert_eq!(
+        count,
+        2,
+        "Expected 2 use-before-assignment errors, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_use_before_assignment_try_catch() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function foo() {
+    let x: number;
+    try {
+        x = 1;
+    } catch {
+    }
+    return x;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let count = checker
+        .ctx
+        .diagnostics
+        .iter()
+        .filter(|diag| diag.code == diagnostic_codes::VARIABLE_USED_BEFORE_ASSIGNED)
+        .count();
+    assert_eq!(
+        count,
+        1,
+        "Expected 1 use-before-assignment error, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_use_before_assignment_for_of_initializer() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function foo(items: number[]) {
+    let x: number;
+    for (x of items) {
+        x;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let count = checker
+        .ctx
+        .diagnostics
+        .iter()
+        .filter(|diag| diag.code == diagnostic_codes::VARIABLE_USED_BEFORE_ASSIGNED)
+        .count();
+    assert_eq!(
+        count,
+        0,
+        "Expected no use-before-assignment errors, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}

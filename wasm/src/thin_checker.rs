@@ -2922,6 +2922,11 @@ impl<'a> ThinCheckerState<'a> {
                 return TypeId::ERROR;
             }
             let declared_type = self.get_type_of_symbol(sym_id);
+            if self.should_check_definite_assignment(sym_id, idx)
+                && !self.is_definitely_assigned_at(idx)
+            {
+                self.error_variable_used_before_assigned_at(name, idx);
+            }
             return self.apply_flow_narrowing(idx, declared_type);
         }
 
@@ -3037,6 +3042,136 @@ impl<'a> ThinCheckerState<'a> {
         // Could also check for types that include null/undefined
         // For now, only narrow unions
         false
+    }
+
+    fn should_check_definite_assignment(&self, sym_id: SymbolId, idx: NodeIndex) -> bool {
+        let Some(symbol) = self.ctx.binder.get_symbol(sym_id) else {
+            return false;
+        };
+
+        if (symbol.flags & symbol_flags::VARIABLE) == 0 {
+            return false;
+        }
+
+        if self.symbol_is_parameter(sym_id) {
+            return false;
+        }
+
+        if self.symbol_has_definite_assignment_assertion(sym_id) {
+            return false;
+        }
+
+        if self.is_for_in_of_assignment_target(idx) {
+            return false;
+        }
+
+        true
+    }
+
+    fn is_definitely_assigned_at(&self, idx: NodeIndex) -> bool {
+        let flow_node = match self.ctx.binder.get_node_flow(idx) {
+            Some(flow) => flow,
+            None => return true,
+        };
+        let analyzer = FlowAnalyzer::new(self.ctx.arena, self.ctx.binder, self.ctx.types);
+        analyzer.is_definitely_assigned(idx, flow_node)
+    }
+
+    fn symbol_is_parameter(&self, sym_id: SymbolId) -> bool {
+        let Some(symbol) = self.ctx.binder.get_symbol(sym_id) else {
+            return false;
+        };
+
+        symbol
+            .declarations
+            .iter()
+            .any(|&decl_idx| self.node_is_or_within_kind(decl_idx, syntax_kind_ext::PARAMETER))
+    }
+
+    fn symbol_has_definite_assignment_assertion(&self, sym_id: SymbolId) -> bool {
+        let Some(symbol) = self.ctx.binder.get_symbol(sym_id) else {
+            return false;
+        };
+
+        for &decl_idx in &symbol.declarations {
+            let Some(var_decl_idx) = self.find_enclosing_variable_declaration(decl_idx) else {
+                continue;
+            };
+            let Some(var_decl_node) = self.ctx.arena.get(var_decl_idx) else {
+                continue;
+            };
+            let Some(var_decl) = self.ctx.arena.get_variable_declaration(var_decl_node) else {
+                continue;
+            };
+            if var_decl.exclamation_token {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    fn find_enclosing_variable_declaration(&self, idx: NodeIndex) -> Option<NodeIndex> {
+        let mut current = idx;
+        loop {
+            let node = self.ctx.arena.get(current)?;
+            if node.kind == syntax_kind_ext::VARIABLE_DECLARATION {
+                return Some(current);
+            }
+            let ext = self.ctx.arena.get_extended(current)?;
+            if ext.parent.is_none() {
+                return None;
+            }
+            current = ext.parent;
+        }
+    }
+
+    fn node_is_or_within_kind(&self, idx: NodeIndex, kind: u16) -> bool {
+        let mut current = idx;
+        loop {
+            let node = match self.ctx.arena.get(current) {
+                Some(node) => node,
+                None => return false,
+            };
+            if node.kind == kind {
+                return true;
+            }
+            let ext = match self.ctx.arena.get_extended(current) {
+                Some(ext) => ext,
+                None => return false,
+            };
+            if ext.parent.is_none() {
+                return false;
+            }
+            current = ext.parent;
+        }
+    }
+
+    fn is_for_in_of_assignment_target(&self, idx: NodeIndex) -> bool {
+        let mut current = idx;
+        loop {
+            let ext = match self.ctx.arena.get_extended(current) {
+                Some(ext) => ext,
+                None => return false,
+            };
+            if ext.parent.is_none() {
+                return false;
+            }
+            let parent = ext.parent;
+            let parent_node = match self.ctx.arena.get(parent) {
+                Some(node) => node,
+                None => return false,
+            };
+            if parent_node.kind == syntax_kind_ext::FOR_IN_STATEMENT
+                || parent_node.kind == syntax_kind_ext::FOR_OF_STATEMENT
+            {
+                if let Some(for_data) = self.ctx.arena.get_for_in_of(parent_node) {
+                    let analyzer = FlowAnalyzer::new(self.ctx.arena, self.ctx.binder, self.ctx.types);
+                    return analyzer.assignment_targets_reference(for_data.initializer, idx);
+                }
+            }
+            current = parent;
+        }
     }
 
     /// Get type of a symbol.
@@ -6094,6 +6229,27 @@ impl<'a> ThinCheckerState<'a> {
             );
             self.ctx.diagnostics.push(Diagnostic {
                 code: diagnostic_codes::ONLY_REFERS_TO_A_TYPE_BUT_IS_BEING_USED_AS_A_VALUE_HERE,
+                category: DiagnosticCategory::Error,
+                message_text: message,
+                start: loc.start,
+                length: loc.length(),
+                file: self.ctx.file_name.clone(),
+                related_information: Vec::new(),
+            });
+        }
+    }
+
+    /// Report TS2454: Variable is used before being assigned.
+    pub fn error_variable_used_before_assigned_at(&mut self, name: &str, idx: NodeIndex) {
+        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages, format_message};
+
+        if let Some(loc) = self.get_source_location(idx) {
+            let message = format_message(
+                diagnostic_messages::VARIABLE_USED_BEFORE_ASSIGNED,
+                &[name],
+            );
+            self.ctx.diagnostics.push(Diagnostic {
+                code: diagnostic_codes::VARIABLE_USED_BEFORE_ASSIGNED,
                 category: DiagnosticCategory::Error,
                 message_text: message,
                 start: loc.start,
