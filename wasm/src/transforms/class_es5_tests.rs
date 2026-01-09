@@ -22199,3 +22199,648 @@ class DataProcessor {
         output
     );
 }
+
+#[test]
+fn test_class_es5_typescript_namespace_merging() {
+    // Namespace merging with class pattern
+    let source = r#"
+class Album {
+    label: Album.AlbumLabel;
+    title: string;
+
+    constructor(title: string, label: Album.AlbumLabel) {
+        this.title = title;
+        this.label = label;
+    }
+
+    getInfo(): string {
+        return `${this.title} (${this.label.name})`;
+    }
+}
+
+namespace Album {
+    export class AlbumLabel {
+        name: string;
+        constructor(name: string) {
+            this.name = name;
+        }
+    }
+
+    export function createDefault(): Album {
+        return new Album("Untitled", new AlbumLabel("Unknown"));
+    }
+
+    export const DEFAULT_LABEL = "Independent";
+}
+
+class Building {
+    name: string;
+    floors: Building.Floor[];
+
+    constructor(name: string) {
+        this.name = name;
+        this.floors = [];
+    }
+
+    addFloor(floor: Building.Floor): void {
+        this.floors.push(floor);
+    }
+}
+
+namespace Building {
+    export interface Floor {
+        number: number;
+        area: number;
+    }
+
+    export class Office implements Floor {
+        number: number;
+        area: number;
+        desks: number;
+
+        constructor(floorNumber: number, area: number, desks: number) {
+            this.number = floorNumber;
+            this.area = area;
+            this.desks = desks;
+        }
+    }
+
+    export function calculateTotalArea(building: Building): number {
+        return building.floors.reduce((sum, floor) => sum + floor.area, 0);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Album") && output.contains("Building"),
+        "Expected namespace merged classes: {}",
+        output
+    );
+
+    // Namespace members should be present
+    assert!(
+        output.contains("AlbumLabel") || output.contains("createDefault"),
+        "Expected namespace members: {}",
+        output
+    );
+
+    // Class IIFE pattern should be present
+    assert!(
+        output.contains("(function ()") || output.contains("(function()") || output.contains("function Album"),
+        "Expected class IIFE pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_typescript_module_augmentation() {
+    // Module augmentation pattern
+    let source = r#"
+// Original module
+namespace MyModule {
+    export class BaseService {
+        name: string = "base";
+
+        execute(): void {
+            console.log("Base execute");
+        }
+    }
+
+    export interface Config {
+        debug: boolean;
+    }
+}
+
+// Augmentation
+namespace MyModule {
+    export class ExtendedService extends BaseService {
+        version: string = "1.0";
+
+        execute(): void {
+            super.execute();
+            console.log("Extended execute");
+        }
+    }
+
+    export function createService(): BaseService {
+        return new ExtendedService();
+    }
+
+    export const VERSION = "2.0.0";
+}
+
+// Another augmentation
+namespace MyModule {
+    export class AdvancedService extends ExtendedService {
+        features: string[] = [];
+
+        addFeature(feature: string): void {
+            this.features.push(feature);
+        }
+    }
+
+    export interface Config {
+        verbose: boolean;
+    }
+}
+
+// Usage
+class Consumer {
+    private service: MyModule.BaseService;
+
+    constructor() {
+        this.service = MyModule.createService();
+    }
+
+    run(): void {
+        this.service.execute();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Module namespace should be present
+    assert!(
+        output.contains("MyModule"),
+        "Expected module namespace: {}",
+        output
+    );
+
+    // Classes should be present
+    assert!(
+        output.contains("BaseService") && output.contains("Consumer"),
+        "Expected module classes: {}",
+        output
+    );
+
+    // Class IIFE pattern should be present
+    assert!(
+        output.contains("(function ()") || output.contains("(function()") || output.contains("function BaseService"),
+        "Expected class IIFE pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_typescript_declaration_merging() {
+    // Declaration merging pattern
+    let source = r#"
+// Interface declaration
+interface Box {
+    height: number;
+    width: number;
+}
+
+// Interface merging
+interface Box {
+    depth: number;
+    scale(factor: number): Box;
+}
+
+// Class implementing merged interface
+class BoxImpl implements Box {
+    height: number;
+    width: number;
+    depth: number;
+
+    constructor(h: number, w: number, d: number) {
+        this.height = h;
+        this.width = w;
+        this.depth = d;
+    }
+
+    scale(factor: number): Box {
+        return new BoxImpl(
+            this.height * factor,
+            this.width * factor,
+            this.depth * factor
+        );
+    }
+
+    volume(): number {
+        return this.height * this.width * this.depth;
+    }
+}
+
+// Function with merged overloads
+function createBox(size: number): Box;
+function createBox(height: number, width: number, depth: number): Box;
+function createBox(a: number, b?: number, c?: number): Box {
+    if (b !== undefined && c !== undefined) {
+        return new BoxImpl(a, b, c);
+    }
+    return new BoxImpl(a, a, a);
+}
+
+// Class merging with namespace
+class Point {
+    x: number;
+    y: number;
+
+    constructor(x: number, y: number) {
+        this.x = x;
+        this.y = y;
+    }
+
+    distanceTo(other: Point): number {
+        return Math.sqrt(
+            Math.pow(other.x - this.x, 2) +
+            Math.pow(other.y - this.y, 2)
+        );
+    }
+}
+
+namespace Point {
+    export const ORIGIN = new Point(0, 0);
+
+    export function fromArray(arr: [number, number]): Point {
+        return new Point(arr[0], arr[1]);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("BoxImpl") && output.contains("Point"),
+        "Expected declaration merged classes: {}",
+        output
+    );
+
+    // Functions should be present
+    assert!(
+        output.contains("createBox"),
+        "Expected merged function: {}",
+        output
+    );
+
+    // Class IIFE pattern should be present
+    assert!(
+        output.contains("(function ()") || output.contains("(function()") || output.contains("function BoxImpl"),
+        "Expected class IIFE pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_typescript_ambient_declarations() {
+    // Ambient declarations pattern
+    let source = r#"
+declare const GLOBAL_CONFIG: {
+    apiUrl: string;
+    timeout: number;
+};
+
+declare function externalLog(message: string): void;
+
+declare class ExternalService {
+    constructor(url: string);
+    fetch(path: string): Promise<any>;
+}
+
+declare namespace ExternalLib {
+    interface Options {
+        debug: boolean;
+    }
+
+    function init(options: Options): void;
+    const version: string;
+}
+
+// Class using ambient declarations
+class ApiClient {
+    private baseUrl: string;
+    private service: ExternalService;
+
+    constructor() {
+        this.baseUrl = GLOBAL_CONFIG.apiUrl;
+        this.service = new ExternalService(this.baseUrl);
+    }
+
+    async getData(path: string): Promise<any> {
+        externalLog(`Fetching: ${path}`);
+        return this.service.fetch(path);
+    }
+
+    init(): void {
+        ExternalLib.init({ debug: true });
+        console.log(`Using lib version: ${ExternalLib.version}`);
+    }
+}
+
+class ConfigManager {
+    private config: typeof GLOBAL_CONFIG;
+
+    constructor() {
+        this.config = GLOBAL_CONFIG;
+    }
+
+    getTimeout(): number {
+        return this.config.timeout;
+    }
+
+    getApiUrl(): string {
+        return this.config.apiUrl;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Implementation classes should be converted
+    assert!(
+        output.contains("ApiClient") && output.contains("ConfigManager"),
+        "Expected implementation classes: {}",
+        output
+    );
+
+    // Ambient declarations should not emit runtime code
+    assert!(
+        !output.contains("declare const") && !output.contains("declare function"),
+        "Expected ambient declarations to be stripped: {}",
+        output
+    );
+
+    // Class IIFE pattern should be present
+    assert!(
+        output.contains("(function ()") || output.contains("(function()") || output.contains("function ApiClient"),
+        "Expected class IIFE pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_typescript_const_assertions() {
+    // Const assertions pattern
+    let source = r#"
+const CONFIG = {
+    api: {
+        url: "https://api.example.com",
+        timeout: 5000
+    },
+    features: ["auth", "logging", "caching"]
+} as const;
+
+const COLORS = ["red", "green", "blue"] as const;
+
+const ACTIONS = {
+    INCREMENT: "INCREMENT",
+    DECREMENT: "DECREMENT",
+    RESET: "RESET"
+} as const;
+
+type ActionType = typeof ACTIONS[keyof typeof ACTIONS];
+
+class Store {
+    private state: { count: number } = { count: 0 };
+
+    dispatch(action: ActionType): void {
+        switch (action) {
+            case ACTIONS.INCREMENT:
+                this.state.count++;
+                break;
+            case ACTIONS.DECREMENT:
+                this.state.count--;
+                break;
+            case ACTIONS.RESET:
+                this.state.count = 0;
+                break;
+        }
+    }
+
+    getState(): { count: number } {
+        return { ...this.state };
+    }
+}
+
+class ThemeManager {
+    private readonly colors = COLORS;
+    private currentIndex: number = 0;
+
+    nextColor(): typeof COLORS[number] {
+        const color = this.colors[this.currentIndex];
+        this.currentIndex = (this.currentIndex + 1) % this.colors.length;
+        return color;
+    }
+
+    getAllColors(): readonly string[] {
+        return this.colors;
+    }
+}
+
+class ConfigService {
+    private readonly config = CONFIG;
+
+    getApiUrl(): string {
+        return this.config.api.url;
+    }
+
+    getTimeout(): number {
+        return this.config.api.timeout;
+    }
+
+    hasFeature(feature: string): boolean {
+        return (this.config.features as readonly string[]).includes(feature);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Store") && output.contains("ThemeManager") && output.contains("ConfigService"),
+        "Expected const assertion classes: {}",
+        output
+    );
+
+    // Const values should be present
+    assert!(
+        output.contains("CONFIG") || output.contains("COLORS") || output.contains("ACTIONS"),
+        "Expected const values: {}",
+        output
+    );
+
+    // Class IIFE pattern should be present
+    assert!(
+        output.contains("(function ()") || output.contains("(function()") || output.contains("function Store"),
+        "Expected class IIFE pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_typescript_type_only_imports() {
+    // Type-only imports and exports pattern
+    let source = r#"
+// Type definitions (simulated)
+interface User {
+    id: number;
+    name: string;
+    email: string;
+}
+
+interface Product {
+    id: number;
+    title: string;
+    price: number;
+}
+
+type UserId = User["id"];
+type ProductId = Product["id"];
+
+// Class using type imports
+class UserRepository {
+    private users: Map<UserId, User> = new Map();
+
+    add(user: User): void {
+        this.users.set(user.id, user);
+    }
+
+    findById(id: UserId): User | undefined {
+        return this.users.get(id);
+    }
+
+    findAll(): User[] {
+        return Array.from(this.users.values());
+    }
+}
+
+class ProductRepository {
+    private products: Map<ProductId, Product> = new Map();
+
+    add(product: Product): void {
+        this.products.set(product.id, product);
+    }
+
+    findById(id: ProductId): Product | undefined {
+        return this.products.get(id);
+    }
+
+    findByPriceRange(min: number, max: number): Product[] {
+        return Array.from(this.products.values())
+            .filter(p => p.price >= min && p.price <= max);
+    }
+}
+
+class OrderService {
+    constructor(
+        private userRepo: UserRepository,
+        private productRepo: ProductRepository
+    ) {}
+
+    createOrder(userId: UserId, productIds: ProductId[]): object {
+        const user = this.userRepo.findById(userId);
+        const products = productIds
+            .map(id => this.productRepo.findById(id))
+            .filter((p): p is Product => p !== undefined);
+
+        return {
+            user,
+            products,
+            total: products.reduce((sum, p) => sum + p.price, 0)
+        };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("UserRepository") && output.contains("ProductRepository") && output.contains("OrderService"),
+        "Expected type-using classes: {}",
+        output
+    );
+
+    // Type-only constructs should be stripped
+    assert!(
+        !output.contains("interface User") && !output.contains("type UserId"),
+        "Expected type-only constructs to be stripped: {}",
+        output
+    );
+
+    // Class IIFE pattern should be present
+    assert!(
+        output.contains("(function ()") || output.contains("(function()") || output.contains("function UserRepository"),
+        "Expected class IIFE pattern: {}",
+        output
+    );
+}
