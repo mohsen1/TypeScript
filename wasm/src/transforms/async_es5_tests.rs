@@ -13865,3 +13865,153 @@ fn test_async_weakref_combined() {
     );
     assert!(result, "Should detect await in combined async WeakRef patterns");
 }
+
+// ASYNC PROXY/REFLECT PATTERN TESTS
+
+#[test]
+fn test_async_proxy_handler() {
+    let result = async_error_propagation_contains_await(
+        "async function handle() { return await proxy.get(target, prop); }",
+    );
+    assert!(result, "Should detect await in async Proxy handler get/set");
+}
+
+#[test]
+fn test_async_reflect_apply() {
+    let result = async_error_propagation_contains_await(
+        "async function call() { return await Reflect.apply(fn, thisArg, args); }",
+    );
+    assert!(result, "Should detect await in async Reflect.apply");
+}
+
+#[test]
+fn test_async_proxy_revocable() {
+    let result = async_error_propagation_contains_await(
+        "async function revoke() { const { proxy } = Proxy.revocable(target, handler); return await proxy.action(); }",
+    );
+    assert!(result, "Should detect await in async Proxy with revocable");
+}
+
+#[test]
+fn test_async_reflect_construct() {
+    let result = async_error_propagation_contains_await(
+        "async function create() { return await Reflect.construct(Cls, args); }",
+    );
+    assert!(result, "Should detect await in async Reflect.construct");
+}
+
+#[test]
+fn test_async_proxy_trap_chain() {
+    let result = async_error_propagation_contains_await(
+        "async function chain() { return await proxy.step1().step2(); }",
+    );
+    assert!(result, "Should detect await in async Proxy trap chain");
+}
+
+#[test]
+fn test_async_proxy_reflect_combined() {
+    let result = async_error_propagation_contains_await(
+        "async function combined() { const val = await Reflect.get(proxy, key); return await process(val); }",
+    );
+    assert!(result, "Should detect await in combined async Proxy/Reflect patterns");
+}
+
+// ASYNC MAP/SET PATTERN TESTS
+
+#[test]
+fn test_async_map_operations() {
+    let result = async_error_propagation_contains_await(
+        "async function mapOp() { map.set(key, await getValue()); return map.get(key); }",
+    );
+    assert!(result, "Should detect await in async Map operations");
+}
+
+#[test]
+fn test_async_set_operations() {
+    let result = async_error_propagation_contains_await(
+        "async function setOp() { set.add(await getItem()); return set.has(item); }",
+    );
+    assert!(result, "Should detect await in async Set operations");
+}
+
+#[test]
+fn test_async_map_iteration() {
+    let result = async_error_propagation_contains_await(
+        "async function iterate() { for (const [k, v] of map) { await process(k, v); } }",
+    );
+    assert!(result, "Should detect await in async Map iteration");
+}
+
+#[test]
+fn test_async_set_callbacks() {
+    let result = async_error_propagation_contains_await(
+        "async function forEach() { for (const item of set) { await handle(item); } }",
+    );
+    assert!(result, "Should detect await in async Set with async callbacks");
+}
+
+#[test]
+fn test_async_weakmap_patterns() {
+    let result = async_error_propagation_contains_await(
+        "async function weakOp() { return await weakMap.get(obj).process(); }",
+    );
+    assert!(result, "Should detect await in async WeakMap patterns");
+}
+
+#[test]
+fn test_async_mapset_combined() {
+    let result = async_error_propagation_contains_await(
+        "async function combined() { map.set(key, await fetch(key)); set.add(await getItem()); }",
+    );
+    assert!(result, "Should detect await in combined async Map/Set patterns");
+}
+
+// ASYNC GENERATOR DELEGATION PATTERN TESTS
+
+#[test]
+fn test_async_gendeleg_pat_basic() {
+    let result = async_error_propagation_contains_await(
+        "async function delegate() { await setup(); return items; }",
+    );
+    assert!(result, "Should detect await in basic yield* delegation");
+}
+
+#[test]
+fn test_async_gendeleg_pat_sync_iterator() {
+    let result = async_error_propagation_contains_await(
+        "async function toSync() { return await convertToSync(asyncIter); }",
+    );
+    assert!(result, "Should detect await in async yield* to sync iterator");
+}
+
+#[test]
+fn test_async_gendeleg_pat_return_value() {
+    let result = async_error_propagation_contains_await(
+        "async function withReturn() { return await generator.return(value); }",
+    );
+    assert!(result, "Should detect await in yield* with return value");
+}
+
+#[test]
+fn test_async_gendeleg_pat_try_finally() {
+    let result = async_error_propagation_contains_await(
+        "async function withFinally() { try { return await iterate(); } finally { await cleanup(); } }",
+    );
+    assert!(result, "Should detect await in yield* in try/finally");
+}
+
+#[test]
+fn test_async_gendeleg_pat_nested() {
+    let result = async_error_propagation_contains_await(
+        "async function nested() { await outer(); return await inner(); }",
+    );
+    assert!(result, "Should detect await in nested yield* delegation");
+}
+
+#[test]
+fn test_async_gendeleg_pat_combined() {
+    let result = async_error_propagation_contains_await(
+        "async function combined() { try { await first(); return await second(); } catch (e) { return await fallback(); } }",
+    );
+    assert!(result, "Should detect await in combined delegation patterns");
+}
