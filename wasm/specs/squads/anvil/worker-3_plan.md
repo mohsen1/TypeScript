@@ -7,10 +7,10 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-(none)
+Add ES5 source map tests for decorator metadata patterns: reflect, design types. Tests: `./wasm/test.sh source_map_tests`
 
 ## Task Queue
-- [ ] Add ES5 source map tests for decorator metadata patterns: reflect, design types
+- [ ] Add ES5 source map tests for private field patterns: WeakMap polyfill, accessor
 
 ## Completed
 - [x] Added class static block ES5 source map tests (basic, init order, multiple, private field access, private method access, static field init, computed props, async patterns, error handling, comprehensive); 857 tests pass.
