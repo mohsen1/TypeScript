@@ -7,10 +7,10 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-None - awaiting assignment from EM-Anvil.
+- [ ] Add ES5 class tests for class field initializer patterns: complex initializers, computed field names, arrow initializers. Tests: `./wasm/test.sh class_es5_tests`
 
 ## Task Queue
-- [ ] Add ES5 class tests for class field initializer patterns: complex initializers, computed field names
+- [ ] Add ES5 class tests for private method patterns: static private, async private, generator private
 
 ## Completed
 - [x] Add ES5 class tests for decorator factory patterns. Tests: `./wasm/test.sh class_es5_tests`

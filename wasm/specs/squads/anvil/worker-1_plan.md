@@ -6,10 +6,10 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-(none)
+- [ ] Add ES5 class tests for template literal type patterns: string manipulation types, key remapping, Uppercase/Lowercase types. Tests: `./wasm/test.sh class_es5_tests`
 
 ## Task Queue
-- [ ] Add ES5 class tests for template literal type patterns: string manipulation types, key remapping
+- [ ] Add ES5 class tests for variadic tuple patterns: spread in tuples, labeled tuple elements
 
 ## Completed
 - [x] Added ES5 tests for conditional type patterns (6 tests): infer keyword patterns, distributive conditionals, Extract types, Exclude types, nested conditional types, combined conditional types. Ran `./wasm/test.sh class_es5_tests` (all 365 pass).
