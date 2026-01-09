@@ -8,12 +8,21 @@ Priority: 2
 
 ## Current Assignment
 - [x] ReturnType/Parameters edge case tests (per GOALS.md W2/Pane4 assignment)
+- [x] Distributive conditional type stress tests (per GOALS.md objective #2)
 
 ## Task Queue
 - [ ] Implement TypeResolver for TypeEvaluator to resolve Refs inside Mapped/Conditional types
 - [ ] This would enable full evaluation of complex patterns like `{ [K in keyof R]: ExtractAction<R[K]> }[keyof R]`
 
 ## Completed
+- [x] Added 18 distributive conditional type stress tests including:
+  - Large union distribution, nested conditionals
+  - Never absorption, all-never results
+  - Literal/object type distribution
+  - Non-distributive wrapped type params
+  - Any/unknown special cases
+  - Infer patterns with distribution
+  - Boolean, function type, recursive patterns
 - [x] Added 28 ReturnType/Parameters/utility type edge case tests including:
   - Async function return types, void/never returns
   - Union and intersection of functions
