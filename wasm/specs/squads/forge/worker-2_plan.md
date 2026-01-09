@@ -21,12 +21,35 @@ Priority: 2
 - [x] Array type tests (readonly, generic, type inference)
 - [x] Union type tests (type narrowing, union distribution)
 - [x] Spread type tests (tuple spreads, object spreads)
+- [x] Awaited type tests (async/await type unwrapping)
 
 ## Task Queue
 - [ ] Implement TypeResolver for TypeEvaluator to resolve Refs inside Mapped/Conditional types
 - [ ] This would enable full evaluation of complex patterns like `{ [K in keyof R]: ExtractAction<R[K]> }[keyof R]`
 
 ## Completed
+- [x] Added 50 awaited type tests including:
+  - Basic Awaited: Promise<string>, Promise<number>, Promise<boolean>
+  - Non-promise passthrough: Awaited<string> = string
+  - Void, undefined, null in promises
+  - Nested promise unwrapping: Promise<Promise<T>>
+  - Triple nested promises
+  - Promise type structure verification
+  - Union with promises: Promise<A> | Promise<B>
+  - Promise or value: Promise<T> | T
+  - Special types: any, never, unknown in Awaited
+  - Async function return inference
+  - Multiple returns in async functions
+  - Await expression unwrapping
+  - Promise.all tuple inference
+  - Promise.race union inference
+  - Promise.allSettled result types
+  - Complex types: objects, arrays, tuples, functions in promises
+  - Literal types, intersection types in promises
+  - Generic async functions with constraints
+  - PromiseLike thenable pattern
+  - Edge cases: nullable, optional, conditional branches
+  - Symbol, bigint promise types
 - [x] Added 45 spread type tests including:
   - Tuple spreads: basic, leading/trailing elements, multiple spreads
   - Empty/single element tuple spreads
@@ -239,6 +262,7 @@ Solution options:
 **YES** - Branch reset to squad/forge baseline and new tests added.
 
 Worker 2 branch now contains:
+- 50 awaited type tests (async/await type unwrapping)
 - 45 spread type tests (tuple spreads, object spreads)
 - 40 union type tests (type narrowing, union distribution)
 - 32 array type tests (readonly, generic, type inference)

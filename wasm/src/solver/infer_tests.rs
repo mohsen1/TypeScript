@@ -16165,3 +16165,944 @@ fn test_spread_object_many_properties() {
         panic!("Expected object type");
     }
 }
+
+// =============================================================================
+// AWAITED TYPE TESTS
+// =============================================================================
+// Tests for async/await type unwrapping (Awaited<T>)
+
+// -----------------------------------------------------------------------------
+// Basic Awaited Type Tests
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_awaited_promise_string() {
+    // Awaited<Promise<string>> = string
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // T is unwrapped from Promise<string>
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_awaited_promise_number() {
+    // Awaited<Promise<number>> = number
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    ctx.add_lower_bound(var_t, TypeId::NUMBER);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_awaited_promise_boolean() {
+    // Awaited<Promise<boolean>> = boolean
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    ctx.add_lower_bound(var_t, TypeId::BOOLEAN);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::BOOLEAN);
+}
+
+#[test]
+fn test_awaited_non_promise_passthrough() {
+    // Awaited<string> = string (non-promise passes through)
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_awaited_number_passthrough() {
+    // Awaited<number> = number
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    ctx.add_lower_bound(var_t, TypeId::NUMBER);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_awaited_promise_void() {
+    // Awaited<Promise<void>> = void
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    ctx.add_lower_bound(var_t, TypeId::VOID);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::VOID);
+}
+
+#[test]
+fn test_awaited_promise_undefined() {
+    // Awaited<Promise<undefined>> = undefined
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    ctx.add_lower_bound(var_t, TypeId::UNDEFINED);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::UNDEFINED);
+}
+
+#[test]
+fn test_awaited_promise_null() {
+    // Awaited<Promise<null>> = null
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    ctx.add_lower_bound(var_t, TypeId::NULL);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::NULL);
+}
+
+// -----------------------------------------------------------------------------
+// Nested Promise Unwrapping Tests
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_awaited_nested_promise() {
+    // Awaited<Promise<Promise<string>>> = string (recursive unwrap)
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Deep unwrap resolves to base type
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_awaited_triple_nested_promise() {
+    // Awaited<Promise<Promise<Promise<number>>>> = number
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    ctx.add_lower_bound(var_t, TypeId::NUMBER);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_awaited_promise_type_structure() {
+    // Verify Promise<T> structure with interner.promise()
+    let interner = TypeInterner::new();
+
+    let promise_string = interner.promise(TypeId::STRING);
+    let promise_number = interner.promise(TypeId::NUMBER);
+
+    // Promises are different types
+    assert_ne!(promise_string, promise_number);
+
+    // Lookup works
+    if let Some(TypeKey::Promise(inner)) = interner.lookup(promise_string) {
+        assert_eq!(inner, TypeId::STRING);
+    } else {
+        panic!("Expected promise type");
+    }
+}
+
+#[test]
+fn test_awaited_nested_promise_structure() {
+    // Promise<Promise<string>> structure
+    let interner = TypeInterner::new();
+
+    let inner_promise = interner.promise(TypeId::STRING);
+    let outer_promise = interner.promise(inner_promise);
+
+    if let Some(TypeKey::Promise(inner)) = interner.lookup(outer_promise) {
+        assert_eq!(inner, inner_promise);
+        if let Some(TypeKey::Promise(innermost)) = interner.lookup(inner) {
+            assert_eq!(innermost, TypeId::STRING);
+        } else {
+            panic!("Expected inner promise");
+        }
+    } else {
+        panic!("Expected outer promise");
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Union with Promise Tests
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_awaited_union_of_promises() {
+    // Awaited<Promise<string> | Promise<number>> = string | number
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    ctx.add_lower_bound(var_t, union);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, union);
+}
+
+#[test]
+fn test_awaited_promise_or_value() {
+    // Awaited<Promise<string> | string> = string
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Both branches resolve to string
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_awaited_promise_or_different_value() {
+    // Awaited<Promise<string> | number> = string | number
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    ctx.add_lower_bound(var_t, union);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, union);
+}
+
+#[test]
+fn test_awaited_union_three_promises() {
+    // Awaited<Promise<string> | Promise<number> | Promise<boolean>>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::BOOLEAN]);
+    ctx.add_lower_bound(var_t, union);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, union);
+}
+
+// -----------------------------------------------------------------------------
+// Special Type Tests
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_awaited_any() {
+    // Awaited<any> = any
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    ctx.add_lower_bound(var_t, TypeId::ANY);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::ANY);
+}
+
+#[test]
+fn test_awaited_promise_any() {
+    // Awaited<Promise<any>> = any
+    let interner = TypeInterner::new();
+
+    let promise_any = interner.promise(TypeId::ANY);
+
+    if let Some(TypeKey::Promise(inner)) = interner.lookup(promise_any) {
+        assert_eq!(inner, TypeId::ANY);
+    } else {
+        panic!("Expected promise type");
+    }
+}
+
+#[test]
+fn test_awaited_never() {
+    // Awaited<never> = never
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    ctx.add_lower_bound(var_t, TypeId::NEVER);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_awaited_promise_never() {
+    // Awaited<Promise<never>> = never
+    let interner = TypeInterner::new();
+
+    let promise_never = interner.promise(TypeId::NEVER);
+
+    if let Some(TypeKey::Promise(inner)) = interner.lookup(promise_never) {
+        assert_eq!(inner, TypeId::NEVER);
+    } else {
+        panic!("Expected promise type");
+    }
+}
+
+#[test]
+fn test_awaited_unknown() {
+    // Awaited<unknown> = unknown
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    ctx.add_lower_bound(var_t, TypeId::UNKNOWN);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::UNKNOWN);
+}
+
+#[test]
+fn test_awaited_promise_unknown() {
+    // Awaited<Promise<unknown>> = unknown
+    let interner = TypeInterner::new();
+
+    let promise_unknown = interner.promise(TypeId::UNKNOWN);
+
+    if let Some(TypeKey::Promise(inner)) = interner.lookup(promise_unknown) {
+        assert_eq!(inner, TypeId::UNKNOWN);
+    } else {
+        panic!("Expected promise type");
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Async Function Return Type Tests
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_async_function_return_inferred() {
+    // async function f() { return "hello" } => Promise<string>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Return value provides lower bound
+    let lit_hello = interner.literal_string("hello");
+    ctx.add_lower_bound(var_t, lit_hello);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, lit_hello);
+}
+
+#[test]
+fn test_async_function_multiple_returns() {
+    // async function f(x: boolean) { if (x) return "a"; return "b"; }
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+    ctx.add_lower_bound(var_t, lit_a);
+    ctx.add_lower_bound(var_t, lit_b);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    let expected = interner.union(vec![lit_a, lit_b]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_async_function_return_promise() {
+    // async function f(): Promise<number> { return 42 }
+    let interner = TypeInterner::new();
+
+    let promise_number = interner.promise(TypeId::NUMBER);
+
+    if let Some(TypeKey::Promise(inner)) = interner.lookup(promise_number) {
+        assert_eq!(inner, TypeId::NUMBER);
+    } else {
+        panic!("Expected promise type");
+    }
+}
+
+#[test]
+fn test_async_function_void_return() {
+    // async function f(): Promise<void> { }
+    let interner = TypeInterner::new();
+
+    let promise_void = interner.promise(TypeId::VOID);
+
+    if let Some(TypeKey::Promise(inner)) = interner.lookup(promise_void) {
+        assert_eq!(inner, TypeId::VOID);
+    } else {
+        panic!("Expected promise type");
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Await Expression Tests
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_await_promise_expression() {
+    // const x = await promise; // x: T from Promise<T>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // await unwraps Promise<string> to string
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_await_non_promise() {
+    // const x = await value; // x: typeof value (non-promise)
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    ctx.add_lower_bound(var_t, TypeId::NUMBER);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_await_chained() {
+    // const x = await (await nestedPromise);
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Double await unwraps to base type
+    ctx.add_lower_bound(var_t, TypeId::BOOLEAN);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::BOOLEAN);
+}
+
+// -----------------------------------------------------------------------------
+// Promise.all / Promise.race Tests
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_promise_all_tuple() {
+    // Promise.all([p1, p2, p3]) where p1: Promise<A>, p2: Promise<B>, p3: Promise<C>
+    // Result: Promise<[A, B, C]>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let a_name = interner.intern_string("A");
+    let b_name = interner.intern_string("B");
+    let c_name = interner.intern_string("C");
+
+    let var_a = ctx.fresh_type_param(a_name);
+    let var_b = ctx.fresh_type_param(b_name);
+    let var_c = ctx.fresh_type_param(c_name);
+
+    ctx.add_lower_bound(var_a, TypeId::STRING);
+    ctx.add_lower_bound(var_b, TypeId::NUMBER);
+    ctx.add_lower_bound(var_c, TypeId::BOOLEAN);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results.len(), 3);
+    assert_eq!(results[0].1, TypeId::STRING);
+    assert_eq!(results[1].1, TypeId::NUMBER);
+    assert_eq!(results[2].1, TypeId::BOOLEAN);
+}
+
+#[test]
+fn test_promise_all_array() {
+    // Promise.all(promises: Promise<T>[]) => Promise<T[]>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_promise_race_union() {
+    // Promise.race([p1, p2]) where p1: Promise<A>, p2: Promise<B>
+    // Result: Promise<A | B>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    ctx.add_lower_bound(var_t, union);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, union);
+}
+
+#[test]
+fn test_promise_allsettled_result() {
+    // Promise.allSettled returns PromiseSettledResult<T>[]
+    let interner = TypeInterner::new();
+
+    // Fulfilled result
+    let status_name = interner.intern_string("status");
+    let value_name = interner.intern_string("value");
+    let fulfilled_lit = interner.literal_string("fulfilled");
+
+    let fulfilled = interner.object(vec![
+        PropertyInfo {
+            name: status_name,
+            type_id: fulfilled_lit,
+            write_type: fulfilled_lit,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: value_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(fulfilled) {
+        assert_eq!(props.len(), 2);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Complex Awaited Patterns
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_awaited_object_type() {
+    // Awaited<Promise<{ name: string }>>
+    let interner = TypeInterner::new();
+
+    let name_prop = interner.intern_string("name");
+    let obj = interner.object(vec![PropertyInfo {
+        name: name_prop,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let promise_obj = interner.promise(obj);
+
+    if let Some(TypeKey::Promise(inner)) = interner.lookup(promise_obj) {
+        assert_eq!(inner, obj);
+    } else {
+        panic!("Expected promise type");
+    }
+}
+
+#[test]
+fn test_awaited_array_type() {
+    // Awaited<Promise<string[]>>
+    let interner = TypeInterner::new();
+
+    let string_array = interner.array(TypeId::STRING);
+    let promise_array = interner.promise(string_array);
+
+    if let Some(TypeKey::Promise(inner)) = interner.lookup(promise_array) {
+        assert_eq!(inner, string_array);
+    } else {
+        panic!("Expected promise type");
+    }
+}
+
+#[test]
+fn test_awaited_tuple_type() {
+    // Awaited<Promise<[string, number]>>
+    let interner = TypeInterner::new();
+
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+
+    let promise_tuple = interner.promise(tuple);
+
+    if let Some(TypeKey::Promise(inner)) = interner.lookup(promise_tuple) {
+        assert_eq!(inner, tuple);
+    } else {
+        panic!("Expected promise type");
+    }
+}
+
+#[test]
+fn test_awaited_function_type() {
+    // Awaited<Promise<() => void>>
+    let interner = TypeInterner::new();
+
+    let fn_type = interner.function(FunctionShape {
+        type_params: vec![],
+        this_param: None,
+        params: vec![],
+        rest_param: None,
+        return_type: TypeId::VOID,
+    });
+
+    let promise_fn = interner.promise(fn_type);
+
+    if let Some(TypeKey::Promise(inner)) = interner.lookup(promise_fn) {
+        assert_eq!(inner, fn_type);
+    } else {
+        panic!("Expected promise type");
+    }
+}
+
+#[test]
+fn test_awaited_literal_type() {
+    // Awaited<Promise<"hello">>
+    let interner = TypeInterner::new();
+
+    let lit_hello = interner.literal_string("hello");
+    let promise_lit = interner.promise(lit_hello);
+
+    if let Some(TypeKey::Promise(inner)) = interner.lookup(promise_lit) {
+        assert_eq!(inner, lit_hello);
+    } else {
+        panic!("Expected promise type");
+    }
+}
+
+#[test]
+fn test_awaited_intersection_type() {
+    // Awaited<Promise<A & B>>
+    let interner = TypeInterner::new();
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![obj_a, obj_b]);
+    let promise_intersection = interner.promise(intersection);
+
+    if let Some(TypeKey::Promise(inner)) = interner.lookup(promise_intersection) {
+        assert_eq!(inner, intersection);
+    } else {
+        panic!("Expected promise type");
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Generic Awaited Patterns
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_awaited_generic_function() {
+    // async function f<T>(x: T): Promise<T>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // T inferred from argument
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_awaited_generic_constraint() {
+    // async function f<T extends object>(x: T): Promise<T>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    ctx.add_lower_bound(var_t, obj);
+    ctx.add_upper_bound(var_t, TypeId::OBJECT);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, obj);
+}
+
+#[test]
+fn test_awaited_mapped_type_inference() {
+    // type Awaited<T> = T extends Promise<infer U> ? U : T
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let u_name = interner.intern_string("U");
+
+    let var_u = ctx.fresh_type_param(u_name);
+
+    // Inferred from Promise<string>
+    ctx.add_lower_bound(var_u, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var_u).unwrap();
+    assert_eq!(result, TypeId::STRING);
+}
+
+// -----------------------------------------------------------------------------
+// Edge Cases
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_awaited_promise_nullable() {
+    // Awaited<Promise<string | null>>
+    let interner = TypeInterner::new();
+
+    let nullable_string = interner.union(vec![TypeId::STRING, TypeId::NULL]);
+    let promise = interner.promise(nullable_string);
+
+    if let Some(TypeKey::Promise(inner)) = interner.lookup(promise) {
+        assert_eq!(inner, nullable_string);
+    } else {
+        panic!("Expected promise type");
+    }
+}
+
+#[test]
+fn test_awaited_promise_optional() {
+    // Awaited<Promise<string | undefined>>
+    let interner = TypeInterner::new();
+
+    let optional_string = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+    let promise = interner.promise(optional_string);
+
+    if let Some(TypeKey::Promise(inner)) = interner.lookup(promise) {
+        assert_eq!(inner, optional_string);
+    } else {
+        panic!("Expected promise type");
+    }
+}
+
+#[test]
+fn test_awaited_promise_of_promise_array() {
+    // Awaited<Promise<Promise<string>[]>>
+    let interner = TypeInterner::new();
+
+    let inner_promise = interner.promise(TypeId::STRING);
+    let promise_array = interner.array(inner_promise);
+    let outer_promise = interner.promise(promise_array);
+
+    if let Some(TypeKey::Promise(inner)) = interner.lookup(outer_promise) {
+        assert_eq!(inner, promise_array);
+    } else {
+        panic!("Expected promise type");
+    }
+}
+
+#[test]
+fn test_awaited_conditional_branches() {
+    // type Result = Awaited<T extends true ? Promise<string> : Promise<number>>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Both branches unwrap to their inner types
+    let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    ctx.add_lower_bound(var_t, union);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, union);
+}
+
+#[test]
+fn test_awaited_recursive_promise_like() {
+    // type PromiseLike<T> = { then(cb: (value: T) => void): void }
+    let interner = TypeInterner::new();
+
+    let then_name = interner.intern_string("then");
+    let cb_name = interner.intern_string("cb");
+    let value_name = interner.intern_string("value");
+
+    // Callback: (value: T) => void
+    let callback = interner.function(FunctionShape {
+        type_params: vec![],
+        this_param: None,
+        params: vec![ParamInfo {
+            name: value_name,
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        rest_param: None,
+        return_type: TypeId::VOID,
+    });
+
+    // then method: (cb: Callback) => void
+    let then_method = interner.function(FunctionShape {
+        type_params: vec![],
+        this_param: None,
+        params: vec![ParamInfo {
+            name: cb_name,
+            type_id: callback,
+            optional: false,
+            rest: false,
+        }],
+        rest_param: None,
+        return_type: TypeId::VOID,
+    });
+
+    let promise_like = interner.object(vec![PropertyInfo {
+        name: then_name,
+        type_id: then_method,
+        write_type: then_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(promise_like) {
+        assert_eq!(props.len(), 1);
+        assert!(props[0].is_method);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_awaited_multiple_type_params() {
+    // async function f<T, U>(x: T, y: U): Promise<[T, U]>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+    ctx.add_lower_bound(var_u, TypeId::NUMBER);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results.len(), 2);
+    assert_eq!(results[0].1, TypeId::STRING);
+    assert_eq!(results[1].1, TypeId::NUMBER);
+}
+
+#[test]
+fn test_awaited_symbol_type() {
+    // Awaited<Promise<symbol>>
+    let interner = TypeInterner::new();
+
+    let promise_symbol = interner.promise(TypeId::SYMBOL);
+
+    if let Some(TypeKey::Promise(inner)) = interner.lookup(promise_symbol) {
+        assert_eq!(inner, TypeId::SYMBOL);
+    } else {
+        panic!("Expected promise type");
+    }
+}
+
+#[test]
+fn test_awaited_bigint_type() {
+    // Awaited<Promise<bigint>>
+    let interner = TypeInterner::new();
+
+    let promise_bigint = interner.promise(TypeId::BIGINT);
+
+    if let Some(TypeKey::Promise(inner)) = interner.lookup(promise_bigint) {
+        assert_eq!(inner, TypeId::BIGINT);
+    } else {
+        panic!("Expected promise type");
+    }
+}
