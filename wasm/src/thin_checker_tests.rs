@@ -11348,3 +11348,180 @@ const makeRequest: (req: API.Request) => API.Response = handleRequest;
         checker.ctx.diagnostics
     );
 }
+
+#[test]
+fn test_property_initialization_if_missing_else_errors() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Foo {
+    name: string;
+    constructor(flag: boolean) {
+        if (flag) {
+            this.name = "yes";
+        }
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        codes.contains(&diagnostic_codes::PROPERTY_HAS_NO_INITIALIZER),
+        "Expected TS2564 for missing initialization, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_property_initialization_if_else_ok() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Bar {
+    name: string;
+    constructor(flag: boolean) {
+        if (flag) {
+            this.name = "yes";
+        } else {
+            this.name = "no";
+        }
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Unexpected diagnostics: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_property_initialization_declare_and_abstract_ok() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+declare class External {
+    name: string;
+}
+
+abstract class Base {
+    abstract name: string;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Unexpected diagnostics: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_property_initialization_computed_keys_ok() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+const a = "a";
+const b = 0;
+enum E { A = 1 }
+
+class C {
+    [a]: number;
+    [b]: number;
+    [E.A]: number;
+    constructor() {
+        this[a] = 1;
+        this[b] = 2;
+        this[E.A] = 3;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Unexpected diagnostics: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_property_initialization_method_call_not_counted() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Foo {
+    name: string;
+    constructor() {
+        this.init();
+    }
+    init() {
+        this.name = "yes";
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        codes.contains(&diagnostic_codes::PROPERTY_HAS_NO_INITIALIZER),
+        "Expected TS2564 for missing initialization, got: {:?}",
+        codes
+    );
+}
