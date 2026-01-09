@@ -37,21 +37,32 @@ Reduce false positives for property access errors by aligning TS2339 behavior wi
 - Extra errors do not increase (no regressions)
 
 ## Resume Notes
-- Branch: `worker/forge-2` (ahead of `origin/rust` by 7 commits).
-- Latest commit: `[wasm] checker: improve TS2339 property access diagnostics`
-- Recent changes: class/interface declaration merging, computed class member name checking with `this` typing, Object prototype members, static inheritance + namespace merge for constructors, additional TS2339 tests.
-- Last tests: `./wasm/test.sh test_ts2339_` (passes).
-- Known remaining TS2339 diffs from last conformance scan (max 500):
-  - Extra: `Symbols/ES5SymbolProperty2.ts`, `Symbols/ES5SymbolProperty6.ts`, `additionalChecks/noPropertyAccessFromIndexSignature1.ts`, `ambient/ambientDeclarations.ts`, `ambient/ambientDeclarationsExternal.ts`, `classes/classDeclarations/classAbstractKeyword/classAbstractCrashedOnce.ts`, `classes/classDeclarations/mergedClassInterface.ts`, `classes/classDeclarations/mergedInheritedClassInterface.ts`, `classes/members/accessibility/privateStaticNotAccessibleInClodule.ts`, `classes/members/accessibility/privateStaticNotAccessibleInClodule2.ts`, `classes/members/accessibility/protectedStaticNotAccessibleInClodule.ts`, `classes/members/privateNames/privateNameHashCharName.ts`.
-  - Missing: `async/es6/asyncWithVarShadowing_es6.ts`, `classes/members/classTypes/staticPropertyNotInClassType.ts`, `classes/members/instanceAndStaticMembers/typeOfThisInStaticMembers12.ts`, `classes/members/instanceAndStaticMembers/typeOfThisInStaticMembers13.ts`, `classes/members/privateNames/privateNameAndIndexSignature.ts`, `classes/members/privateNames/privateNameBadAssignment.ts`, `classes/members/privateNames/privateNameBadDeclaration.ts`, `classes/members/privateNames/privateNameInInExpression.ts`.
-- Conformance scan command (docker + custom script):
-  - `docker run --rm --memory="8g" --cpus="4" -e NODE_PATH=/usr/local/lib/node_modules -e MAX_TESTS=500 -v "$(pwd)/wasm/pkg:/app/pkg:ro" -v "$(pwd)/tests:/tests:ro" -v "/tmp/ts2339-scan.mjs:/app/ts2339-scan.mjs:ro" ts-conformance-runner node /app/ts2339-scan.mjs`
+- Branch: `worker/forge-2` (ahead of `origin/rust`).
+- Latest commit: `[wasm] checker: add static index signature support to CallableShape`
+- Recent changes: Added static index signature support to CallableShape for class constructors, fixed merge conflict in solver/subtype.rs, created find-ts2339.mjs conformance scan script.
+- Last tests: `./wasm/test.sh test_ts2339_` (9 tests pass).
+- **Latest TS2339 conformance scan results (1000 files):**
+  - Extra (false positives): 27 files (was 28, fixed staticIndexSignature4.ts)
+  - Missing: 29 files
+  - Main categories of false positives:
+    1. **Control flow narrowing** (10 files) - `length` property errors on narrowed unions (constLocalsInFunctionExpressions, controlFlowWhileStatement, etc.)
+    2. **Private names** (6 files) - `#prop` access on class types
+    3. **Mixin classes** (4 files) - Properties not found on mixin types
+    4. **Dynamic imports** (5 files) - importCallExpression tests
+  - Main categories of missing errors:
+    1. **Private names** (14 files) - Missing errors for invalid #prop access
+    2. **globalThis** (9 files) - Property access on globalThis
+    3. **Control flow aliasing** (1 file)
+- Conformance scan command: `cd wasm/differential-test && node find-ts2339.mjs --max=1000 --samples=30`
 - Remember: do not touch `.role/AGENTS.md`.
 
 ## Task Queue
-- Re-run TS2339 conformance scan and log deltas.
-- Investigate remaining TS2339 diffs (Symbol.iterator, index-signature property access, private names).
-- Confirm behavior for property access on intersection types.
+- Fix control flow narrowing for property access after type guards (highest priority - affects 10 files)
+  - **Root cause identified:** In `handle_assignment` in control_flow.rs, when an assignment affects a reference, we return the declared type instead of the assigned expression's type. For example, after `x = ""` where `x: string | number`, we should narrow `x` to `string`, but we return `string | number`.
+  - **Fix needed:** Track assigned types in flow nodes and use them for narrowing.
+- Investigate private name (#prop) handling - both extra and missing errors
+- Fix mixin class property resolution
+- Add globalThis property checking
 
 ## Completed
 - Implemented property access on constrained type parameters in checker and solver.
@@ -63,7 +74,12 @@ Reduce false positives for property access errors by aligning TS2339 behavior wi
 - Added Object prototype members and static inheritance/namespace merging for TS2339.
 - Allowed class/interface declaration merging in the binder.
 - Added TS2339 tests for static-instance access, computed `this` names, class/interface merges.
-- Ran `./wasm/test.sh test_ts2339_` (passes; full run still fails: TS2792 module resolution in multi-file import tests).
+- Created find-ts2339.mjs conformance scan script for TS2339 analysis.
+- Added static index signature support to CallableShape (fields + property access resolution).
+- Ran conformance scan: 28 extra, 29 missing (from 1000 files).
+- Fixed parser to preserve static modifier on index signatures (was dropping static keyword).
+- Fixed static index signature property access - staticIndexSignature4.ts now passes.
+- Conformance scan after fix: 27 extra, 29 missing (from 1000 files).
 
 ## Ready for Merge
 Yes

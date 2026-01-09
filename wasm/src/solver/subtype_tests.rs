@@ -3950,7 +3950,7 @@ fn test_function_top_assignability() {
         call_signatures: Vec::new(),
         construct_signatures: Vec::new(),
         properties: Vec::new(),
-    });
+    ..Default::default() });
 
     let specific_fn = interner.function(FunctionShape {
         type_params: vec![],
@@ -17426,7 +17426,7 @@ fn test_variance_method_bivariant_params() {
                     type_id: TypeId::STRING,
                     optional: false,
                     rest: false,
-                }],
+                ..Default::default() }],
                 this_type: None,
                 return_type: TypeId::VOID,
                 type_predicate: None,
@@ -17452,7 +17452,7 @@ fn test_variance_method_bivariant_params() {
                     type_id: wide_type,
                     optional: false,
                     rest: false,
-                }],
+                ..Default::default() }],
                 this_type: None,
                 return_type: TypeId::VOID,
                 type_predicate: None,
@@ -18447,7 +18447,7 @@ fn test_this_parameter_in_callable_method() {
             optional: false,
             readonly: false,
             is_method: true,
-        }],
+        ..Default::default() }],
     });
 
     // Plain method without this
@@ -18470,7 +18470,7 @@ fn test_this_parameter_in_callable_method() {
             optional: false,
             readonly: false,
             is_method: true,
-        }],
+        ..Default::default() }],
     });
 
     // Both should be compatible (methods are bivariant)
@@ -24564,7 +24564,7 @@ fn test_overload_empty_callable() {
         call_signatures: vec![],
         construct_signatures: vec![],
         properties: vec![],
-    });
+    ..Default::default() });
 
     assert!(empty_callable != TypeId::ERROR);
 }

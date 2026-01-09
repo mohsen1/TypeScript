@@ -736,7 +736,7 @@ fn test_property_access_callable_members() {
         call_signatures: vec![call_sig],
         construct_signatures: vec![],
         properties: vec![],
-    });
+    ..Default::default() });
 
     let result = evaluator.resolve_property_access(callable, "bind");
     match result {
@@ -1543,7 +1543,7 @@ fn test_call_generic_callable_signature() {
             type_predicate: None,
         }],
         construct_signatures: Vec::new(),
-        properties: Vec::new(),
+        properties: Vec::new(), ..Default::default()
     });
 
     let result = evaluator.resolve_call(callable, &[TypeId::NUMBER]);
@@ -1725,7 +1725,7 @@ fn test_infer_generic_callable_param_from_function() {
             type_predicate: None,
         }],
         construct_signatures: Vec::new(),
-        properties: Vec::new(),
+        properties: Vec::new(), ..Default::default()
     });
 
     let func = FunctionShape {
@@ -1814,7 +1814,7 @@ fn test_infer_generic_function_param_from_callable() {
             type_predicate: None,
         }],
         construct_signatures: Vec::new(),
-        properties: Vec::new(),
+        properties: Vec::new(), ..Default::default()
     });
 
     let result = infer_generic_function(&interner, &mut subtype, &func, &[callable_arg]);
@@ -1897,7 +1897,7 @@ fn test_infer_generic_function_param_from_overloaded_callable() {
             },
         ],
         construct_signatures: Vec::new(),
-        properties: Vec::new(),
+        properties: Vec::new(), ..Default::default()
     });
 
     let result = infer_generic_function(&interner, &mut subtype, &func, &[callable_arg]);
@@ -1930,7 +1930,7 @@ fn test_infer_generic_callable_param_from_callable() {
             type_predicate: None,
         }],
         construct_signatures: Vec::new(),
-        properties: Vec::new(),
+        properties: Vec::new(), ..Default::default()
     });
 
     let func = FunctionShape {
@@ -1961,7 +1961,7 @@ fn test_infer_generic_callable_param_from_callable() {
             type_predicate: None,
         }],
         construct_signatures: Vec::new(),
-        properties: Vec::new(),
+        properties: Vec::new(), ..Default::default()
     });
 
     let result = infer_generic_function(&interner, &mut subtype, &func, &[callable_arg]);
@@ -1994,7 +1994,7 @@ fn test_infer_generic_construct_signature_param() {
             return_type: t_type,
             type_predicate: None,
         }],
-        properties: Vec::new(),
+        properties: Vec::new(), ..Default::default()
     });
 
     let func = FunctionShape {
@@ -2025,7 +2025,7 @@ fn test_infer_generic_construct_signature_param() {
             return_type: TypeId::NUMBER,
             type_predicate: None,
         }],
-        properties: Vec::new(),
+        properties: Vec::new(), ..Default::default()
     });
 
     let result = infer_generic_function(&interner, &mut subtype, &func, &[ctor_arg]);

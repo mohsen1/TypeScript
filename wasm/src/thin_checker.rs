@@ -630,29 +630,12 @@ impl<'a> ThinCheckerState<'a> {
 
                 if has_type_args {
                     let is_builtin_array = name == "Array" || name == "ReadonlyArray";
-                    let is_builtin_utility_type = Self::is_builtin_utility_type(name);
                     if !is_builtin_array
-                        && !is_builtin_utility_type
                         && self.lookup_type_parameter(name).is_none()
                         && self.resolve_identifier_symbol(type_name_idx).is_none()
                     {
-                        if let Some(type_id) =
-                            self.resolve_builtin_utility_type_reference(name, &type_ref.type_arguments)
-                        {
-                            return type_id;
-                        }
                         self.error_cannot_find_name_at(name, type_name_idx);
                         return TypeId::ERROR;
-                    }
-                    // For utility types without lib.d.ts, return a permissive type
-                    if is_builtin_utility_type && self.resolve_identifier_symbol(type_name_idx).is_none() {
-                        // Resolve type arguments first to catch errors in them
-                        if let Some(args) = &type_ref.type_arguments {
-                            for &arg_idx in &args.nodes {
-                                let _ = self.get_type_from_type_node(arg_idx);
-                            }
-                        }
-                        return TypeId::UNKNOWN;
                     }
                     if !is_builtin_array {
                         if let Some(sym_id) = self.resolve_identifier_symbol(type_name_idx) {
@@ -877,59 +860,6 @@ impl<'a> ThinCheckerState<'a> {
             return Some(type_id);
         }
         None
-    }
-
-    fn resolve_builtin_utility_type_reference(
-        &mut self,
-        name: &str,
-        type_args: &Option<crate::parser::NodeList>,
-    ) -> Option<TypeId> {
-        use crate::solver::{ConditionalType, MappedType, TypeKey, TypeParamInfo};
-
-        let args = type_args.as_ref()?;
-        if args.nodes.len() != 2 {
-            return None;
-        }
-
-        match name {
-            "Exclude" => {
-                let check_type = self.get_type_from_type_node(args.nodes[0]);
-                let extends_type = self.get_type_from_type_node(args.nodes[1]);
-                if check_type == TypeId::ERROR || extends_type == TypeId::ERROR {
-                    return Some(TypeId::ERROR);
-                }
-                Some(self.ctx.types.conditional(ConditionalType {
-                    check_type,
-                    extends_type,
-                    true_type: TypeId::NEVER,
-                    false_type: check_type,
-                    is_distributive: true,
-                }))
-            }
-            "Pick" => {
-                let base_type = self.get_type_from_type_node(args.nodes[0]);
-                let key_type = self.get_type_from_type_node(args.nodes[1]);
-                if base_type == TypeId::ERROR || key_type == TypeId::ERROR {
-                    return Some(TypeId::ERROR);
-                }
-                let type_param = TypeParamInfo {
-                    name: self.ctx.types.intern_string("__pick_key"),
-                    constraint: Some(key_type),
-                    default: None,
-                };
-                let param_type = self.ctx.types.intern(TypeKey::TypeParameter(type_param.clone()));
-                let template = self.ctx.types.intern(TypeKey::IndexAccess(base_type, param_type));
-                Some(self.ctx.types.mapped(MappedType {
-                    type_param,
-                    constraint: key_type,
-                    name_type: None,
-                    template,
-                    readonly_modifier: None,
-                    optional_modifier: None,
-                }))
-            }
-            _ => None,
-        }
     }
 
     /// Resolve a type by name from lib file contexts.
@@ -1350,31 +1280,6 @@ impl<'a> ThinCheckerState<'a> {
         TypeId::ANY
     }
 
-    /// Get type from an intersection type node (A & B).
-    fn get_type_from_intersection_type(&mut self, idx: NodeIndex) -> TypeId {
-        let Some(node) = self.ctx.arena.get(idx) else {
-            return TypeId::ANY;
-        };
-
-        if let Some(composite) = self.ctx.arena.get_composite_type(node) {
-            let mut member_types = Vec::new();
-            for &type_idx in &composite.types.nodes {
-                member_types.push(self.get_type_from_type_node(type_idx));
-            }
-
-            if member_types.is_empty() {
-                return TypeId::UNKNOWN;
-            }
-            if member_types.len() == 1 {
-                return member_types[0];
-            }
-
-            return self.ctx.types.intersection(member_types);
-        }
-
-        TypeId::ANY
-    }
-
     /// Get type from a type query node (typeof X).
     /// Creates a TypeQuery type with the actual SymbolId from the binder.
     fn get_type_from_type_query(&mut self, idx: NodeIndex) -> TypeId {
@@ -1398,7 +1303,12 @@ impl<'a> ThinCheckerState<'a> {
             .map_or(false, |args| !args.nodes.is_empty());
 
         let base = if let Some(sym_id) = self.resolve_value_symbol_for_lowering(type_query.expr_name) {
-            self.get_type_of_symbol(SymbolId(sym_id));
+            if !has_type_args {
+                let resolved = self.get_type_of_symbol(crate::binder::SymbolId(sym_id));
+                if resolved != TypeId::ANY && resolved != TypeId::ERROR {
+                    return resolved;
+                }
+            }
             self.ctx.types.intern(TypeKey::TypeQuery(SymbolRef(sym_id)))
         } else if self.resolve_type_symbol_for_lowering(type_query.expr_name).is_some() {
             let name = name_text.as_deref().unwrap_or("<unknown>");
@@ -1945,17 +1855,6 @@ impl<'a> ThinCheckerState<'a> {
                 self.ctx.type_parameter_scope.remove(&name);
             }
         }
-    }
-
-    /// Push a single type parameter (e.g., from a mapped type) into scope.
-    /// Returns the update needed for pop_type_parameters.
-    fn push_single_type_parameter(&mut self, param_idx: NodeIndex) -> Option<(String, Option<TypeId>)> {
-        use crate::solver::TypeKey;
-
-        let (info, name) = self.lower_type_parameter_info(param_idx)?;
-        let type_id = self.ctx.types.intern(TypeKey::TypeParameter(info));
-        let previous = self.ctx.type_parameter_scope.insert(name.clone(), type_id);
-        Some((name, previous))
     }
 
     /// Get type of an interface declaration.
@@ -3679,8 +3578,7 @@ impl<'a> ThinCheckerState<'a> {
         let name = &ident.escaped_text;
 
         // Resolve via binder persistent scopes for stateless lookup.
-        let sym_id_opt = self.resolve_identifier_symbol(idx);
-        if let Some(sym_id) = sym_id_opt {
+        if let Some(sym_id) = self.resolve_identifier_symbol(idx) {
             if self.alias_resolves_to_type_only(sym_id) {
                 self.error_type_only_value_at(name, idx);
                 return TypeId::ERROR;
@@ -3693,9 +3591,9 @@ impl<'a> ThinCheckerState<'a> {
                 return TypeId::ERROR;
             }
             let declared_type = self.get_type_of_symbol(sym_id);
-            let should_check = self.should_check_definite_assignment(sym_id, idx);
-            let is_assigned = self.is_definitely_assigned_at(idx);
-            if should_check && !is_assigned {
+            if self.should_check_definite_assignment(sym_id, idx)
+                && !self.is_definitely_assigned_at(idx)
+            {
                 self.error_variable_used_before_assigned_at(name, idx);
             }
             return self.apply_flow_narrowing(idx, declared_type);
@@ -4505,6 +4403,8 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Get the type of an assignment target without definite assignment checks.
     fn get_type_of_assignment_target(&mut self, idx: NodeIndex) -> TypeId {
+        use crate::scanner::SyntaxKind;
+
         if let Some(node) = self.ctx.arena.get(idx) {
             if node.kind == SyntaxKind::Identifier as u16 {
                 if let Some(sym_id) = self.resolve_identifier_symbol(idx) {
@@ -4696,17 +4596,13 @@ impl<'a> ThinCheckerState<'a> {
         // Get the type of the callee
         let callee_type = self.get_type_of_node(call.expression);
 
-        // Get arguments list (may be None for calls without arguments)
-        let args = call.arguments.as_ref().map(|a| &a.nodes).map(|n| n.as_slice()).unwrap_or(&[]);
-
         // Check if callee is any/error (don't report for those)
-        // Still process arguments to trigger definite assignment checks (TS2454) even if callee is any
         if callee_type == TypeId::ANY || callee_type == TypeId::ERROR {
-            for &arg_idx in args {
-                self.get_type_of_node(arg_idx);
-            }
             return TypeId::ANY;
         }
+
+        // Get arguments list (may be None for calls without arguments)
+        let args = call.arguments.as_ref().map(|a| &a.nodes).map(|n| n.as_slice()).unwrap_or(&[]);
 
         let overload_signatures = match self.ctx.types.lookup(callee_type) {
             Some(TypeKey::Callable(shape_id)) => {
@@ -6195,6 +6091,9 @@ impl<'a> ThinCheckerState<'a> {
         // Check the function body (for type errors within the body)
         if !func.body.is_none() {
             self.cache_parameter_types(&func.parameters.nodes, Some(&param_types));
+
+            // Check that parameter default values are assignable to declared types (TS2322)
+            self.check_parameter_initializers(&func.parameters.nodes);
 
             let mut has_contextual_return = false;
             if !has_type_annotation {
@@ -8693,11 +8592,6 @@ impl<'a> ThinCheckerState<'a> {
                 // are resolved via binder (for abstract class detection)
                 return self.get_type_from_union_type(idx);
             }
-            if node.kind == syntax_kind_ext::INTERSECTION_TYPE {
-                // Handle intersection types specially so nested type references
-                // still run through checker resolution (e.g., built-in utility fallbacks).
-                return self.get_type_from_intersection_type(idx);
-            }
             if node.kind == syntax_kind_ext::TYPE_LITERAL {
                 // Type literals should use checker resolution so type parameters resolve correctly.
                 return self.get_type_from_type_literal(idx);
@@ -9252,14 +9146,6 @@ impl<'a> ThinCheckerState<'a> {
         true
     }
 
-    fn resolve_no_implicit_returns_from_source(&self, text: &str) -> bool {
-        if let Some(value) = Self::parse_test_option_bool(text, "@noimplicitreturns") {
-            return value;
-        }
-        // noImplicitReturns is NOT enabled by strict mode by default
-        false
-    }
-
     fn parse_test_option_bool(text: &str, key: &str) -> Option<bool> {
         for line in text.lines().take(32) {
             let trimmed = line.trim();
@@ -9305,7 +9191,6 @@ impl<'a> ThinCheckerState<'a> {
 
         if let Some(sf) = self.ctx.arena.get_source_file(node) {
             self.ctx.no_implicit_any = self.resolve_no_implicit_any_from_source(&sf.text);
-            self.ctx.no_implicit_returns = self.resolve_no_implicit_returns_from_source(&sf.text);
 
             // Type check each top-level statement
             for &stmt_idx in &sf.statements.nodes {
@@ -9536,6 +9421,9 @@ impl<'a> ThinCheckerState<'a> {
 
                         self.cache_parameter_types(&func.parameters.nodes, None);
 
+                        // Check that parameter default values are assignable to declared types (TS2322)
+                        self.check_parameter_initializers(&func.parameters.nodes);
+
                         if !has_type_annotation {
                             return_type = self.infer_return_type_from_body(func.body, None);
                         }
@@ -9573,17 +9461,6 @@ impl<'a> ThinCheckerState<'a> {
                                 func.type_annotation,
                                 diagnostic_messages::FUNCTION_LACKS_ENDING_RETURN_STATEMENT,
                                 diagnostic_codes::NOT_ALL_CODE_PATHS_RETURN_VALUE,
-                            );
-                        }
-
-                        // Check for TS7030: noImplicitReturns - not all code paths return a value
-                        if self.ctx.no_implicit_returns && has_return && falls_through {
-                            use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
-                            let error_node = if !func.name.is_none() { func.name } else { func.body };
-                            self.error_at_node(
-                                error_node,
-                                diagnostic_messages::NOT_ALL_CODE_PATHS_RETURN,
-                                diagnostic_codes::NOT_ALL_CODE_PATHS_RETURN,
                             );
                         }
 
@@ -9665,12 +9542,9 @@ impl<'a> ThinCheckerState<'a> {
             // Type alias declarations - check the type for accessor body and parameter property errors
             syntax_kind_ext::TYPE_ALIAS_DECLARATION => {
                 if let Some(type_alias) = self.ctx.arena.get_type_alias(node) {
-                    // Push type parameters into scope before checking
-                    let (_params, updates) = self.push_type_parameters(&type_alias.type_parameters);
                     // Check the type for accessor bodies in ambient context and parameter properties
                     self.check_type_for_missing_names(type_alias.type_node);
                     self.check_type_for_parameter_properties(type_alias.type_node);
-                    self.pop_type_parameters(updates);
                 }
             }
             // Other type declarations - just register them, no expression checking needed
@@ -11624,39 +11498,6 @@ impl<'a> ThinCheckerState<'a> {
         self.pop_type_parameters(type_param_updates);
     }
 
-    /// Check if a name is a built-in TypeScript utility type.
-    /// These are types like Partial<T>, Required<T>, etc. from lib.es5.d.ts.
-    /// When lib.d.ts is not loaded, we handle these specially to avoid false TS2304 errors.
-    fn is_builtin_utility_type(name: &str) -> bool {
-        matches!(name,
-            // Mapped utility types
-            "Partial" | "Required" | "Readonly" | "Pick" | "Omit" | "Record"
-            // Conditional utility types
-            | "Exclude" | "Extract" | "NonNullable"
-            // Function utility types
-            | "ReturnType" | "Parameters" | "ConstructorParameters" | "InstanceType"
-            // String manipulation types
-            | "Uppercase" | "Lowercase" | "Capitalize" | "Uncapitalize"
-            // Other utility types
-            | "ThisType" | "ThisParameterType" | "OmitThisParameter"
-            | "Awaited" | "NoInfer"
-            // Promise-related types (commonly used generics)
-            | "Promise" | "PromiseLike"
-            // Iterator types
-            | "Iterable" | "Iterator" | "IterableIterator" | "AsyncIterable" | "AsyncIterator" | "AsyncIterableIterator"
-            // Generator types
-            | "Generator" | "GeneratorFunction" | "AsyncGenerator" | "AsyncGeneratorFunction"
-            // Array-like types (already handled but including for completeness)
-            | "ArrayLike" | "Readonly" | "ReadonlyArray"
-            // Collection types
-            | "Map" | "Set" | "WeakMap" | "WeakSet" | "WeakRef"
-            // TypedArray types
-            | "TypedArray"
-            // Error types
-            | "Error" | "EvalError" | "RangeError" | "ReferenceError" | "SyntaxError" | "TypeError" | "URIError" | "AggregateError"
-        )
-    }
-
     /// Check if a node has the `declare` modifier.
     fn has_declare_modifier(&self, modifiers: &Option<crate::parser::NodeList>) -> bool {
         use crate::scanner::SyntaxKind;
@@ -12170,17 +12011,13 @@ impl<'a> ThinCheckerState<'a> {
             }
             k if k == syntax_kind_ext::FUNCTION_TYPE || k == syntax_kind_ext::CONSTRUCTOR_TYPE => {
                 if let Some(func_type) = self.ctx.arena.get_function_type(node) {
-                    // Check constraint/default types before pushing params into scope
                     self.check_type_parameters_for_missing_names(&func_type.type_parameters);
-                    // Push type parameters into scope for parameter types and return type
-                    let (_params, updates) = self.push_type_parameters(&func_type.type_parameters);
                     for &param_idx in &func_type.parameters.nodes {
                         self.check_parameter_type_for_missing_names(param_idx);
                     }
                     if !func_type.type_annotation.is_none() {
                         self.check_type_for_missing_names(func_type.type_annotation);
                     }
-                    self.pop_type_parameters(updates);
                 }
             }
             k if k == syntax_kind_ext::ARRAY_TYPE => {
@@ -12236,10 +12073,7 @@ impl<'a> ThinCheckerState<'a> {
             }
             k if k == syntax_kind_ext::MAPPED_TYPE => {
                 if let Some(mapped) = self.ctx.arena.get_mapped_type(node) {
-                    // Check the type parameter's constraint/default for missing names first
                     self.check_type_parameter_node_for_missing_names(mapped.type_parameter);
-                    // Push the mapped type parameter into scope for name_type and type_node
-                    let update = self.push_single_type_parameter(mapped.type_parameter);
                     if !mapped.name_type.is_none() {
                         self.check_type_for_missing_names(mapped.name_type);
                     }
@@ -12250,10 +12084,6 @@ impl<'a> ThinCheckerState<'a> {
                         for &member_idx in &members.nodes {
                             self.check_type_member_for_missing_names(member_idx);
                         }
-                    }
-                    // Pop the mapped type parameter from scope
-                    if let Some((name, previous)) = update {
-                        self.pop_type_parameters(vec![(name, previous)]);
                     }
                 }
             }
@@ -13817,6 +13647,39 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    /// Check that parameter default values (initializers) are assignable to declared parameter types.
+    /// This emits TS2322 when the default value type doesn't match the parameter type annotation.
+    fn check_parameter_initializers(&mut self, parameters: &[NodeIndex]) {
+        for &param_idx in parameters {
+            let Some(param_node) = self.ctx.arena.get(param_idx) else {
+                continue;
+            };
+            let Some(param) = self.ctx.arena.get_parameter(param_node) else {
+                continue;
+            };
+
+            // Only check if there's both a type annotation and an initializer
+            if param.type_annotation.is_none() || param.initializer.is_none() {
+                continue;
+            }
+
+            // Get the declared parameter type
+            let declared_type = self.get_type_from_type_node(param.type_annotation);
+
+            // Get the type of the initializer
+            let init_type = self.get_type_of_node(param.initializer);
+
+            // Check if the initializer type is assignable to the declared type
+            if !self.is_assignable_to(init_type, declared_type) {
+                self.error_type_not_assignable_with_reason_at(
+                    init_type,
+                    declared_type,
+                    param_idx,
+                );
+            }
+        }
+    }
+
     fn node_text(&self, node_idx: NodeIndex) -> Option<String> {
         let (start, end) = self.get_node_span(node_idx)?;
         let source = self.ctx.arena.source_files.first()?.text.as_str();
@@ -14299,6 +14162,9 @@ impl<'a> ThinCheckerState<'a> {
 
         self.cache_parameter_types(&method.parameters.nodes, None);
 
+        // Check that parameter default values are assignable to declared types (TS2322)
+        self.check_parameter_initializers(&method.parameters.nodes);
+
         // Check for parameter properties (error 2369)
         // Parameter properties are only allowed in constructors, not in methods
         self.check_parameter_properties(&method.parameters.nodes);
@@ -14358,16 +14224,6 @@ impl<'a> ThinCheckerState<'a> {
                 );
             }
 
-            // Check for TS7030: noImplicitReturns - not all code paths return a value
-            if self.ctx.no_implicit_returns && has_return && falls_through {
-                use crate::checker::types::diagnostics::diagnostic_messages;
-                self.error_at_node(
-                    method.name,
-                    diagnostic_messages::NOT_ALL_CODE_PATHS_RETURN,
-                    diagnostic_codes::NOT_ALL_CODE_PATHS_RETURN,
-                );
-            }
-
             self.pop_return_type();
         }
 
@@ -14421,6 +14277,9 @@ impl<'a> ThinCheckerState<'a> {
         // Constructors don't have explicit return types
 
         self.cache_parameter_types(&ctor.parameters.nodes, None);
+
+        // Check that parameter default values are assignable to declared types (TS2322)
+        self.check_parameter_initializers(&ctor.parameters.nodes);
 
         // Set in_constructor flag for abstract property checks (error 2715)
         if let Some(ref mut class_info) = self.ctx.enclosing_class {
@@ -14478,6 +14337,9 @@ impl<'a> ThinCheckerState<'a> {
 
         self.cache_parameter_types(&accessor.parameters.nodes, None);
 
+        // Check that parameter default values are assignable to declared types (TS2322)
+        self.check_parameter_initializers(&accessor.parameters.nodes);
+
         // Check for parameter properties (error 2369)
         // Parameter properties are only allowed in constructors, not in accessors
         self.check_parameter_properties(&accessor.parameters.nodes);
@@ -14531,16 +14393,6 @@ impl<'a> ThinCheckerState<'a> {
                         accessor.type_annotation,
                         diagnostic_messages::FUNCTION_LACKS_ENDING_RETURN_STATEMENT,
                         diagnostic_codes::NOT_ALL_CODE_PATHS_RETURN_VALUE,
-                    );
-                }
-
-                // Check for TS7030: noImplicitReturns - not all code paths return a value
-                if self.ctx.no_implicit_returns && has_return && falls_through {
-                    use crate::checker::types::diagnostics::diagnostic_messages;
-                    self.error_at_node(
-                        accessor.name,
-                        diagnostic_messages::NOT_ALL_CODE_PATHS_RETURN,
-                        diagnostic_codes::NOT_ALL_CODE_PATHS_RETURN,
                     );
                 }
             }
