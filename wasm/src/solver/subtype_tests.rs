@@ -11432,3 +11432,621 @@ fn test_readonly_method_property() {
     // Mutable method is subtype of readonly method
     assert!(checker.is_subtype_of(obj_mutable_method, obj_readonly_method));
 }
+
+// =============================================================================
+// Tuple Type Subtype Tests
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// Fixed Length Tuple Assignability
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_tuple_fixed_same_length_same_types() {
+    // [string, number] <: [string, number]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let tuple1 = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+
+    let tuple2 = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+
+    // Same types - bidirectional subtype
+    assert!(checker.is_subtype_of(tuple1, tuple2));
+    assert!(checker.is_subtype_of(tuple2, tuple1));
+}
+
+#[test]
+fn test_tuple_fixed_covariant_elements() {
+    // ["hello", 42] <: [string, number]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let hello = interner.literal_string("hello");
+    let forty_two = interner.literal_number(42.0);
+
+    let literal_tuple = interner.tuple(vec![
+        TupleElement { type_id: hello, name: None, optional: false, rest: false },
+        TupleElement { type_id: forty_two, name: None, optional: false, rest: false },
+    ]);
+
+    let wide_tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+
+    // Literal tuple is subtype of wider tuple
+    assert!(checker.is_subtype_of(literal_tuple, wide_tuple));
+    // Wider tuple is NOT subtype of literal
+    assert!(!checker.is_subtype_of(wide_tuple, literal_tuple));
+}
+
+#[test]
+fn test_tuple_fixed_different_lengths_not_subtype() {
+    // [string, number, boolean] is NOT subtype of [string, number]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let tuple_3 = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+    ]);
+
+    let tuple_2 = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+
+    // Extra element - not subtype of fixed tuple
+    assert!(!checker.is_subtype_of(tuple_3, tuple_2));
+    // Missing element - not subtype
+    assert!(!checker.is_subtype_of(tuple_2, tuple_3));
+}
+
+#[test]
+fn test_tuple_fixed_type_mismatch() {
+    // [string, string] is NOT subtype of [string, number]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let tuple_ss = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+
+    let tuple_sn = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+
+    // Different element types - not subtypes
+    assert!(!checker.is_subtype_of(tuple_ss, tuple_sn));
+    assert!(!checker.is_subtype_of(tuple_sn, tuple_ss));
+}
+
+#[test]
+fn test_tuple_fixed_empty_tuple() {
+    // [] <: []
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let empty_tuple = interner.tuple(vec![]);
+
+    // Empty tuple is subtype of itself
+    assert!(checker.is_subtype_of(empty_tuple, empty_tuple));
+}
+
+#[test]
+fn test_tuple_fixed_single_element() {
+    // [string] <: [string]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let single = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+
+    assert!(checker.is_subtype_of(single, single));
+}
+
+#[test]
+fn test_tuple_fixed_union_element() {
+    // [string | number] <: [string | number]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    let tuple_union = interner.tuple(vec![
+        TupleElement { type_id: union, name: None, optional: false, rest: false },
+    ]);
+
+    let tuple_string = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+
+    // [string] <: [string | number]
+    assert!(checker.is_subtype_of(tuple_string, tuple_union));
+    // [string | number] is NOT subtype of [string]
+    assert!(!checker.is_subtype_of(tuple_union, tuple_string));
+}
+
+// -----------------------------------------------------------------------------
+// Rest Element Handling
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_tuple_rest_basic() {
+    // [string, ...number[]] - tuple with rest
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let number_array = interner.array(TypeId::NUMBER);
+
+    let tuple_with_rest = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: number_array, name: None, optional: false, rest: true },
+    ]);
+
+    let tuple_string_number = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+
+    // Fixed tuple with matching types is subtype of rest tuple
+    assert!(checker.is_subtype_of(tuple_string_number, tuple_with_rest));
+}
+
+#[test]
+fn test_tuple_rest_accepts_multiple() {
+    // [string, number, number, number] <: [string, ...number[]]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let number_array = interner.array(TypeId::NUMBER);
+
+    let tuple_with_rest = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: number_array, name: None, optional: false, rest: true },
+    ]);
+
+    let tuple_four = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+
+    // Multiple numbers match rest
+    assert!(checker.is_subtype_of(tuple_four, tuple_with_rest));
+}
+
+#[test]
+fn test_tuple_rest_accepts_zero() {
+    // [string] <: [string, ...number[]]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let number_array = interner.array(TypeId::NUMBER);
+
+    let tuple_with_rest = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: number_array, name: None, optional: false, rest: true },
+    ]);
+
+    let tuple_one = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+
+    // Zero rest elements is valid
+    assert!(checker.is_subtype_of(tuple_one, tuple_with_rest));
+}
+
+#[test]
+fn test_tuple_rest_type_mismatch() {
+    // [string, boolean] is NOT subtype of [string, ...number[]]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let number_array = interner.array(TypeId::NUMBER);
+
+    let tuple_with_rest = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: number_array, name: None, optional: false, rest: true },
+    ]);
+
+    let tuple_bool = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+    ]);
+
+    // boolean doesn't match number rest
+    assert!(!checker.is_subtype_of(tuple_bool, tuple_with_rest));
+}
+
+#[test]
+fn test_tuple_rest_to_rest() {
+    // [...string[]] <: [...string[]]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let string_array = interner.array(TypeId::STRING);
+
+    let tuple_rest1 = interner.tuple(vec![
+        TupleElement { type_id: string_array, name: None, optional: false, rest: true },
+    ]);
+
+    let tuple_rest2 = interner.tuple(vec![
+        TupleElement { type_id: string_array, name: None, optional: false, rest: true },
+    ]);
+
+    // Same rest types - bidirectional subtype
+    assert!(checker.is_subtype_of(tuple_rest1, tuple_rest2));
+    assert!(checker.is_subtype_of(tuple_rest2, tuple_rest1));
+}
+
+#[test]
+fn test_tuple_rest_covariant() {
+    // [...("hello")[]] <: [...string[]]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let hello = interner.literal_string("hello");
+    let hello_array = interner.array(hello);
+    let string_array = interner.array(TypeId::STRING);
+
+    let tuple_literal_rest = interner.tuple(vec![
+        TupleElement { type_id: hello_array, name: None, optional: false, rest: true },
+    ]);
+
+    let tuple_string_rest = interner.tuple(vec![
+        TupleElement { type_id: string_array, name: None, optional: false, rest: true },
+    ]);
+
+    // Literal rest is subtype of string rest
+    assert!(checker.is_subtype_of(tuple_literal_rest, tuple_string_rest));
+}
+
+#[test]
+fn test_tuple_rest_middle_position() {
+    // [string, ...number[], boolean] - rest in middle
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let number_array = interner.array(TypeId::NUMBER);
+
+    let tuple_middle_rest = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: number_array, name: None, optional: false, rest: true },
+        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+    ]);
+
+    let tuple_three = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+    ]);
+
+    // Fixed tuple matches middle rest
+    assert!(checker.is_subtype_of(tuple_three, tuple_middle_rest));
+}
+
+// -----------------------------------------------------------------------------
+// Optional Element Patterns
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_tuple_optional_basic() {
+    // [string, number?] - optional second element
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let tuple_optional = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: true, rest: false },
+    ]);
+
+    let tuple_one = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+
+    // Shorter tuple matches optional
+    assert!(checker.is_subtype_of(tuple_one, tuple_optional));
+}
+
+#[test]
+fn test_tuple_optional_provided() {
+    // [string, number] <: [string, number?]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let tuple_optional = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: true, rest: false },
+    ]);
+
+    let tuple_both = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+
+    // Full tuple with optional provided is subtype
+    assert!(checker.is_subtype_of(tuple_both, tuple_optional));
+}
+
+#[test]
+fn test_tuple_optional_all_optional() {
+    // [string?, number?]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let tuple_all_optional = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: true, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: true, rest: false },
+    ]);
+
+    let empty_tuple = interner.tuple(vec![]);
+
+    // Empty tuple matches all optional
+    assert!(checker.is_subtype_of(empty_tuple, tuple_all_optional));
+}
+
+#[test]
+fn test_tuple_optional_type_mismatch() {
+    // [string, boolean] is NOT subtype of [string, number?]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let tuple_optional_number = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: true, rest: false },
+    ]);
+
+    let tuple_with_bool = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+    ]);
+
+    // Wrong type for optional slot
+    assert!(!checker.is_subtype_of(tuple_with_bool, tuple_optional_number));
+}
+
+#[test]
+fn test_tuple_optional_required_to_optional() {
+    // Required element can fill optional slot
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let tuple_required = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+
+    let tuple_optional = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: true, rest: false },
+    ]);
+
+    // Required is subtype of optional
+    assert!(checker.is_subtype_of(tuple_required, tuple_optional));
+}
+
+#[test]
+fn test_tuple_optional_to_required_not_subtype() {
+    // [string?] is NOT subtype of [string]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let tuple_required = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+
+    let tuple_optional = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: true, rest: false },
+    ]);
+
+    // Optional is NOT subtype of required
+    assert!(!checker.is_subtype_of(tuple_optional, tuple_required));
+}
+
+#[test]
+fn test_tuple_optional_multiple() {
+    // [string, number?, boolean?]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let tuple_multi_optional = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: true, rest: false },
+        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: true, rest: false },
+    ]);
+
+    let tuple_one = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+
+    let tuple_two = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+
+    // Both shorter tuples match
+    assert!(checker.is_subtype_of(tuple_one, tuple_multi_optional));
+    assert!(checker.is_subtype_of(tuple_two, tuple_multi_optional));
+}
+
+// -----------------------------------------------------------------------------
+// Labeled Tuple Elements
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_tuple_labeled_same_labels() {
+    // [x: string, y: number] <: [x: string, y: number]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let x_name = interner.intern_string("x");
+    let y_name = interner.intern_string("y");
+
+    let tuple1 = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: Some(x_name), optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: Some(y_name), optional: false, rest: false },
+    ]);
+
+    let tuple2 = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: Some(x_name), optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: Some(y_name), optional: false, rest: false },
+    ]);
+
+    // Same labels - bidirectional subtype
+    assert!(checker.is_subtype_of(tuple1, tuple2));
+    assert!(checker.is_subtype_of(tuple2, tuple1));
+}
+
+#[test]
+fn test_tuple_labeled_to_unlabeled() {
+    // [x: string, y: number] <: [string, number]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let x_name = interner.intern_string("x");
+    let y_name = interner.intern_string("y");
+
+    let labeled = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: Some(x_name), optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: Some(y_name), optional: false, rest: false },
+    ]);
+
+    let unlabeled = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+
+    // Labels don't affect subtyping - types must match
+    assert!(checker.is_subtype_of(labeled, unlabeled));
+    assert!(checker.is_subtype_of(unlabeled, labeled));
+}
+
+#[test]
+fn test_tuple_labeled_different_labels() {
+    // [a: string, b: number] <: [x: string, y: number]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_name = interner.intern_string("a");
+    let b_name = interner.intern_string("b");
+    let x_name = interner.intern_string("x");
+    let y_name = interner.intern_string("y");
+
+    let tuple_ab = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: Some(a_name), optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: Some(b_name), optional: false, rest: false },
+    ]);
+
+    let tuple_xy = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: Some(x_name), optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: Some(y_name), optional: false, rest: false },
+    ]);
+
+    // Different labels but same types - should still be subtypes
+    assert!(checker.is_subtype_of(tuple_ab, tuple_xy));
+    assert!(checker.is_subtype_of(tuple_xy, tuple_ab));
+}
+
+#[test]
+fn test_tuple_labeled_optional() {
+    // [x: string, y?: number]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let x_name = interner.intern_string("x");
+    let y_name = interner.intern_string("y");
+
+    let labeled_optional = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: Some(x_name), optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: Some(y_name), optional: true, rest: false },
+    ]);
+
+    let labeled_one = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: Some(x_name), optional: false, rest: false },
+    ]);
+
+    // Shorter tuple matches optional labeled
+    assert!(checker.is_subtype_of(labeled_one, labeled_optional));
+}
+
+#[test]
+fn test_tuple_labeled_rest() {
+    // [x: string, ...rest: number[]]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let x_name = interner.intern_string("x");
+    let rest_name = interner.intern_string("rest");
+    let number_array = interner.array(TypeId::NUMBER);
+
+    let labeled_rest = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: Some(x_name), optional: false, rest: false },
+        TupleElement { type_id: number_array, name: Some(rest_name), optional: false, rest: true },
+    ]);
+
+    let labeled_two = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: Some(x_name), optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+
+    // Fixed elements match labeled rest
+    assert!(checker.is_subtype_of(labeled_two, labeled_rest));
+}
+
+#[test]
+fn test_tuple_labeled_covariant() {
+    // [x: "hello"] <: [x: string]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let x_name = interner.intern_string("x");
+    let hello = interner.literal_string("hello");
+
+    let literal_labeled = interner.tuple(vec![
+        TupleElement { type_id: hello, name: Some(x_name), optional: false, rest: false },
+    ]);
+
+    let string_labeled = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: Some(x_name), optional: false, rest: false },
+    ]);
+
+    // Literal labeled is subtype of string labeled
+    assert!(checker.is_subtype_of(literal_labeled, string_labeled));
+}
+
+#[test]
+fn test_tuple_labeled_mixed() {
+    // [x: string, number, y: boolean] - mixed labeled/unlabeled
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let x_name = interner.intern_string("x");
+    let y_name = interner.intern_string("y");
+
+    let mixed = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: Some(x_name), optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::BOOLEAN, name: Some(y_name), optional: false, rest: false },
+    ]);
+
+    let all_unlabeled = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+    ]);
+
+    // Mixed and unlabeled should be equivalent
+    assert!(checker.is_subtype_of(mixed, all_unlabeled));
+    assert!(checker.is_subtype_of(all_unlabeled, mixed));
+}
