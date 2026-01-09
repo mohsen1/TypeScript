@@ -36393,3 +36393,671 @@ class TimeoutPromise<T> {
         output
     );
 }
+
+// =============================================================================
+// RECURSIVE TYPE PATTERN TESTS - tree, linked list, JSON
+// =============================================================================
+
+#[test]
+fn test_class_es5_recursive_type_tree() {
+    let source = r#"
+// Recursive tree type pattern
+interface TreeNode<T> {
+    value: T;
+    children: TreeNode<T>[];
+}
+
+type BinaryTreeNode<T> = {
+    value: T;
+    left: BinaryTreeNode<T> | null;
+    right: BinaryTreeNode<T> | null;
+};
+
+class Tree<T> {
+    private root: TreeNode<T> | null = null;
+
+    constructor(rootValue?: T) {
+        if (rootValue !== undefined) {
+            this.root = { value: rootValue, children: [] };
+        }
+    }
+
+    getRoot(): TreeNode<T> | null {
+        return this.root;
+    }
+
+    setRoot(node: TreeNode<T>): void {
+        this.root = node;
+    }
+
+    addChild(parent: TreeNode<T>, value: T): TreeNode<T> {
+        const child: TreeNode<T> = { value, children: [] };
+        parent.children.push(child);
+        return child;
+    }
+
+    traverse(callback: (node: TreeNode<T>) => void): void {
+        if (this.root) {
+            this.traverseNode(this.root, callback);
+        }
+    }
+
+    private traverseNode(node: TreeNode<T>, callback: (node: TreeNode<T>) => void): void {
+        callback(node);
+        node.children.forEach(child => this.traverseNode(child, callback));
+    }
+
+    getDepth(): number {
+        if (!this.root) return 0;
+        return this.calculateDepth(this.root);
+    }
+
+    private calculateDepth(node: TreeNode<T>): number {
+        if (node.children.length === 0) return 1;
+        return 1 + Math.max(...node.children.map(c => this.calculateDepth(c)));
+    }
+}
+
+class BinaryTree<T> {
+    private root: BinaryTreeNode<T> | null = null;
+
+    constructor(rootValue?: T) {
+        if (rootValue !== undefined) {
+            this.root = { value: rootValue, left: null, right: null };
+        }
+    }
+
+    getRoot(): BinaryTreeNode<T> | null {
+        return this.root;
+    }
+
+    insert(value: T, compareFn: (a: T, b: T) => number): void {
+        const newNode: BinaryTreeNode<T> = { value, left: null, right: null };
+        if (!this.root) {
+            this.root = newNode;
+            return;
+        }
+        this.insertNode(this.root, newNode, compareFn);
+    }
+
+    private insertNode(node: BinaryTreeNode<T>, newNode: BinaryTreeNode<T>, compareFn: (a: T, b: T) => number): void {
+        if (compareFn(newNode.value, node.value) < 0) {
+            if (node.left === null) {
+                node.left = newNode;
+            } else {
+                this.insertNode(node.left, newNode, compareFn);
+            }
+        } else {
+            if (node.right === null) {
+                node.right = newNode;
+            } else {
+                this.insertNode(node.right, newNode, compareFn);
+            }
+        }
+    }
+
+    inorderTraversal(callback: (value: T) => void): void {
+        if (this.root) {
+            this.inorder(this.root, callback);
+        }
+    }
+
+    private inorder(node: BinaryTreeNode<T>, callback: (value: T) => void): void {
+        if (node.left) this.inorder(node.left, callback);
+        callback(node.value);
+        if (node.right) this.inorder(node.right, callback);
+    }
+}
+
+class FileSystemTree {
+    private root: TreeNode<string>;
+
+    constructor(rootName: string) {
+        this.root = { value: rootName, children: [] };
+    }
+
+    getRoot(): TreeNode<string> {
+        return this.root;
+    }
+
+    addFolder(parent: TreeNode<string>, name: string): TreeNode<string> {
+        const folder: TreeNode<string> = { value: name, children: [] };
+        parent.children.push(folder);
+        return folder;
+    }
+
+    addFile(parent: TreeNode<string>, name: string): TreeNode<string> {
+        const file: TreeNode<string> = { value: name, children: [] };
+        parent.children.push(file);
+        return file;
+    }
+
+    findNode(name: string): TreeNode<string> | null {
+        return this.findInNode(this.root, name);
+    }
+
+    private findInNode(node: TreeNode<string>, name: string): TreeNode<string> | null {
+        if (node.value === name) return node;
+        for (const child of node.children) {
+            const found = this.findInNode(child, name);
+            if (found) return found;
+        }
+        return null;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Tree") && output.contains("BinaryTree") && output.contains("FileSystemTree"),
+        "Expected recursive tree type classes: {}",
+        output
+    );
+
+    // Tree methods
+    assert!(
+        output.contains("getRoot") && output.contains("setRoot") && output.contains("addChild") && output.contains("traverse"),
+        "Expected Tree methods: {}",
+        output
+    );
+
+    // BinaryTree methods
+    assert!(
+        output.contains("insert") && output.contains("inorderTraversal"),
+        "Expected BinaryTree methods: {}",
+        output
+    );
+
+    // FileSystemTree methods
+    assert!(
+        output.contains("addFolder") && output.contains("addFile") && output.contains("findNode"),
+        "Expected FileSystemTree methods: {}",
+        output
+    );
+
+    // Interface and type aliases should be stripped
+    assert!(
+        !output.contains("interface TreeNode") && !output.contains("type BinaryTreeNode"),
+        "Expected interface and type aliases to be stripped: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_recursive_type_linked_list() {
+    let source = r#"
+// Recursive linked list type pattern
+interface ListNode<T> {
+    value: T;
+    next: ListNode<T> | null;
+}
+
+type DoublyLinkedNode<T> = {
+    value: T;
+    prev: DoublyLinkedNode<T> | null;
+    next: DoublyLinkedNode<T> | null;
+};
+
+class LinkedList<T> {
+    private head: ListNode<T> | null = null;
+    private tail: ListNode<T> | null = null;
+    private length: number = 0;
+
+    getHead(): ListNode<T> | null {
+        return this.head;
+    }
+
+    getTail(): ListNode<T> | null {
+        return this.tail;
+    }
+
+    getLength(): number {
+        return this.length;
+    }
+
+    append(value: T): void {
+        const node: ListNode<T> = { value, next: null };
+        if (!this.tail) {
+            this.head = this.tail = node;
+        } else {
+            this.tail.next = node;
+            this.tail = node;
+        }
+        this.length++;
+    }
+
+    prepend(value: T): void {
+        const node: ListNode<T> = { value, next: this.head };
+        this.head = node;
+        if (!this.tail) {
+            this.tail = node;
+        }
+        this.length++;
+    }
+
+    removeFirst(): T | null {
+        if (!this.head) return null;
+        const value = this.head.value;
+        this.head = this.head.next;
+        if (!this.head) {
+            this.tail = null;
+        }
+        this.length--;
+        return value;
+    }
+
+    find(predicate: (value: T) => boolean): T | null {
+        let current = this.head;
+        while (current) {
+            if (predicate(current.value)) {
+                return current.value;
+            }
+            current = current.next;
+        }
+        return null;
+    }
+
+    toArray(): T[] {
+        const result: T[] = [];
+        let current = this.head;
+        while (current) {
+            result.push(current.value);
+            current = current.next;
+        }
+        return result;
+    }
+}
+
+class DoublyLinkedList<T> {
+    private head: DoublyLinkedNode<T> | null = null;
+    private tail: DoublyLinkedNode<T> | null = null;
+    private length: number = 0;
+
+    getHead(): DoublyLinkedNode<T> | null {
+        return this.head;
+    }
+
+    getTail(): DoublyLinkedNode<T> | null {
+        return this.tail;
+    }
+
+    getLength(): number {
+        return this.length;
+    }
+
+    append(value: T): void {
+        const node: DoublyLinkedNode<T> = { value, prev: this.tail, next: null };
+        if (!this.tail) {
+            this.head = this.tail = node;
+        } else {
+            this.tail.next = node;
+            this.tail = node;
+        }
+        this.length++;
+    }
+
+    prepend(value: T): void {
+        const node: DoublyLinkedNode<T> = { value, prev: null, next: this.head };
+        if (!this.head) {
+            this.head = this.tail = node;
+        } else {
+            this.head.prev = node;
+            this.head = node;
+        }
+        this.length++;
+    }
+
+    removeLast(): T | null {
+        if (!this.tail) return null;
+        const value = this.tail.value;
+        this.tail = this.tail.prev;
+        if (this.tail) {
+            this.tail.next = null;
+        } else {
+            this.head = null;
+        }
+        this.length--;
+        return value;
+    }
+
+    reverse(): void {
+        let current = this.head;
+        let temp: DoublyLinkedNode<T> | null = null;
+        while (current) {
+            temp = current.prev;
+            current.prev = current.next;
+            current.next = temp;
+            current = current.prev;
+        }
+        temp = this.head;
+        this.head = this.tail;
+        this.tail = temp;
+    }
+}
+
+class CircularLinkedList<T> {
+    private head: ListNode<T> | null = null;
+    private length: number = 0;
+
+    getHead(): ListNode<T> | null {
+        return this.head;
+    }
+
+    getLength(): number {
+        return this.length;
+    }
+
+    append(value: T): void {
+        const node: ListNode<T> = { value, next: null };
+        if (!this.head) {
+            this.head = node;
+            node.next = node;
+        } else {
+            let current = this.head;
+            while (current.next !== this.head) {
+                current = current.next!;
+            }
+            current.next = node;
+            node.next = this.head;
+        }
+        this.length++;
+    }
+
+    rotate(): void {
+        if (this.head && this.head.next) {
+            this.head = this.head.next;
+        }
+    }
+
+    toArray(): T[] {
+        const result: T[] = [];
+        if (!this.head) return result;
+        let current = this.head;
+        do {
+            result.push(current.value);
+            current = current.next!;
+        } while (current !== this.head);
+        return result;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("LinkedList") && output.contains("DoublyLinkedList") && output.contains("CircularLinkedList"),
+        "Expected recursive linked list type classes: {}",
+        output
+    );
+
+    // LinkedList methods
+    assert!(
+        output.contains("append") && output.contains("prepend") && output.contains("removeFirst") && output.contains("find"),
+        "Expected LinkedList methods: {}",
+        output
+    );
+
+    // DoublyLinkedList methods
+    assert!(
+        output.contains("removeLast") && output.contains("reverse"),
+        "Expected DoublyLinkedList methods: {}",
+        output
+    );
+
+    // CircularLinkedList methods
+    assert!(
+        output.contains("rotate") && output.contains("toArray"),
+        "Expected CircularLinkedList methods: {}",
+        output
+    );
+
+    // Interface and type aliases should be stripped
+    assert!(
+        !output.contains("interface ListNode") && !output.contains("type DoublyLinkedNode"),
+        "Expected interface and type aliases to be stripped: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_recursive_type_json() {
+    let source = r#"
+// Recursive JSON type pattern
+type JSONPrimitive = string | number | boolean | null;
+type JSONArray = JSONValue[];
+type JSONObject = { [key: string]: JSONValue };
+type JSONValue = JSONPrimitive | JSONArray | JSONObject;
+
+class JSONParser {
+    parse(input: string): JSONValue {
+        return JSON.parse(input);
+    }
+
+    stringify(value: JSONValue, indent?: number): string {
+        return JSON.stringify(value, null, indent);
+    }
+
+    isObject(value: JSONValue): value is JSONObject {
+        return typeof value === "object" && value !== null && !Array.isArray(value);
+    }
+
+    isArray(value: JSONValue): value is JSONArray {
+        return Array.isArray(value);
+    }
+
+    isPrimitive(value: JSONValue): value is JSONPrimitive {
+        return !this.isObject(value) && !this.isArray(value);
+    }
+}
+
+class JSONTransformer {
+    private value: JSONValue;
+
+    constructor(value: JSONValue) {
+        this.value = value;
+    }
+
+    getValue(): JSONValue {
+        return this.value;
+    }
+
+    mapStrings(fn: (s: string) => string): JSONTransformer {
+        return new JSONTransformer(this.transformStrings(this.value, fn));
+    }
+
+    private transformStrings(value: JSONValue, fn: (s: string) => string): JSONValue {
+        if (typeof value === "string") {
+            return fn(value);
+        }
+        if (Array.isArray(value)) {
+            return value.map(item => this.transformStrings(item, fn));
+        }
+        if (typeof value === "object" && value !== null) {
+            const result: JSONObject = {};
+            for (const key in value) {
+                result[key] = this.transformStrings(value[key], fn);
+            }
+            return result;
+        }
+        return value;
+    }
+
+    filterNulls(): JSONTransformer {
+        return new JSONTransformer(this.removeNulls(this.value));
+    }
+
+    private removeNulls(value: JSONValue): JSONValue {
+        if (value === null) {
+            return null;
+        }
+        if (Array.isArray(value)) {
+            return value.filter(item => item !== null).map(item => this.removeNulls(item));
+        }
+        if (typeof value === "object" && value !== null) {
+            const result: JSONObject = {};
+            for (const key in value) {
+                if (value[key] !== null) {
+                    result[key] = this.removeNulls(value[key]);
+                }
+            }
+            return result;
+        }
+        return value;
+    }
+
+    getDepth(): number {
+        return this.calculateDepth(this.value);
+    }
+
+    private calculateDepth(value: JSONValue): number {
+        if (value === null || typeof value !== "object") {
+            return 0;
+        }
+        if (Array.isArray(value)) {
+            if (value.length === 0) return 1;
+            return 1 + Math.max(...value.map(item => this.calculateDepth(item)));
+        }
+        const keys = Object.keys(value);
+        if (keys.length === 0) return 1;
+        return 1 + Math.max(...keys.map(key => this.calculateDepth(value[key])));
+    }
+}
+
+class JSONPathQuery {
+    private root: JSONValue;
+
+    constructor(root: JSONValue) {
+        this.root = root;
+    }
+
+    getRoot(): JSONValue {
+        return this.root;
+    }
+
+    get(path: string): JSONValue | undefined {
+        const parts = path.split(".").filter(p => p.length > 0);
+        let current: JSONValue = this.root;
+        for (const part of parts) {
+            if (typeof current !== "object" || current === null) {
+                return undefined;
+            }
+            if (Array.isArray(current)) {
+                const index = parseInt(part, 10);
+                if (isNaN(index)) return undefined;
+                current = current[index];
+            } else {
+                current = (current as JSONObject)[part];
+            }
+            if (current === undefined) return undefined;
+        }
+        return current;
+    }
+
+    set(path: string, value: JSONValue): void {
+        const parts = path.split(".").filter(p => p.length > 0);
+        if (parts.length === 0) return;
+        let current: JSONValue = this.root;
+        for (let i = 0; i < parts.length - 1; i++) {
+            const part = parts[i];
+            if (typeof current !== "object" || current === null || Array.isArray(current)) {
+                return;
+            }
+            current = (current as JSONObject)[part];
+        }
+        if (typeof current === "object" && current !== null && !Array.isArray(current)) {
+            (current as JSONObject)[parts[parts.length - 1]] = value;
+        }
+    }
+
+    has(path: string): boolean {
+        return this.get(path) !== undefined;
+    }
+
+    keys(): string[] {
+        if (typeof this.root === "object" && this.root !== null && !Array.isArray(this.root)) {
+            return Object.keys(this.root);
+        }
+        return [];
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("JSONParser") && output.contains("JSONTransformer") && output.contains("JSONPathQuery"),
+        "Expected recursive JSON type classes: {}",
+        output
+    );
+
+    // JSONParser methods
+    assert!(
+        output.contains("parse") && output.contains("stringify") && output.contains("isObject") && output.contains("isArray"),
+        "Expected JSONParser methods: {}",
+        output
+    );
+
+    // JSONTransformer methods
+    assert!(
+        output.contains("mapStrings") && output.contains("filterNulls") && output.contains("getDepth"),
+        "Expected JSONTransformer methods: {}",
+        output
+    );
+
+    // JSONPathQuery methods
+    assert!(
+        output.contains("get") && output.contains("set") && output.contains("has") && output.contains("keys"),
+        "Expected JSONPathQuery methods: {}",
+        output
+    );
+
+    // Type aliases should be stripped
+    assert!(
+        !output.contains("type JSONPrimitive") && !output.contains("type JSONArray") && !output.contains("type JSONValue"),
+        "Expected type aliases to be stripped: {}",
+        output
+    );
+}
