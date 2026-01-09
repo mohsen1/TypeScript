@@ -6,12 +6,15 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-- [ ] Add ES5 class tests for union type patterns: discriminated unions, type narrowing
+- [ ] Add ES5 class tests for keyof/typeof patterns: keyof object, typeof value, indexed access types. Tests: `./wasm/test.sh class_es5_tests`
 
 ## Task Queue
-(empty)
+- [ ] Add ES5 class tests for template string type patterns: string interpolation, pattern matching
 
 ## Completed
+- [x] Added ES5 tests for infer keyword patterns (6 tests): array element, function return, promise unwrap, constructor params, tuple elements, combined infer patterns. Ran `./wasm/test.sh class_es5_tests` (all 407 pass).
+- [x] Added ES5 tests for mapped type patterns (6 tests): Partial, Required, Readonly, Pick, Omit, Record. Ran `./wasm/test.sh class_es5_tests` (all 401 pass).
+- [x] Added ES5 tests for union type patterns (6 tests): discriminated unions, type narrowing, string literal unions, number literal unions, nullable unions, combined union patterns. Ran `./wasm/test.sh class_es5_tests` (all 395 pass).
 - [x] Added ES5 tests for intersection type patterns (6 tests): object intersection, interface merging, conditional intersection, generic intersection, mixin intersection patterns, combined intersection patterns. Ran `./wasm/test.sh class_es5_tests` (all 389 pass).
 - [x] Added ES5 tests for recursive type patterns (6 tests): recursive type aliases, tree structure types, linked list types, JSON recursive types, nested object types, combined recursive patterns. Ran `./wasm/test.sh class_es5_tests` (all 383 pass).
 - [x] Added ES5 tests for variadic tuple patterns (6 tests): spread in tuples, labeled tuple elements, rest elements in tuples, tuple manipulation, optional tuple elements, combined variadic tuple patterns. Ran `./wasm/test.sh class_es5_tests` (all 377 pass).

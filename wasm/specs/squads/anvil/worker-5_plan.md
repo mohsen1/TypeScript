@@ -7,12 +7,18 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- [ ] Add async ES5 tests for async channel patterns: send, receive, buffered, unbuffered. Tests: `./wasm/test.sh async_es5_tests`
+- [ ] Add async ES5 tests for async scheduler patterns: priority queue, delay, throttle, debounce. Tests: `./wasm/test.sh async_es5_tests`
 
 ## Task Queue
+- [ ] Add async ES5 tests for async event emitter patterns: on, off, once, emit
 
 
 ## Completed
+- [x] Added 12 async pool pattern tests (worker pool, task pool, connection pool, release, resize, drain, shutdown, health check, evict, batch, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (772 tests PASS).
+- [x] Added 12 async barrier pattern tests (wait, wait all, count down, reset, timeout, arrive, parties, phase, broken, action, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (760 tests PASS).
+- [x] Added 12 async mutex pattern tests (lock, unlock, try-lock, deadlock prevention, timeout, guard, reentrant, fair, read-write, upgrade, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (748 tests PASS).
+- [x] Added 12 async semaphore pattern tests (acquire, release, concurrent limit, wait queue, try acquire, timeout, permits, drain, available, guard, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (736 tests PASS).
+- [x] Added 12 async channel pattern tests (send, receive, buffered, unbuffered, close, select, broadcast, multicast, pipe, timeout, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (724 tests PASS).
 - [x] Added 12 async observable pattern tests (subscribe, unsubscribe, next, error, complete, map, filter, merge, concat, switchMap, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (712 tests PASS).
 - [x] Added 12 async state machine pattern tests (transition, enter, exit, event, dispatch, guard, action, effect, context, subscribe, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (700 tests PASS).
 - [x] Added 12 async retry pattern tests (exponential backoff, linear backoff, fixed delay, circuit breaker, jitter, timeout, max retries, conditional, fallback, abort, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (688 tests PASS).
