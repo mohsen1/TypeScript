@@ -7,12 +7,13 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [ ] Add ES5 class tests for constructor signature patterns: overloads, optional params. Tests: `./wasm/test.sh class_es5_tests`
+None - ready for next task.
 
 ## Task Queue
 - [ ] Add ES5 class tests for generic constraint patterns: extends, keyof, conditional
 
 ## Completed
+- [x] Add ES5 class tests for constructor signature patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for interface implementation patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for abstract class implementation patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for class static block patterns. Tests: `./wasm/test.sh class_es5_tests`

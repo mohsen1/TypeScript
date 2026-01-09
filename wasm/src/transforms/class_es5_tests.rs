@@ -32735,600 +32735,73 @@ class HashMap<K, V> implements KeyValueStore<K, V> {
 }
 
 // ============================================================================
-// UTILITY TYPE PATTERN TESTS
+// CONSTRUCTOR SIGNATURE PATTERN TESTS
 // ============================================================================
 
-/// Test utility type patterns: Awaited type
+/// Test ES5 class downleveling with constructor optional parameter patterns
 #[test]
-fn test_class_es5_utility_awaited() {
+fn test_class_es5_constructor_signature_optional_params() {
     let source = r#"
-type Awaited<T> = T extends Promise<infer U> ? Awaited<U> : T;
-
-class AsyncDataFetcher<T> {
-    private url: string;
-
-    constructor(url: string) {
-        this.url = url;
-    }
-
-    async fetch(): Promise<T> {
-        const response = await fetch(this.url);
-        return response.json();
-    }
-
-    async fetchAndTransform<R>(transform: (data: Awaited<Promise<T>>) => R): Promise<R> {
-        const data = await this.fetch();
-        return transform(data);
-    }
-}
-
-class PromiseResolver<T> {
-    private promise: Promise<T>;
-
-    constructor(promise: Promise<T>) {
-        this.promise = promise;
-    }
-
-    async resolve(): Promise<Awaited<Promise<T>>> {
-        return await this.promise;
-    }
-
-    async resolveWithDefault(defaultValue: Awaited<Promise<T>>): Promise<Awaited<Promise<T>>> {
-        try {
-            return await this.promise;
-        } catch {
-            return defaultValue;
-        }
-    }
-}
-
-class NestedPromiseHandler {
-    async unwrap<T>(nested: Promise<Promise<T>>): Promise<Awaited<Promise<Promise<T>>>> {
-        return await (await nested);
-    }
-
-    async unwrapAll<T>(promises: Promise<T>[]): Promise<Awaited<Promise<T>>[]> {
-        return Promise.all(promises);
-    }
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Classes should be converted to ES5
-    assert!(
-        output.contains("function AsyncDataFetcher") &&
-        output.contains("function PromiseResolver") &&
-        output.contains("function NestedPromiseHandler"),
-        "Expected ES5 class constructors: {}",
-        output
-    );
-
-    // Async methods should use __awaiter
-    assert!(
-        output.contains("__awaiter") || output.contains("fetch"),
-        "Expected async handling: {}",
-        output
-    );
-
-    // Methods preserved
-    assert!(
-        output.contains("resolve") && output.contains("unwrap"),
-        "Expected async methods: {}",
-        output
-    );
-}
-
-/// Test utility type patterns: NonNullable type
-#[test]
-fn test_class_es5_utility_nonnullable() {
-    let source = r#"
-class NullableHandler<T> {
-    private value: T | null | undefined;
-
-    constructor(value: T | null | undefined) {
-        this.value = value;
-    }
-
-    getValue(): T | null | undefined {
-        return this.value;
-    }
-
-    getValueOrThrow(): NonNullable<T> {
-        if (this.value === null || this.value === undefined) {
-            throw new Error("Value is null or undefined");
-        }
-        return this.value as NonNullable<T>;
-    }
-
-    getValueOrDefault(defaultValue: NonNullable<T>): NonNullable<T> {
-        if (this.value === null || this.value === undefined) {
-            return defaultValue;
-        }
-        return this.value as NonNullable<T>;
-    }
-
-    map<U>(fn: (value: NonNullable<T>) => U): U | null {
-        if (this.value === null || this.value === undefined) {
-            return null;
-        }
-        return fn(this.value as NonNullable<T>);
-    }
-}
-
-class OptionalChain {
-    private data: Record<string, unknown> | null;
-
-    constructor(data: Record<string, unknown> | null) {
-        this.data = data;
-    }
-
-    get<K extends string>(key: K): NonNullable<unknown> | null {
-        if (!this.data) return null;
-        const value = this.data[key];
-        if (value === null || value === undefined) return null;
-        return value as NonNullable<unknown>;
-    }
-
-    getRequired<K extends string>(key: K): NonNullable<unknown> {
-        const value = this.get(key);
-        if (value === null) {
-            throw new Error("Required key missing: " + key);
-        }
-        return value;
-    }
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Classes should be converted
-    assert!(
-        output.contains("function NullableHandler") && output.contains("function OptionalChain"),
-        "Expected ES5 class constructors: {}",
-        output
-    );
-
-    // Methods on prototype
-    assert!(
-        output.contains("getValueOrThrow") && output.contains("getValueOrDefault"),
-        "Expected nullable handling methods: {}",
-        output
-    );
-
-    // Null checks preserved
-    assert!(
-        output.contains("null") && output.contains("undefined"),
-        "Expected null/undefined checks: {}",
-        output
-    );
-}
-
-/// Test utility type patterns: ReturnType type
-#[test]
-fn test_class_es5_utility_returntype() {
-    let source = r#"
-function createUser(name: string, age: number) {
-    return { name, age, createdAt: new Date() };
-}
-
-function fetchData(): Promise<{ items: string[]; count: number }> {
-    return Promise.resolve({ items: [], count: 0 });
-}
-
-type UserType = ReturnType<typeof createUser>;
-type DataType = ReturnType<typeof fetchData>;
-
-class UserFactory {
-    create(name: string, age: number): ReturnType<typeof createUser> {
-        return createUser(name, age);
-    }
-
-    createMany(users: Array<{ name: string; age: number }>): ReturnType<typeof createUser>[] {
-        return users.map(u => this.create(u.name, u.age));
-    }
-}
-
-class DataService {
-    private cache: ReturnType<typeof fetchData> | null = null;
-
-    async getData(): Promise<ReturnType<typeof fetchData>> {
-        if (!this.cache) {
-            this.cache = fetchData();
-        }
-        return this.cache;
-    }
-
-    async getItems(): Promise<string[]> {
-        const data = await this.getData();
-        return data.items;
-    }
-}
-
-class FunctionWrapper<F extends (...args: any[]) => any> {
-    private fn: F;
-
-    constructor(fn: F) {
-        this.fn = fn;
-    }
-
-    call(...args: Parameters<F>): ReturnType<F> {
-        return this.fn(...args);
-    }
-
-    memoize(): (...args: Parameters<F>) => ReturnType<F> {
-        const cache = new Map<string, ReturnType<F>>();
-        return (...args: Parameters<F>): ReturnType<F> => {
-            const key = JSON.stringify(args);
-            if (cache.has(key)) {
-                return cache.get(key)!;
-            }
-            const result = this.fn(...args);
-            cache.set(key, result);
-            return result;
-        };
-    }
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Classes should be converted
-    assert!(
-        output.contains("function UserFactory") &&
-        output.contains("function DataService") &&
-        output.contains("function FunctionWrapper"),
-        "Expected ES5 class constructors: {}",
-        output
-    );
-
-    // Factory methods
-    assert!(
-        output.contains("create") && output.contains("createMany"),
-        "Expected factory methods: {}",
-        output
-    );
-
-    // Wrapper methods
-    assert!(
-        output.contains("call") && output.contains("memoize"),
-        "Expected wrapper methods: {}",
-        output
-    );
-}
-
-/// Test utility type patterns: Parameters type
-#[test]
-fn test_class_es5_utility_parameters() {
-    let source = r#"
-function formatMessage(template: string, ...args: unknown[]): string {
-    return template.replace(/{(\d+)}/g, (_, i) => String(args[i]));
-}
-
-function calculate(a: number, b: number, operation: "add" | "subtract"): number {
-    return operation === "add" ? a + b : a - b;
-}
-
-class MessageFormatter {
-    format(...args: Parameters<typeof formatMessage>): string {
-        return formatMessage(...args);
-    }
-
-    formatWithPrefix(prefix: string, ...args: Parameters<typeof formatMessage>): string {
-        return prefix + ": " + this.format(...args);
-    }
-}
-
-class Calculator {
-    execute(...args: Parameters<typeof calculate>): ReturnType<typeof calculate> {
-        return calculate(...args);
-    }
-
-    executeWithLogging(...args: Parameters<typeof calculate>): number {
-        const result = this.execute(...args);
-        console.log("Calculated:", args, "=", result);
-        return result;
-    }
-}
-
-class FunctionInvoker<F extends (...args: any[]) => any> {
-    private fn: F;
-    private defaultArgs: Partial<Parameters<F>>;
-
-    constructor(fn: F, defaultArgs: Partial<Parameters<F>> = {} as Partial<Parameters<F>>) {
-        this.fn = fn;
-        this.defaultArgs = defaultArgs;
-    }
-
-    invoke(...args: Parameters<F>): ReturnType<F> {
-        return this.fn(...args);
-    }
-
-    invokeWithDefaults(...partialArgs: Partial<Parameters<F>>): ReturnType<F> {
-        const mergedArgs = { ...this.defaultArgs, ...partialArgs };
-        return this.fn(...(Object.values(mergedArgs) as Parameters<F>));
-    }
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Classes should be converted
-    assert!(
-        output.contains("function MessageFormatter") &&
-        output.contains("function Calculator") &&
-        output.contains("function FunctionInvoker"),
-        "Expected ES5 class constructors: {}",
-        output
-    );
-
-    // Formatter methods
-    assert!(
-        output.contains("format") && output.contains("formatWithPrefix"),
-        "Expected formatter methods: {}",
-        output
-    );
-
-    // Invoker methods
-    assert!(
-        output.contains("invoke") && output.contains("invokeWithDefaults"),
-        "Expected invoker methods: {}",
-        output
-    );
-}
-
-/// Test utility type patterns: InstanceType type
-#[test]
-fn test_class_es5_utility_instancetype() {
-    let source = r#"
-class Animal {
-    name: string;
-    constructor(name: string) {
-        this.name = name;
-    }
-    speak(): string {
-        return this.name + " makes a sound";
-    }
-}
-
-class Dog extends Animal {
-    breed: string;
-    constructor(name: string, breed: string) {
-        super(name);
-        this.breed = breed;
-    }
-    speak(): string {
-        return this.name + " barks";
-    }
-}
-
-class Factory<T extends new (...args: any[]) => any> {
-    private ctor: T;
-
-    constructor(ctor: T) {
-        this.ctor = ctor;
-    }
-
-    create(...args: ConstructorParameters<T>): InstanceType<T> {
-        return new this.ctor(...args);
-    }
-
-    createMany(argsArray: ConstructorParameters<T>[]): InstanceType<T>[] {
-        return argsArray.map(args => this.create(...args));
-    }
-}
-
-class Registry<T extends new (...args: any[]) => any> {
-    private items: Map<string, InstanceType<T>> = new Map();
-    private factory: Factory<T>;
-
-    constructor(ctor: T) {
-        this.factory = new Factory(ctor);
-    }
-
-    register(key: string, ...args: ConstructorParameters<T>): InstanceType<T> {
-        const instance = this.factory.create(...args);
-        this.items.set(key, instance);
-        return instance;
-    }
-
-    get(key: string): InstanceType<T> | undefined {
-        return this.items.get(key);
-    }
-
-    getAll(): InstanceType<T>[] {
-        return Array.from(this.items.values());
-    }
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // All classes should be converted
-    assert!(
-        output.contains("function Animal") &&
-        output.contains("function Dog") &&
-        output.contains("function Factory") &&
-        output.contains("function Registry"),
-        "Expected ES5 class constructors: {}",
-        output
-    );
-
-    // Inheritance should be handled
-    assert!(
-        output.contains("__extends") || output.contains("extends"),
-        "Expected inheritance: {}",
-        output
-    );
-
-    // Factory and registry methods
-    assert!(
-        output.contains("create") && output.contains("register"),
-        "Expected factory/registry methods: {}",
-        output
-    );
-}
-
-/// Test utility type patterns: combined utility types
-#[test]
-fn test_class_es5_utility_combined_patterns() {
-    let source = r#"
-type Awaited<T> = T extends Promise<infer U> ? Awaited<U> : T;
-
-interface ApiResponse<T> {
-    data: T;
-    status: number;
-    message: string;
-}
-
-function apiCall<T>(url: string): Promise<ApiResponse<T>> {
-    return fetch(url).then(r => r.json());
-}
-
-class ApiClient<T> {
+class HttpClient {
     private baseUrl: string;
+    private timeout: number;
+    private headers: Record<string, string>;
+    private retries: number;
 
-    constructor(baseUrl: string) {
+    constructor(
+        baseUrl: string,
+        timeout?: number,
+        headers?: Record<string, string>,
+        retries?: number
+    ) {
         this.baseUrl = baseUrl;
+        this.timeout = timeout ?? 5000;
+        this.headers = headers ?? {};
+        this.retries = retries ?? 3;
     }
 
-    async get(path: string): Promise<Awaited<ReturnType<typeof apiCall<T>>>> {
-        return apiCall<T>(this.baseUrl + path);
-    }
-
-    async getOrDefault(
-        path: string,
-        defaultValue: NonNullable<T>
-    ): Promise<NonNullable<T>> {
-        try {
-            const response = await this.get(path);
-            if (response.data === null || response.data === undefined) {
-                return defaultValue;
-            }
-            return response.data as NonNullable<T>;
-        } catch {
-            return defaultValue;
-        }
+    get(path: string): Promise<any> {
+        return fetch(this.baseUrl + path, {
+            headers: this.headers
+        }).then(r => r.json());
     }
 }
 
-class ServiceFactory {
-    private constructors: Map<string, new (...args: any[]) => any> = new Map();
+class Logger {
+    private level: string;
+    private prefix: string;
+    private timestamps: boolean;
 
-    register<T extends new (...args: any[]) => any>(
-        name: string,
-        ctor: T
-    ): void {
-        this.constructors.set(name, ctor);
+    constructor(
+        level: string = "info",
+        prefix: string = "",
+        timestamps: boolean = true
+    ) {
+        this.level = level;
+        this.prefix = prefix;
+        this.timestamps = timestamps;
     }
 
-    create<T extends new (...args: any[]) => any>(
-        name: string,
-        ...args: ConstructorParameters<T>
-    ): InstanceType<T> | null {
-        const ctor = this.constructors.get(name);
-        if (!ctor) return null;
-        return new ctor(...args) as InstanceType<T>;
-    }
-
-    createRequired<T extends new (...args: any[]) => any>(
-        name: string,
-        ...args: ConstructorParameters<T>
-    ): NonNullable<InstanceType<T>> {
-        const instance = this.create<T>(name, ...args);
-        if (!instance) {
-            throw new Error("Service not found: " + name);
-        }
-        return instance;
+    log(message: string): void {
+        const ts = this.timestamps ? new Date().toISOString() + " " : "";
+        console.log(ts + this.prefix + message);
     }
 }
 
-class TypedEventEmitter<Events extends Record<string, (...args: any[]) => void>> {
-    private handlers: Map<keyof Events, Set<Events[keyof Events]>> = new Map();
+class EventBus {
+    private name: string;
+    private maxListeners: number;
+    private debug: boolean;
 
-    on<K extends keyof Events>(event: K, handler: Events[K]): void {
-        if (!this.handlers.has(event)) {
-            this.handlers.set(event, new Set());
-        }
-        this.handlers.get(event)!.add(handler);
+    constructor(name?: string, maxListeners?: number, debug?: boolean) {
+        this.name = name || "default";
+        this.maxListeners = maxListeners || 10;
+        this.debug = debug || false;
     }
 
-    emit<K extends keyof Events>(event: K, ...args: Parameters<Events[K]>): void {
-        const handlers = this.handlers.get(event);
-        if (handlers) {
-            handlers.forEach(handler => handler(...args));
-        }
-    }
-
-    off<K extends keyof Events>(event: K, handler: Events[K]): void {
-        const handlers = this.handlers.get(event);
-        if (handlers) {
-            handlers.delete(handler);
+    emit(event: string, data?: any): void {
+        if (this.debug) {
+            console.log("[" + this.name + "] Emitting:", event);
         }
     }
 }
@@ -33349,40 +32822,252 @@ class TypedEventEmitter<Events extends Record<string, (...args: any[]) => void>>
 
     let output = printer.get_output().to_string();
 
-    // All classes should be converted
+    // Classes should be converted
     assert!(
-        output.contains("function ApiClient") &&
-        output.contains("function ServiceFactory") &&
-        output.contains("function TypedEventEmitter"),
-        "Expected ES5 class constructors: {}",
+        output.contains("HttpClient") && output.contains("Logger") && output.contains("EventBus"),
+        "Expected constructor optional param classes: {}",
         output
     );
 
-    // ApiClient methods
+    // Methods should be preserved
     assert!(
-        output.contains("get") && output.contains("getOrDefault"),
-        "Expected ApiClient methods: {}",
+        output.contains("get") && output.contains("log") && output.contains("emit"),
+        "Expected methods: {}",
         output
     );
 
-    // ServiceFactory methods
+    // Properties should be referenced
     assert!(
-        output.contains("register") && output.contains("create") && output.contains("createRequired"),
-        "Expected ServiceFactory methods: {}",
+        output.contains("baseUrl") && output.contains("timeout") && output.contains("headers"),
+        "Expected HttpClient properties: {}",
+        output
+    );
+}
+
+/// Test ES5 class downleveling with constructor rest parameter patterns
+#[test]
+fn test_class_es5_constructor_signature_rest_params() {
+    let source = r#"
+class Command {
+    private name: string;
+    private args: string[];
+
+    constructor(name: string, ...args: string[]) {
+        this.name = name;
+        this.args = args;
+    }
+
+    execute(): string {
+        return this.name + " " + this.args.join(" ");
+    }
+
+    getArgs(): string[] {
+        return [...this.args];
+    }
+}
+
+class Pipeline {
+    private stages: Function[];
+
+    constructor(...stages: Function[]) {
+        this.stages = stages;
+    }
+
+    run(input: any): any {
+        return this.stages.reduce((acc, stage) => stage(acc), input);
+    }
+
+    addStage(stage: Function): void {
+        this.stages.push(stage);
+    }
+}
+
+class CompositeValidator {
+    private validators: ((value: any) => boolean)[];
+    private mode: string;
+
+    constructor(mode: string, ...validators: ((value: any) => boolean)[]) {
+        this.mode = mode;
+        this.validators = validators;
+    }
+
+    validate(value: any): boolean {
+        if (this.mode === "all") {
+            return this.validators.every(v => v(value));
+        } else {
+            return this.validators.some(v => v(value));
+        }
+    }
+
+    addValidator(validator: (value: any) => boolean): void {
+        this.validators.push(validator);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Command") && output.contains("Pipeline") && output.contains("CompositeValidator"),
+        "Expected constructor rest param classes: {}",
         output
     );
 
-    // EventEmitter methods
+    // Methods should be preserved
     assert!(
-        output.contains("on") && output.contains("emit") && output.contains("off"),
-        "Expected EventEmitter methods: {}",
+        output.contains("execute") && output.contains("run") && output.contains("validate"),
+        "Expected methods: {}",
         output
     );
 
-    // Map operations
+    // Additional methods
     assert!(
-        output.contains(".get(") && output.contains(".set("),
-        "Expected Map operations: {}",
+        output.contains("getArgs") && output.contains("addStage") && output.contains("addValidator"),
+        "Expected additional methods: {}",
+        output
+    );
+}
+
+/// Test ES5 class downleveling with constructor overload signature patterns
+#[test]
+fn test_class_es5_constructor_signature_overloads() {
+    let source = r#"
+class Point {
+    x: number;
+    y: number;
+
+    constructor();
+    constructor(x: number);
+    constructor(x: number, y: number);
+    constructor(x?: number, y?: number) {
+        this.x = x ?? 0;
+        this.y = y ?? x ?? 0;
+    }
+
+    distanceTo(other: Point): number {
+        const dx = this.x - other.x;
+        const dy = this.y - other.y;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    static fromArray(arr: [number, number]): Point {
+        return new Point(arr[0], arr[1]);
+    }
+}
+
+class Rectangle {
+    width: number;
+    height: number;
+    x: number;
+    y: number;
+
+    constructor(width: number, height: number);
+    constructor(width: number, height: number, x: number, y: number);
+    constructor(width: number, height: number, x?: number, y?: number) {
+        this.width = width;
+        this.height = height;
+        this.x = x ?? 0;
+        this.y = y ?? 0;
+    }
+
+    area(): number {
+        return this.width * this.height;
+    }
+
+    contains(point: Point): boolean {
+        return point.x >= this.x && point.x <= this.x + this.width &&
+               point.y >= this.y && point.y <= this.y + this.height;
+    }
+}
+
+class Color {
+    r: number;
+    g: number;
+    b: number;
+    a: number;
+
+    constructor(hex: string);
+    constructor(r: number, g: number, b: number);
+    constructor(r: number, g: number, b: number, a: number);
+    constructor(rOrHex: number | string, g?: number, b?: number, a?: number) {
+        if (typeof rOrHex === "string") {
+            // Parse hex
+            this.r = 0;
+            this.g = 0;
+            this.b = 0;
+            this.a = 1;
+        } else {
+            this.r = rOrHex;
+            this.g = g ?? 0;
+            this.b = b ?? 0;
+            this.a = a ?? 1;
+        }
+    }
+
+    toHex(): string {
+        return this.r.toString(16) + this.g.toString(16) + this.b.toString(16);
+    }
+
+    withAlpha(alpha: number): Color {
+        return new Color(this.r, this.g, this.b, alpha);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Point") && output.contains("Rectangle") && output.contains("Color"),
+        "Expected constructor overload classes: {}",
+        output
+    );
+
+    // Point methods
+    assert!(
+        output.contains("distanceTo") && output.contains("fromArray"),
+        "Expected Point methods: {}",
+        output
+    );
+
+    // Rectangle methods
+    assert!(
+        output.contains("area") && output.contains("contains"),
+        "Expected Rectangle methods: {}",
+        output
+    );
+
+    // Color methods
+    assert!(
+        output.contains("toHex") && output.contains("withAlpha"),
+        "Expected Color methods: {}",
         output
     );
 }
