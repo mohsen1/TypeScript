@@ -4202,3 +4202,223 @@ fn test_async_field_expression_body() {
         output
     );
 }
+
+// ============================================================================
+// Async method with super property access tests
+// ============================================================================
+
+/// Helper to parse and emit an async method that accesses super properties
+fn parse_and_emit_async_super_property(source: &str) -> String {
+    use crate::parser::syntax_kind_ext;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &class_idx in &source_file.statements.nodes {
+                if let Some(class_node) = parser.arena.get(class_idx) {
+                    if class_node.kind == syntax_kind_ext::CLASS_DECLARATION {
+                        if let Some(class_data) = parser.arena.get_class(class_node) {
+                            // Check if this class has an extends clause (derived class)
+                            if class_data.heritage_clauses.is_some() {
+                                for &member_idx in &class_data.members.nodes {
+                                    if let Some(member_node) = parser.arena.get(member_idx) {
+                                        if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
+                                            if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                                let emitter = AsyncES5Emitter::new(&parser.arena);
+                                                let has_await = emitter.body_contains_await(method_data.body);
+                                                let mut emitter = AsyncES5Emitter::new(&parser.arena);
+                                                if has_await {
+                                                    return emitter.emit_generator_body_with_await(method_data.body);
+                                                } else {
+                                                    return emitter.emit_simple_generator_body(method_data.body);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    String::new()
+}
+
+/// Helper to check if async method with super property access contains await
+fn super_property_method_contains_await(source: &str) -> bool {
+    use crate::parser::syntax_kind_ext;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &class_idx in &source_file.statements.nodes {
+                if let Some(class_node) = parser.arena.get(class_idx) {
+                    if class_node.kind == syntax_kind_ext::CLASS_DECLARATION {
+                        if let Some(class_data) = parser.arena.get_class(class_node) {
+                            if class_data.heritage_clauses.is_some() {
+                                for &member_idx in &class_data.members.nodes {
+                                    if let Some(member_node) = parser.arena.get(member_idx) {
+                                        if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
+                                            if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                                let emitter = AsyncES5Emitter::new(&parser.arena);
+                                                return emitter.body_contains_await(method_data.body);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+#[test]
+fn test_async_super_property_read_basic() {
+    let output = parse_and_emit_async_super_property(
+        "class Base { name = 'base'; } class Derived extends Base { async bar() { const n = await Promise.resolve(super.name); return n; } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Super property read should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_super_property_with_return() {
+    let output = parse_and_emit_async_super_property(
+        "class Base { value = 42; } class Derived extends Base { async bar() { return await Promise.resolve(super.value); } }",
+    );
+    assert!(
+        output.contains("return [2 /*return*/, _a.sent()]") || output.contains("[4 /*yield*/"),
+        "Super property return should emit correctly: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_super_property_no_await() {
+    let output = parse_and_emit_async_super_property(
+        "class Base { value = 42; } class Derived extends Base { async bar() { return super.value; } }",
+    );
+    assert!(
+        output.contains("[2 /*return*/"),
+        "Sync super property should have return: {}",
+        output
+    );
+    assert!(
+        !output.contains("switch"),
+        "No await should skip switch: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_super_property_multiple_accesses() {
+    let output = parse_and_emit_async_super_property(
+        "class Base { a = 1; b = 2; } class Derived extends Base { async bar() { const x = await Promise.resolve(super.a); const y = await Promise.resolve(super.b); return x + y; } }",
+    );
+    assert!(
+        output.contains("case 1:") && output.contains("case 2:"),
+        "Multiple super property accesses should have multiple cases: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_super_property_body_contains_await() {
+    assert!(
+        super_property_method_contains_await(
+            "class Base {} class Derived extends Base { async bar() { await fetch(); } }"
+        ),
+        "Should detect await in super property method"
+    );
+}
+
+#[test]
+fn test_async_super_property_body_no_await() {
+    assert!(
+        !super_property_method_contains_await(
+            "class Base { value = 42; } class Derived extends Base { async bar() { return super.value; } }"
+        ),
+        "Should not detect await when none present"
+    );
+}
+
+#[test]
+fn test_async_super_property_ignores_nested_async() {
+    assert!(
+        !super_property_method_contains_await(
+            "class Base { value = 0; } class Derived extends Base { async bar() { const inner = async () => { await Promise.resolve(super.value); }; return 1; } }"
+        ),
+        "Should ignore await in nested async"
+    );
+}
+
+#[test]
+fn test_async_super_property_in_expression() {
+    let output = parse_and_emit_async_super_property(
+        "class Base { multiplier = 2; } class Derived extends Base { async bar(x: number) { return await Promise.resolve(x * super.multiplier); } }",
+    );
+    assert!(
+        output.contains("[4 /*yield*/") || output.contains("switch (_a.label)"),
+        "Super property in expression should have yield or switch: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_super_property_with_try_catch() {
+    assert!(
+        super_property_method_contains_await(
+            "class Base {} class Derived extends Base { async bar() { try { await riskyOp(); } catch (e) { log(e); } } }"
+        ),
+        "Should detect await in try block with super property"
+    );
+}
+
+#[test]
+fn test_async_super_property_assignment() {
+    let output = parse_and_emit_async_super_property(
+        "class Base { value = 0; } class Derived extends Base { async bar() { const v = super.value; await process(v); return v; } }",
+    );
+    assert!(
+        output.contains("[4 /*yield*/") || output.contains("switch (_a.label)"),
+        "Super property assignment with await should have yield or switch: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_super_property_getter() {
+    let output = parse_and_emit_async_super_property(
+        "class Base { get computed() { return 42; } } class Derived extends Base { async bar() { return await Promise.resolve(super.computed); } }",
+    );
+    assert!(
+        output.contains("[4 /*yield*/") || output.contains("switch (_a.label)"),
+        "Super getter property should have yield or switch: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_super_property_conditional() {
+    let output = parse_and_emit_async_super_property(
+        "class Base { value = 0; } class Derived extends Base { async bar(cond: boolean) { if (cond) { return await Promise.resolve(super.value); } return 0; } }",
+    );
+    assert!(
+        output.contains("[4 /*yield*/") || output.contains("switch (_a.label)"),
+        "Conditional super property should have yield or switch: {}",
+        output
+    );
+}
