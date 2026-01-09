@@ -11884,6 +11884,123 @@ fn test_mapped_type_both_modifiers() {
     assert_eq!(result, expected);
 }
 
+/// Test mapped type with both remove modifiers (-readonly -?).
+///
+/// `{ -readonly [K in keyof T]-?: T[K] }` should remove both readonly and optional.
+#[test]
+fn test_mapped_type_both_remove_modifiers() {
+    let interner = TypeInterner::new();
+
+    // Iterate over "data" key with both -readonly and -? modifiers
+    let key_data = interner.literal_string("data");
+
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint: key_data,
+        name_type: None,
+        template: TypeId::STRING,
+        readonly_modifier: Some(MappedModifier::Remove),  // -readonly
+        optional_modifier: Some(MappedModifier::Remove),  // -?
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Expected: { data: string } with both readonly and optional removed
+    let data_name = interner.intern_string("data");
+    let expected = interner.object(vec![PropertyInfo {
+        name: data_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,  // optional removed
+        readonly: false,  // readonly removed
+        is_method: false,
+    }]);
+
+    assert_eq!(result, expected);
+}
+
+/// Test mapped type with mixed modifiers (+readonly -?).
+///
+/// `{ +readonly [K in keyof T]-?: T[K] }` should add readonly and remove optional.
+#[test]
+fn test_mapped_type_add_readonly_remove_optional() {
+    let interner = TypeInterner::new();
+
+    // Iterate over "value" key with +readonly and -? modifiers
+    let key_value = interner.literal_string("value");
+
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint: key_value,
+        name_type: None,
+        template: TypeId::NUMBER,
+        readonly_modifier: Some(MappedModifier::Add),     // +readonly
+        optional_modifier: Some(MappedModifier::Remove),  // -?
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Expected: { readonly value: number } (readonly added, optional removed)
+    let value_name = interner.intern_string("value");
+    let expected = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,  // optional removed
+        readonly: true,   // readonly added
+        is_method: false,
+    }]);
+
+    assert_eq!(result, expected);
+}
+
+/// Test mapped type with mixed modifiers (-readonly +?).
+///
+/// `{ -readonly [K in keyof T]+?: T[K] }` should remove readonly and add optional.
+#[test]
+fn test_mapped_type_remove_readonly_add_optional() {
+    let interner = TypeInterner::new();
+
+    // Iterate over "config" key with -readonly and +? modifiers
+    let key_config = interner.literal_string("config");
+
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint: key_config,
+        name_type: None,
+        template: TypeId::BOOLEAN,
+        readonly_modifier: Some(MappedModifier::Remove),  // -readonly
+        optional_modifier: Some(MappedModifier::Add),     // +?
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Expected: { config?: boolean } (readonly removed, optional added)
+    let config_name = interner.intern_string("config");
+    let expected = interner.object(vec![PropertyInfo {
+        name: config_name,
+        type_id: TypeId::BOOLEAN,
+        write_type: TypeId::BOOLEAN,
+        optional: true,   // optional added
+        readonly: false,  // readonly removed
+        is_method: false,
+    }]);
+
+    assert_eq!(result, expected);
+}
+
 /// Test conditional with void check type.
 ///
 /// `void extends undefined ? true : false` should be false.
