@@ -85,6 +85,7 @@ pub mod diagnostic_messages {
     // Basic type errors
     pub const TYPE_NOT_ASSIGNABLE: &str = "Type '{0}' is not assignable to type '{1}'.";
     pub const CANNOT_FIND_NAME: &str = "Cannot find name '{0}'.";
+    pub const DUPLICATE_IDENTIFIER: &str = "Duplicate identifier '{0}'.";
     pub const PROPERTY_DOES_NOT_EXIST: &str = "Property '{0}' does not exist on type '{1}'.";
     pub const PROPERTY_MISSING: &str = "Property '{0}' is missing in type '{1}'.";
     pub const PROPERTY_MISSING_BUT_REQUIRED: &str = "Property '{0}' is missing in type '{1}' but required in type '{2}'.";

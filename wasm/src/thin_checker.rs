@@ -6270,6 +6270,136 @@ impl<'a> ThinCheckerState<'a> {
             // Check for export assignment with other exports (2309)
             self.check_export_assignment(&sf.statements.nodes);
 
+            // Check for duplicate identifiers (2300)
+            self.check_duplicate_identifiers();
+        }
+    }
+
+    /// Check for duplicate identifiers in the current file scope (TS2300).
+    /// This checks all symbols in file_locals and reports errors when symbols
+    /// have multiple declarations that can't be merged.
+    fn check_duplicate_identifiers(&mut self) {
+        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages, format_message};
+        use crate::binder::symbol_flags;
+
+        // Collect symbols to check - we need to clone the keys to avoid borrowing issues
+        let symbol_ids: Vec<_> = self.ctx.binder.file_locals.iter()
+            .map(|(_, &id)| id)
+            .collect();
+
+        for sym_id in symbol_ids {
+            let Some(symbol) = self.ctx.binder.get_symbol(sym_id) else {
+                continue;
+            };
+
+            // Skip if only one declaration
+            if symbol.declarations.len() <= 1 {
+                continue;
+            }
+
+            let name = symbol.escaped_name.clone();
+            let declarations = symbol.declarations.clone();
+            let flags = symbol.flags;
+
+            // Check if any declarations conflict based on symbol flags
+            // Block-scoped variables (let/const) can never be duplicated
+            let is_block_scoped = (flags & symbol_flags::BLOCK_SCOPED_VARIABLE) != 0;
+
+            // Count declaration types
+            let mut function_count = 0;
+            let mut _interface_count = 0;  // Interfaces can merge, so we don't report duplicates
+            let mut class_count = 0;
+            let mut type_alias_count = 0;
+            let mut enum_count = 0;
+            let mut var_count = 0;
+
+            for &decl_idx in &declarations {
+                if let Some(decl_node) = self.ctx.arena.get(decl_idx) {
+                    match decl_node.kind {
+                        syntax_kind_ext::VARIABLE_DECLARATION => {
+                            var_count += 1;
+                        }
+                        syntax_kind_ext::FUNCTION_DECLARATION => {
+                            function_count += 1;
+                        }
+                        syntax_kind_ext::CLASS_DECLARATION => {
+                            class_count += 1;
+                        }
+                        syntax_kind_ext::INTERFACE_DECLARATION => {
+                            _interface_count += 1;
+                        }
+                        syntax_kind_ext::TYPE_ALIAS_DECLARATION => {
+                            type_alias_count += 1;
+                        }
+                        syntax_kind_ext::ENUM_DECLARATION => {
+                            enum_count += 1;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            // Determine if we should report duplicates
+            let should_report =
+                // Block-scoped variables (let/const) can never be duplicated
+                (is_block_scoped && declarations.len() > 1) ||
+                // Multiple type aliases are duplicates
+                type_alias_count > 1 ||
+                // Type alias with anything else is a duplicate
+                (type_alias_count >= 1 && declarations.len() > type_alias_count) ||
+                // Multiple classes are duplicates
+                class_count > 1 ||
+                // Class with function is a duplicate
+                (class_count >= 1 && function_count >= 1) ||
+                // Class with variable is a duplicate
+                (class_count >= 1 && var_count >= 1) ||
+                // Multiple variables (var) with different initialization aren't duplicates,
+                // but let/const with anything else is
+                (is_block_scoped && (function_count + class_count + enum_count) >= 1);
+
+            if should_report {
+                let message = format_message(diagnostic_messages::DUPLICATE_IDENTIFIER, &[&name]);
+
+                // Report on all declarations except the first one
+                for &decl_idx in declarations.iter().skip(1) {
+                    // Get the name node for better error location
+                    let error_node = self.get_declaration_name_node(decl_idx).unwrap_or(decl_idx);
+                    self.error_at_node(error_node, &message, diagnostic_codes::DUPLICATE_IDENTIFIER);
+                }
+            }
+        }
+    }
+
+    /// Get the name node of a declaration for error reporting.
+    fn get_declaration_name_node(&self, decl_idx: NodeIndex) -> Option<NodeIndex> {
+        let node = self.ctx.arena.get(decl_idx)?;
+
+        match node.kind {
+            syntax_kind_ext::VARIABLE_DECLARATION => {
+                let var_decl = self.ctx.arena.get_variable_declaration(node)?;
+                Some(var_decl.name)
+            }
+            syntax_kind_ext::FUNCTION_DECLARATION => {
+                let func = self.ctx.arena.get_function(node)?;
+                Some(func.name)
+            }
+            syntax_kind_ext::CLASS_DECLARATION => {
+                let class = self.ctx.arena.get_class(node)?;
+                Some(class.name)
+            }
+            syntax_kind_ext::INTERFACE_DECLARATION => {
+                let interface = self.ctx.arena.get_interface(node)?;
+                Some(interface.name)
+            }
+            syntax_kind_ext::TYPE_ALIAS_DECLARATION => {
+                let type_alias = self.ctx.arena.get_type_alias(node)?;
+                Some(type_alias.name)
+            }
+            syntax_kind_ext::ENUM_DECLARATION => {
+                let enum_decl = self.ctx.arena.get_enum(node)?;
+                Some(enum_decl.name)
+            }
+            _ => None,
         }
     }
 
