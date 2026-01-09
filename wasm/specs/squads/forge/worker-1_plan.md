@@ -60,12 +60,12 @@ Yes
 
 ## Resume Notes
 - Branch: `worker/forge-1`
-- Unit tests: 4922 total, 4855 passed, 64 failed, 3 ignored (improved from 4848/67).
-- Merged with origin/squad/forge.
+- Unit tests: 4922 total, 4847 passed, 74 failed, 1 ignored.
+- Synced with origin/squad/forge (resolved merge conflict in binder.rs, added CallableShape fields).
 - TS2304 work complete: added utility type handling to reduce false positives.
 - TS2454 implementation complete: 7 tests passing.
-- TS2564 implementation enhanced:
-  - 11 tests passing (added 4 edge case tests)
-  - Parameter properties, conditional branches, derived classes with super
-  - Control flow analysis tracks assignments through if/else
+- TS2564 implementation complete:
+  - 11 tests passing
+  - Handles: optional, initializers, definite assertion (!), static, parameter properties
+  - Constructor assignment tracking with control flow (if/else, derived class super)
 - Conformance tests: Docker runner has path issue (lib.d.ts not copied), skipped for now.
