@@ -37210,3 +37210,672 @@ class DataRepository<T extends { id: string }> {
         output
     );
 }
+
+// ============================================================================
+// EXPORT ASSIGNMENT PATTERN TESTS
+// ============================================================================
+
+/// Test basic export = class pattern
+#[test]
+fn test_class_es5_export_assignment_basic() {
+    let source = r#"
+class Calculator {
+    private value: number = 0;
+
+    constructor(initial: number = 0) {
+        this.value = initial;
+    }
+
+    add(n: number): Calculator {
+        this.value += n;
+        return this;
+    }
+
+    subtract(n: number): Calculator {
+        this.value -= n;
+        return this;
+    }
+
+    multiply(n: number): Calculator {
+        this.value *= n;
+        return this;
+    }
+
+    divide(n: number): Calculator {
+        if (n !== 0) {
+            this.value /= n;
+        }
+        return this;
+    }
+
+    getValue(): number {
+        return this.value;
+    }
+
+    reset(): Calculator {
+        this.value = 0;
+        return this;
+    }
+}
+
+export = Calculator;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Calculator class should be ES5 constructor
+    assert!(
+        output.contains("function Calculator"),
+        "Expected ES5 Calculator class: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("add") && output.contains("subtract") && output.contains("multiply"),
+        "Expected Calculator methods: {}",
+        output
+    );
+
+    // Export assignment should be present
+    assert!(
+        output.contains("module.exports") || output.contains("export"),
+        "Expected export assignment: {}",
+        output
+    );
+}
+
+/// Test export = with namespace augmentation
+#[test]
+fn test_class_es5_export_assignment_namespace() {
+    let source = r#"
+class Logger {
+    private name: string;
+    private level: number;
+
+    constructor(name: string) {
+        this.name = name;
+        this.level = Logger.INFO;
+    }
+
+    log(message: string): void {
+        console.log("[" + this.name + "] " + message);
+    }
+
+    setLevel(level: number): void {
+        this.level = level;
+    }
+
+    getLevel(): number {
+        return this.level;
+    }
+
+    getName(): string {
+        return this.name;
+    }
+}
+
+namespace Logger {
+    export const DEBUG = 0;
+    export const INFO = 1;
+    export const WARN = 2;
+    export const ERROR = 3;
+
+    export function create(name: string): Logger {
+        return new Logger(name);
+    }
+}
+
+export = Logger;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Logger class should be ES5 constructor
+    assert!(
+        output.contains("function Logger"),
+        "Expected ES5 Logger class: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains(".log") && output.contains("setLevel") && output.contains("getLevel"),
+        "Expected Logger methods: {}",
+        output
+    );
+
+    // Namespace constants should be present
+    assert!(
+        output.contains("DEBUG") && output.contains("INFO") && output.contains("WARN"),
+        "Expected Logger namespace constants: {}",
+        output
+    );
+}
+
+/// Test import = require pattern with class usage
+#[test]
+fn test_class_es5_import_require_pattern() {
+    let source = r#"
+import events = require("events");
+
+class EventManager {
+    private handlers: Map<string, Function[]> = new Map();
+
+    on(event: string, handler: Function): void {
+        if (!this.handlers.has(event)) {
+            this.handlers.set(event, []);
+        }
+        this.handlers.get(event)!.push(handler);
+    }
+
+    off(event: string, handler: Function): void {
+        const handlers = this.handlers.get(event);
+        if (handlers) {
+            const index = handlers.indexOf(handler);
+            if (index !== -1) {
+                handlers.splice(index, 1);
+            }
+        }
+    }
+
+    emit(event: string, ...args: any[]): void {
+        const handlers = this.handlers.get(event);
+        if (handlers) {
+            handlers.forEach(h => h(...args));
+        }
+    }
+
+    once(event: string, handler: Function): void {
+        const wrapper = (...args: any[]) => {
+            this.off(event, wrapper);
+            handler(...args);
+        };
+        this.on(event, wrapper);
+    }
+
+    removeAllListeners(event?: string): void {
+        if (event) {
+            this.handlers.delete(event);
+        } else {
+            this.handlers.clear();
+        }
+    }
+}
+
+class NotificationCenter extends EventManager {
+    notify(type: string, data: any): void {
+        this.emit(type, data);
+    }
+
+    subscribe(type: string, callback: (data: any) => void): void {
+        this.on(type, callback);
+    }
+
+    unsubscribe(type: string, callback: (data: any) => void): void {
+        this.off(type, callback);
+    }
+}
+
+export = NotificationCenter;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // EventManager class should be ES5 constructor
+    assert!(
+        output.contains("function EventManager"),
+        "Expected ES5 EventManager class: {}",
+        output
+    );
+
+    // NotificationCenter class should be ES5 constructor
+    assert!(
+        output.contains("function NotificationCenter"),
+        "Expected ES5 NotificationCenter class: {}",
+        output
+    );
+
+    // EventManager methods
+    assert!(
+        output.contains(".on") && output.contains(".off") && output.contains(".emit"),
+        "Expected EventManager methods: {}",
+        output
+    );
+
+    // NotificationCenter methods
+    assert!(
+        output.contains("notify") && output.contains("subscribe") && output.contains("unsubscribe"),
+        "Expected NotificationCenter methods: {}",
+        output
+    );
+
+    // Inheritance should be present
+    assert!(
+        output.contains("__extends") || output.contains("_super"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+}
+
+/// Test export = with interface implementation
+#[test]
+fn test_class_es5_export_assignment_interface() {
+    let source = r#"
+interface Serializable {
+    serialize(): string;
+    deserialize(data: string): void;
+}
+
+interface Cloneable<T> {
+    clone(): T;
+}
+
+class DataModel implements Serializable, Cloneable<DataModel> {
+    private id: string;
+    private data: Record<string, any>;
+    private createdAt: Date;
+
+    constructor(id: string, data: Record<string, any> = {}) {
+        this.id = id;
+        this.data = data;
+        this.createdAt = new Date();
+    }
+
+    getId(): string {
+        return this.id;
+    }
+
+    getData(): Record<string, any> {
+        return { ...this.data };
+    }
+
+    setData(key: string, value: any): void {
+        this.data[key] = value;
+    }
+
+    serialize(): string {
+        return JSON.stringify({
+            id: this.id,
+            data: this.data,
+            createdAt: this.createdAt.toISOString()
+        });
+    }
+
+    deserialize(json: string): void {
+        const parsed = JSON.parse(json);
+        this.id = parsed.id;
+        this.data = parsed.data;
+        this.createdAt = new Date(parsed.createdAt);
+    }
+
+    clone(): DataModel {
+        const cloned = new DataModel(this.id, { ...this.data });
+        return cloned;
+    }
+
+    getCreatedAt(): Date {
+        return this.createdAt;
+    }
+}
+
+export = DataModel;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // DataModel class should be ES5 constructor
+    assert!(
+        output.contains("function DataModel"),
+        "Expected ES5 DataModel class: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("getId") && output.contains("getData") && output.contains("setData"),
+        "Expected DataModel methods: {}",
+        output
+    );
+
+    // Interface methods
+    assert!(
+        output.contains("serialize") && output.contains("deserialize") && output.contains("clone"),
+        "Expected Serializable/Cloneable methods: {}",
+        output
+    );
+
+    // Interfaces should be stripped
+    assert!(
+        !output.contains("interface Serializable") && !output.contains("interface Cloneable"),
+        "Expected interfaces to be stripped: {}",
+        output
+    );
+}
+
+/// Test export = function with class inside
+#[test]
+fn test_class_es5_export_assignment_function() {
+    let source = r#"
+function createService(config: { name: string; timeout: number }): Service {
+    return new Service(config.name, config.timeout);
+}
+
+class Service {
+    private name: string;
+    private timeout: number;
+    private isRunning: boolean = false;
+
+    constructor(name: string, timeout: number) {
+        this.name = name;
+        this.timeout = timeout;
+    }
+
+    start(): void {
+        this.isRunning = true;
+    }
+
+    stop(): void {
+        this.isRunning = false;
+    }
+
+    isActive(): boolean {
+        return this.isRunning;
+    }
+
+    getName(): string {
+        return this.name;
+    }
+
+    getTimeout(): number {
+        return this.timeout;
+    }
+
+    setTimeout(timeout: number): void {
+        this.timeout = timeout;
+    }
+}
+
+namespace createService {
+    export const DEFAULT_TIMEOUT = 5000;
+
+    export function withDefaults(name: string): Service {
+        return new Service(name, DEFAULT_TIMEOUT);
+    }
+
+    export class ServiceError extends Error {
+        constructor(message: string) {
+            super(message);
+            this.name = "ServiceError";
+        }
+    }
+}
+
+export = createService;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Service class should be ES5 constructor
+    assert!(
+        output.contains("function Service"),
+        "Expected ES5 Service class: {}",
+        output
+    );
+
+    // createService function should exist
+    assert!(
+        output.contains("createService"),
+        "Expected createService function: {}",
+        output
+    );
+
+    // Service methods
+    assert!(
+        output.contains("start") && output.contains("stop") && output.contains("isActive"),
+        "Expected Service methods: {}",
+        output
+    );
+
+    // Namespace members
+    assert!(
+        output.contains("DEFAULT_TIMEOUT") && output.contains("withDefaults"),
+        "Expected namespace members: {}",
+        output
+    );
+}
+
+/// Test combined export assignment patterns
+#[test]
+fn test_class_es5_export_assignment_combined() {
+    let source = r#"
+import path = require("path");
+
+interface StorageOptions {
+    basePath: string;
+    maxSize: number;
+}
+
+interface StorageItem<T> {
+    key: string;
+    value: T;
+    expires?: number;
+}
+
+class Storage<T> {
+    private options: StorageOptions;
+    private items: Map<string, StorageItem<T>> = new Map();
+
+    constructor(options: StorageOptions) {
+        this.options = options;
+    }
+
+    set(key: string, value: T, ttl?: number): void {
+        const item: StorageItem<T> = {
+            key,
+            value,
+            expires: ttl ? Date.now() + ttl : undefined
+        };
+        this.items.set(key, item);
+    }
+
+    get(key: string): T | undefined {
+        const item = this.items.get(key);
+        if (!item) return undefined;
+        if (item.expires && Date.now() > item.expires) {
+            this.items.delete(key);
+            return undefined;
+        }
+        return item.value;
+    }
+
+    has(key: string): boolean {
+        return this.get(key) !== undefined;
+    }
+
+    delete(key: string): boolean {
+        return this.items.delete(key);
+    }
+
+    clear(): void {
+        this.items.clear();
+    }
+
+    keys(): string[] {
+        return Array.from(this.items.keys());
+    }
+
+    size(): number {
+        return this.items.size;
+    }
+
+    getOptions(): StorageOptions {
+        return { ...this.options };
+    }
+}
+
+namespace Storage {
+    export const VERSION = "1.0.0";
+
+    export function create<T>(basePath: string, maxSize: number = 1000): Storage<T> {
+        return new Storage<T>({ basePath, maxSize });
+    }
+
+    export function createInMemory<T>(): Storage<T> {
+        return new Storage<T>({ basePath: "", maxSize: Infinity });
+    }
+
+    export class StorageError extends Error {
+        constructor(message: string, public code: string) {
+            super(message);
+            this.name = "StorageError";
+        }
+    }
+}
+
+class PersistentStorage<T> extends Storage<T> {
+    private filePath: string;
+
+    constructor(options: StorageOptions, fileName: string) {
+        super(options);
+        this.filePath = options.basePath + "/" + fileName;
+    }
+
+    getFilePath(): string {
+        return this.filePath;
+    }
+
+    async save(): Promise<void> {
+        // Would save to file
+    }
+
+    async load(): Promise<void> {
+        // Would load from file
+    }
+}
+
+export = Storage;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Storage class should be ES5 constructor
+    assert!(
+        output.contains("function Storage"),
+        "Expected ES5 Storage class: {}",
+        output
+    );
+
+    // PersistentStorage class should be ES5 constructor
+    assert!(
+        output.contains("function PersistentStorage"),
+        "Expected ES5 PersistentStorage class: {}",
+        output
+    );
+
+    // Storage methods
+    assert!(
+        output.contains(".set") && output.contains(".get") && output.contains(".has"),
+        "Expected Storage methods: {}",
+        output
+    );
+
+    // PersistentStorage methods
+    assert!(
+        output.contains("getFilePath") && output.contains("save") && output.contains("load"),
+        "Expected PersistentStorage methods: {}",
+        output
+    );
+
+    // Namespace members
+    assert!(
+        output.contains("VERSION") && output.contains("create") && output.contains("createInMemory"),
+        "Expected Storage namespace members: {}",
+        output
+    );
+
+    // Inheritance should be present
+    assert!(
+        output.contains("__extends") || output.contains("_super"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+}
