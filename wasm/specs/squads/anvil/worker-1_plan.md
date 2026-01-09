@@ -6,10 +6,10 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-None - awaiting task from EM-Anvil
+Add ES5 class tests for namespace patterns: merged, exported, nested. Tests: `./wasm/test.sh class_es5_tests`
 
 ## Task Queue
-- [ ] Add ES5 class tests for namespace patterns: merged, exported, nested
+- [ ] Add ES5 class tests for declaration merging patterns: interface, namespace, function
 
 ## Completed
 - [x] Added ES5 tests for enum patterns (6 tests): const enum, string enum, numeric enum, computed enum values, enum class properties, combined enum patterns. Ran `./wasm/test.sh class_es5_tests` (all 446 pass).

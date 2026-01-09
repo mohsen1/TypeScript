@@ -7,10 +7,10 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-(none)
+Add ES5 Proxy patterns parity tests: handler traps, revocable, Reflect integration. Tests: `./wasm/test.sh emitter_parity`
 
 ## Task Queue
-- [ ] Add ES5 Proxy patterns parity tests: handler traps, revocable, Reflect integration
+- [ ] Add ES5 WeakRef patterns parity tests: deref, FinalizationRegistry, weak cache
 
 ## Completed
 - [x] Added ES5 Symbol patterns parity tests (well-known, Symbol.for, Symbol.keyFor, computed-class) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (367 tests).
