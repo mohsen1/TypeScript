@@ -18,7 +18,7 @@ use crate::parser::NodeIndex;
 use crate::parser::thin_node::ThinNodeArena;
 use crate::parser::syntax_kind_ext;
 use crate::scanner::SyntaxKind;
-use crate::binder::{ScopeId, SymbolId, symbol_flags};
+use crate::binder::{ContainerKind, ScopeId, SymbolId, symbol_flags};
 use crate::thin_binder::ThinBinderState;
 use crate::solver::{TypeId, TypeInterner, ContextualTypeContext};
 use crate::checker::types::diagnostics::{
