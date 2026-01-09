@@ -6,12 +6,16 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-- [ ] Add ES5 class tests for keyof/typeof patterns: keyof object, typeof value, indexed access types. Tests: `./wasm/test.sh class_es5_tests`
+- [ ] Add ES5 class tests for utility type patterns: Awaited, NonNullable, ReturnType. Tests: `./wasm/test.sh class_es5_tests`
 
 ## Task Queue
-- [ ] Add ES5 class tests for template string type patterns: string interpolation, pattern matching
+- [ ] Add ES5 class tests for function overload patterns: multiple signatures, implementation
 
 ## Completed
+- [x] Added ES5 tests for nominal type patterns (6 tests): basic branded, opaque types, branded type guards, branded numeric, branded string, combined nominal patterns. Ran `./wasm/test.sh class_es5_tests` (all 437 pass).
+- [x] Added ES5 tests for assertion function patterns (6 tests): basic asserts, type predicates, generic signatures, class methods, inheritance, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 431 pass).
+- [x] Added ES5 tests for template string type patterns (6 tests): string interpolation, pattern matching, literal keys, tagged template types, string manipulation types, combined template patterns. Ran `./wasm/test.sh class_es5_tests` (all 422 pass).
+- [x] Added ES5 tests for keyof/typeof patterns (6 tests): keyof object, typeof value, indexed access types, keyof generics, typeof const assertions, combined keyof/typeof. Ran `./wasm/test.sh class_es5_tests` (all 416 pass).
 - [x] Added ES5 tests for infer keyword patterns (6 tests): array element, function return, promise unwrap, constructor params, tuple elements, combined infer patterns. Ran `./wasm/test.sh class_es5_tests` (all 407 pass).
 - [x] Added ES5 tests for mapped type patterns (6 tests): Partial, Required, Readonly, Pick, Omit, Record. Ran `./wasm/test.sh class_es5_tests` (all 401 pass).
 - [x] Added ES5 tests for union type patterns (6 tests): discriminated unions, type narrowing, string literal unions, number literal unions, nullable unions, combined union patterns. Ran `./wasm/test.sh class_es5_tests` (all 395 pass).
