@@ -5,6 +5,17 @@ Updated: 2026-01-09
 Priority: 2
 
 ---
+## 🚨 URGENT: EM-ANVIL ACTION REQUIRED
+
+**CHECK WORKER ASSIGNMENTS - CORRECT IF WRONG**
+
+If any worker is NOT following their assigned task:
+1. **Send ESC key** to stop their active work
+2. Reassign per the assignments below
+3. Workers 3-5 MUST be on CONFORMANCE HARNESS, not manual tests
+4. Workers 1-2 MUST be on bug fixes only, not new features
+
+---
 ## 📢 EM-ANVIL: DIRECTIVE UPDATE
 
 **Operation Crucible - NEW APPROACH:**

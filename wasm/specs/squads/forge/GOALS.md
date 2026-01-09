@@ -5,6 +5,16 @@ Updated: 2026-01-09
 Priority: 1
 
 ---
+## 🚨 URGENT: EM-FORGE ACTION REQUIRED
+
+**⛔ DROP ALL REDUX/LODASH WORK IMMEDIATELY**
+
+If any worker is currently working on Redux/Lodash issues:
+1. **Send ESC key** to stop active work
+2. Reassign to tasks below
+3. We have senior staff handling Redux/Lodash - your team must focus elsewhere
+
+---
 ## 📢 EM-FORGE: DIRECTIVE UPDATE
 
 **Redux/Lodash blocker is handled by senior staff. DO NOT work on it.**
@@ -86,13 +96,20 @@ Per Project Direction: **Autocratic Scheduling + Bisect-on-Merge**
 - PRs that regress ANY existing baseline are auto-rejected
 
 ## Squad Status
-- Last EM Report: 2026-01-09 - Reassigned from Redux blocker
+- Last EM Report: 2026-01-09 - EM session complete
+- Redux Baseline: 4 diagnostics (stable, target: 0)
 - Workers Active: 5/5
-- Current Focus: Generic Inference + Conditional Types
-- Direction: Solver hardening (NOT Redux)
+- Current Focus: Generic Inference + Conditional Types + Fix failing tests
+- Direction: Solver hardening per new directive
+- Session Merges:
+  - forge-3: try_expand_type_arg fix
+  - forge-5-track: 33 edge case tests for evaluate
+- Blocked Commits:
+  - forge-2: Removes Ref/TypeQuery handling (regression)
+  - forge-5: Merge conflicts in thin_checker.rs
 - Worker Assignments:
-  - W1: Generic inference from usage (`solver/infer.rs`)
-  - W2: Context-sensitive typing edge cases
-  - W3: Circular constraints in `extends` clauses
-  - W4: Distributive conditional types over unions
-  - W5: Fix failing conditional infer tests
+  - W1/Pane3: test_conditional_infer_function_optional_param_distributive
+  - W2/Pane4: Eager type argument resolution
+  - W3/Pane5: compile_class_with_generic_constructor
+  - W4/Pane6: Running tests
+  - W5/Pane7: test_conditional_infer_function_optional_param_non_distributive_union_input
