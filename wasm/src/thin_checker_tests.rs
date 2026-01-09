@@ -4505,6 +4505,97 @@ const anon = () => { return null; };
     assert_eq!(count(7011), 1, "Expected one 7011 error, got codes: {:?}", codes);
 }
 
+/// Test that functions that only throw don't trigger TS2355.
+/// TS2355: "A function whose declared type is neither 'void' nor 'any' must return a value"
+/// This should NOT fire for functions that only throw since throwing is a valid exit.
+#[test]
+fn test_throw_only_function_no_2355() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// Function that only throws should NOT get 2355
+function throwOnly(): number {
+    throw new Error("always throws");
+}
+
+// Method that only throws should NOT get 2355
+class C {
+    throwMethod(): string {
+        throw new Error("always throws");
+    }
+
+    get throwGetter(): number {
+        throw new Error("getter throws");
+    }
+}
+
+// Function that DOES fall through without returning SHOULD get 2355
+function fallsThrough(): number {
+    console.log("oops, no return");
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count = |code| codes.iter().filter(|&&c| c == code).count();
+
+    // Only fallsThrough should get 2355, not the throw-only functions
+    assert_eq!(count(2355), 1, "Expected exactly one 2355 error for fallsThrough(), got: {:?}", codes);
+
+    // Verify which function got the error by checking the messages
+    let error_2355 = checker.ctx.diagnostics.iter().find(|d| d.code == 2355);
+    assert!(error_2355.is_some(), "Should have a 2355 error");
+}
+
+/// Test that infinite loops don't trigger TS2355 either
+#[test]
+fn test_infinite_loop_no_2355() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// Infinite loop without break should NOT get 2355
+function infiniteLoop(): number {
+    while (true) {
+        console.log("forever");
+    }
+}
+
+// But loop with break SHOULD fall through
+function loopWithBreak(): number {
+    while (true) {
+        break;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count = |code| codes.iter().filter(|&&c| c == code).count();
+
+    // Only loopWithBreak should get 2355
+    assert_eq!(count(2355), 1, "Expected exactly one 2355 error for loopWithBreak(), got: {:?}", codes);
+}
+
 #[test]
 fn test_no_implicit_any_false_suppresses_diagnostics() {
     use crate::thin_parser::ThinParserState;
