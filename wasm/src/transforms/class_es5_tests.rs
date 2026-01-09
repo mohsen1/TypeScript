@@ -34553,3 +34553,541 @@ class NotificationManager {
         output
     );
 }
+
+// =============================================================================
+// CONDITIONAL TYPE PATTERN TESTS - Exclude, Extract, NonNullable
+// =============================================================================
+
+#[test]
+fn test_class_es5_conditional_type_exclude() {
+    let source = r#"
+// Exclude conditional type pattern
+type EventType = "click" | "focus" | "blur" | "keydown" | "keyup";
+type MouseEventType = Exclude<EventType, "keydown" | "keyup">;
+type KeyboardEventType = Exclude<EventType, "click" | "focus" | "blur">;
+
+class EventDispatcher<T extends string> {
+    private handlers: Map<T, Function[]> = new Map();
+
+    on(event: T, handler: Function): void {
+        if (!this.handlers.has(event)) {
+            this.handlers.set(event, []);
+        }
+        this.handlers.get(event)!.push(handler);
+    }
+
+    off(event: T, handler: Function): void {
+        const handlers = this.handlers.get(event);
+        if (handlers) {
+            const index = handlers.indexOf(handler);
+            if (index >= 0) {
+                handlers.splice(index, 1);
+            }
+        }
+    }
+
+    emit(event: T, data?: unknown): void {
+        const handlers = this.handlers.get(event);
+        if (handlers) {
+            handlers.forEach(h => h(data));
+        }
+    }
+}
+
+class MouseEventDispatcher extends EventDispatcher<MouseEventType> {
+    handleClick(handler: Function): void {
+        this.on("click", handler);
+    }
+
+    handleFocus(handler: Function): void {
+        this.on("focus", handler);
+    }
+
+    handleBlur(handler: Function): void {
+        this.on("blur", handler);
+    }
+}
+
+class KeyboardEventDispatcher extends EventDispatcher<KeyboardEventType> {
+    handleKeyDown(handler: Function): void {
+        this.on("keydown", handler);
+    }
+
+    handleKeyUp(handler: Function): void {
+        this.on("keyup", handler);
+    }
+}
+
+type StatusCode = 200 | 201 | 400 | 401 | 404 | 500;
+type SuccessCode = Exclude<StatusCode, 400 | 401 | 404 | 500>;
+type ErrorCode = Exclude<StatusCode, 200 | 201>;
+
+class ResponseHandler<T extends StatusCode> {
+    handle(code: T, data: unknown): void {
+        console.log("Handling status:", code);
+    }
+}
+
+class SuccessHandler extends ResponseHandler<SuccessCode> {
+    handleSuccess(data: unknown): void {
+        this.handle(200, data);
+    }
+}
+
+class ErrorHandler extends ResponseHandler<ErrorCode> {
+    handleError(message: string): void {
+        this.handle(400, { error: message });
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("EventDispatcher") && output.contains("MouseEventDispatcher") && output.contains("KeyboardEventDispatcher"),
+        "Expected Exclude conditional type classes: {}",
+        output
+    );
+
+    // EventDispatcher methods
+    assert!(
+        output.contains("on") && output.contains("off") && output.contains("emit"),
+        "Expected EventDispatcher methods: {}",
+        output
+    );
+
+    // MouseEventDispatcher methods
+    assert!(
+        output.contains("handleClick") && output.contains("handleFocus") && output.contains("handleBlur"),
+        "Expected MouseEventDispatcher methods: {}",
+        output
+    );
+
+    // KeyboardEventDispatcher methods
+    assert!(
+        output.contains("handleKeyDown") && output.contains("handleKeyUp"),
+        "Expected KeyboardEventDispatcher methods: {}",
+        output
+    );
+
+    // ResponseHandler classes
+    assert!(
+        output.contains("ResponseHandler") && output.contains("SuccessHandler") && output.contains("ErrorHandler"),
+        "Expected ResponseHandler classes: {}",
+        output
+    );
+
+    // Type aliases should be stripped
+    assert!(
+        !output.contains("type EventType") && !output.contains("type MouseEventType") && !output.contains("type KeyboardEventType"),
+        "Expected type aliases to be stripped: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_conditional_type_extract() {
+    let source = r#"
+// Extract conditional type pattern
+type AllTypes = string | number | boolean | null | undefined | object | Function;
+type PrimitiveTypes = Extract<AllTypes, string | number | boolean>;
+type NullableTypes = Extract<AllTypes, null | undefined>;
+type ObjectTypes = Extract<AllTypes, object | Function>;
+
+class TypeValidator<T> {
+    private validators: ((value: unknown) => boolean)[] = [];
+
+    addValidator(fn: (value: unknown) => boolean): void {
+        this.validators.push(fn);
+    }
+
+    validate(value: unknown): boolean {
+        return this.validators.every(v => v(value));
+    }
+
+    validateAll(values: unknown[]): boolean[] {
+        return values.map(v => this.validate(v));
+    }
+}
+
+class PrimitiveValidator extends TypeValidator<PrimitiveTypes> {
+    constructor() {
+        super();
+        this.addValidator(v => typeof v === "string" || typeof v === "number" || typeof v === "boolean");
+    }
+
+    validateString(value: unknown): boolean {
+        return typeof value === "string";
+    }
+
+    validateNumber(value: unknown): boolean {
+        return typeof value === "number";
+    }
+
+    validateBoolean(value: unknown): boolean {
+        return typeof value === "boolean";
+    }
+}
+
+class NullableValidator extends TypeValidator<NullableTypes> {
+    constructor() {
+        super();
+        this.addValidator(v => v === null || v === undefined);
+    }
+
+    isNull(value: unknown): boolean {
+        return value === null;
+    }
+
+    isUndefined(value: unknown): boolean {
+        return value === undefined;
+    }
+}
+
+type HTTPMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "HEAD" | "OPTIONS";
+type SafeMethod = Extract<HTTPMethod, "GET" | "HEAD" | "OPTIONS">;
+type UnsafeMethod = Extract<HTTPMethod, "POST" | "PUT" | "DELETE" | "PATCH">;
+
+class RequestBuilder<M extends HTTPMethod> {
+    protected method: M;
+    protected url: string = "";
+    protected headers: Record<string, string> = {};
+
+    constructor(method: M) {
+        this.method = method;
+    }
+
+    setUrl(url: string): this {
+        this.url = url;
+        return this;
+    }
+
+    setHeader(key: string, value: string): this {
+        this.headers[key] = value;
+        return this;
+    }
+
+    getMethod(): M {
+        return this.method;
+    }
+}
+
+class SafeRequestBuilder extends RequestBuilder<SafeMethod> {
+    constructor(method: SafeMethod) {
+        super(method);
+    }
+
+    cache(duration: number): this {
+        this.setHeader("Cache-Control", "max-age=" + duration);
+        return this;
+    }
+}
+
+class UnsafeRequestBuilder extends RequestBuilder<UnsafeMethod> {
+    private body: unknown;
+
+    constructor(method: UnsafeMethod) {
+        super(method);
+    }
+
+    setBody(body: unknown): this {
+        this.body = body;
+        return this;
+    }
+
+    getBody(): unknown {
+        return this.body;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("TypeValidator") && output.contains("PrimitiveValidator") && output.contains("NullableValidator"),
+        "Expected Extract conditional type classes: {}",
+        output
+    );
+
+    // TypeValidator methods
+    assert!(
+        output.contains("addValidator") && output.contains("validate") && output.contains("validateAll"),
+        "Expected TypeValidator methods: {}",
+        output
+    );
+
+    // PrimitiveValidator methods
+    assert!(
+        output.contains("validateString") && output.contains("validateNumber") && output.contains("validateBoolean"),
+        "Expected PrimitiveValidator methods: {}",
+        output
+    );
+
+    // NullableValidator methods
+    assert!(
+        output.contains("isNull") && output.contains("isUndefined"),
+        "Expected NullableValidator methods: {}",
+        output
+    );
+
+    // RequestBuilder classes
+    assert!(
+        output.contains("RequestBuilder") && output.contains("SafeRequestBuilder") && output.contains("UnsafeRequestBuilder"),
+        "Expected RequestBuilder classes: {}",
+        output
+    );
+
+    // Type aliases should be stripped
+    assert!(
+        !output.contains("type AllTypes") && !output.contains("type PrimitiveTypes") && !output.contains("type SafeMethod"),
+        "Expected type aliases to be stripped: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_conditional_type_nonnullable() {
+    let source = r#"
+// NonNullable conditional type pattern
+type MaybeString = string | null | undefined;
+type MaybeNumber = number | null | undefined;
+type DefiniteString = NonNullable<MaybeString>;
+type DefiniteNumber = NonNullable<MaybeNumber>;
+
+class SafeValueWrapper<T> {
+    private value: T | null | undefined;
+
+    constructor(value?: T | null) {
+        this.value = value;
+    }
+
+    get(): T | null | undefined {
+        return this.value;
+    }
+
+    getOrDefault(defaultValue: NonNullable<T>): NonNullable<T> {
+        return (this.value ?? defaultValue) as NonNullable<T>;
+    }
+
+    getOrThrow(): NonNullable<T> {
+        if (this.value === null || this.value === undefined) {
+            throw new Error("Value is null or undefined");
+        }
+        return this.value as NonNullable<T>;
+    }
+
+    map<U>(fn: (value: NonNullable<T>) => U): SafeValueWrapper<U> {
+        if (this.value === null || this.value === undefined) {
+            return new SafeValueWrapper<U>();
+        }
+        return new SafeValueWrapper(fn(this.value as NonNullable<T>));
+    }
+
+    isPresent(): boolean {
+        return this.value !== null && this.value !== undefined;
+    }
+}
+
+class StringWrapper extends SafeValueWrapper<string> {
+    toUpperCase(): SafeValueWrapper<string> {
+        return this.map(s => s.toUpperCase());
+    }
+
+    toLowerCase(): SafeValueWrapper<string> {
+        return this.map(s => s.toLowerCase());
+    }
+
+    trim(): SafeValueWrapper<string> {
+        return this.map(s => s.trim());
+    }
+}
+
+class NumberWrapper extends SafeValueWrapper<number> {
+    add(n: number): SafeValueWrapper<number> {
+        return this.map(x => x + n);
+    }
+
+    multiply(n: number): SafeValueWrapper<number> {
+        return this.map(x => x * n);
+    }
+
+    abs(): SafeValueWrapper<number> {
+        return this.map(x => Math.abs(x));
+    }
+}
+
+interface User {
+    id: number;
+    name: string;
+    email: string | null;
+    phone?: string;
+}
+
+type RequiredUser = {
+    [K in keyof User]-?: NonNullable<User[K]>;
+};
+
+class UserValidator {
+    private user: User;
+
+    constructor(user: User) {
+        this.user = user;
+    }
+
+    hasEmail(): boolean {
+        return this.user.email !== null;
+    }
+
+    hasPhone(): boolean {
+        return this.user.phone !== undefined;
+    }
+
+    toRequiredUser(): RequiredUser | null {
+        if (this.user.email === null || this.user.phone === undefined) {
+            return null;
+        }
+        return {
+            id: this.user.id,
+            name: this.user.name,
+            email: this.user.email,
+            phone: this.user.phone
+        };
+    }
+
+    getEmail(): NonNullable<User["email"]> | null {
+        return this.user.email;
+    }
+
+    getPhone(): NonNullable<User["phone"]> | undefined {
+        return this.user.phone;
+    }
+}
+
+class DataProcessor<T extends object> {
+    private data: T;
+
+    constructor(data: T) {
+        this.data = data;
+    }
+
+    getField<K extends keyof T>(key: K): T[K] {
+        return this.data[key];
+    }
+
+    getNonNullableField<K extends keyof T>(key: K): NonNullable<T[K]> {
+        const value = this.data[key];
+        if (value === null || value === undefined) {
+            throw new Error("Field is null or undefined: " + String(key));
+        }
+        return value as NonNullable<T[K]>;
+    }
+
+    setField<K extends keyof T>(key: K, value: T[K]): void {
+        this.data[key] = value;
+    }
+
+    hasValue<K extends keyof T>(key: K): boolean {
+        return this.data[key] !== null && this.data[key] !== undefined;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("SafeValueWrapper") && output.contains("StringWrapper") && output.contains("NumberWrapper"),
+        "Expected NonNullable conditional type classes: {}",
+        output
+    );
+
+    // SafeValueWrapper methods
+    assert!(
+        output.contains("getOrDefault") && output.contains("getOrThrow") && output.contains("isPresent"),
+        "Expected SafeValueWrapper methods: {}",
+        output
+    );
+
+    // StringWrapper methods
+    assert!(
+        output.contains("toUpperCase") && output.contains("toLowerCase") && output.contains("trim"),
+        "Expected StringWrapper methods: {}",
+        output
+    );
+
+    // NumberWrapper methods
+    assert!(
+        output.contains("add") && output.contains("multiply") && output.contains("abs"),
+        "Expected NumberWrapper methods: {}",
+        output
+    );
+
+    // UserValidator class
+    assert!(
+        output.contains("UserValidator") && output.contains("hasEmail") && output.contains("hasPhone"),
+        "Expected UserValidator class: {}",
+        output
+    );
+
+    // DataProcessor class
+    assert!(
+        output.contains("DataProcessor") && output.contains("getField") && output.contains("getNonNullableField"),
+        "Expected DataProcessor class: {}",
+        output
+    );
+
+    // Type aliases should be stripped
+    assert!(
+        !output.contains("type MaybeString") && !output.contains("type DefiniteString") && !output.contains("type RequiredUser"),
+        "Expected type aliases to be stripped: {}",
+        output
+    );
+
+    // Interface should be stripped
+    assert!(
+        !output.contains("interface User"),
+        "Expected interface to be stripped: {}",
+        output
+    );
+}
