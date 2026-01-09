@@ -2369,8 +2369,9 @@ impl ThinParserState {
         // Skip 'get' or 'set'
         self.next_token();
 
-        // Check for property name (identifier, string, number, or computed)
+        // Check for property name (identifier, private identifier, string, number, or computed)
         let has_name = self.is_token(SyntaxKind::Identifier) ||
+                       self.is_token(SyntaxKind::PrivateIdentifier) ||
                        self.is_token(SyntaxKind::StringLiteral) ||
                        self.is_token(SyntaxKind::NumericLiteral) ||
                        self.is_token(SyntaxKind::OpenBracketToken);
