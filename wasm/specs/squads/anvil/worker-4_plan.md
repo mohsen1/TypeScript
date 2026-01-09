@@ -7,10 +7,10 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-None - awaiting assignment from EM-Anvil
+Add ES5 class tests for variadic tuple patterns: spread, labeled, optional. Tests: `./wasm/test.sh class_es5_tests`
 
 ## Task Queue
-- [ ] Add ES5 class tests for variadic tuple patterns: spread, labeled, optional
+- [ ] Add ES5 class tests for key remapping patterns: as clause, template literals
 
 ## Completed
 - [x] Add ES5 class tests for recursive type patterns: tree, linked list, JSON. Tests: `./wasm/test.sh class_es5_tests`
