@@ -7119,9 +7119,10 @@ impl<'a> ThinCheckerState<'a> {
             return;
         }
 
+        let requires_super = self.class_has_base(class);
         let constructor_body = self.find_constructor_body(&class.members.nodes);
         let assigned = if let Some(body_idx) = constructor_body {
-            self.analyze_constructor_assignments(body_idx, &tracked)
+            self.analyze_constructor_assignments(body_idx, &tracked, requires_super)
         } else {
             FxHashSet::default()
         };
@@ -7168,6 +7169,28 @@ impl<'a> ThinCheckerState<'a> {
         !self.type_includes_undefined(prop_type)
     }
 
+    fn class_has_base(&self, class: &crate::parser::thin_node::ClassData) -> bool {
+        use crate::scanner::SyntaxKind;
+
+        let Some(ref heritage_clauses) = class.heritage_clauses else {
+            return false;
+        };
+
+        for &clause_idx in &heritage_clauses.nodes {
+            let Some(clause_node) = self.ctx.arena.get(clause_idx) else {
+                continue;
+            };
+            let Some(heritage) = self.ctx.arena.get_heritage_clause(clause_node) else {
+                continue;
+            };
+            if heritage.token == SyntaxKind::ExtendsKeyword as u16 {
+                return true;
+            }
+        }
+
+        false
+    }
+
     fn type_includes_undefined(&self, type_id: TypeId) -> bool {
         use crate::solver::TypeKey;
 
@@ -7205,9 +7228,88 @@ impl<'a> ThinCheckerState<'a> {
         &self,
         body_idx: NodeIndex,
         tracked: &FxHashSet<PropertyKey>,
+        require_super: bool,
     ) -> FxHashSet<PropertyKey> {
-        let result = self.analyze_statement(body_idx, &FxHashSet::default(), tracked);
+        let result = if require_super {
+            self.analyze_constructor_body_after_super(body_idx, tracked)
+        } else {
+            self.analyze_statement(body_idx, &FxHashSet::default(), tracked)
+        };
 
+        self.flow_result_to_assigned(result)
+    }
+
+    fn analyze_constructor_body_after_super(
+        &self,
+        body_idx: NodeIndex,
+        tracked: &FxHashSet<PropertyKey>,
+    ) -> FlowResult {
+        let Some(body_node) = self.ctx.arena.get(body_idx) else {
+            return FlowResult {
+                normal: Some(FxHashSet::default()),
+                exits: None,
+            };
+        };
+
+        if body_node.kind != syntax_kind_ext::BLOCK {
+            return FlowResult {
+                normal: Some(FxHashSet::default()),
+                exits: None,
+            };
+        }
+
+        let Some(block) = self.ctx.arena.get_block(body_node) else {
+            return FlowResult {
+                normal: Some(FxHashSet::default()),
+                exits: None,
+            };
+        };
+
+        let Some(start_idx) = self.find_super_statement_start(&block.statements.nodes) else {
+            return FlowResult {
+                normal: Some(FxHashSet::default()),
+                exits: None,
+            };
+        };
+
+        self.analyze_block(&block.statements.nodes[start_idx..], &FxHashSet::default(), tracked)
+    }
+
+    fn find_super_statement_start(&self, statements: &[NodeIndex]) -> Option<usize> {
+        for (idx, &stmt_idx) in statements.iter().enumerate() {
+            if self.is_super_call_statement(stmt_idx) {
+                return Some(idx + 1);
+            }
+        }
+        None
+    }
+
+    fn is_super_call_statement(&self, stmt_idx: NodeIndex) -> bool {
+        let Some(node) = self.ctx.arena.get(stmt_idx) else {
+            return false;
+        };
+        if node.kind != syntax_kind_ext::EXPRESSION_STATEMENT {
+            return false;
+        }
+        let Some(expr_stmt) = self.ctx.arena.get_expression_statement(node) else {
+            return false;
+        };
+        let Some(expr_node) = self.ctx.arena.get(expr_stmt.expression) else {
+            return false;
+        };
+        if expr_node.kind != syntax_kind_ext::CALL_EXPRESSION {
+            return false;
+        };
+        let Some(call) = self.ctx.arena.get_call_expr(expr_node) else {
+            return false;
+        };
+        let Some(callee_node) = self.ctx.arena.get(call.expression) else {
+            return false;
+        };
+        callee_node.kind == SyntaxKind::SuperKeyword as u16
+    }
+
+    fn flow_result_to_assigned(&self, result: FlowResult) -> FxHashSet<PropertyKey> {
         let mut assigned = None;
         if let Some(normal) = result.normal {
             assigned = Some(normal);
