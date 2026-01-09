@@ -9138,3 +9138,338 @@ class ImmutableList<T> {
         output
     );
 }
+
+// =============================================================================
+// WeakMap/WeakSet Private Field Polyfill Tests
+// =============================================================================
+
+#[test]
+fn test_class_es5_weakmap_private_field_basic() {
+    // Private fields polyfilled with WeakMap pattern
+    let source = r#"
+class SecureData {
+    #secret: string;
+    #value: number;
+
+    constructor(secret: string, value: number) {
+        this.#secret = secret;
+        this.#value = value;
+    }
+
+    getSecret(): string {
+        return this.#secret;
+    }
+
+    getValue(): number {
+        return this.#value;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be present
+    assert!(
+        output.contains("SecureData"),
+        "Expected SecureData class: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("getSecret") && output.contains("getValue"),
+        "Expected getSecret and getValue methods: {}",
+        output
+    );
+
+    // Private field access should be transformed
+    assert!(
+        output.contains("secret") && output.contains("value"),
+        "Expected private field references: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_weakmap_private_field_methods() {
+    // Private methods polyfilled with WeakSet pattern
+    let source = r#"
+class Processor {
+    #data: any[] = [];
+
+    #validate(item: any): boolean {
+        return item !== null && item !== undefined;
+    }
+
+    #transform(item: any): any {
+        return { processed: true, data: item };
+    }
+
+    add(item: any): void {
+        if (this.#validate(item)) {
+            this.#data.push(this.#transform(item));
+        }
+    }
+
+    getAll(): any[] {
+        return this.#data;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be present
+    assert!(
+        output.contains("Processor"),
+        "Expected Processor class: {}",
+        output
+    );
+
+    // Public methods should be present
+    assert!(
+        output.contains("add") && output.contains("getAll"),
+        "Expected add and getAll methods: {}",
+        output
+    );
+
+    // Private method names should be present
+    assert!(
+        output.contains("validate") && output.contains("transform"),
+        "Expected private method names: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_weakmap_private_field_inheritance() {
+    // Private fields in inheritance - each class has its own WeakMap
+    let source = r#"
+class Parent {
+    #parentSecret: string = "parent";
+
+    getParentSecret(): string {
+        return this.#parentSecret;
+    }
+}
+
+class Child extends Parent {
+    #childSecret: string = "child";
+
+    getChildSecret(): string {
+        return this.#childSecret;
+    }
+
+    getBoth(): string {
+        return this.getParentSecret() + " " + this.#childSecret;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be present
+    assert!(
+        output.contains("Parent") && output.contains("Child"),
+        "Expected Parent and Child classes: {}",
+        output
+    );
+
+    // Inheritance should be present
+    assert!(
+        output.contains("__extends") || output.contains("prototype"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("getParentSecret") && output.contains("getChildSecret") && output.contains("getBoth"),
+        "Expected getter methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_weakmap_private_field_static() {
+    // Static private fields with WeakMap-like pattern
+    let source = r#"
+class Registry {
+    static #instances: Map<string, Registry> = new Map();
+    static #counter: number = 0;
+
+    #id: number;
+
+    constructor() {
+        this.#id = Registry.#counter++;
+    }
+
+    static register(name: string, instance: Registry): void {
+        this.#instances.set(name, instance);
+    }
+
+    static get(name: string): Registry | undefined {
+        return this.#instances.get(name);
+    }
+
+    getId(): number {
+        return this.#id;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be present
+    assert!(
+        output.contains("Registry"),
+        "Expected Registry class: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("register") && output.contains("get"),
+        "Expected register and get methods: {}",
+        output
+    );
+
+    // Instance method should be present
+    assert!(
+        output.contains("getId"),
+        "Expected getId method: {}",
+        output
+    );
+
+    // Private field references should be present
+    assert!(
+        output.contains("instances") || output.contains("counter") || output.contains("id"),
+        "Expected private field references: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_weakmap_private_field_accessors() {
+    // Private field with getter/setter accessors
+    let source = r#"
+class BoundedValue {
+    #value: number = 0;
+    #min: number;
+    #max: number;
+
+    constructor(min: number, max: number) {
+        this.#min = min;
+        this.#max = max;
+    }
+
+    get value(): number {
+        return this.#value;
+    }
+
+    set value(v: number) {
+        if (v < this.#min) {
+            this.#value = this.#min;
+        } else if (v > this.#max) {
+            this.#value = this.#max;
+        } else {
+            this.#value = v;
+        }
+    }
+
+    reset(): void {
+        this.#value = this.#min;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be present
+    assert!(
+        output.contains("BoundedValue"),
+        "Expected BoundedValue class: {}",
+        output
+    );
+
+    // Accessor property should be defined
+    assert!(
+        output.contains("value"),
+        "Expected value accessor: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("reset"),
+        "Expected reset method: {}",
+        output
+    );
+
+    // Private field references should be transformed
+    assert!(
+        output.contains("min") && output.contains("max"),
+        "Expected min and max field references: {}",
+        output
+    );
+}
