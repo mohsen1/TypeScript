@@ -7,10 +7,10 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-(none)
+- [ ] Add ES5 class tests for decorator metadata patterns: reflect metadata, design types, parameter metadata. Tests: `./wasm/test.sh class_es5_tests`
 
 ## Task Queue
-- [ ] Add ES5 class tests for decorator metadata patterns: reflect metadata, design types
+- [ ] Add ES5 class tests for class static block patterns: initialization order, multiple blocks
 
 ## Completed
 - [x] Add ES5 class tests for import assertion patterns. Tests: `./wasm/test.sh class_es5_tests`
