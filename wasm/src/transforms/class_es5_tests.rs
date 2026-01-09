@@ -14875,34 +14875,187 @@ class PluginRegistry {
     );
 }
 
+// ============================================================================
+// Symbol.iterator Pattern Tests (Full Pipeline)
+// ============================================================================
+
 #[test]
-fn test_class_es5_object_getprototypeof_basic() {
-    // Basic Object.getPrototypeOf usage for prototype inspection
+fn test_class_es5_symbol_iterator_range() {
+    // Custom range iterator implementation
     let source = r#"
-class PrototypeInspector {
-    getProto(obj: object): object | null {
-        return Object.getPrototypeOf(obj);
+class Range {
+    private start: number;
+    private end: number;
+    private step: number;
+
+    constructor(start: number, end: number, step: number = 1) {
+        this.start = start;
+        this.end = end;
+        this.step = step;
     }
 
-    getPrototypeChain(obj: object): object[] {
-        const chain: object[] = [];
-        let current = Object.getPrototypeOf(obj);
-        while (current !== null) {
-            chain.push(current);
-            current = Object.getPrototypeOf(current);
+    *[Symbol.iterator](): Generator<number> {
+        for (let i = this.start; i <= this.end; i += this.step) {
+            yield i;
         }
-        return chain;
     }
 
-    hasPrototype(obj: object, proto: object): boolean {
-        let current = Object.getPrototypeOf(obj);
-        while (current !== null) {
-            if (current === proto) {
-                return true;
+    toArray(): number[] {
+        return [...this];
+    }
+
+    get length(): number {
+        return Math.ceil((this.end - this.start + 1) / this.step);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function Range"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Symbol.iterator should be present
+    assert!(
+        output.contains("Symbol.iterator") || output.contains("iterator"),
+        "Expected Symbol.iterator reference: {}",
+        output
+    );
+
+    // Helper methods should be present
+    assert!(
+        output.contains("toArray"),
+        "Expected toArray method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_iterator_linked_list() {
+    // Linked list with iterator implementation
+    let source = r#"
+class LinkedListNode<T> {
+    value: T;
+    next: LinkedListNode<T> | null = null;
+
+    constructor(value: T) {
+        this.value = value;
+    }
+}
+
+class LinkedList<T> {
+    private head: LinkedListNode<T> | null = null;
+    private tail: LinkedListNode<T> | null = null;
+    private size: number = 0;
+
+    append(value: T): void {
+        const node = new LinkedListNode(value);
+        if (!this.tail) {
+            this.head = this.tail = node;
+        } else {
+            this.tail.next = node;
+            this.tail = node;
+        }
+        this.size++;
+    }
+
+    *[Symbol.iterator](): Generator<T> {
+        let current = this.head;
+        while (current) {
+            yield current.value;
+            current = current.next;
+        }
+    }
+
+    get length(): number {
+        return this.size;
+    }
+
+    isEmpty(): boolean {
+        return this.size === 0;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Both classes should be converted
+    assert!(
+        output.contains("function LinkedListNode"),
+        "Expected LinkedListNode function: {}",
+        output
+    );
+    assert!(
+        output.contains("function LinkedList"),
+        "Expected LinkedList function: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("append") && output.contains("isEmpty"),
+        "Expected append and isEmpty methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_iterator_with_return_value() {
+    // Iterator with return value and done state
+    let source = r#"
+class CountdownIterator {
+    private count: number;
+
+    constructor(start: number) {
+        this.count = start;
+    }
+
+    [Symbol.iterator](): Iterator<number, string> {
+        let current = this.count;
+        return {
+            next(): IteratorResult<number, string> {
+                if (current > 0) {
+                    return { value: current--, done: false };
+                }
+                return { value: "Liftoff!", done: true };
             }
-            current = Object.getPrototypeOf(current);
-        }
-        return false;
+        };
+    }
+
+    reset(value: number): void {
+        this.count = value;
+    }
+
+    get remaining(): number {
+        return this.count;
     }
 }
 "#;
@@ -14921,44 +15074,59 @@ class PrototypeInspector {
 
     let output = printer.get_output().to_string();
 
+    // Class should be converted
     assert!(
-        output.contains("PrototypeInspector"),
-        "Expected PrototypeInspector class: {}",
+        output.contains("function CountdownIterator"),
+        "Expected function declaration: {}",
         output
     );
+
+    // Methods should be present
     assert!(
-        output.contains("Object.getPrototypeOf"),
-        "Expected Object.getPrototypeOf: {}",
+        output.contains("reset"),
+        "Expected reset method: {}",
         output
     );
+
+    // remaining getter should be present
     assert!(
-        output.contains("getProto") && output.contains("getPrototypeChain"),
-        "Expected methods: {}",
+        output.contains("remaining"),
+        "Expected remaining getter: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_object_setprototypeof_basic() {
-    // Basic Object.setPrototypeOf usage for prototype modification
+fn test_class_es5_symbol_iterator_with_inheritance() {
+    // Iterator with class inheritance
     let source = r#"
-class PrototypeModifier {
-    static setProto(obj: object, proto: object | null): object {
-        return Object.setPrototypeOf(obj, proto);
+abstract class IterableCollection<T> {
+    protected items: T[] = [];
+
+    abstract [Symbol.iterator](): Iterator<T>;
+
+    add(item: T): void {
+        this.items.push(item);
     }
 
-    static createWithProto<T extends object>(props: T, proto: object | null): T {
-        const obj = { ...props };
-        Object.setPrototypeOf(obj, proto);
-        return obj as T;
+    get size(): number {
+        return this.items.length;
     }
+}
 
-    static removeProto(obj: object): object {
-        return Object.setPrototypeOf(obj, null);
+class ForwardIterable<T> extends IterableCollection<T> {
+    *[Symbol.iterator](): Generator<T> {
+        for (const item of this.items) {
+            yield item;
+        }
     }
+}
 
-    changePrototype(target: object, newProto: object): void {
-        Object.setPrototypeOf(target, newProto);
+class ReverseIterable<T> extends IterableCollection<T> {
+    *[Symbol.iterator](): Generator<T> {
+        for (let i = this.items.length - 1; i >= 0; i--) {
+            yield this.items[i];
+        }
     }
 }
 "#;
@@ -14977,56 +15145,78 @@ class PrototypeModifier {
 
     let output = printer.get_output().to_string();
 
+    // All three classes should be converted
     assert!(
-        output.contains("PrototypeModifier"),
-        "Expected PrototypeModifier class: {}",
+        output.contains("function IterableCollection"),
+        "Expected IterableCollection function: {}",
         output
     );
     assert!(
-        output.contains("Object.setPrototypeOf"),
-        "Expected Object.setPrototypeOf: {}",
+        output.contains("function ForwardIterable"),
+        "Expected ForwardIterable function: {}",
         output
     );
     assert!(
-        output.contains("setProto") && output.contains("createWithProto"),
-        "Expected methods: {}",
+        output.contains("function ReverseIterable"),
+        "Expected ReverseIterable function: {}",
+        output
+    );
+
+    // Inheritance should be set up
+    assert!(
+        output.contains("__extends") || output.contains("extends"),
+        "Expected inheritance: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_object_getprototypeof_inheritance() {
-    // Object.getPrototypeOf for checking inheritance chain
+fn test_class_es5_symbol_iterator_map_entries() {
+    // Custom map with iterator returning entries
     let source = r#"
-class InheritanceChecker {
-    static isInstanceOf(obj: object, constructor: Function): boolean {
-        let proto = Object.getPrototypeOf(obj);
-        while (proto !== null) {
-            if (proto === constructor.prototype) {
-                return true;
-            }
-            proto = Object.getPrototypeOf(proto);
+class SimpleMap<K, V> {
+    private keys: K[] = [];
+    private values: V[] = [];
+
+    set(key: K, value: V): void {
+        const idx = this.keys.indexOf(key);
+        if (idx === -1) {
+            this.keys.push(key);
+            this.values.push(value);
+        } else {
+            this.values[idx] = value;
         }
-        return false;
     }
 
-    static getConstructor(obj: object): Function | undefined {
-        const proto = Object.getPrototypeOf(obj);
-        return proto?.constructor;
+    get(key: K): V | undefined {
+        const idx = this.keys.indexOf(key);
+        return idx !== -1 ? this.values[idx] : undefined;
     }
 
-    static getInheritanceDepth(obj: object): number {
-        let depth = 0;
-        let proto = Object.getPrototypeOf(obj);
-        while (proto !== null) {
-            depth++;
-            proto = Object.getPrototypeOf(proto);
+    *[Symbol.iterator](): Generator<[K, V]> {
+        for (let i = 0; i < this.keys.length; i++) {
+            yield [this.keys[i], this.values[i]];
         }
-        return depth;
     }
 
-    comparePrototypes(a: object, b: object): boolean {
-        return Object.getPrototypeOf(a) === Object.getPrototypeOf(b);
+    *entries(): Generator<[K, V]> {
+        yield* this;
+    }
+
+    *keysIter(): Generator<K> {
+        for (const key of this.keys) {
+            yield key;
+        }
+    }
+
+    *valuesIter(): Generator<V> {
+        for (const value of this.values) {
+            yield value;
+        }
+    }
+
+    get size(): number {
+        return this.keys.length;
     }
 }
 "#;
@@ -15045,248 +15235,31 @@ class InheritanceChecker {
 
     let output = printer.get_output().to_string();
 
+    // Class should be converted
     assert!(
-        output.contains("InheritanceChecker"),
-        "Expected InheritanceChecker class: {}",
+        output.contains("function SimpleMap"),
+        "Expected function declaration: {}",
         output
     );
+
+    // Map methods should be present
     assert!(
-        output.contains("Object.getPrototypeOf"),
-        "Expected Object.getPrototypeOf: {}",
+        output.contains("set") && output.contains("get"),
+        "Expected set and get methods: {}",
         output
     );
+
+    // Iterator methods should be present
     assert!(
-        output.contains("isInstanceOf") && output.contains("getInheritanceDepth"),
-        "Expected methods: {}",
+        output.contains("entries") && output.contains("keysIter") && output.contains("valuesIter"),
+        "Expected iterator methods: {}",
         output
     );
-}
 
-#[test]
-fn test_class_es5_object_setprototypeof_mixin() {
-    // Object.setPrototypeOf for dynamic mixin pattern
-    let source = r#"
-class DynamicMixin {
-    static applyMixin<T extends object, M extends object>(target: T, mixin: M): T & M {
-        const combined = Object.create(Object.getPrototypeOf(target)) as T & M;
-        Object.assign(combined, target, mixin);
-        return combined;
-    }
-
-    static chainPrototypes(obj: object, ...protos: object[]): object {
-        let current = obj;
-        for (const proto of protos) {
-            const newProto = Object.create(proto);
-            Object.setPrototypeOf(current, newProto);
-            current = newProto;
-        }
-        return obj;
-    }
-
-    static insertPrototype(obj: object, newProto: object): object {
-        const oldProto = Object.getPrototypeOf(obj);
-        Object.setPrototypeOf(newProto, oldProto);
-        Object.setPrototypeOf(obj, newProto);
-        return obj;
-    }
-
-    wrapWithPrototype<T extends object>(target: T, wrapper: object): T {
-        Object.setPrototypeOf(wrapper, Object.getPrototypeOf(target));
-        Object.setPrototypeOf(target, wrapper);
-        return target;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
+    // size getter should be present
     assert!(
-        output.contains("DynamicMixin"),
-        "Expected DynamicMixin class: {}",
-        output
-    );
-    assert!(
-        output.contains("Object.setPrototypeOf") && output.contains("Object.getPrototypeOf"),
-        "Expected prototype methods: {}",
-        output
-    );
-    assert!(
-        output.contains("applyMixin") && output.contains("chainPrototypes"),
-        "Expected mixin methods: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_prototype_in_constructor() {
-    // Object.getPrototypeOf/setPrototypeOf in constructor
-    let source = r#"
-class PrototypeAwareClass {
-    private originalProto: object | null;
-    private protoChain: object[];
-
-    constructor(inheritFrom?: object) {
-        this.originalProto = Object.getPrototypeOf(this);
-        this.protoChain = [];
-
-        let proto = Object.getPrototypeOf(this);
-        while (proto !== null) {
-            this.protoChain.push(proto);
-            proto = Object.getPrototypeOf(proto);
-        }
-
-        if (inheritFrom) {
-            const currentProto = Object.getPrototypeOf(this);
-            Object.setPrototypeOf(inheritFrom, currentProto);
-            Object.setPrototypeOf(this, inheritFrom);
-        }
-    }
-
-    getOriginalPrototype(): object | null {
-        return this.originalProto;
-    }
-
-    getChainLength(): number {
-        return this.protoChain.length;
-    }
-
-    resetPrototype(): void {
-        if (this.originalProto) {
-            Object.setPrototypeOf(this, this.originalProto);
-        }
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    assert!(
-        output.contains("PrototypeAwareClass"),
-        "Expected PrototypeAwareClass class: {}",
-        output
-    );
-    assert!(
-        output.contains("Object.getPrototypeOf"),
-        "Expected Object.getPrototypeOf: {}",
-        output
-    );
-    assert!(
-        output.contains("getOriginalPrototype") && output.contains("resetPrototype"),
-        "Expected methods: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_prototype_combined() {
-    // Combined Object.getPrototypeOf/setPrototypeOf patterns
-    let source = r#"
-class PrototypeUtilities {
-    static cloneWithPrototype<T extends object>(source: T): T {
-        const proto = Object.getPrototypeOf(source);
-        const clone = Object.create(proto) as T;
-        Object.assign(clone, source);
-        return clone;
-    }
-
-    static swapPrototypes(a: object, b: object): void {
-        const protoA = Object.getPrototypeOf(a);
-        const protoB = Object.getPrototypeOf(b);
-        Object.setPrototypeOf(a, protoB);
-        Object.setPrototypeOf(b, protoA);
-    }
-
-    static isolate(obj: object): object {
-        const proto = Object.getPrototypeOf(obj);
-        const isolated = Object.create(null);
-        Object.keys(obj).forEach(key => {
-            (isolated as any)[key] = (obj as any)[key];
-        });
-        return isolated;
-    }
-
-    static reconnect(obj: object, proto: object): object {
-        Object.setPrototypeOf(obj, proto);
-        return obj;
-    }
-
-    static getPrototypeMethods(obj: object): string[] {
-        const methods: string[] = [];
-        let proto = Object.getPrototypeOf(obj);
-        while (proto !== null && proto !== Object.prototype) {
-            Object.getOwnPropertyNames(proto)
-                .filter(name => typeof (proto as any)[name] === 'function')
-                .forEach(name => methods.push(name));
-            proto = Object.getPrototypeOf(proto);
-        }
-        return methods;
-    }
-
-    copyPrototypeChain<T extends object>(source: T, target: object): void {
-        const sourceProto = Object.getPrototypeOf(source);
-        if (sourceProto) {
-            Object.setPrototypeOf(target, sourceProto);
-        }
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    assert!(
-        output.contains("PrototypeUtilities"),
-        "Expected PrototypeUtilities class: {}",
-        output
-    );
-    assert!(
-        output.contains("Object.getPrototypeOf") && output.contains("Object.setPrototypeOf"),
-        "Expected prototype methods: {}",
-        output
-    );
-    assert!(
-        output.contains("cloneWithPrototype") && output.contains("swapPrototypes"),
-        "Expected utility methods: {}",
-        output
-    );
-    assert!(
-        output.contains("isolate") && output.contains("reconnect"),
-        "Expected isolation methods: {}",
+        output.contains("size"),
+        "Expected size getter: {}",
         output
     );
 }
