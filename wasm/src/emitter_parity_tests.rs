@@ -5888,3 +5888,217 @@ class DataLoader {
         output
     );
 }
+
+/// Parity test for ES5 getter decorator.
+/// Decorator on getter accessor should be lowered properly.
+#[test]
+fn test_parity_es5_accessor_decorator_getter() {
+    let source = r#"function enumerable(target: any, key: string, desc: PropertyDescriptor) {}
+
+class Person {
+    private _name: string = "";
+
+    @enumerable
+    get name(): string {
+        return this._name;
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify class exists
+    assert!(
+        output.contains("Person"),
+        "Output should define Person class: {}",
+        output
+    );
+    // No decorator syntax in ES5
+    assert!(
+        !output.contains("@enumerable"),
+        "ES5 output should not contain @enumerable decorator syntax: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains("PropertyDescriptor"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 setter decorator.
+/// Decorator on setter accessor should be lowered properly.
+#[test]
+fn test_parity_es5_accessor_decorator_setter() {
+    let source = r#"function validate(target: any, key: string, desc: PropertyDescriptor) {}
+
+class Account {
+    private _balance: number = 0;
+
+    @validate
+    set balance(value: number) {
+        this._balance = value;
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify class exists
+    assert!(
+        output.contains("Account"),
+        "Output should define Account class: {}",
+        output
+    );
+    // No decorator syntax in ES5
+    assert!(
+        !output.contains("@validate"),
+        "ES5 output should not contain @validate decorator syntax: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number") && !output.contains("PropertyDescriptor"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 multiple accessor decorators.
+/// Multiple decorators on accessor should be lowered properly.
+#[test]
+fn test_parity_es5_accessor_decorator_multiple() {
+    let source = r#"function log(target: any, key: string, desc: PropertyDescriptor) {}
+function cache(target: any, key: string, desc: PropertyDescriptor) {}
+
+class Calculator {
+    private _result: number = 0;
+
+    @log
+    @cache
+    get result(): number {
+        return this._result;
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify class exists
+    assert!(
+        output.contains("Calculator"),
+        "Output should define Calculator class: {}",
+        output
+    );
+    // No decorator syntax in ES5
+    assert!(
+        !output.contains("@log") && !output.contains("@cache"),
+        "ES5 output should not contain decorator syntax: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number") && !output.contains("PropertyDescriptor"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 static accessor decorator.
+/// Decorator on static accessor should be lowered properly.
+#[test]
+fn test_parity_es5_accessor_decorator_static() {
+    let source = r#"function readonly(target: any, key: string, desc: PropertyDescriptor) {}
+
+class AppConfig {
+    private static _version: string = "1.0";
+
+    @readonly
+    static get version(): string {
+        return AppConfig._version;
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify class exists
+    assert!(
+        output.contains("AppConfig"),
+        "Output should define AppConfig class: {}",
+        output
+    );
+    // No decorator syntax in ES5
+    assert!(
+        !output.contains("@readonly"),
+        "ES5 output should not contain @readonly decorator syntax: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains("PropertyDescriptor"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
