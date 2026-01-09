@@ -11328,3 +11328,340 @@ class StateManager {
         output
     );
 }
+
+// ============================================================================
+// Symbol.toPrimitive Tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_symbol_to_primitive_basic() {
+    // Basic Symbol.toPrimitive method
+    let source = r#"
+class Money {
+    private amount: number;
+    private currency: string;
+
+    constructor(amount: number, currency: string) {
+        this.amount = amount;
+        this.currency = currency;
+    }
+
+    [Symbol.toPrimitive](hint: string): string | number {
+        if (hint === "number") {
+            return this.amount;
+        }
+        return `${this.currency}${this.amount}`;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted to function
+    assert!(
+        output.contains("function Money"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // hint parameter should be present
+    assert!(
+        output.contains("hint"),
+        "Expected hint parameter: {}",
+        output
+    );
+
+    // number check should be present
+    assert!(
+        output.contains("number"),
+        "Expected number hint check: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_to_primitive_all_hints() {
+    // Symbol.toPrimitive handling all hint types
+    let source = r#"
+class Temperature {
+    private celsius: number;
+
+    constructor(celsius: number) {
+        this.celsius = celsius;
+    }
+
+    [Symbol.toPrimitive](hint: string): string | number | boolean {
+        switch (hint) {
+            case "number":
+                return this.celsius;
+            case "string":
+                return `${this.celsius} degrees C`;
+            default:
+                return this.celsius > 0;
+        }
+    }
+
+    toFahrenheit(): number {
+        return (this.celsius * 9/5) + 32;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function Temperature"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // switch statement should be present
+    assert!(
+        output.contains("switch") || output.contains("case"),
+        "Expected switch statement: {}",
+        output
+    );
+
+    // toFahrenheit method should be present
+    assert!(
+        output.contains("toFahrenheit"),
+        "Expected toFahrenheit method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_to_primitive_with_date_like() {
+    // Date-like class with Symbol.toPrimitive
+    let source = r#"
+class CustomDate {
+    private timestamp: number;
+
+    constructor(timestamp: number) {
+        this.timestamp = timestamp;
+    }
+
+    [Symbol.toPrimitive](hint: string): string | number {
+        if (hint === "number") {
+            return this.timestamp;
+        }
+        if (hint === "string") {
+            return new Date(this.timestamp).toISOString();
+        }
+        // default hint
+        return this.timestamp;
+    }
+
+    getTime(): number {
+        return this.timestamp;
+    }
+
+    toString(): string {
+        return new Date(this.timestamp).toISOString();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function CustomDate"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("getTime") && output.contains("toString"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Date constructor should be present
+    assert!(
+        output.contains("Date"),
+        "Expected Date reference: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_to_primitive_with_inheritance() {
+    // Symbol.toPrimitive with inheritance
+    let source = r#"
+class BaseValue {
+    protected value: number;
+
+    constructor(value: number) {
+        this.value = value;
+    }
+
+    [Symbol.toPrimitive](hint: string): string | number {
+        if (hint === "number") {
+            return this.value;
+        }
+        return String(this.value);
+    }
+}
+
+class Percentage extends BaseValue {
+    constructor(value: number) {
+        super(value);
+    }
+
+    [Symbol.toPrimitive](hint: string): string | number {
+        if (hint === "number") {
+            return this.value / 100;
+        }
+        return `${this.value}%`;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Both classes should be present
+    assert!(
+        output.contains("BaseValue") && output.contains("Percentage"),
+        "Expected both classes: {}",
+        output
+    );
+
+    // Inheritance pattern should be present
+    assert!(
+        output.contains("__extends") || output.contains("prototype"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+
+    // super call should be present
+    assert!(
+        output.contains("_super") || output.contains(".call(this"),
+        "Expected super call: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_to_primitive_with_other_symbols() {
+    // Class with multiple well-known symbols including toPrimitive
+    let source = r#"
+class RichValue {
+    private data: number;
+    private label: string;
+
+    constructor(data: number, label: string) {
+        this.data = data;
+        this.label = label;
+    }
+
+    [Symbol.toPrimitive](hint: string): string | number {
+        if (hint === "number") {
+            return this.data;
+        }
+        return `${this.label}: ${this.data}`;
+    }
+
+    get [Symbol.toStringTag](): string {
+        return "RichValue";
+    }
+
+    *[Symbol.iterator](): Iterator<number> {
+        yield this.data;
+    }
+
+    getData(): number {
+        return this.data;
+    }
+
+    getLabel(): string {
+        return this.label;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function RichValue"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("getData") && output.contains("getLabel"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Object.defineProperty for getter (toStringTag)
+    assert!(
+        output.contains("Object.defineProperty") || output.contains("prototype"),
+        "Expected property definition: {}",
+        output
+    );
+}
