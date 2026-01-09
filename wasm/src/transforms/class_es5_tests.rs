@@ -17078,3 +17078,379 @@ class ReactiveValue<T> {
         output
     );
 }
+
+// ============================================================================
+// Using Declarations (Resource Management) Pattern Tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_using_declaration_basic() {
+    // Basic using declaration with Symbol.dispose
+    let source = r#"
+class FileHandle {
+    private path: string;
+    private isOpen: boolean = true;
+
+    constructor(path: string) {
+        this.path = path;
+    }
+
+    read(): string {
+        if (!this.isOpen) throw new Error("File is closed");
+        return "file contents";
+    }
+
+    [Symbol.dispose](): void {
+        this.isOpen = false;
+        console.log(`Closing file: ${this.path}`);
+    }
+}
+
+function processFile(path: string): string {
+    using file = new FileHandle(path);
+    return file.read();
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function FileHandle"),
+        "Expected FileHandle function: {}",
+        output
+    );
+
+    // Symbol.dispose should be present
+    assert!(
+        output.contains("Symbol.dispose") || output.contains("dispose"),
+        "Expected dispose method: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("read"),
+        "Expected read method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_using_declaration_async() {
+    // Async using declaration with Symbol.asyncDispose
+    let source = r#"
+class AsyncConnection {
+    private url: string;
+    private connected: boolean = false;
+
+    constructor(url: string) {
+        this.url = url;
+    }
+
+    async connect(): Promise<void> {
+        this.connected = true;
+        console.log(`Connected to ${this.url}`);
+    }
+
+    async query(sql: string): Promise<any[]> {
+        if (!this.connected) throw new Error("Not connected");
+        return [];
+    }
+
+    async [Symbol.asyncDispose](): Promise<void> {
+        if (this.connected) {
+            this.connected = false;
+            console.log(`Disconnected from ${this.url}`);
+        }
+    }
+}
+
+async function runQuery(url: string, sql: string): Promise<any[]> {
+    await using conn = new AsyncConnection(url);
+    await conn.connect();
+    return await conn.query(sql);
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function AsyncConnection"),
+        "Expected AsyncConnection function: {}",
+        output
+    );
+
+    // Async methods should be transformed
+    assert!(
+        output.contains("connect") && output.contains("query"),
+        "Expected async methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_using_declaration_in_class_method() {
+    // Using declaration inside class methods
+    let source = r#"
+class Lock {
+    private locked: boolean = false;
+
+    acquire(): void {
+        this.locked = true;
+    }
+
+    [Symbol.dispose](): void {
+        this.locked = false;
+    }
+}
+
+class CriticalSection {
+    private lock: Lock = new Lock();
+
+    executeWithLock(callback: () => void): void {
+        using acquired = this.lock;
+        acquired.acquire();
+        callback();
+    }
+
+    async executeWithLockAsync(callback: () => Promise<void>): Promise<void> {
+        using acquired = this.lock;
+        acquired.acquire();
+        await callback();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("function Lock") && output.contains("function CriticalSection"),
+        "Expected class functions: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("executeWithLock") && output.contains("acquire"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_using_declaration_multiple() {
+    // Multiple using declarations
+    let source = r#"
+class Resource {
+    private name: string;
+    private disposed: boolean = false;
+
+    constructor(name: string) {
+        this.name = name;
+        console.log(`Acquired: ${name}`);
+    }
+
+    use(): void {
+        if (this.disposed) throw new Error(`${this.name} is disposed`);
+        console.log(`Using: ${this.name}`);
+    }
+
+    [Symbol.dispose](): void {
+        this.disposed = true;
+        console.log(`Disposed: ${this.name}`);
+    }
+}
+
+function useMultipleResources(): void {
+    using r1 = new Resource("first");
+    using r2 = new Resource("second");
+    using r3 = new Resource("third");
+
+    r1.use();
+    r2.use();
+    r3.use();
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function Resource"),
+        "Expected Resource function: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("use"),
+        "Expected use method: {}",
+        output
+    );
+
+    // Function should be present
+    assert!(
+        output.contains("useMultipleResources"),
+        "Expected useMultipleResources function: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_using_declaration_disposable_pattern() {
+    // Disposable pattern with inheritance
+    let source = r#"
+interface Disposable {
+    [Symbol.dispose](): void;
+}
+
+class BaseResource implements Disposable {
+    protected disposed: boolean = false;
+
+    [Symbol.dispose](): void {
+        this.disposed = true;
+    }
+
+    protected checkDisposed(): void {
+        if (this.disposed) {
+            throw new Error("Resource already disposed");
+        }
+    }
+}
+
+class DatabaseConnection extends BaseResource {
+    private connectionString: string;
+
+    constructor(connectionString: string) {
+        super();
+        this.connectionString = connectionString;
+    }
+
+    execute(query: string): any[] {
+        this.checkDisposed();
+        return [];
+    }
+
+    [Symbol.dispose](): void {
+        console.log("Closing database connection");
+        super[Symbol.dispose]();
+    }
+}
+
+class TransactionScope extends BaseResource {
+    private connection: DatabaseConnection;
+    private committed: boolean = false;
+
+    constructor(connection: DatabaseConnection) {
+        super();
+        this.connection = connection;
+    }
+
+    commit(): void {
+        this.checkDisposed();
+        this.committed = true;
+    }
+
+    rollback(): void {
+        this.checkDisposed();
+        this.committed = false;
+    }
+
+    [Symbol.dispose](): void {
+        if (!this.committed) {
+            console.log("Rolling back transaction");
+        }
+        super[Symbol.dispose]();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("function BaseResource"),
+        "Expected BaseResource function: {}",
+        output
+    );
+    assert!(
+        output.contains("function DatabaseConnection"),
+        "Expected DatabaseConnection function: {}",
+        output
+    );
+    assert!(
+        output.contains("function TransactionScope"),
+        "Expected TransactionScope function: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("execute") && output.contains("commit"),
+        "Expected methods: {}",
+        output
+    );
+}
