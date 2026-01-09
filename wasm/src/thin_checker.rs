@@ -503,6 +503,11 @@ impl<'a> ThinCheckerState<'a> {
                     // Ensure the base type symbol is resolved first so its type params
                     // are available in the type_env for Application expansion
                     let _ = self.get_type_of_symbol(sym_id);
+                    if let Some(args) = &type_ref.type_arguments {
+                        for &arg_idx in &args.nodes {
+                            let _ = self.get_type_from_type_node(arg_idx);
+                        }
+                    }
                     let type_param_bindings = self.get_type_param_bindings();
                     let type_resolver = |node_idx: NodeIndex| self.resolve_type_symbol_for_lowering(node_idx);
                     let value_resolver = |node_idx: NodeIndex| self.resolve_value_symbol_for_lowering(node_idx);
@@ -5541,6 +5546,18 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Get type parameters for a symbol (for generic type aliases and interfaces).
     fn get_type_params_for_symbol(&mut self, sym_id: SymbolId) -> Vec<crate::solver::TypeParamInfo> {
+        if let Some(symbol_arena) = self.ctx.binder.symbol_arenas.get(&sym_id) {
+            if !std::ptr::eq(symbol_arena.as_ref(), self.ctx.arena) {
+                let mut checker = ThinCheckerState::new(
+                    symbol_arena.as_ref(),
+                    self.ctx.binder,
+                    self.ctx.types,
+                    self.ctx.file_name.clone(),
+                );
+                return checker.get_type_params_for_symbol(sym_id);
+            }
+        }
+
         let Some(symbol) = self.ctx.binder.get_symbol(sym_id) else {
             return Vec::new();
         };

@@ -1099,6 +1099,9 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         if evaluated_object != object_type || evaluated_index != index_type {
             return self.evaluate_index_access(evaluated_object, evaluated_index);
         }
+        if evaluated_object == TypeId::ANY || evaluated_index == TypeId::ANY {
+            return TypeId::ANY;
+        }
 
         // Get the object structure
         let obj_key = match self.interner.lookup(object_type) {
@@ -1973,12 +1976,20 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                         keys.has_number = true;
                         continue;
                     }
+                    if member == TypeId::SYMBOL {
+                        // We don't model symbol index signatures yet; ignore symbol keys.
+                        continue;
+                    }
                     if let Some(TypeKey::Literal(LiteralValue::String(s))) = self.interner.lookup(member) {
                         keys.string_literals.push(s);
                     } else {
                         // Non-literal in union - can't fully evaluate
                         return None;
                     }
+                }
+                if !keys.has_string && !keys.has_number && keys.string_literals.is_empty() {
+                    // Only symbol keys (or nothing) - defer until we support symbol indices.
+                    return None;
                 }
                 Some(keys)
             }
