@@ -9252,6 +9252,14 @@ impl<'a> ThinCheckerState<'a> {
         true
     }
 
+    fn resolve_no_implicit_returns_from_source(&self, text: &str) -> bool {
+        if let Some(value) = Self::parse_test_option_bool(text, "@noimplicitreturns") {
+            return value;
+        }
+        // noImplicitReturns is NOT enabled by strict mode by default
+        false
+    }
+
     fn parse_test_option_bool(text: &str, key: &str) -> Option<bool> {
         for line in text.lines().take(32) {
             let trimmed = line.trim();
@@ -9297,6 +9305,7 @@ impl<'a> ThinCheckerState<'a> {
 
         if let Some(sf) = self.ctx.arena.get_source_file(node) {
             self.ctx.no_implicit_any = self.resolve_no_implicit_any_from_source(&sf.text);
+            self.ctx.no_implicit_returns = self.resolve_no_implicit_returns_from_source(&sf.text);
 
             // Type check each top-level statement
             for &stmt_idx in &sf.statements.nodes {
@@ -9564,6 +9573,17 @@ impl<'a> ThinCheckerState<'a> {
                                 func.type_annotation,
                                 diagnostic_messages::FUNCTION_LACKS_ENDING_RETURN_STATEMENT,
                                 diagnostic_codes::NOT_ALL_CODE_PATHS_RETURN_VALUE,
+                            );
+                        }
+
+                        // Check for TS7030: noImplicitReturns - not all code paths return a value
+                        if self.ctx.no_implicit_returns && has_return && falls_through {
+                            use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
+                            let error_node = if !func.name.is_none() { func.name } else { func.body };
+                            self.error_at_node(
+                                error_node,
+                                diagnostic_messages::NOT_ALL_CODE_PATHS_RETURN,
+                                diagnostic_codes::NOT_ALL_CODE_PATHS_RETURN,
                             );
                         }
 
@@ -14338,6 +14358,16 @@ impl<'a> ThinCheckerState<'a> {
                 );
             }
 
+            // Check for TS7030: noImplicitReturns - not all code paths return a value
+            if self.ctx.no_implicit_returns && has_return && falls_through {
+                use crate::checker::types::diagnostics::diagnostic_messages;
+                self.error_at_node(
+                    method.name,
+                    diagnostic_messages::NOT_ALL_CODE_PATHS_RETURN,
+                    diagnostic_codes::NOT_ALL_CODE_PATHS_RETURN,
+                );
+            }
+
             self.pop_return_type();
         }
 
@@ -14501,6 +14531,16 @@ impl<'a> ThinCheckerState<'a> {
                         accessor.type_annotation,
                         diagnostic_messages::FUNCTION_LACKS_ENDING_RETURN_STATEMENT,
                         diagnostic_codes::NOT_ALL_CODE_PATHS_RETURN_VALUE,
+                    );
+                }
+
+                // Check for TS7030: noImplicitReturns - not all code paths return a value
+                if self.ctx.no_implicit_returns && has_return && falls_through {
+                    use crate::checker::types::diagnostics::diagnostic_messages;
+                    self.error_at_node(
+                        accessor.name,
+                        diagnostic_messages::NOT_ALL_CODE_PATHS_RETURN,
+                        diagnostic_codes::NOT_ALL_CODE_PATHS_RETURN,
                     );
                 }
             }

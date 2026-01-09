@@ -132,6 +132,7 @@ pub mod diagnostic_messages {
 
     // Switch exhaustiveness / control flow
     pub const NOT_EXHAUSTIVE: &str = "Not all code paths return a value.";
+    pub const NOT_ALL_CODE_PATHS_RETURN: &str = "Not all code paths return a value.";
     pub const SWITCH_NOT_EXHAUSTIVE: &str = "Switch is not exhaustive. Did you forget to handle '{0}'?";
     pub const FUNCTION_LACKS_ENDING_RETURN_STATEMENT: &str =
         "Function lacks ending return statement and return type does not include 'undefined'.";
@@ -356,4 +357,5 @@ pub mod diagnostic_codes {
     pub const IMPLICIT_ANY_RETURN: u32 = 7010;
     pub const IMPLICIT_ANY_RETURN_FUNCTION_EXPRESSION: u32 = 7011;
     pub const COULD_NOT_RESOLVE_TYPE: u32 = 7016;
+    pub const NOT_ALL_CODE_PATHS_RETURN: u32 = 7030;
 }

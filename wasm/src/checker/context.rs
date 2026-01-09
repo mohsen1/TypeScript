@@ -123,6 +123,9 @@ pub struct CheckerContext<'a> {
     /// Whether noImplicitAny checks are enabled.
     pub no_implicit_any: bool,
 
+    /// Whether noImplicitReturns checks are enabled.
+    pub no_implicit_returns: bool,
+
     // --- Caches ---
 
     /// Cached types for symbols.
@@ -247,6 +250,7 @@ impl<'a> CheckerContext<'a> {
             types,
             file_name,
             no_implicit_any: true,
+            no_implicit_returns: false,
             symbol_types: FxHashMap::default(),
             var_decl_types: FxHashMap::default(),
             node_types: FxHashMap::default(),
@@ -296,6 +300,7 @@ impl<'a> CheckerContext<'a> {
             types,
             file_name,
             no_implicit_any: true,
+            no_implicit_returns: false,
             symbol_types: cache.symbol_types,
             var_decl_types: FxHashMap::default(),
             node_types: cache.node_types,

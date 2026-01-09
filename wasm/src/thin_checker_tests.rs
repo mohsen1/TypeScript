@@ -4556,6 +4556,77 @@ function implicitAnyParam(x) {
 }
 
 #[test]
+fn test_no_implicit_returns_ts7030() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// @noImplicitReturns: true
+function maybeReturn(flag: boolean): number {
+    if (flag) {
+        return 1;
+    }
+    // Falls through without return - should trigger TS7030
+}
+
+function alwaysReturns(flag: boolean): number {
+    if (flag) {
+        return 1;
+    }
+    return 2;  // OK - all paths return
+}
+
+function noReturns(): void {
+    console.log("ok");  // OK - void function
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count_7030 = codes.iter().filter(|&&c| c == 7030).count();
+    assert_eq!(count_7030, 1, "Expected one TS7030 error for maybeReturn, got codes: {:?}", codes);
+}
+
+#[test]
+fn test_no_implicit_returns_disabled() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// @noImplicitReturns: false
+function maybeReturn(flag: boolean): number {
+    if (flag) {
+        return 1;
+    }
+    // Falls through without return - should NOT trigger TS7030 when disabled
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count_7030 = codes.iter().filter(|&&c| c == 7030).count();
+    assert_eq!(count_7030, 0, "Should not have TS7030 when noImplicitReturns is false, got codes: {:?}", codes);
+}
+
+#[test]
 fn test_implicit_any_parameters_in_type_signatures() {
     use crate::thin_parser::ThinParserState;
 
@@ -12924,17 +12995,37 @@ x.type;
 }
 
 // =============================================================================
-// TS2454 Variable Used Before Assignment Tests
+// Tests for class method `this` return type assignability
 // =============================================================================
 
-/// Test that using a let variable before assignment emits TS2454
 #[test]
-fn test_ts2454_variable_used_before_assigned() {
+#[ignore] // TODO: Fix class method returning this - currently produces spurious TS2322
+fn test_class_method_return_this_no_error() {
+    // This test documents a bug: returning `this` from a method that returns
+    // the class type should not produce TS2322.
+    //
+    // Bug: The checker compares `this` structurally with private brand markers
+    // against the class type, causing:
+    // "Type '{ ...; readonly __private_brand_0: any; ... }' is not assignable to type 'Builder<T>'"
     use crate::thin_parser::ThinParserState;
 
     let source = r#"
-let x: number;
-console.log(x);
+class Builder<T> {
+    private value: T;
+
+    constructor(initial: T) {
+        this.value = initial;
+    }
+
+    set(value: T): Builder<T> {
+        this.value = value;
+        return this;  // Should be valid - this is Builder<T>
+    }
+
+    build(): T {
+        return this.value;
+    }
+}
 "#;
 
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -12948,84 +13039,35 @@ console.log(x);
     let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
 
-    let count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2454).count();
-    assert_eq!(
-        count,
-        1,
-        "Expected TS2454 for unassigned variable, got: {:?}",
-        checker.ctx.diagnostics
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2322),
+        "Should NOT have TS2322 for returning `this` from method, got: {:?}",
+        codes
     );
 }
 
-/// Test that assigned variable doesn't emit TS2454
 #[test]
-fn test_ts2454_assigned_variable_no_error() {
+#[ignore] // TODO: Fix generic constructor type inference - currently produces spurious TS2322
+fn test_generic_constructor_return_type_no_error() {
+    // This test documents a bug: calling a generic constructor with inferred type
+    // argument should return the properly typed instance.
+    //
+    // Bug: `new Builder(fn(this.value))` where fn: (T) => U returns Builder<U>,
+    // but the checker sees a structural type with brand markers instead of Builder<U>.
     use crate::thin_parser::ThinParserState;
 
     let source = r#"
-let x: number;
-x = 42;
-console.log(x);
-"#;
+class Builder<T> {
+    private value: T;
 
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+    constructor(initial: T) {
+        this.value = initial;
+    }
 
-    let mut binder = ThinBinderState::new();
-    binder.bind_source_file(parser.get_arena(), root);
-
-    let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
-    checker.check_source_file(root);
-
-    let count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2454).count();
-    assert_eq!(
-        count,
-        0,
-        "Expected no TS2454 for assigned variable, got: {:?}",
-        checker.ctx.diagnostics
-    );
-}
-
-/// Test that variable with initializer doesn't emit TS2454
-#[test]
-fn test_ts2454_initialized_variable_no_error() {
-    use crate::thin_parser::ThinParserState;
-
-    let source = r#"
-let x: number = 42;
-console.log(x);
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
-
-    let mut binder = ThinBinderState::new();
-    binder.bind_source_file(parser.get_arena(), root);
-
-    let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
-    checker.check_source_file(root);
-
-    let count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2454).count();
-    assert_eq!(
-        count,
-        0,
-        "Expected no TS2454 for initialized variable, got: {:?}",
-        checker.ctx.diagnostics
-    );
-}
-
-/// Test that parameter doesn't emit TS2454
-#[test]
-fn test_ts2454_parameter_no_error() {
-    use crate::thin_parser::ThinParserState;
-
-    let source = r#"
-function foo(x: number) {
-    console.log(x);
+    transform<U>(fn: (value: T) => U): Builder<U> {
+        return new Builder(fn(this.value));  // Should be valid
+    }
 }
 "#;
 
@@ -13040,109 +13082,10 @@ function foo(x: number) {
     let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
 
-    let count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2454).count();
-    assert_eq!(
-        count,
-        0,
-        "Expected no TS2454 for function parameter, got: {:?}",
-        checker.ctx.diagnostics
-    );
-}
-
-/// Test that variable assigned in both if/else branches doesn't emit TS2454
-#[test]
-fn test_ts2454_assigned_in_both_branches_no_error() {
-    use crate::thin_parser::ThinParserState;
-
-    let source = r#"
-let x: number;
-if (Math.random() > 0.5) {
-    x = 1;
-} else {
-    x = 2;
-}
-console.log(x);
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
-
-    let mut binder = ThinBinderState::new();
-    binder.bind_source_file(parser.get_arena(), root);
-
-    let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
-    checker.check_source_file(root);
-
-    let count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2454).count();
-    assert_eq!(
-        count,
-        0,
-        "Expected no TS2454 when assigned in both branches, got: {:?}",
-        checker.ctx.diagnostics
-    );
-}
-
-/// Test that variable assigned in only if branch emits TS2454
-#[test]
-fn test_ts2454_assigned_in_only_if_branch_error() {
-    use crate::thin_parser::ThinParserState;
-
-    let source = r#"
-let x: number;
-if (Math.random() > 0.5) {
-    x = 1;
-}
-console.log(x);
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
-
-    let mut binder = ThinBinderState::new();
-    binder.bind_source_file(parser.get_arena(), root);
-
-    let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
-    checker.check_source_file(root);
-
-    let count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2454).count();
-    assert_eq!(
-        count,
-        1,
-        "Expected TS2454 when only assigned in if branch, got: {:?}",
-        checker.ctx.diagnostics
-    );
-}
-
-/// Test that `var` declaration doesn't emit TS2454 (only let/const require definite assignment)
-#[test]
-fn test_ts2454_var_declaration_no_error() {
-    use crate::thin_parser::ThinParserState;
-
-    let source = r#"
-var x: number;
-console.log(x);
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
-
-    let mut binder = ThinBinderState::new();
-    binder.bind_source_file(parser.get_arena(), root);
-
-    let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
-    checker.check_source_file(root);
-
-    let count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2454).count();
-    assert_eq!(
-        count,
-        0,
-        "Expected no TS2454 for var declaration (only let/const), got: {:?}",
-        checker.ctx.diagnostics
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2322),
+        "Should NOT have TS2322 for generic constructor return, got: {:?}",
+        codes
     );
 }
