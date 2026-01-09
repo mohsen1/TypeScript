@@ -108,8 +108,8 @@ namespace Models {
 
 ## Success Criteria
 
-- [ ] Symbol lookup correctly traverses namespace parent chain
-- [ ] Export visibility is respected
+- [x] Symbol lookup correctly traverses namespace parent chain
+- [x] Export visibility is respected
 - [ ] TS2304 false positives reduced significantly
 - [ ] No new false negatives (missing real errors)
 
@@ -135,7 +135,9 @@ node wasm/differential-test/conformance-runner.mjs --max=200 -v 2>&1 | grep TS23
 Target: Combined with Worker 1, reduce TS2304 from 75 to <20.
 
 ## Status
-Active
+Active - implementation done, awaiting push
+
+Ready for Merge: No (push blocked: git auth)
 
 ## Notes
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`

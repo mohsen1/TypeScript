@@ -30023,3 +30023,1128 @@ function narrowUnion(value: string | number | boolean | object | null): string {
         output
     );
 }
+
+// ============================================================================
+// ES5 Satisfies Expression Parity Tests
+// ============================================================================
+
+/// Test ES5 basic satisfies with object literal
+#[test]
+fn test_parity_es5_satisfies_object_literal() {
+    let source = r##"
+interface Config {
+    name: string;
+    value: number;
+    enabled?: boolean;
+}
+
+const config = {
+    name: "app",
+    value: 42,
+    enabled: true
+} satisfies Config;
+
+type Colors = Record<string, string>;
+
+const palette = {
+    red: "#ff0000",
+    green: "#00ff00",
+    blue: "#0000ff"
+} satisfies Colors;
+
+interface User {
+    id: string;
+    name: string;
+    email: string;
+}
+
+const users = {
+    admin: { id: "1", name: "Admin", email: "admin@example.com" },
+    guest: { id: "2", name: "Guest", email: "guest@example.com" }
+} satisfies Record<string, User>;
+
+function getConfig(): Config {
+    return { name: "test", value: 0 } satisfies Config;
+}
+"##;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Variables should be present with their values
+    assert!(
+        output.contains("config") && output.contains("palette") && output.contains("users"),
+        "Variables should be present: {}",
+        output
+    );
+    // Object literals should remain
+    assert!(
+        output.contains("name: \"app\"") || output.contains("name:\"app\""),
+        "Object literal values should remain: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface Config") && !output.contains("interface User"),
+        "Interfaces should be erased: {}",
+        output
+    );
+    // satisfies keyword should be erased
+    assert!(
+        !output.contains("satisfies Config") && !output.contains("satisfies Colors"),
+        "satisfies keyword should be erased: {}",
+        output
+    );
+    // Type alias should be erased
+    assert!(
+        !output.contains("type Colors"),
+        "Type alias should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 satisfies with array literal
+#[test]
+fn test_parity_es5_satisfies_array_literal() {
+    let source = r#"
+type StringArray = string[];
+type NumberTuple = [number, number, number];
+
+const names = ["Alice", "Bob", "Charlie"] satisfies StringArray;
+const coordinates = [10, 20, 30] satisfies NumberTuple;
+
+interface MenuItem {
+    label: string;
+    action: string;
+}
+
+const menu = [
+    { label: "File", action: "file" },
+    { label: "Edit", action: "edit" },
+    { label: "View", action: "view" }
+] satisfies MenuItem[];
+
+type Matrix = number[][];
+
+const matrix = [
+    [1, 2, 3],
+    [4, 5, 6],
+    [7, 8, 9]
+] satisfies Matrix;
+
+function getItems(): string[] {
+    return ["a", "b", "c"] satisfies string[];
+}
+
+const mixed = [1, "two", true] satisfies (number | string | boolean)[];
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Variables should be present
+    assert!(
+        output.contains("names") && output.contains("coordinates") && output.contains("menu"),
+        "Variables should be present: {}",
+        output
+    );
+    // Array values should remain
+    assert!(
+        output.contains("\"Alice\"") && output.contains("\"Bob\""),
+        "Array values should remain: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type StringArray") && !output.contains("type NumberTuple"),
+        "Type aliases should be erased: {}",
+        output
+    );
+    // satisfies keyword should be erased
+    assert!(
+        !output.contains("satisfies StringArray") && !output.contains("satisfies MenuItem"),
+        "satisfies keyword should be erased: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface MenuItem"),
+        "Interface should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 satisfies with function expression
+#[test]
+fn test_parity_es5_satisfies_function_expr() {
+    let source = r#"
+type Handler = (event: string) => void;
+type AsyncHandler = (event: string) => Promise<void>;
+type Callback<T> = (value: T) => T;
+
+const handler = function(event: string): void {
+    console.log(event);
+} satisfies Handler;
+
+const asyncHandler = async function(event: string): Promise<void> {
+    await Promise.resolve();
+    console.log(event);
+} satisfies AsyncHandler;
+
+const arrowHandler = ((event: string): void => {
+    console.log(event);
+}) satisfies Handler;
+
+const doubler = ((x: number): number => x * 2) satisfies Callback<number>;
+
+interface EventHandlers {
+    onClick: Handler;
+    onHover: Handler;
+}
+
+const handlers = {
+    onClick: function(e: string) { console.log("click", e); },
+    onHover: function(e: string) { console.log("hover", e); }
+} satisfies EventHandlers;
+
+type Reducer<S, A> = (state: S, action: A) => S;
+
+const counterReducer = ((state: number, action: { type: string }) => {
+    if (action.type === "increment") return state + 1;
+    return state;
+}) satisfies Reducer<number, { type: string }>;
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Variables should be present
+    assert!(
+        output.contains("handler") && output.contains("arrowHandler") && output.contains("handlers"),
+        "Variables should be present: {}",
+        output
+    );
+    // Function keyword should remain
+    assert!(
+        output.contains("function"),
+        "Function keyword should remain: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type Handler") && !output.contains("type AsyncHandler"),
+        "Type aliases should be erased: {}",
+        output
+    );
+    // satisfies keyword should be erased
+    assert!(
+        !output.contains("satisfies Handler") && !output.contains("satisfies Callback"),
+        "satisfies keyword should be erased: {}",
+        output
+    );
+    // Parameter type annotations should be erased
+    assert!(
+        !output.contains("event: string") && !output.contains("state: number"),
+        "Parameter type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 satisfies with as const
+#[test]
+fn test_parity_es5_satisfies_as_const() {
+    let source = r##"
+interface Theme {
+    colors: {
+        primary: string;
+        secondary: string;
+    };
+    spacing: readonly number[];
+}
+
+const theme = {
+    colors: {
+        primary: "#007bff",
+        secondary: "#6c757d"
+    },
+    spacing: [0, 4, 8, 16, 32] as const
+} satisfies Theme;
+
+type Routes = Record<string, { path: string; exact?: boolean }>;
+
+const routes = {
+    home: { path: "/", exact: true },
+    about: { path: "/about" },
+    contact: { path: "/contact" }
+} as const satisfies Routes;
+
+const STATUS = {
+    PENDING: "pending",
+    SUCCESS: "success",
+    ERROR: "error"
+} as const satisfies Record<string, string>;
+
+type StatusType = typeof STATUS[keyof typeof STATUS];
+
+const directions = ["north", "south", "east", "west"] as const satisfies readonly string[];
+
+interface Config {
+    version: number;
+    features: readonly string[];
+}
+
+const appConfig = {
+    version: 1,
+    features: ["auth", "dashboard", "settings"] as const
+} satisfies Config;
+"##;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Variables should be present
+    assert!(
+        output.contains("theme") && output.contains("routes") && output.contains("STATUS"),
+        "Variables should be present: {}",
+        output
+    );
+    // Object values should remain
+    assert!(
+        output.contains("\"#007bff\"") || output.contains("primary"),
+        "Object values should remain: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface Theme") && !output.contains("interface Config"),
+        "Interfaces should be erased: {}",
+        output
+    );
+    // satisfies keyword should be erased
+    assert!(
+        !output.contains("satisfies Theme") && !output.contains("satisfies Routes"),
+        "satisfies keyword should be erased: {}",
+        output
+    );
+    // as const should be erased
+    assert!(
+        !output.contains("as const"),
+        "as const should be erased: {}",
+        output
+    );
+    // Type alias should be erased
+    assert!(
+        !output.contains("type Routes") && !output.contains("type StatusType"),
+        "Type aliases should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 satisfies in class context
+#[test]
+fn test_parity_es5_satisfies_class_context() {
+    let source = r#"
+interface ButtonConfig {
+    label: string;
+    variant: "primary" | "secondary";
+    disabled?: boolean;
+}
+
+interface FormConfig {
+    fields: string[];
+    validation: boolean;
+}
+
+class Component {
+    getConfig(): ButtonConfig {
+        return { label: "Submit", variant: "primary" } satisfies ButtonConfig;
+    }
+
+    getFormConfig(): FormConfig {
+        return { fields: ["name", "email"], validation: true } satisfies FormConfig;
+    }
+}
+
+type Logger = {
+    log: (msg: string) => void;
+    error: (msg: string) => void;
+};
+
+function createLogger(): Logger {
+    return {
+        log: (msg: string) => console.log(msg),
+        error: (msg: string) => console.error(msg)
+    } satisfies Logger;
+}
+
+const options = {
+    timeout: 5000,
+    retries: 3
+} satisfies { timeout: number; retries: number };
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Class and functions should be present
+    assert!(
+        output.contains("Component") && output.contains("createLogger"),
+        "Class and functions should be present: {}",
+        output
+    );
+    // Interfaces should be erased
+    assert!(
+        !output.contains("interface ButtonConfig") && !output.contains("interface FormConfig"),
+        "Interfaces should be erased: {}",
+        output
+    );
+    // satisfies keyword should be erased
+    assert!(
+        !output.contains("satisfies ButtonConfig") && !output.contains("satisfies FormConfig") && !output.contains("satisfies Logger"),
+        "satisfies keyword should be erased: {}",
+        output
+    );
+    // Type alias should be erased
+    assert!(
+        !output.contains("type Logger"),
+        "Type alias should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 combined satisfies patterns
+#[test]
+fn test_parity_es5_satisfies_combined() {
+    let source = r#"
+interface ApiEndpoint {
+    method: "GET" | "POST" | "PUT" | "DELETE";
+    path: string;
+    auth?: boolean;
+}
+
+type ApiRoutes = Record<string, ApiEndpoint>;
+
+const api = {
+    getUsers: { method: "GET", path: "/users", auth: true },
+    createUser: { method: "POST", path: "/users", auth: true },
+    getUser: { method: "GET", path: "/users/:id" }
+} satisfies ApiRoutes;
+
+interface State<T> {
+    data: T | null;
+    loading: boolean;
+    error: string | null;
+}
+
+type UserState = State<{ id: string; name: string }>;
+
+const initialState = {
+    data: null,
+    loading: false,
+    error: null
+} satisfies UserState;
+
+type Validator<T> = {
+    validate: (value: T) => boolean;
+    message: string;
+};
+
+const emailValidator = {
+    validate: (value: string) => value.includes("@"),
+    message: "Invalid email"
+} satisfies Validator<string>;
+
+interface Component<P> {
+    props: P;
+    render: () => string;
+}
+
+const button = {
+    props: { label: "Click me", disabled: false },
+    render() { return `<button>${this.props.label}</button>`; }
+} satisfies Component<{ label: string; disabled: boolean }>;
+
+type EventMap = {
+    [K: string]: (...args: any[]) => void;
+};
+
+const events = {
+    onClick: (e: MouseEvent) => console.log(e),
+    onKeyDown: (e: KeyboardEvent) => console.log(e),
+    onCustom: (data: unknown) => console.log(data)
+} satisfies EventMap;
+
+async function fetchData<T>(): Promise<State<T>> {
+    return { data: null, loading: true, error: null } satisfies State<T>;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Variables should be present
+    assert!(
+        output.contains("api") && output.contains("initialState") && output.contains("emailValidator"),
+        "Variables should be present: {}",
+        output
+    );
+    // Object values should remain
+    assert!(
+        output.contains("\"/users\"") || output.contains("path"),
+        "Object values should remain: {}",
+        output
+    );
+    // Interfaces should be erased
+    assert!(
+        !output.contains("interface ApiEndpoint") && !output.contains("interface State") && !output.contains("interface Component"),
+        "Interfaces should be erased: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type ApiRoutes") && !output.contains("type UserState") && !output.contains("type Validator"),
+        "Type aliases should be erased: {}",
+        output
+    );
+    // satisfies keyword should be erased
+    assert!(
+        !output.contains("satisfies ApiRoutes") && !output.contains("satisfies UserState") && !output.contains("satisfies Validator"),
+        "satisfies keyword should be erased: {}",
+        output
+    );
+    // Generic type parameters should be erased
+    assert!(
+        !output.contains("<T>") && !output.contains("<P>"),
+        "Generic type parameters should be erased: {}",
+        output
+    );
+}
+
+// ============================================================================
+// ES5 Const Assertion Parity Tests
+// ============================================================================
+
+/// Test ES5 object literal as const
+#[test]
+fn test_parity_es5_const_assertion_object() {
+    let source = r#"
+const config = {
+    name: "app",
+    version: 1,
+    debug: false
+} as const;
+
+const settings = {
+    theme: "dark",
+    language: "en",
+    notifications: true
+} as const;
+
+type ConfigType = typeof config;
+type SettingsType = typeof settings;
+
+function getConfigValue<K extends keyof typeof config>(key: K): typeof config[K] {
+    return config[key];
+}
+
+const nested = {
+    level1: {
+        level2: {
+            value: "deep"
+        }
+    }
+} as const;
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Variables should be present
+    assert!(
+        output.contains("config") && output.contains("settings") && output.contains("nested"),
+        "Variables should be present: {}",
+        output
+    );
+    // Object values should remain
+    assert!(
+        output.contains("\"app\"") && output.contains("\"dark\""),
+        "Object values should remain: {}",
+        output
+    );
+    // as const should be erased
+    assert!(
+        !output.contains("as const"),
+        "as const should be erased: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type ConfigType") && !output.contains("type SettingsType"),
+        "Type aliases should be erased: {}",
+        output
+    );
+    // Generic type parameters should be erased
+    assert!(
+        !output.contains("<K extends"),
+        "Generic type parameters should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 array literal as const
+#[test]
+fn test_parity_es5_const_assertion_array() {
+    let source = r#"
+const colors = ["red", "green", "blue"] as const;
+const numbers = [1, 2, 3, 4, 5] as const;
+const mixed = [true, "hello", 42] as const;
+
+type Colors = typeof colors;
+type ColorItem = typeof colors[number];
+
+function getColor(index: 0 | 1 | 2): typeof colors[typeof index] {
+    return colors[index];
+}
+
+const matrix = [
+    [1, 2, 3],
+    [4, 5, 6]
+] as const;
+
+const tuple = [100, "text", false] as const;
+type TupleType = typeof tuple;
+
+const empty = [] as const;
+const single = ["only"] as const;
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Variables should be present
+    assert!(
+        output.contains("colors") && output.contains("numbers") && output.contains("mixed"),
+        "Variables should be present: {}",
+        output
+    );
+    // Array values should remain
+    assert!(
+        output.contains("\"red\"") && output.contains("\"green\""),
+        "Array values should remain: {}",
+        output
+    );
+    // as const should be erased
+    assert!(
+        !output.contains("as const"),
+        "as const should be erased: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type Colors") && !output.contains("type ColorItem") && !output.contains("type TupleType"),
+        "Type aliases should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 nested as const
+#[test]
+fn test_parity_es5_const_assertion_nested() {
+    let source = r#"
+const deepConfig = {
+    database: {
+        host: "localhost",
+        port: 5432,
+        credentials: {
+            user: "admin",
+            pass: "secret"
+        }
+    },
+    cache: {
+        enabled: true,
+        ttl: 3600
+    }
+} as const;
+
+const routes = {
+    api: {
+        users: "/api/users",
+        posts: "/api/posts",
+        comments: {
+            list: "/api/comments",
+            create: "/api/comments/new"
+        }
+    }
+} as const;
+
+type DeepConfigType = typeof deepConfig;
+type DatabaseConfig = typeof deepConfig.database;
+type CredentialsType = typeof deepConfig.database.credentials;
+
+function getRoute<
+    K1 extends keyof typeof routes,
+    K2 extends keyof typeof routes[K1]
+>(k1: K1, k2: K2): typeof routes[K1][K2] {
+    return routes[k1][k2];
+}
+
+const arrayOfObjects = [
+    { id: 1, name: "first" },
+    { id: 2, name: "second" }
+] as const;
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Variables should be present
+    assert!(
+        output.contains("deepConfig") && output.contains("routes") && output.contains("arrayOfObjects"),
+        "Variables should be present: {}",
+        output
+    );
+    // Nested values should remain
+    assert!(
+        output.contains("\"localhost\"") && output.contains("5432"),
+        "Nested values should remain: {}",
+        output
+    );
+    // as const should be erased
+    assert!(
+        !output.contains("as const"),
+        "as const should be erased: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type DeepConfigType") && !output.contains("type DatabaseConfig"),
+        "Type aliases should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 as const with type assertion
+#[test]
+fn test_parity_es5_const_assertion_with_type() {
+    let source = r#"
+interface Config {
+    readonly name: string;
+    readonly value: number;
+}
+
+const config = {
+    name: "test",
+    value: 42
+} as const as Config;
+
+const data = {
+    id: 1,
+    status: "active"
+} as { readonly id: number; readonly status: string };
+
+type Status = "pending" | "active" | "done";
+const status = "active" as const as Status;
+
+const items = ["a", "b", "c"] as const as readonly string[];
+
+function process<T>(value: T): T {
+    return value;
+}
+
+const result = process({ x: 1, y: 2 } as const);
+
+const assertion = (5 as const) + (10 as const);
+const stringLiteral = "hello" as const;
+const numberLiteral = 42 as const;
+const booleanLiteral = true as const;
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Variables should be present
+    assert!(
+        output.contains("config") && output.contains("data") && output.contains("status"),
+        "Variables should be present: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface Config"),
+        "Interface should be erased: {}",
+        output
+    );
+    // as const should be erased
+    assert!(
+        !output.contains("as const"),
+        "as const should be erased: {}",
+        output
+    );
+    // Type assertions should be erased
+    assert!(
+        !output.contains("as Config") && !output.contains("as Status"),
+        "Type assertions should be erased: {}",
+        output
+    );
+    // Type alias should be erased
+    assert!(
+        !output.contains("type Status"),
+        "Type alias should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 as const in function return
+#[test]
+fn test_parity_es5_const_assertion_function_return() {
+    let source = r#"
+function getConfig() {
+    return {
+        host: "localhost",
+        port: 8080
+    } as const;
+}
+
+function getColors() {
+    return ["red", "green", "blue"] as const;
+}
+
+function createTuple() {
+    return [1, "two", true] as const;
+}
+
+const arrowConfig = () => ({
+    name: "arrow",
+    value: 100
+} as const);
+
+const arrowArray = () => [1, 2, 3] as const;
+
+class ConfigFactory {
+    create() {
+        return {
+            type: "factory",
+            id: 123
+        } as const;
+    }
+
+    static getDefault() {
+        return {
+            type: "default",
+            id: 0
+        } as const;
+    }
+}
+
+async function asyncConfig() {
+    return {
+        async: true,
+        data: "loaded"
+    } as const;
+}
+
+function* generatorConfig() {
+    yield { step: 1, value: "first" } as const;
+    yield { step: 2, value: "second" } as const;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions and class should be present
+    assert!(
+        output.contains("getConfig") && output.contains("getColors") && output.contains("ConfigFactory"),
+        "Functions and class should be present: {}",
+        output
+    );
+    // as const should be erased
+    assert!(
+        !output.contains("as const"),
+        "as const should be erased: {}",
+        output
+    );
+    // Return values should remain
+    assert!(
+        output.contains("\"localhost\"") || output.contains("localhost"),
+        "Return values should remain: {}",
+        output
+    );
+}
+
+/// Test ES5 combined const assertion patterns
+#[test]
+fn test_parity_es5_const_assertion_combined() {
+    let source = r#"
+const ACTIONS = {
+    CREATE: "create",
+    UPDATE: "update",
+    DELETE: "delete"
+} as const;
+
+type ActionType = typeof ACTIONS[keyof typeof ACTIONS];
+
+const PERMISSIONS = ["read", "write", "admin"] as const;
+type Permission = typeof PERMISSIONS[number];
+
+interface User {
+    id: number;
+    permissions: readonly Permission[];
+}
+
+function hasPermission(user: User, perm: Permission): boolean {
+    return user.permissions.includes(perm);
+}
+
+const defaultUser = {
+    id: 0,
+    name: "guest",
+    roles: ["viewer"] as const,
+    settings: {
+        theme: "light",
+        notifications: false
+    } as const
+} as const;
+
+type DefaultUserType = typeof defaultUser;
+
+class ActionHandler {
+    private actions = ACTIONS;
+
+    getAction<K extends keyof typeof ACTIONS>(key: K): typeof ACTIONS[K] {
+        return this.actions[key];
+    }
+
+    getAllActions() {
+        return Object.values(ACTIONS) as ActionType[];
+    }
+}
+
+const lookup = {
+    codes: {
+        success: 200,
+        error: 500,
+        notFound: 404
+    },
+    messages: ["OK", "Error", "Not Found"]
+} as const;
+
+function getCode<K extends keyof typeof lookup.codes>(key: K): typeof lookup.codes[K] {
+    return lookup.codes[key];
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Variables, functions and class should be present
+    assert!(
+        output.contains("ACTIONS") && output.contains("PERMISSIONS") && output.contains("ActionHandler"),
+        "Variables, functions and class should be present: {}",
+        output
+    );
+    // as const should be erased
+    assert!(
+        !output.contains("as const"),
+        "as const should be erased: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type ActionType") && !output.contains("type Permission") && !output.contains("type DefaultUserType"),
+        "Type aliases should be erased: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface User"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Generic type parameters should be erased
+    assert!(
+        !output.contains("<K extends keyof"),
+        "Generic type parameters should be erased: {}",
+        output
+    );
+}

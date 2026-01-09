@@ -45889,3 +45889,1823 @@ const eventStream = new EventStream<string>();
         output
     );
 }
+
+/// Test ES5 class with basic Reflect.metadata decorator pattern
+#[test]
+fn test_class_es5_reflect_metadata_basic_pattern() {
+    let source = r#"
+function metadata(key: string, value: any): ClassDecorator & MethodDecorator & PropertyDecorator {
+    return function(target: any, propertyKey?: string | symbol, descriptor?: PropertyDescriptor) {
+        if (propertyKey) {
+            Reflect.defineMetadata(key, value, target, propertyKey);
+        } else {
+            Reflect.defineMetadata(key, value, target);
+        }
+    };
+}
+
+@metadata("role", "admin")
+@metadata("version", "1.0.0")
+class UserService {
+    @metadata("cache", true)
+    private users: Map<string, any> = new Map();
+
+    @metadata("log", true)
+    @metadata("async", false)
+    getUser(id: string): any {
+        return this.users.get(id);
+    }
+
+    @metadata("validate", true)
+    setUser(id: string, user: any): void {
+        this.users.set(id, user);
+    }
+}
+
+@metadata("singleton", true)
+class ConfigService {
+    private config: Record<string, any> = {};
+
+    @metadata("readonly", true)
+    get(key: string): any {
+        return this.config[key];
+    }
+
+    @metadata("writeonly", false)
+    set(key: string, value: any): void {
+        this.config[key] = value;
+    }
+}
+
+const userService = new UserService();
+const configService = new ConfigService();
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("UserService") && output.contains("ConfigService"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("getUser") && output.contains("setUser"),
+        "Expected UserService methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("get") && output.contains("set"),
+        "Expected ConfigService methods: {}",
+        output
+    );
+
+    // Decorator function should exist
+    assert!(
+        output.contains("metadata"),
+        "Expected metadata function: {}",
+        output
+    );
+
+    // Type annotations should be stripped
+    assert!(
+        !output.contains(": ClassDecorator") && !output.contains(": MethodDecorator"),
+        "Expected type annotations to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with design type metadata pattern
+#[test]
+fn test_class_es5_reflect_metadata_design_type_pattern() {
+    let source = r#"
+function Type(type: Function): PropertyDecorator {
+    return function(target: Object, propertyKey: string | symbol) {
+        Reflect.defineMetadata("design:type", type, target, propertyKey);
+    };
+}
+
+function Injectable(): ClassDecorator {
+    return function(target: Function) {
+        const paramTypes = Reflect.getMetadata("design:paramtypes", target) || [];
+        Reflect.defineMetadata("injectable:params", paramTypes, target);
+    };
+}
+
+class Logger {
+    log(message: string): void {
+        console.log(message);
+    }
+}
+
+class Database {
+    query(sql: string): any[] {
+        return [];
+    }
+}
+
+@Injectable()
+class Repository {
+    @Type(Database)
+    private db: Database;
+
+    @Type(Logger)
+    private logger: Logger;
+
+    constructor(db: Database, logger: Logger) {
+        this.db = db;
+        this.logger = logger;
+    }
+
+    findAll(): any[] {
+        this.logger.log("Finding all");
+        return this.db.query("SELECT * FROM table");
+    }
+
+    findById(id: string): any {
+        this.logger.log("Finding by id: " + id);
+        return this.db.query("SELECT * FROM table WHERE id = " + id)[0];
+    }
+}
+
+@Injectable()
+class Service {
+    @Type(Repository)
+    private repo: Repository;
+
+    constructor(repo: Repository) {
+        this.repo = repo;
+    }
+
+    getAll(): any[] {
+        return this.repo.findAll();
+    }
+}
+
+const repo = new Repository(new Database(), new Logger());
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Logger") && output.contains("Database") && output.contains("Repository") && output.contains("Service"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("findAll") && output.contains("findById"),
+        "Expected Repository methods: {}",
+        output
+    );
+
+    // Decorator functions should exist
+    assert!(
+        output.contains("Type") && output.contains("Injectable"),
+        "Expected decorator functions: {}",
+        output
+    );
+
+    // Type annotations should be stripped
+    assert!(
+        !output.contains(": PropertyDecorator") && !output.contains(": ClassDecorator"),
+        "Expected type annotations to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with parameter type metadata pattern
+#[test]
+fn test_class_es5_reflect_metadata_param_type_pattern() {
+    let source = r#"
+function Inject(token: string): ParameterDecorator {
+    return function(target: Object, propertyKey: string | symbol | undefined, parameterIndex: number) {
+        const existingParams = Reflect.getMetadata("inject:params", target) || [];
+        existingParams[parameterIndex] = token;
+        Reflect.defineMetadata("inject:params", existingParams, target);
+    };
+}
+
+function Optional(): ParameterDecorator {
+    return function(target: Object, propertyKey: string | symbol | undefined, parameterIndex: number) {
+        const optionalParams = Reflect.getMetadata("optional:params", target) || [];
+        optionalParams[parameterIndex] = true;
+        Reflect.defineMetadata("optional:params", optionalParams, target);
+    };
+}
+
+function Validate(validator: (value: any) => boolean): ParameterDecorator {
+    return function(target: Object, propertyKey: string | symbol | undefined, parameterIndex: number) {
+        const validators = Reflect.getMetadata("validators", target, propertyKey!) || [];
+        validators[parameterIndex] = validator;
+        Reflect.defineMetadata("validators", validators, target, propertyKey!);
+    };
+}
+
+class AuthService {
+    authenticate(
+        @Inject("username") username: string,
+        @Inject("password") password: string,
+        @Optional() @Inject("rememberMe") rememberMe?: boolean
+    ): boolean {
+        return username.length > 0 && password.length > 0;
+    }
+
+    validateToken(
+        @Validate((v) => typeof v === "string") token: string
+    ): boolean {
+        return token.length > 0;
+    }
+}
+
+class UserController {
+    constructor(
+        @Inject("AuthService") private authService: AuthService,
+        @Inject("Logger") @Optional() private logger?: any
+    ) {}
+
+    login(
+        @Validate((v) => v.length >= 3) username: string,
+        @Validate((v) => v.length >= 8) password: string
+    ): boolean {
+        return this.authService.authenticate(username, password);
+    }
+}
+
+const authService = new AuthService();
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("AuthService") && output.contains("UserController"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("authenticate") && output.contains("validateToken"),
+        "Expected AuthService methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("login"),
+        "Expected UserController methods: {}",
+        output
+    );
+
+    // Decorator functions should exist
+    assert!(
+        output.contains("Inject") && output.contains("Optional") && output.contains("Validate"),
+        "Expected decorator functions: {}",
+        output
+    );
+
+    // Type annotations should be stripped
+    assert!(
+        !output.contains(": ParameterDecorator"),
+        "Expected type annotations to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with return type metadata pattern
+#[test]
+fn test_class_es5_reflect_metadata_return_type_pattern() {
+    let source = r#"
+function ReturnType(type: Function): MethodDecorator {
+    return function(target: Object, propertyKey: string | symbol, descriptor: PropertyDescriptor) {
+        Reflect.defineMetadata("design:returntype", type, target, propertyKey);
+        return descriptor;
+    };
+}
+
+function AsyncReturn(type: Function): MethodDecorator {
+    return function(target: Object, propertyKey: string | symbol, descriptor: PropertyDescriptor) {
+        Reflect.defineMetadata("async:returntype", type, target, propertyKey);
+        Reflect.defineMetadata("is:async", true, target, propertyKey);
+        return descriptor;
+    };
+}
+
+function Cacheable(ttl: number): MethodDecorator {
+    return function(target: Object, propertyKey: string | symbol, descriptor: PropertyDescriptor) {
+        const returnType = Reflect.getMetadata("design:returntype", target, propertyKey);
+        Reflect.defineMetadata("cache:ttl", ttl, target, propertyKey);
+        Reflect.defineMetadata("cache:type", returnType, target, propertyKey);
+        return descriptor;
+    };
+}
+
+class User {
+    id: string;
+    name: string;
+
+    constructor(id: string, name: string) {
+        this.id = id;
+        this.name = name;
+    }
+}
+
+class UserRepository {
+    private users: Map<string, User> = new Map();
+
+    @ReturnType(User)
+    @Cacheable(300)
+    findById(id: string): User | undefined {
+        return this.users.get(id);
+    }
+
+    @ReturnType(Array)
+    @Cacheable(600)
+    findAll(): User[] {
+        return Array.from(this.users.values());
+    }
+
+    @AsyncReturn(User)
+    async findByIdAsync(id: string): Promise<User | undefined> {
+        return this.users.get(id);
+    }
+
+    @ReturnType(Boolean)
+    save(user: User): boolean {
+        this.users.set(user.id, user);
+        return true;
+    }
+}
+
+const repo = new UserRepository();
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("User") && output.contains("UserRepository"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("findById") && output.contains("findAll") && output.contains("findByIdAsync") && output.contains("save"),
+        "Expected UserRepository methods: {}",
+        output
+    );
+
+    // Decorator functions should exist
+    assert!(
+        output.contains("ReturnType") && output.contains("AsyncReturn") && output.contains("Cacheable"),
+        "Expected decorator functions: {}",
+        output
+    );
+
+    // Type annotations should be stripped
+    assert!(
+        !output.contains(": MethodDecorator") && !output.contains(": PropertyDescriptor"),
+        "Expected type annotations to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with custom metadata keys pattern
+#[test]
+fn test_class_es5_reflect_metadata_custom_keys_pattern() {
+    let source = r#"
+const ROUTE_METADATA = Symbol("route");
+const METHOD_METADATA = Symbol("method");
+const MIDDLEWARE_METADATA = Symbol("middleware");
+const GUARD_METADATA = Symbol("guard");
+
+function Controller(path: string): ClassDecorator {
+    return function(target: Function) {
+        Reflect.defineMetadata(ROUTE_METADATA, path, target);
+    };
+}
+
+function Get(path: string): MethodDecorator {
+    return function(target: Object, propertyKey: string | symbol, descriptor: PropertyDescriptor) {
+        Reflect.defineMetadata(ROUTE_METADATA, path, target, propertyKey);
+        Reflect.defineMetadata(METHOD_METADATA, "GET", target, propertyKey);
+        return descriptor;
+    };
+}
+
+function Post(path: string): MethodDecorator {
+    return function(target: Object, propertyKey: string | symbol, descriptor: PropertyDescriptor) {
+        Reflect.defineMetadata(ROUTE_METADATA, path, target, propertyKey);
+        Reflect.defineMetadata(METHOD_METADATA, "POST", target, propertyKey);
+        return descriptor;
+    };
+}
+
+function UseMiddleware(...middlewares: Function[]): MethodDecorator {
+    return function(target: Object, propertyKey: string | symbol, descriptor: PropertyDescriptor) {
+        Reflect.defineMetadata(MIDDLEWARE_METADATA, middlewares, target, propertyKey);
+        return descriptor;
+    };
+}
+
+function UseGuard(guard: Function): MethodDecorator {
+    return function(target: Object, propertyKey: string | symbol, descriptor: PropertyDescriptor) {
+        const guards = Reflect.getMetadata(GUARD_METADATA, target, propertyKey) || [];
+        guards.push(guard);
+        Reflect.defineMetadata(GUARD_METADATA, guards, target, propertyKey);
+        return descriptor;
+    };
+}
+
+function authMiddleware(req: any, res: any, next: Function) {
+    next();
+}
+
+function logMiddleware(req: any, res: any, next: Function) {
+    console.log(req.url);
+    next();
+}
+
+function AdminGuard(req: any): boolean {
+    return req.user?.role === "admin";
+}
+
+@Controller("/users")
+class UserController {
+    @Get("/")
+    @UseMiddleware(logMiddleware)
+    getAll(): any[] {
+        return [];
+    }
+
+    @Get("/:id")
+    @UseMiddleware(authMiddleware, logMiddleware)
+    @UseGuard(AdminGuard)
+    getById(id: string): any {
+        return { id };
+    }
+
+    @Post("/")
+    @UseMiddleware(authMiddleware)
+    @UseGuard(AdminGuard)
+    create(data: any): any {
+        return data;
+    }
+}
+
+const controller = new UserController();
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("UserController"),
+        "Expected UserController class: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("getAll") && output.contains("getById") && output.contains("create"),
+        "Expected UserController methods: {}",
+        output
+    );
+
+    // Decorator functions should exist
+    assert!(
+        output.contains("Controller") && output.contains("Get") && output.contains("Post"),
+        "Expected route decorator functions: {}",
+        output
+    );
+
+    assert!(
+        output.contains("UseMiddleware") && output.contains("UseGuard"),
+        "Expected middleware decorator functions: {}",
+        output
+    );
+
+    // Symbol constants should exist
+    assert!(
+        output.contains("ROUTE_METADATA") && output.contains("METHOD_METADATA"),
+        "Expected metadata symbol constants: {}",
+        output
+    );
+
+    // Type annotations should be stripped
+    assert!(
+        !output.contains(": ClassDecorator") && !output.contains(": MethodDecorator"),
+        "Expected type annotations to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with combined reflect-metadata patterns
+#[test]
+fn test_class_es5_reflect_metadata_combined_pattern() {
+    let source = r#"
+const INJECTABLE = Symbol("injectable");
+const DEPENDENCIES = Symbol("dependencies");
+const SCOPE = Symbol("scope");
+
+type Scope = "singleton" | "transient" | "request";
+
+function Injectable(options?: { scope?: Scope }): ClassDecorator {
+    return function(target: Function) {
+        Reflect.defineMetadata(INJECTABLE, true, target);
+        Reflect.defineMetadata(SCOPE, options?.scope || "singleton", target);
+
+        const paramTypes = Reflect.getMetadata("design:paramtypes", target) || [];
+        Reflect.defineMetadata(DEPENDENCIES, paramTypes, target);
+    };
+}
+
+function Inject(token: string | symbol): ParameterDecorator {
+    return function(target: Object, propertyKey: string | symbol | undefined, parameterIndex: number) {
+        const injections = Reflect.getMetadata("custom:inject", target) || [];
+        injections[parameterIndex] = token;
+        Reflect.defineMetadata("custom:inject", injections, target);
+    };
+}
+
+function Property(options?: { required?: boolean; default?: any }): PropertyDecorator {
+    return function(target: Object, propertyKey: string | symbol) {
+        const type = Reflect.getMetadata("design:type", target, propertyKey);
+        Reflect.defineMetadata("property:type", type, target, propertyKey);
+        Reflect.defineMetadata("property:options", options || {}, target, propertyKey);
+    };
+}
+
+function Method(options?: { async?: boolean; cacheable?: boolean }): MethodDecorator {
+    return function(target: Object, propertyKey: string | symbol, descriptor: PropertyDescriptor) {
+        const returnType = Reflect.getMetadata("design:returntype", target, propertyKey);
+        const paramTypes = Reflect.getMetadata("design:paramtypes", target, propertyKey);
+
+        Reflect.defineMetadata("method:returntype", returnType, target, propertyKey);
+        Reflect.defineMetadata("method:paramtypes", paramTypes, target, propertyKey);
+        Reflect.defineMetadata("method:options", options || {}, target, propertyKey);
+
+        return descriptor;
+    };
+}
+
+interface ILogger {
+    log(message: string): void;
+    error(message: string): void;
+}
+
+interface IDatabase {
+    query(sql: string): Promise<any[]>;
+    execute(sql: string): Promise<void>;
+}
+
+@Injectable({ scope: "singleton" })
+class Logger implements ILogger {
+    @Property({ required: false, default: "INFO" })
+    level: string = "INFO";
+
+    @Method({ async: false })
+    log(message: string): void {
+        console.log(`[${this.level}] ${message}`);
+    }
+
+    @Method({ async: false })
+    error(message: string): void {
+        console.error(`[ERROR] ${message}`);
+    }
+}
+
+@Injectable({ scope: "singleton" })
+class Database implements IDatabase {
+    @Property({ required: true })
+    connectionString: string;
+
+    constructor(@Inject("CONNECTION_STRING") connectionString: string) {
+        this.connectionString = connectionString;
+    }
+
+    @Method({ async: true, cacheable: false })
+    async query(sql: string): Promise<any[]> {
+        return [];
+    }
+
+    @Method({ async: true })
+    async execute(sql: string): Promise<void> {
+        // Execute SQL
+    }
+}
+
+@Injectable({ scope: "transient" })
+class UserService {
+    @Property()
+    private logger: Logger;
+
+    @Property()
+    private db: Database;
+
+    constructor(
+        @Inject("Logger") logger: Logger,
+        @Inject("Database") db: Database
+    ) {
+        this.logger = logger;
+        this.db = db;
+    }
+
+    @Method({ async: true, cacheable: true })
+    async findAll(): Promise<any[]> {
+        this.logger.log("Finding all users");
+        return this.db.query("SELECT * FROM users");
+    }
+
+    @Method({ async: true })
+    async findById(id: string): Promise<any> {
+        this.logger.log("Finding user by id: " + id);
+        const results = await this.db.query("SELECT * FROM users WHERE id = " + id);
+        return results[0];
+    }
+
+    @Method({ async: true })
+    async create(data: any): Promise<any> {
+        this.logger.log("Creating user");
+        await this.db.execute("INSERT INTO users ...");
+        return data;
+    }
+}
+
+class Container {
+    private instances: Map<string | symbol, any> = new Map();
+    private factories: Map<string | symbol, Function> = new Map();
+
+    register<T>(token: string | symbol, factory: () => T): void {
+        this.factories.set(token, factory);
+    }
+
+    resolve<T>(token: string | symbol): T {
+        if (this.instances.has(token)) {
+            return this.instances.get(token);
+        }
+
+        const factory = this.factories.get(token);
+        if (!factory) {
+            throw new Error("No factory registered for token");
+        }
+
+        const instance = factory();
+        this.instances.set(token, instance);
+        return instance as T;
+    }
+
+    getMetadata(target: Function): any {
+        return {
+            injectable: Reflect.getMetadata(INJECTABLE, target),
+            scope: Reflect.getMetadata(SCOPE, target),
+            dependencies: Reflect.getMetadata(DEPENDENCIES, target)
+        };
+    }
+}
+
+const container = new Container();
+const logger = new Logger();
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Logger") && output.contains("Database") && output.contains("UserService") && output.contains("Container"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Logger methods
+    assert!(
+        output.contains("log") && output.contains("error"),
+        "Expected Logger methods: {}",
+        output
+    );
+
+    // Database methods
+    assert!(
+        output.contains("query") && output.contains("execute"),
+        "Expected Database methods: {}",
+        output
+    );
+
+    // UserService methods
+    assert!(
+        output.contains("findAll") && output.contains("findById") && output.contains("create"),
+        "Expected UserService methods: {}",
+        output
+    );
+
+    // Container methods
+    assert!(
+        output.contains("register") && output.contains("resolve") && output.contains("getMetadata"),
+        "Expected Container methods: {}",
+        output
+    );
+
+    // Decorator functions should exist
+    assert!(
+        output.contains("Injectable") && output.contains("Inject") && output.contains("Property") && output.contains("Method"),
+        "Expected decorator functions: {}",
+        output
+    );
+
+    // Symbol constants should exist
+    assert!(
+        output.contains("INJECTABLE") && output.contains("DEPENDENCIES") && output.contains("SCOPE"),
+        "Expected metadata symbol constants: {}",
+        output
+    );
+
+    // Interfaces should be stripped
+    assert!(
+        !output.contains("interface ILogger") && !output.contains("interface IDatabase"),
+        "Expected interfaces to be stripped: {}",
+        output
+    );
+
+    // Type alias should be stripped
+    assert!(
+        !output.contains("type Scope"),
+        "Expected type alias to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with revealing module pattern
+#[test]
+fn test_class_es5_revealing_module_pattern() {
+    let source = r#"
+const CounterModule = (function() {
+    let count = 0;
+
+    class Counter {
+        private _value: number;
+
+        constructor(initial: number = 0) {
+            this._value = initial;
+        }
+
+        increment(): number {
+            this._value++;
+            count++;
+            return this._value;
+        }
+
+        decrement(): number {
+            this._value--;
+            return this._value;
+        }
+
+        getValue(): number {
+            return this._value;
+        }
+    }
+
+    function createCounter(initial?: number): Counter {
+        return new Counter(initial);
+    }
+
+    function getTotalOperations(): number {
+        return count;
+    }
+
+    return {
+        Counter,
+        createCounter,
+        getTotalOperations
+    };
+})();
+
+const LoggerModule = (function() {
+    const logs: string[] = [];
+
+    class Logger {
+        private prefix: string;
+
+        constructor(prefix: string = "") {
+            this.prefix = prefix;
+        }
+
+        log(message: string): void {
+            const entry = this.prefix ? `[${this.prefix}] ${message}` : message;
+            logs.push(entry);
+            console.log(entry);
+        }
+
+        warn(message: string): void {
+            this.log(`WARN: ${message}`);
+        }
+
+        error(message: string): void {
+            this.log(`ERROR: ${message}`);
+        }
+    }
+
+    function getLogs(): string[] {
+        return [...logs];
+    }
+
+    function clearLogs(): void {
+        logs.length = 0;
+    }
+
+    return {
+        Logger,
+        getLogs,
+        clearLogs
+    };
+})();
+
+const counter = CounterModule.createCounter(10);
+const logger = new LoggerModule.Logger("App");
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Module names should exist
+    assert!(
+        output.contains("CounterModule") && output.contains("LoggerModule"),
+        "Expected module names: {}",
+        output
+    );
+
+    // Classes should be converted
+    assert!(
+        output.contains("Counter") && output.contains("Logger"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("increment") && output.contains("decrement") && output.contains("getValue"),
+        "Expected Counter methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("log") && output.contains("warn") && output.contains("error"),
+        "Expected Logger methods: {}",
+        output
+    );
+
+    // Module functions should exist
+    assert!(
+        output.contains("createCounter") && output.contains("getTotalOperations"),
+        "Expected CounterModule functions: {}",
+        output
+    );
+
+    assert!(
+        output.contains("getLogs") && output.contains("clearLogs"),
+        "Expected LoggerModule functions: {}",
+        output
+    );
+}
+
+/// Test ES5 class with namespace module pattern
+#[test]
+fn test_class_es5_namespace_module_pattern() {
+    let source = r#"
+namespace DataAccess {
+    export interface Repository<T> {
+        findAll(): T[];
+        findById(id: string): T | undefined;
+        save(entity: T): void;
+        delete(id: string): boolean;
+    }
+
+    export class BaseEntity {
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+
+        constructor(id: string) {
+            this.id = id;
+            this.createdAt = new Date();
+            this.updatedAt = new Date();
+        }
+
+        touch(): void {
+            this.updatedAt = new Date();
+        }
+    }
+
+    export class InMemoryRepository<T extends BaseEntity> implements Repository<T> {
+        protected entities: Map<string, T> = new Map();
+
+        findAll(): T[] {
+            return Array.from(this.entities.values());
+        }
+
+        findById(id: string): T | undefined {
+            return this.entities.get(id);
+        }
+
+        save(entity: T): void {
+            entity.touch();
+            this.entities.set(entity.id, entity);
+        }
+
+        delete(id: string): boolean {
+            return this.entities.delete(id);
+        }
+    }
+}
+
+namespace Services {
+    export class UserService {
+        private repo: DataAccess.Repository<DataAccess.BaseEntity>;
+
+        constructor(repo: DataAccess.Repository<DataAccess.BaseEntity>) {
+            this.repo = repo;
+        }
+
+        getAllUsers(): DataAccess.BaseEntity[] {
+            return this.repo.findAll();
+        }
+
+        getUserById(id: string): DataAccess.BaseEntity | undefined {
+            return this.repo.findById(id);
+        }
+    }
+}
+
+const repo = new DataAccess.InMemoryRepository<DataAccess.BaseEntity>();
+const service = new Services.UserService(repo);
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Namespaces should exist
+    assert!(
+        output.contains("DataAccess") && output.contains("Services"),
+        "Expected namespaces: {}",
+        output
+    );
+
+    // Classes should be converted
+    assert!(
+        output.contains("BaseEntity") && output.contains("InMemoryRepository") && output.contains("UserService"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("findAll") && output.contains("findById") && output.contains("save"),
+        "Expected Repository methods: {}",
+        output
+    );
+
+    // Interface should be stripped
+    assert!(
+        !output.contains("interface Repository"),
+        "Expected interface to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with import/export class patterns
+#[test]
+fn test_class_es5_import_export_class_pattern() {
+    let source = r#"
+export interface Serializable {
+    serialize(): string;
+    deserialize(data: string): void;
+}
+
+export abstract class Model implements Serializable {
+    abstract id: string;
+
+    abstract serialize(): string;
+    abstract deserialize(data: string): void;
+
+    clone(): this {
+        const data = this.serialize();
+        const clone = Object.create(Object.getPrototypeOf(this));
+        clone.deserialize(data);
+        return clone;
+    }
+}
+
+export class User extends Model {
+    id: string;
+    name: string;
+    email: string;
+
+    constructor(id: string, name: string, email: string) {
+        super();
+        this.id = id;
+        this.name = name;
+        this.email = email;
+    }
+
+    serialize(): string {
+        return JSON.stringify({ id: this.id, name: this.name, email: this.email });
+    }
+
+    deserialize(data: string): void {
+        const obj = JSON.parse(data);
+        this.id = obj.id;
+        this.name = obj.name;
+        this.email = obj.email;
+    }
+}
+
+export class Product extends Model {
+    id: string;
+    title: string;
+    price: number;
+
+    constructor(id: string, title: string, price: number) {
+        super();
+        this.id = id;
+        this.title = title;
+        this.price = price;
+    }
+
+    serialize(): string {
+        return JSON.stringify({ id: this.id, title: this.title, price: this.price });
+    }
+
+    deserialize(data: string): void {
+        const obj = JSON.parse(data);
+        this.id = obj.id;
+        this.title = obj.title;
+        this.price = obj.price;
+    }
+}
+
+export default class DefaultExportClass {
+    value: string;
+
+    constructor(value: string) {
+        this.value = value;
+    }
+
+    getValue(): string {
+        return this.value;
+    }
+}
+
+const user = new User("1", "John", "john@example.com");
+const product = new Product("1", "Widget", 9.99);
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Model") && output.contains("User") && output.contains("Product"),
+        "Expected classes: {}",
+        output
+    );
+
+    assert!(
+        output.contains("DefaultExportClass"),
+        "Expected default export class: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("serialize") && output.contains("deserialize") && output.contains("clone"),
+        "Expected Model methods: {}",
+        output
+    );
+
+    // Interface should be stripped
+    assert!(
+        !output.contains("interface Serializable"),
+        "Expected interface to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with barrel export variation pattern
+#[test]
+fn test_class_es5_barrel_export_variation_pattern() {
+    let source = r#"
+// models/user.ts style
+class UserModel {
+    id: string;
+    username: string;
+
+    constructor(id: string, username: string) {
+        this.id = id;
+        this.username = username;
+    }
+
+    toJSON(): object {
+        return { id: this.id, username: this.username };
+    }
+}
+
+// models/product.ts style
+class ProductModel {
+    id: string;
+    name: string;
+    price: number;
+
+    constructor(id: string, name: string, price: number) {
+        this.id = id;
+        this.name = name;
+        this.price = price;
+    }
+
+    toJSON(): object {
+        return { id: this.id, name: this.name, price: this.price };
+    }
+}
+
+// models/order.ts style
+class OrderModel {
+    id: string;
+    userId: string;
+    products: ProductModel[];
+
+    constructor(id: string, userId: string, products: ProductModel[] = []) {
+        this.id = id;
+        this.userId = userId;
+        this.products = products;
+    }
+
+    addProduct(product: ProductModel): void {
+        this.products.push(product);
+    }
+
+    getTotal(): number {
+        return this.products.reduce((sum, p) => sum + p.price, 0);
+    }
+
+    toJSON(): object {
+        return {
+            id: this.id,
+            userId: this.userId,
+            products: this.products.map(p => p.toJSON())
+        };
+    }
+}
+
+// models/index.ts barrel export style
+const Models = {
+    User: UserModel,
+    Product: ProductModel,
+    Order: OrderModel
+};
+
+// Export types for convenience
+type User = UserModel;
+type Product = ProductModel;
+type Order = OrderModel;
+
+// Factory functions
+function createUser(id: string, username: string): UserModel {
+    return new UserModel(id, username);
+}
+
+function createProduct(id: string, name: string, price: number): ProductModel {
+    return new ProductModel(id, name, price);
+}
+
+function createOrder(id: string, userId: string): OrderModel {
+    return new OrderModel(id, userId);
+}
+
+const Factories = {
+    createUser,
+    createProduct,
+    createOrder
+};
+
+const user = Factories.createUser("1", "john");
+const product = Factories.createProduct("1", "Widget", 9.99);
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("UserModel") && output.contains("ProductModel") && output.contains("OrderModel"),
+        "Expected model classes: {}",
+        output
+    );
+
+    // Barrel export object should exist
+    assert!(
+        output.contains("Models"),
+        "Expected Models barrel export: {}",
+        output
+    );
+
+    // Factory functions should exist
+    assert!(
+        output.contains("createUser") && output.contains("createProduct") && output.contains("createOrder"),
+        "Expected factory functions: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("toJSON") && output.contains("addProduct") && output.contains("getTotal"),
+        "Expected model methods: {}",
+        output
+    );
+
+    // Type aliases should be stripped
+    assert!(
+        !output.contains("type User =") && !output.contains("type Product ="),
+        "Expected type aliases to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with re-export variation pattern
+#[test]
+fn test_class_es5_re_export_variation_pattern() {
+    let source = r#"
+// core/base.ts
+abstract class BaseService {
+    protected name: string;
+
+    constructor(name: string) {
+        this.name = name;
+    }
+
+    getName(): string {
+        return this.name;
+    }
+
+    abstract execute(): void;
+}
+
+// core/logger.ts
+class LogService extends BaseService {
+    private logs: string[] = [];
+
+    constructor() {
+        super("LogService");
+    }
+
+    execute(): void {
+        console.log("LogService executing...");
+    }
+
+    log(message: string): void {
+        this.logs.push(message);
+    }
+
+    getLogs(): string[] {
+        return [...this.logs];
+    }
+}
+
+// core/cache.ts
+class CacheService extends BaseService {
+    private cache: Map<string, any> = new Map();
+
+    constructor() {
+        super("CacheService");
+    }
+
+    execute(): void {
+        console.log("CacheService executing...");
+    }
+
+    set(key: string, value: any): void {
+        this.cache.set(key, value);
+    }
+
+    get(key: string): any {
+        return this.cache.get(key);
+    }
+
+    clear(): void {
+        this.cache.clear();
+    }
+}
+
+// core/index.ts re-export pattern
+const CoreServices = {
+    BaseService,
+    LogService,
+    CacheService
+};
+
+// features/auth.ts
+class AuthService extends BaseService {
+    private logService: LogService;
+
+    constructor(logService: LogService) {
+        super("AuthService");
+        this.logService = logService;
+    }
+
+    execute(): void {
+        this.logService.log("AuthService executing...");
+    }
+
+    authenticate(username: string, password: string): boolean {
+        this.logService.log(`Authenticating user: ${username}`);
+        return username.length > 0 && password.length > 0;
+    }
+}
+
+// features/data.ts
+class DataService extends BaseService {
+    private cacheService: CacheService;
+    private logService: LogService;
+
+    constructor(cacheService: CacheService, logService: LogService) {
+        super("DataService");
+        this.cacheService = cacheService;
+        this.logService = logService;
+    }
+
+    execute(): void {
+        this.logService.log("DataService executing...");
+    }
+
+    fetch(key: string): any {
+        const cached = this.cacheService.get(key);
+        if (cached) {
+            this.logService.log(`Cache hit for: ${key}`);
+            return cached;
+        }
+        this.logService.log(`Cache miss for: ${key}`);
+        return null;
+    }
+
+    store(key: string, value: any): void {
+        this.cacheService.set(key, value);
+        this.logService.log(`Stored: ${key}`);
+    }
+}
+
+// features/index.ts re-export pattern
+const FeatureServices = {
+    AuthService,
+    DataService
+};
+
+// main index.ts - aggregate exports
+const AllServices = {
+    ...CoreServices,
+    ...FeatureServices
+};
+
+const logService = new LogService();
+const cacheService = new CacheService();
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Base class should be converted
+    assert!(
+        output.contains("BaseService"),
+        "Expected BaseService class: {}",
+        output
+    );
+
+    // Core services should exist
+    assert!(
+        output.contains("LogService") && output.contains("CacheService"),
+        "Expected core service classes: {}",
+        output
+    );
+
+    // Feature services should exist
+    assert!(
+        output.contains("AuthService") && output.contains("DataService"),
+        "Expected feature service classes: {}",
+        output
+    );
+
+    // Re-export objects should exist
+    assert!(
+        output.contains("CoreServices") && output.contains("FeatureServices") && output.contains("AllServices"),
+        "Expected re-export objects: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("getName") && output.contains("execute"),
+        "Expected BaseService methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("authenticate") && output.contains("fetch") && output.contains("store"),
+        "Expected feature service methods: {}",
+        output
+    );
+}
+
+/// Test ES5 class with combined module patterns
+#[test]
+fn test_class_es5_combined_module_patterns() {
+    let source = r#"
+// Types module
+namespace Types {
+    export interface Entity {
+        id: string;
+        createdAt: Date;
+    }
+
+    export interface Persistable {
+        save(): Promise<void>;
+        load(id: string): Promise<void>;
+    }
+
+    export type EntityId = string | number;
+}
+
+// Base module with revealing pattern
+const BaseModule = (function() {
+    abstract class AbstractEntity implements Types.Entity {
+        id: string;
+        createdAt: Date;
+
+        constructor(id: string) {
+            this.id = id;
+            this.createdAt = new Date();
+        }
+
+        abstract validate(): boolean;
+    }
+
+    class EntityFactory {
+        private static instances: Map<string, AbstractEntity> = new Map();
+
+        static register(id: string, entity: AbstractEntity): void {
+            this.instances.set(id, entity);
+        }
+
+        static get(id: string): AbstractEntity | undefined {
+            return this.instances.get(id);
+        }
+
+        static clear(): void {
+            this.instances.clear();
+        }
+    }
+
+    return {
+        AbstractEntity,
+        EntityFactory
+    };
+})();
+
+// Domain module using namespace
+namespace Domain {
+    export class User extends (BaseModule.AbstractEntity as any) {
+        name: string;
+        email: string;
+
+        constructor(id: string, name: string, email: string) {
+            super(id);
+            this.name = name;
+            this.email = email;
+        }
+
+        validate(): boolean {
+            return this.name.length > 0 && this.email.includes("@");
+        }
+
+        getDisplayName(): string {
+            return `${this.name} <${this.email}>`;
+        }
+    }
+
+    export class Order extends (BaseModule.AbstractEntity as any) {
+        userId: string;
+        total: number;
+        items: string[];
+
+        constructor(id: string, userId: string) {
+            super(id);
+            this.userId = userId;
+            this.total = 0;
+            this.items = [];
+        }
+
+        validate(): boolean {
+            return this.userId.length > 0 && this.items.length > 0;
+        }
+
+        addItem(item: string, price: number): void {
+            this.items.push(item);
+            this.total += price;
+        }
+
+        getItemCount(): number {
+            return this.items.length;
+        }
+    }
+}
+
+// Services module
+namespace Services {
+    export class UserService {
+        private users: Map<string, Domain.User> = new Map();
+
+        create(id: string, name: string, email: string): Domain.User {
+            const user = new Domain.User(id, name, email);
+            if (user.validate()) {
+                this.users.set(id, user);
+                BaseModule.EntityFactory.register(id, user as any);
+            }
+            return user;
+        }
+
+        findById(id: string): Domain.User | undefined {
+            return this.users.get(id);
+        }
+
+        findAll(): Domain.User[] {
+            return Array.from(this.users.values());
+        }
+    }
+
+    export class OrderService {
+        private orders: Map<string, Domain.Order> = new Map();
+
+        create(id: string, userId: string): Domain.Order {
+            const order = new Domain.Order(id, userId);
+            this.orders.set(id, order);
+            return order;
+        }
+
+        findByUserId(userId: string): Domain.Order[] {
+            return Array.from(this.orders.values()).filter(o => o.userId === userId);
+        }
+
+        getOrderTotal(orderId: string): number {
+            const order = this.orders.get(orderId);
+            return order ? order.total : 0;
+        }
+    }
+}
+
+// Application facade
+class Application {
+    private userService: Services.UserService;
+    private orderService: Services.OrderService;
+
+    constructor() {
+        this.userService = new Services.UserService();
+        this.orderService = new Services.OrderService();
+    }
+
+    getUserService(): Services.UserService {
+        return this.userService;
+    }
+
+    getOrderService(): Services.OrderService {
+        return this.orderService;
+    }
+
+    initialize(): void {
+        console.log("Application initialized");
+    }
+}
+
+// Export aggregation
+const Modules = {
+    Types,
+    BaseModule,
+    Domain,
+    Services,
+    Application
+};
+
+const app = new Application();
+app.initialize();
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Namespaces should exist
+    assert!(
+        output.contains("Types") && output.contains("Domain") && output.contains("Services"),
+        "Expected namespaces: {}",
+        output
+    );
+
+    // Revealing module should exist
+    assert!(
+        output.contains("BaseModule"),
+        "Expected BaseModule: {}",
+        output
+    );
+
+    // Domain classes should exist
+    assert!(
+        output.contains("User") && output.contains("Order"),
+        "Expected domain classes: {}",
+        output
+    );
+
+    // Service classes should exist
+    assert!(
+        output.contains("UserService") && output.contains("OrderService"),
+        "Expected service classes: {}",
+        output
+    );
+
+    // Application class should exist
+    assert!(
+        output.contains("Application"),
+        "Expected Application class: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("validate") && output.contains("getDisplayName"),
+        "Expected User methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("create") && output.contains("findById") && output.contains("findAll"),
+        "Expected UserService methods: {}",
+        output
+    );
+
+    // Aggregate export should exist
+    assert!(
+        output.contains("Modules"),
+        "Expected Modules aggregate export: {}",
+        output
+    );
+
+    // Interfaces should be stripped
+    assert!(
+        !output.contains("interface Entity") && !output.contains("interface Persistable"),
+        "Expected interfaces to be stripped: {}",
+        output
+    );
+
+    // Type alias should be stripped
+    assert!(
+        !output.contains("type EntityId"),
+        "Expected type alias to be stripped: {}",
+        output
+    );
+}

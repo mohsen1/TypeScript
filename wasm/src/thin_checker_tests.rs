@@ -3244,6 +3244,90 @@ type Alias = Outer.Inner;
 }
 
 #[test]
+fn test_checker_nested_namespace_export_visible() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace A {
+    export type ID = string;
+    namespace B {
+        let x: ID;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+}
+
+#[test]
+fn test_checker_nested_namespace_non_exported_not_visible() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace A {
+    type Internal = number;
+    namespace B {
+        let x: Internal;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(codes.contains(&2304), "Expected error 2304 for non-exported parent type, got: {:?}", codes);
+}
+
+#[test]
+fn test_checker_nested_namespace_exported_class_visible() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace Models {
+    export class User {}
+    namespace Helpers {
+        function getUser(): User {
+            return new User();
+        }
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+}
+
+#[test]
 fn test_checker_module_augmentation_merges_exports() {
     use crate::thin_parser::ThinParserState;
     use crate::solver::TypeKey;
