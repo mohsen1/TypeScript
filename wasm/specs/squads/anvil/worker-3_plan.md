@@ -23,7 +23,40 @@ class Derived extends Base {
 ```
 
 ## Completed
-(none yet for this assignment)
+
+### Session 1: Private Name Parser Fixes (2026-01-09)
+
+1. **Fix compilation error in subtype.rs** - Fixed undefined variable `s_sym` in TypeQuery subtype check that prevented compilation.
+
+2. **Support private identifiers in accessor names** (`thin_parser.rs:2373-2377`)
+   - Issue: `static get #quux()` was being parsed with name "get" instead of "#quux"
+   - Root cause: `look_ahead_is_accessor` function didn't check for PrivateIdentifier tokens
+   - Fix: Added `self.is_token(SyntaxKind::PrivateIdentifier)` to the accessor name check
+
+3. **Support generator methods with private names** (`thin_parser.rs:2217-2218, 2298`)
+   - Issue: `static async *#baz()` caused TS1068 "Unexpected token"
+   - Root cause: Class member parser wasn't consuming asterisk token before property name
+   - Fix: Added `let asterisk_token = self.parse_optional(SyntaxKind::AsteriskToken);` and updated MethodDeclData
+
+4. **Unit tests added** (`thin_checker_tests.rs`):
+   - `test_private_static_method_access_no_error` - Tests A.#foo(30)
+   - `test_private_static_accessor_access_no_error` - Tests A.#quux accessors
+   - `test_private_static_generator_method_access_no_error` - Tests static async *#baz()
+
+### Verification Results
+
+After fixes, direct checker runs on the private name test files produce **no errors**:
+- `privateNamesAndStaticMethods.ts` - No errors
+- `privateNameStaticsAndStaticMethods.ts` - No errors
+- `privateNameStaticAccessorsAccess.ts` - No errors
+
+### Remaining Issues Identified
+
+The mixin class tests (`mixinAbstractClasses.ts`, `mixinClassesAnonymous.ts`) fail due to **`abstract new` syntax** not being supported by the parser:
+```typescript
+function Mixin<TBaseClass extends abstract new (...args: any) => any>(baseClass: TBaseClass)
+```
+This is a separate parser issue - the abstract constructor type syntax needs parser support.
 
 TSC correctly finds `name` by walking up the inheritance chain.
 
