@@ -10947,3 +10947,384 @@ class PropertyDefiner {
         output
     );
 }
+
+// ============================================================================
+// Object.assign Pattern Tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_object_assign_basic() {
+    // Basic Object.assign usage
+    let source = r#"
+class ObjectMerger {
+    merge<T extends object, U extends object>(target: T, source: U): T & U {
+        return Object.assign(target, source);
+    }
+
+    extend<T extends object>(target: T, ...sources: object[]): T {
+        return Object.assign(target, ...sources);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("ObjectMerger"),
+        "Expected ObjectMerger class: {}",
+        output
+    );
+
+    // Object.assign should be present
+    assert!(
+        output.contains("Object.assign"),
+        "Expected Object.assign: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("merge") && output.contains("extend"),
+        "Expected merge and extend methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_object_assign_defaults() {
+    // Object.assign for default values
+    let source = r#"
+interface Config {
+    host: string;
+    port: number;
+    timeout: number;
+}
+
+class ConfigManager {
+    private defaults: Config = {
+        host: "localhost",
+        port: 8080,
+        timeout: 5000
+    };
+
+    getConfig(overrides: Partial<Config>): Config {
+        return Object.assign({}, this.defaults, overrides);
+    }
+
+    updateDefaults(updates: Partial<Config>): void {
+        Object.assign(this.defaults, updates);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("ConfigManager"),
+        "Expected ConfigManager class: {}",
+        output
+    );
+
+    // Object.assign should be present
+    assert!(
+        output.contains("Object.assign"),
+        "Expected Object.assign: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("getConfig") && output.contains("updateDefaults"),
+        "Expected getConfig and updateDefaults methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_object_assign_clone() {
+    // Object.assign for shallow cloning
+    let source = r#"
+class Cloner<T extends object> {
+    shallowClone(obj: T): T {
+        return Object.assign({}, obj) as T;
+    }
+
+    cloneWithChanges<U extends Partial<T>>(obj: T, changes: U): T {
+        return Object.assign({}, obj, changes);
+    }
+
+    cloneArray(arr: T[]): T[] {
+        return arr.map(item => Object.assign({}, item) as T);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("Cloner"),
+        "Expected Cloner class: {}",
+        output
+    );
+
+    // Object.assign should be present
+    assert!(
+        output.contains("Object.assign"),
+        "Expected Object.assign: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("shallowClone") && output.contains("cloneWithChanges") && output.contains("cloneArray"),
+        "Expected shallowClone, cloneWithChanges, cloneArray methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_object_assign_mixin() {
+    // Object.assign for mixin pattern
+    let source = r#"
+interface Disposable {
+    dispose(): void;
+}
+
+interface Activatable {
+    activate(): void;
+    deactivate(): void;
+}
+
+class MixinBuilder {
+    applyMixins<T extends object>(target: T, ...mixins: object[]): T & Disposable & Activatable {
+        return Object.assign(target, ...mixins) as T & Disposable & Activatable;
+    }
+
+    createWithMixins<T extends object>(base: T): T & Disposable {
+        const disposable: Disposable = {
+            dispose() { console.log("disposed"); }
+        };
+        return Object.assign({}, base, disposable);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("MixinBuilder"),
+        "Expected MixinBuilder class: {}",
+        output
+    );
+
+    // Object.assign should be present
+    assert!(
+        output.contains("Object.assign"),
+        "Expected Object.assign: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("applyMixins") && output.contains("createWithMixins"),
+        "Expected applyMixins and createWithMixins methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_object_assign_constructor() {
+    // Object.assign in constructor
+    let source = r#"
+interface Options {
+    name: string;
+    value: number;
+    enabled: boolean;
+}
+
+class Component {
+    name: string;
+    value: number;
+    enabled: boolean;
+
+    constructor(options: Partial<Options>) {
+        const defaults: Options = {
+            name: "default",
+            value: 0,
+            enabled: true
+        };
+        Object.assign(this, defaults, options);
+        this.name = this.name;
+        this.value = this.value;
+        this.enabled = this.enabled;
+    }
+
+    getState(): Options {
+        return Object.assign({}, { name: this.name, value: this.value, enabled: this.enabled });
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("Component"),
+        "Expected Component class: {}",
+        output
+    );
+
+    // Object.assign should be present
+    assert!(
+        output.contains("Object.assign"),
+        "Expected Object.assign: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("getState"),
+        "Expected getState method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_object_assign_immutable() {
+    // Object.assign for immutable update pattern
+    let source = r#"
+interface State {
+    count: number;
+    items: string[];
+    metadata: Record<string, any>;
+}
+
+class StateManager {
+    private state: State;
+
+    constructor(initial: State) {
+        this.state = Object.assign({}, initial);
+    }
+
+    updateCount(count: number): State {
+        this.state = Object.assign({}, this.state, { count });
+        return this.state;
+    }
+
+    addItem(item: string): State {
+        const items = [...this.state.items, item];
+        this.state = Object.assign({}, this.state, { items });
+        return this.state;
+    }
+
+    setMetadata(key: string, value: any): State {
+        const metadata = Object.assign({}, this.state.metadata, { [key]: value });
+        this.state = Object.assign({}, this.state, { metadata });
+        return this.state;
+    }
+
+    getState(): State {
+        return Object.assign({}, this.state);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("StateManager"),
+        "Expected StateManager class: {}",
+        output
+    );
+
+    // Object.assign should be present
+    assert!(
+        output.contains("Object.assign"),
+        "Expected Object.assign: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("updateCount") && output.contains("addItem") && output.contains("setMetadata"),
+        "Expected updateCount, addItem, setMetadata methods: {}",
+        output
+    );
+}
