@@ -6172,11 +6172,23 @@ impl ThinParserState {
             NodeIndex::NONE
         };
 
+        // Set context flags for async/generator to properly parse await/yield in method bodies.
+        let saved_flags = self.context_flags;
+        if is_async {
+            self.context_flags |= CONTEXT_FLAG_ASYNC;
+        }
+        if asterisk {
+            self.context_flags |= CONTEXT_FLAG_GENERATOR;
+        }
+
         let body = if self.is_token(SyntaxKind::OpenBraceToken) {
             self.parse_block()
         } else {
             NodeIndex::NONE
         };
+
+        // Restore context flags after parsing body.
+        self.context_flags = saved_flags;
 
         let modifiers = if is_async {
             let mod_idx = self.arena.create_modifier(SyntaxKind::AsyncKeyword, start_pos);
