@@ -7,22 +7,7 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-Add ES5 source map tests for private class features transform
-
-Per GOALS.md Objective 2: Source map validation
-
-Steps:
-1. Add 6 ES5 source map tests for private class features to `wasm/src/source_map_tests.rs`:
-   - Private field read mapping
-   - Private field write mapping
-   - Private method call mapping
-   - Private accessor mapping
-   - Private static members
-   - Combined private features source map patterns
-2. Run `./wasm/test.sh source_map` to verify all tests pass
-3. Commit with message: `[wasm] source_map: add private class features transform tests`
-4. Push to `origin/worker/anvil-3`
-5. Update this plan file and push
+(awaiting next task from EM-Anvil)
 
 **Sync instructions**: Use squad/anvil (not origin/rust):
 ```
@@ -33,6 +18,7 @@ git fetch origin && git reset --hard origin/squad/anvil
 (empty - will receive new tasks from EM after completing current assignment)
 
 ## Completed
+- [x] Added private class features ES5 source map tests (private field read, private field write, private method call, private accessor, private static members, comprehensive); 875 tests pass.
 - [x] Added generator transform ES5 source map tests (basic yield mapping, multiple yields, yield* delegation, class method, try/finally cleanup, comprehensive); 869 tests pass.
 - [x] Added async/class integration ES5 source map tests (derived class super call, async arrow field initializer, static this capture, generator method, constructor simulation, comprehensive); 863 tests pass.
 - [x] Added class static block ES5 source map tests (basic, init order, multiple, private field access, private method access, static field init, computed props, async patterns, error handling, comprehensive); 857 tests pass.
