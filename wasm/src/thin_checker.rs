@@ -3953,6 +3953,17 @@ impl<'a> ThinCheckerState<'a> {
                             diagnostic_codes::PROPERTY_ACCESS_FROM_INDEX_SIGNATURE,
                         );
                     }
+
+                    // Check for access modifier violations (TS2341, TS2445)
+                    // Skip check for 'this' expressions - they're always accessing own class members
+                    if !self.is_this_expression(access.expression) {
+                        if let Some((error_code, error_message, _class_name)) =
+                            self.check_property_accessibility(object_type, property_name)
+                        {
+                            self.error_at_node(access.name_or_argument, &error_message, error_code);
+                        }
+                    }
+
                     self.apply_flow_narrowing(idx, prop_type)
                 }
 
@@ -7745,6 +7756,276 @@ impl<'a> ThinCheckerState<'a> {
                 }
             }
         }
+        false
+    }
+
+    /// Check if access to a property on a class instance type is allowed based on visibility modifiers.
+    /// Returns None if access is allowed, or Some((error_code, message)) if forbidden.
+    ///
+    /// This enforces:
+    /// - TS2341: Property 'X' is private and only accessible within class 'Y'
+    /// - TS2445: Property 'X' is protected and only accessible within class 'Y' and its subclasses
+    fn check_property_accessibility(
+        &self,
+        object_type: TypeId,
+        property_name: &str,
+    ) -> Option<(u32, String, String)> {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+        use crate::solver::{TypeKey, SymbolRef};
+
+        // Check if the object type is a class instance (TypeKey::Ref)
+        let Some(TypeKey::Ref(SymbolRef(sym_id))) = self.ctx.types.lookup(object_type) else {
+            return None;
+        };
+
+        // Get the class symbol
+        let Some(class_symbol) = self.ctx.binder.get_symbol(SymbolId(sym_id)) else {
+            return None;
+        };
+
+        // Look up the property in class members
+        let Some(ref members) = class_symbol.members else {
+            return None;
+        };
+
+        let Some(member_sym_id) = members.get(property_name) else {
+            return None;
+        };
+
+        let Some(member_symbol) = self.ctx.binder.get_symbol(member_sym_id) else {
+            return None;
+        };
+
+        // Get the member's declaration to check modifiers
+        let decl_idx = member_symbol.value_declaration;
+        if decl_idx.is_none() {
+            // Try from declarations list
+            if member_symbol.declarations.is_empty() {
+                return None;
+            }
+            // Use first declaration
+            let first_decl = member_symbol.declarations[0];
+            return self.check_member_accessibility_at_decl(
+                first_decl,
+                property_name,
+                &class_symbol.escaped_name,
+                sym_id,
+            );
+        }
+
+        self.check_member_accessibility_at_decl(
+            decl_idx,
+            property_name,
+            &class_symbol.escaped_name,
+            sym_id,
+        )
+    }
+
+    /// Check accessibility for a member declaration.
+    fn check_member_accessibility_at_decl(
+        &self,
+        decl_idx: NodeIndex,
+        property_name: &str,
+        class_name: &str,
+        class_sym_id: u32,
+    ) -> Option<(u32, String, String)> {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+
+        let Some(decl_node) = self.ctx.arena.get(decl_idx) else {
+            return None;
+        };
+
+        // Get modifiers from the declaration
+        let modifiers = self.get_modifiers_from_node(decl_node);
+
+        let is_private = self.has_private_modifier(&modifiers);
+        let is_protected = self.has_protected_modifier(&modifiers);
+
+        if !is_private && !is_protected {
+            return None; // Public access, allowed
+        }
+
+        // Check enclosing class context
+        let enclosing_class = self.ctx.enclosing_class.as_ref();
+
+        if is_private {
+            // Private: must be accessed from within the same class
+            if let Some(ref enc_class) = enclosing_class {
+                // Check if we're in the same class by comparing member nodes
+                // The property's class should match the enclosing class
+                if self.is_same_class_context(&enc_class.member_nodes, class_sym_id) {
+                    return None; // Same class, access allowed
+                }
+            }
+            // Private access from outside class
+            return Some((
+                diagnostic_codes::PROPERTY_IS_PRIVATE,
+                format!(
+                    "Property '{}' is private and only accessible within class '{}'.",
+                    property_name, class_name
+                ),
+                class_name.to_string(),
+            ));
+        }
+
+        if is_protected {
+            // Protected: must be accessed from within the same class or a subclass
+            if let Some(ref enc_class) = enclosing_class {
+                // Check if we're in the same class
+                if self.is_same_class_context(&enc_class.member_nodes, class_sym_id) {
+                    return None; // Same class, access allowed
+                }
+                // Check if we're in a subclass
+                if self.is_subclass_of(&enc_class.member_nodes, class_sym_id) {
+                    return None; // Subclass, access allowed
+                }
+            }
+            // Protected access from outside class hierarchy
+            return Some((
+                diagnostic_codes::PROPERTY_IS_PROTECTED,
+                format!(
+                    "Property '{}' is protected and only accessible within class '{}' and its subclasses.",
+                    property_name, class_name
+                ),
+                class_name.to_string(),
+            ));
+        }
+
+        None
+    }
+
+    /// Get modifiers from a declaration node.
+    fn get_modifiers_from_node(&self, node: &crate::parser::thin_node::ThinNode) -> Option<crate::parser::NodeList> {
+        // Handle property declaration
+        if let Some(prop) = self.ctx.arena.get_property_decl(node) {
+            return prop.modifiers.clone();
+        }
+        // Handle method declaration
+        if let Some(method) = self.ctx.arena.get_method_decl(node) {
+            return method.modifiers.clone();
+        }
+        // Handle get/set accessor
+        if let Some(accessor) = self.ctx.arena.get_accessor(node) {
+            return accessor.modifiers.clone();
+        }
+        // Handle parameter with modifier (constructor parameter properties)
+        if let Some(param) = self.ctx.arena.get_parameter(node) {
+            return param.modifiers.clone();
+        }
+        None
+    }
+
+    /// Check if the enclosing class is the same as the target class.
+    fn is_same_class_context(&self, enclosing_member_nodes: &[NodeIndex], target_class_sym_id: u32) -> bool {
+        // Get the class symbol from one of the member nodes
+        for &member_idx in enclosing_member_nodes {
+            if let Some(sym_id) = self.ctx.binder.get_node_symbol(member_idx) {
+                if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
+                    // The parent of a class member is the class symbol
+                    if symbol.parent.0 == target_class_sym_id {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Check if the enclosing class is a subclass of the target class.
+    fn is_subclass_of(&self, enclosing_member_nodes: &[NodeIndex], target_class_sym_id: u32) -> bool {
+        // Get the enclosing class symbol
+        let enclosing_class_sym_id = self.get_class_symbol_from_members(enclosing_member_nodes);
+        let Some(enc_class_sym_id) = enclosing_class_sym_id else {
+            return false;
+        };
+
+        // Check if enc_class_sym_id extends (directly or indirectly) target_class_sym_id
+        self.class_extends_class(enc_class_sym_id, SymbolId(target_class_sym_id))
+    }
+
+    /// Get the class symbol ID from member nodes.
+    fn get_class_symbol_from_members(&self, member_nodes: &[NodeIndex]) -> Option<SymbolId> {
+        for &member_idx in member_nodes {
+            if let Some(sym_id) = self.ctx.binder.get_node_symbol(member_idx) {
+                if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
+                    if !symbol.parent.is_none() {
+                        return Some(symbol.parent);
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    /// Check if class_a extends class_b (directly or indirectly).
+    fn class_extends_class(&self, class_a: SymbolId, class_b: SymbolId) -> bool {
+        if class_a == class_b {
+            return true;
+        }
+
+        let Some(class_a_symbol) = self.ctx.binder.get_symbol(class_a) else {
+            return false;
+        };
+
+        // Get the class declaration
+        let decl_idx = class_a_symbol.value_declaration;
+        if decl_idx.is_none() {
+            return false;
+        }
+
+        let Some(decl_node) = self.ctx.arena.get(decl_idx) else {
+            return false;
+        };
+
+        let Some(class_decl) = self.ctx.arena.get_class(decl_node) else {
+            return false;
+        };
+
+        // Check heritage clauses for extends
+        let Some(ref heritage_clauses) = class_decl.heritage_clauses else {
+            return false;
+        };
+
+        for &clause_idx in &heritage_clauses.nodes {
+            let Some(clause_node) = self.ctx.arena.get(clause_idx) else {
+                continue;
+            };
+
+            let Some(heritage) = self.ctx.arena.get_heritage_clause(clause_node) else {
+                continue;
+            };
+
+            // Only check extends clause (not implements)
+            if heritage.token != SyntaxKind::ExtendsKeyword as u16 {
+                continue;
+            }
+
+            // Get the base class type
+            for &type_idx in &heritage.types.nodes {
+                let Some(type_node) = self.ctx.arena.get(type_idx) else {
+                    continue;
+                };
+
+                // Get the expression from the expression with type arguments
+                let expr_idx = if let Some(expr_with_types) = self.ctx.arena.get_expr_type_args(type_node) {
+                    expr_with_types.expression
+                } else {
+                    type_idx
+                };
+
+                // Resolve the base class symbol
+                if let Some(base_sym_id) = self.resolve_heritage_symbol(expr_idx) {
+                    if base_sym_id == class_b {
+                        return true;
+                    }
+                    // Recursively check if the base class extends class_b
+                    if self.class_extends_class(base_sym_id, class_b) {
+                        return true;
+                    }
+                }
+            }
+        }
+
         false
     }
 
