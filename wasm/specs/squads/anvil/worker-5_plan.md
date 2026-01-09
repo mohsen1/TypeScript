@@ -7,12 +7,14 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- [ ] Add async ES5 tests for async timeout patterns: timeout, deadline, cancel. Tests: `./wasm/test.sh async_es5_tests`
+- [ ] Add async ES5 tests for async generator delegation patterns: yield*, nested. Tests: `./wasm/test.sh async_es5_tests`
 
 ## Task Queue
 
 
 ## Completed
+- [x] Added 12 async iterator pattern tests (next, return, throw, for-await-of, symbol, done, value, from, map, filter, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (832 tests PASS).
+- [x] Added 12 async timeout pattern tests (basic, deadline, cancel, race, abort, extend, remaining, expired, reset, clear, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (820 tests PASS).
 - [x] Added 12 async queue operations pattern tests (enqueue, dequeue, peek, drain, priority, size, clear, contains, iterator, batch, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (808 tests PASS).
 - [x] Added 12 async event emitter pattern tests (on, off, once, emit, wait, remove all, listeners, prepend, error, pipe, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (796 tests PASS).
 - [x] Added 12 async scheduler pattern tests (priority, delay, throttle, debounce, schedule, cancel, interval, cron, immediate, next tick, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (784 tests PASS).
