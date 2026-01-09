@@ -136,6 +136,27 @@ node conformance-runner.mjs expressions --max=500
 ```
 
 ---
+## Worker Workflow (CRITICAL)
+
+**Before every PR, workers MUST run ALL 5655 conformance tests:**
+
+```bash
+cd wasm/differential-test
+bash run-conformance.sh --all --workers=14
+```
+
+**Why:** Fixing one error code can easily break another. For example:
+- Fixing TS2304 (scope resolution) might introduce new TS2339 (property access) errors
+- Parser fixes for TS1005 might cause new TS1109 errors
+- Type narrowing changes affect multiple error codes
+
+**Acceptance Criteria:**
+1. Target error code occurrences must decrease
+2. Overall exact match % must NOT decrease (currently 23.3%)
+3. No new crashes introduced
+4. Document any trade-offs in PR description
+
+---
 ## Squad Status
 - Last Update: 2026-01-09 14:00
 - False Positives: **1766 tests (35.8%)** - target: <500

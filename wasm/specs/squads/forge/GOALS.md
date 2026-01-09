@@ -128,6 +128,28 @@ bash run-conformance.sh --sequential --max=100
 ```
 
 ---
+## Worker Workflow (CRITICAL)
+
+**Before every PR, workers MUST run ALL 5655 conformance tests:**
+
+```bash
+cd wasm/differential-test
+bash run-conformance.sh --all --workers=14
+```
+
+**Why:** Implementing one error check can easily break others. For example:
+- Adding TS2454 (definite assignment) might trigger false TS2322 (type assignability) errors
+- TS7006 (implicit any) detection might conflict with existing type inference
+- Control flow analysis changes affect multiple error codes
+
+**Acceptance Criteria:**
+1. Target error code occurrences must be implemented correctly
+2. Overall exact match % must NOT decrease (currently 23.3%)
+3. No new crashes introduced
+4. Extra error count must NOT increase significantly
+5. Document any trade-offs in PR description
+
+---
 ## Squad Status
 - Last Update: 2026-01-09 14:00
 - Conformance: **23.3% exact match** (up from 18.1%)
