@@ -7,9 +7,10 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-None - awaiting next task assignment.
+- [ ] Add async ES5 tests for async barrier patterns: wait all, count down, reset, timeout. Tests: `./wasm/test.sh async_es5_tests`
 
 ## Task Queue
+- [ ] Add async ES5 tests for async pool patterns: worker pool, task pool, connection pool
 
 
 ## Completed
