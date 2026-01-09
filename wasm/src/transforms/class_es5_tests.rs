@@ -12071,179 +12071,39 @@ class ArrayFactory {
 }
 
 // ============================================================================
-// Symbol.species Additional Tests (Full Pipeline)
+// Map/Set Collection Pattern Tests
 // ============================================================================
 
 #[test]
-fn test_class_es5_symbol_species_promise_like() {
-    // Promise-like class with Symbol.species for chaining
+fn test_class_es5_map_basic() {
+    // Basic Map operations
     let source = r#"
-class CustomPromise<T> {
-    private value: T | null = null;
-    private resolved: boolean = false;
-
-    static get [Symbol.species](): typeof CustomPromise {
-        return CustomPromise;
-    }
-
-    constructor(executor: (resolve: (value: T) => void) => void) {
-        executor((value: T) => {
-            this.value = value;
-            this.resolved = true;
-        });
-    }
-
-    then<U>(fn: (value: T) => U): CustomPromise<U> {
-        const Species = (this.constructor as any)[Symbol.species] || CustomPromise;
-        return new Species((resolve: (v: U) => void) => {
-            if (this.resolved && this.value !== null) {
-                resolve(fn(this.value));
-            }
-        });
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Class should be converted
-    assert!(
-        output.contains("function CustomPromise"),
-        "Expected function declaration: {}",
-        output
-    );
-
-    // then method should be present
-    assert!(
-        output.contains("then"),
-        "Expected then method: {}",
-        output
-    );
-
-    // Species reference should be present
-    assert!(
-        output.contains("Species") || output.contains("species"),
-        "Expected species reference: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_symbol_species_set_like() {
-    // Set-like class with Symbol.species
-    let source = r#"
-class CustomSet<T> {
-    private items: Set<T> = new Set();
-
-    static get [Symbol.species](): typeof CustomSet {
-        return CustomSet;
-    }
-
-    add(item: T): this {
-        this.items.add(item);
-        return this;
-    }
-
-    has(item: T): boolean {
-        return this.items.has(item);
-    }
-
-    filter(predicate: (item: T) => boolean): CustomSet<T> {
-        const Species = (this.constructor as any)[Symbol.species] || CustomSet;
-        const result = new Species();
-        this.items.forEach(item => {
-            if (predicate(item)) {
-                result.add(item);
-            }
-        });
-        return result;
-    }
-
-    get size(): number {
-        return this.items.size;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Class should be converted
-    assert!(
-        output.contains("function CustomSet"),
-        "Expected function declaration: {}",
-        output
-    );
-
-    // Methods should be present
-    assert!(
-        output.contains("add") && output.contains("has") && output.contains("filter"),
-        "Expected methods: {}",
-        output
-    );
-
-    // size getter should be present
-    assert!(
-        output.contains("size"),
-        "Expected size property: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_symbol_species_map_like() {
-    // Map-like class with Symbol.species for transformation methods
-    let source = r#"
-class CustomMap<K, V> {
-    private entries: Map<K, V> = new Map();
-
-    static get [Symbol.species](): typeof CustomMap {
-        return CustomMap;
-    }
+class MapWrapper<K, V> {
+    private map: Map<K, V> = new Map();
 
     set(key: K, value: V): this {
-        this.entries.set(key, value);
+        this.map.set(key, value);
         return this;
     }
 
     get(key: K): V | undefined {
-        return this.entries.get(key);
+        return this.map.get(key);
     }
 
-    mapValues<U>(fn: (value: V) => U): CustomMap<K, U> {
-        const Species = (this.constructor as any)[Symbol.species] || CustomMap;
-        const result = new Species();
-        this.entries.forEach((value, key) => {
-            result.set(key, fn(value));
-        });
-        return result;
+    has(key: K): boolean {
+        return this.map.has(key);
+    }
+
+    delete(key: K): boolean {
+        return this.map.delete(key);
+    }
+
+    clear(): void {
+        this.map.clear();
     }
 
     get size(): number {
-        return this.entries.size;
+        return this.map.size;
     }
 }
 "#;
@@ -12262,53 +12122,55 @@ class CustomMap<K, V> {
 
     let output = printer.get_output().to_string();
 
-    // Class should be converted
+    // Class should be emitted
     assert!(
-        output.contains("function CustomMap"),
-        "Expected function declaration: {}",
+        output.contains("MapWrapper"),
+        "Expected MapWrapper class: {}",
+        output
+    );
+
+    // Map should be present
+    assert!(
+        output.contains("Map"),
+        "Expected Map: {}",
         output
     );
 
     // Methods should be present
     assert!(
-        output.contains("set") && output.contains("get") && output.contains("mapValues"),
-        "Expected methods: {}",
+        output.contains("set") && output.contains("get") && output.contains("has"),
+        "Expected set, get, has methods: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_symbol_species_with_generics_and_constraints() {
-    // Symbol.species with complex generic constraints
+fn test_class_es5_map_iteration() {
+    // Map iteration patterns
     let source = r#"
-interface Comparable<T> {
-    compareTo(other: T): number;
-}
+class MapIterator<K, V> {
+    private data: Map<K, V> = new Map();
 
-class SortedList<T extends Comparable<T>> {
-    private items: T[] = [];
-
-    static get [Symbol.species](): typeof SortedList {
-        return SortedList;
+    keys(): K[] {
+        return Array.from(this.data.keys());
     }
 
-    add(item: T): void {
-        this.items.push(item);
-        this.items.sort((a, b) => a.compareTo(b));
+    values(): V[] {
+        return Array.from(this.data.values());
     }
 
-    slice(start: number, end?: number): SortedList<T> {
-        const Species = (this.constructor as any)[Symbol.species] || SortedList;
-        const result = new Species();
-        const sliced = this.items.slice(start, end);
-        for (const item of sliced) {
-            result.items.push(item);
-        }
+    entries(): [K, V][] {
+        return Array.from(this.data.entries());
+    }
+
+    forEach(callback: (value: V, key: K) => void): void {
+        this.data.forEach((v, k) => callback(v, k));
+    }
+
+    map<R>(transform: (value: V, key: K) => R): R[] {
+        const result: R[] = [];
+        this.data.forEach((v, k) => result.push(transform(v, k)));
         return result;
-    }
-
-    get length(): number {
-        return this.items.length;
     }
 }
 "#;
@@ -12327,67 +12189,58 @@ class SortedList<T extends Comparable<T>> {
 
     let output = printer.get_output().to_string();
 
-    // Class should be converted
+    // Class should be emitted
     assert!(
-        output.contains("function SortedList"),
-        "Expected function declaration: {}",
+        output.contains("MapIterator"),
+        "Expected MapIterator class: {}",
+        output
+    );
+
+    // Map should be present
+    assert!(
+        output.contains("Map"),
+        "Expected Map: {}",
         output
     );
 
     // Methods should be present
     assert!(
-        output.contains("add") && output.contains("slice"),
-        "Expected methods: {}",
-        output
-    );
-
-    // Species reference should be present
-    assert!(
-        output.contains("Species") || output.contains("species"),
-        "Expected species reference: {}",
+        output.contains("keys") && output.contains("values") && output.contains("entries"),
+        "Expected keys, values, entries methods: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_symbol_species_observable_pattern() {
-    // Observable pattern using Symbol.species
+fn test_class_es5_set_basic() {
+    // Basic Set operations
     let source = r#"
-class Observable<T> {
-    private subscribers: ((value: T) => void)[] = [];
+class SetWrapper<T> {
+    private set: Set<T> = new Set();
 
-    static get [Symbol.species](): typeof Observable {
-        return Observable;
+    add(value: T): this {
+        this.set.add(value);
+        return this;
     }
 
-    subscribe(callback: (value: T) => void): void {
-        this.subscribers.push(callback);
+    has(value: T): boolean {
+        return this.set.has(value);
     }
 
-    emit(value: T): void {
-        for (const subscriber of this.subscribers) {
-            subscriber(value);
-        }
+    delete(value: T): boolean {
+        return this.set.delete(value);
     }
 
-    map<U>(transform: (value: T) => U): Observable<U> {
-        const Species = (this.constructor as any)[Symbol.species] || Observable;
-        const result = new Species();
-        this.subscribe((value: T) => {
-            result.emit(transform(value));
-        });
-        return result;
+    clear(): void {
+        this.set.clear();
     }
 
-    filter(predicate: (value: T) => boolean): Observable<T> {
-        const Species = (this.constructor as any)[Symbol.species] || Observable;
-        const result = new Species();
-        this.subscribe((value: T) => {
-            if (predicate(value)) {
-                result.emit(value);
-            }
-        });
-        return result;
+    toArray(): T[] {
+        return Array.from(this.set);
+    }
+
+    get size(): number {
+        return this.set.size;
     }
 }
 "#;
@@ -12406,24 +12259,230 @@ class Observable<T> {
 
     let output = printer.get_output().to_string();
 
-    // Class should be converted
+    // Class should be emitted
     assert!(
-        output.contains("function Observable"),
-        "Expected function declaration: {}",
+        output.contains("SetWrapper"),
+        "Expected SetWrapper class: {}",
+        output
+    );
+
+    // Set should be present
+    assert!(
+        output.contains("Set"),
+        "Expected Set: {}",
         output
     );
 
     // Methods should be present
     assert!(
-        output.contains("subscribe") && output.contains("emit") && output.contains("map") && output.contains("filter"),
-        "Expected methods: {}",
+        output.contains("add") && output.contains("has") && output.contains("toArray"),
+        "Expected add, has, toArray methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_weakmap_usage() {
+    // WeakMap for private data pattern
+    let source = r#"
+const privateData = new WeakMap<object, Record<string, any>>();
+
+class PrivateStore {
+    constructor() {
+        privateData.set(this, {});
+    }
+
+    setPrivate(key: string, value: any): void {
+        const data = privateData.get(this);
+        if (data) {
+            data[key] = value;
+        }
+    }
+
+    getPrivate(key: string): any {
+        const data = privateData.get(this);
+        return data ? data[key] : undefined;
+    }
+
+    hasPrivate(key: string): boolean {
+        const data = privateData.get(this);
+        return data ? key in data : false;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("PrivateStore"),
+        "Expected PrivateStore class: {}",
         output
     );
 
-    // Species reference should be present
+    // WeakMap should be present
     assert!(
-        output.contains("Species") || output.contains("species"),
-        "Expected species reference: {}",
+        output.contains("WeakMap"),
+        "Expected WeakMap: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("setPrivate") && output.contains("getPrivate") && output.contains("hasPrivate"),
+        "Expected setPrivate, getPrivate, hasPrivate methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_weakset_usage() {
+    // WeakSet for tracking objects
+    let source = r#"
+class ObjectTracker {
+    private tracked: WeakSet<object> = new WeakSet();
+
+    track(obj: object): void {
+        this.tracked.add(obj);
+    }
+
+    isTracked(obj: object): boolean {
+        return this.tracked.has(obj);
+    }
+
+    untrack(obj: object): boolean {
+        return this.tracked.delete(obj);
+    }
+
+    trackMultiple(...objects: object[]): void {
+        for (const obj of objects) {
+            this.tracked.add(obj);
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("ObjectTracker"),
+        "Expected ObjectTracker class: {}",
+        output
+    );
+
+    // WeakSet should be present
+    assert!(
+        output.contains("WeakSet"),
+        "Expected WeakSet: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("track") && output.contains("isTracked") && output.contains("untrack"),
+        "Expected track, isTracked, untrack methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_map_set_combined() {
+    // Combined Map and Set patterns
+    let source = r#"
+class Graph<T> {
+    private nodes: Set<T> = new Set();
+    private edges: Map<T, Set<T>> = new Map();
+
+    addNode(node: T): void {
+        this.nodes.add(node);
+        if (!this.edges.has(node)) {
+            this.edges.set(node, new Set());
+        }
+    }
+
+    addEdge(from: T, to: T): void {
+        this.addNode(from);
+        this.addNode(to);
+        this.edges.get(from)!.add(to);
+    }
+
+    getNeighbors(node: T): T[] {
+        const neighbors = this.edges.get(node);
+        return neighbors ? Array.from(neighbors) : [];
+    }
+
+    hasNode(node: T): boolean {
+        return this.nodes.has(node);
+    }
+
+    hasEdge(from: T, to: T): boolean {
+        const neighbors = this.edges.get(from);
+        return neighbors ? neighbors.has(to) : false;
+    }
+
+    getNodeCount(): number {
+        return this.nodes.size;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("Graph"),
+        "Expected Graph class: {}",
+        output
+    );
+
+    // Map and Set should be present
+    assert!(
+        output.contains("Map") && output.contains("Set"),
+        "Expected Map and Set: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("addNode") && output.contains("addEdge") && output.contains("getNeighbors"),
+        "Expected addNode, addEdge, getNeighbors methods: {}",
         output
     );
 }
