@@ -1,105 +1,42 @@
 # Worker 2 Plan - Squad Forge
 
 ## Mission
-Implement TS2564 property initialization checking (class field analysis - edge cases).
+TS2339 property access improvements (type parameter constraints + class instance expansion).
 
 Status: Complete
 Priority: 1
 
 ## Current Assignment
-Handle edge cases for property initialization: control flow in constructors, inheritance, and special patterns.
-
-**Error Code:** TS2564 - "Property 'X' has no initializer and is not definitely assigned in the constructor"
-
-**Impact:** 135 conformance tests affected (shared with Worker 1)
-
-### Background
-Worker 1 handles the basic case. Worker 2 handles edge cases:
-- Properties assigned in `if` branches (need all paths)
-- Properties assigned via method calls in constructor
-- Inherited properties from base class
-- Properties with `declare` modifier (should skip)
-- Abstract properties (should skip)
+Improve TS2339 property access, focusing on:
+- Resolve property access on constrained type parameters
+- Expand Application types using class instance types for assignability
+- Prevent recursion when resolving self-referential class instance types
+- Update generic-constraint tests
 
 ### Steps
-1. **Add edge case test cases**:
-   ```typescript
-   // Should error: not assigned in all paths
-   class Foo {
-     name: string;
-     constructor(flag: boolean) {
-       if (flag) { this.name = "yes"; }
-       // missing else branch
-     }
-   }
-
-   // Should NOT error: assigned in all paths
-   class Bar {
-     name: string;
-     constructor(flag: boolean) {
-       if (flag) { this.name = "yes"; }
-       else { this.name = "no"; }
-     }
-   }
-
-   // Should NOT error: declare modifier
-   declare class External {
-     name: string;
-   }
-
-   // Should NOT error: abstract property
-   abstract class Base {
-     abstract name: string;
-   }
-   ```
-
-2. **Extend control flow analysis**:
-   - Use existing `checker/control_flow.rs` infrastructure
-   - Track property assignments across all code paths
-   - Handle try/catch/finally blocks
-   - Handle early returns
-
-3. **Handle inheritance**:
-   - If base class constructor assigns a property, derived class shouldn't re-require it
-   - Check for `super()` call location
-
-4. **Run conformance tests** and report numbers.
+1. Update property access resolution in checker + solver for TypeParameter constraints.
+2. Ensure type_env uses class instance types + params for Application expansion, with recursion guard.
+3. Update thin_checker_tests cross-scope generic constraints to expect no errors.
+4. Run `./wasm/test.sh` and record failures.
 
 ### Key Files
-- `wasm/src/thin_checker.rs` - main checker
-- `wasm/src/checker/control_flow.rs` - flow analysis
-- `wasm/src/ast.rs` - AST node types for modifiers
-
-### Success Criteria
-- Control flow analysis for constructor property assignment
-- No false positives for edge cases
-- Works correctly with inheritance
-
-## Task Queue
-(empty - single focused task)
+- `wasm/src/thin_checker.rs`
+- `wasm/src/solver/operations.rs`
+- `wasm/src/checker/context.rs`
+- `wasm/src/thin_checker_tests.rs`
 
 ## Completed
-- Added 5 additional edge case tests for TS2564:
-  - Optional properties (?)
-  - Definite assignment assertion (!)
-  - Properties with initializers
-  - Static properties
-  - Simple constructor assignment
-- Fixed missing BindResult import in lib.rs
-- Fixed format! macro usage with format_message helper
-- Fixed NodeList vs Vec type mismatch in find_constructor_body call
-
-Note: Worker 1 had already implemented comprehensive TS2564 checking including
-control flow analysis. My contribution adds complementary edge case tests and
-compilation fixes.
+- Implemented property access on constrained type parameters in checker and solver.
+- Stored class instance types + type params in type_env to expand Application types.
+- Added recursion guard for class instance type resolution to avoid stack overflow.
+- Updated cross-scope generic constraints test to expect no errors.
+- Ran `./wasm/test.sh` (fails: TS2792 module resolution in multi-file import tests).
 
 ## Ready for Merge
 Yes
 
 ## Notes
-- Coordinate with Worker 1 (basic TS2564 implementation)
-- Build on Worker 1's work, don't duplicate
-- Run `./wasm/test.sh` before pushing
-- Commit format: `[wasm] checker: TS2564 control flow and edge cases`
-- Push to: `origin/worker/forge-2`
+- Full test run failing in `cli::driver_tests::compile_multi_file_project_with_imports`
+  and `cli::driver_tests::compile_multi_file_project_with_default_and_named_imports` (TS2792).
+- Must rerun tests after module resolution fix.
 - **NEVER edit**: `STRUCTURE.md`, `GOALS.md`, other workers' plan files, or anything in `orchestrator/`
