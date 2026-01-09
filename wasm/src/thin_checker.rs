@@ -4401,6 +4401,28 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    /// Get the type of an assignment target without definite assignment checks.
+    fn get_type_of_assignment_target(&mut self, idx: NodeIndex) -> TypeId {
+        use crate::scanner::SyntaxKind;
+
+        if let Some(node) = self.ctx.arena.get(idx) {
+            if node.kind == SyntaxKind::Identifier as u16 {
+                if let Some(sym_id) = self.resolve_identifier_symbol(idx) {
+                    if self.alias_resolves_to_type_only(sym_id) {
+                        if let Some(ident) = self.ctx.arena.get_identifier(node) {
+                            self.error_type_only_value_at(&ident.escaped_text, idx);
+                        }
+                        return TypeId::ERROR;
+                    }
+                    let declared_type = self.get_type_of_symbol(sym_id);
+                    return declared_type;
+                }
+            }
+        }
+
+        self.get_type_of_node(idx)
+    }
+
     /// Get type of binary expression.
     fn get_type_of_binary_expression(&mut self, idx: NodeIndex) -> TypeId {
         use crate::solver::{BinaryOpEvaluator, BinaryOpResult};
