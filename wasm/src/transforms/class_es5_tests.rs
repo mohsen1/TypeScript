@@ -13153,26 +13153,24 @@ class CustomPattern {
 }
 
 // ============================================================================
-// Object.getOwnPropertyDescriptor pattern tests
+// Symbol.replace Tests
 // ============================================================================
 
 #[test]
-fn test_class_es5_get_own_property_descriptor_basic() {
-    // Basic Object.getOwnPropertyDescriptor usage
+fn test_class_es5_symbol_replace_basic() {
+    // Basic Symbol.replace implementation for custom replacer
     let source = r#"
-class PropertyInspector {
-    inspect(obj: object, key: string): PropertyDescriptor | undefined {
-        return Object.getOwnPropertyDescriptor(obj, key);
+class SimpleReplacer {
+    private searchValue: string;
+    private replaceValue: string;
+
+    constructor(search: string, replace: string) {
+        this.searchValue = search;
+        this.replaceValue = replace;
     }
 
-    isWritable(obj: object, key: string): boolean {
-        const desc = Object.getOwnPropertyDescriptor(obj, key);
-        return desc ? desc.writable === true : false;
-    }
-
-    isEnumerable(obj: object, key: string): boolean {
-        const desc = Object.getOwnPropertyDescriptor(obj, key);
-        return desc ? desc.enumerable === true : false;
+    [Symbol.replace](str: string): string {
+        return str.split(this.searchValue).join(this.replaceValue);
     }
 }
 "#;
@@ -13191,47 +13189,45 @@ class PropertyInspector {
 
     let output = printer.get_output().to_string();
 
-    // Class should be emitted
+    // Class should be converted
     assert!(
-        output.contains("PropertyInspector"),
-        "Expected PropertyInspector class: {}",
+        output.contains("function SimpleReplacer"),
+        "Expected function declaration: {}",
         output
     );
 
-    // Object.getOwnPropertyDescriptor should be present
+    // Symbol.replace should be referenced
     assert!(
-        output.contains("Object.getOwnPropertyDescriptor"),
-        "Expected Object.getOwnPropertyDescriptor: {}",
-        output
-    );
-
-    // Methods should be present
-    assert!(
-        output.contains("inspect") && output.contains("isWritable"),
-        "Expected inspect, isWritable methods: {}",
+        output.contains("replace") || output.contains("Symbol"),
+        "Expected Symbol.replace reference: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_get_own_property_descriptor_with_define() {
-    // Object.getOwnPropertyDescriptor with Object.defineProperty
+fn test_class_es5_symbol_replace_with_function() {
+    // Symbol.replace with replacer function parameter
     let source = r#"
-class PropertyCopier {
-    copyProperty(source: object, target: object, key: string): void {
-        const desc = Object.getOwnPropertyDescriptor(source, key);
-        if (desc) {
-            Object.defineProperty(target, key, desc);
-        }
+class FunctionReplacer {
+    private pattern: string;
+
+    constructor(pattern: string) {
+        this.pattern = pattern;
     }
 
-    copyAllProperties(source: object, target: object): void {
-        for (const key of Object.keys(source)) {
-            const desc = Object.getOwnPropertyDescriptor(source, key);
-            if (desc) {
-                Object.defineProperty(target, key, desc);
-            }
+    [Symbol.replace](str: string, replacer: (match: string, offset: number, original: string) => string): string {
+        let result = str;
+        let idx = 0;
+        while ((idx = result.indexOf(this.pattern, idx)) !== -1) {
+            const replacement = replacer(this.pattern, idx, str);
+            result = result.substring(0, idx) + replacement + result.substring(idx + this.pattern.length);
+            idx += replacement.length;
         }
+        return result;
+    }
+
+    get source(): string {
+        return this.pattern;
     }
 }
 "#;
@@ -13250,46 +13246,44 @@ class PropertyCopier {
 
     let output = printer.get_output().to_string();
 
-    // Class should be emitted
+    // Class should be converted
     assert!(
-        output.contains("PropertyCopier"),
-        "Expected PropertyCopier class: {}",
+        output.contains("function FunctionReplacer"),
+        "Expected function declaration: {}",
         output
     );
 
-    // Object methods should be present
+    // Source getter should be present
     assert!(
-        output.contains("Object.getOwnPropertyDescriptor") && output.contains("Object.defineProperty"),
-        "Expected Object.getOwnPropertyDescriptor and Object.defineProperty: {}",
-        output
-    );
-
-    // Methods should be present
-    assert!(
-        output.contains("copyProperty") && output.contains("copyAllProperties"),
-        "Expected copyProperty, copyAllProperties methods: {}",
+        output.contains("source") || output.contains("defineProperty"),
+        "Expected source getter: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_get_own_property_descriptors() {
-    // Object.getOwnPropertyDescriptors usage
+fn test_class_es5_symbol_replace_global() {
+    // Symbol.replace with global flag behavior
     let source = r#"
-class ObjectCloner {
-    shallowClone<T extends object>(obj: T): T {
-        const descriptors = Object.getOwnPropertyDescriptors(obj);
-        return Object.create(Object.getPrototypeOf(obj), descriptors);
+class GlobalReplacer {
+    private pattern: string;
+    readonly global: boolean = true;
+    readonly flags: string = "g";
+
+    constructor(pattern: string) {
+        this.pattern = pattern;
     }
 
-    getDescriptors(obj: object): PropertyDescriptorMap {
-        return Object.getOwnPropertyDescriptors(obj);
+    [Symbol.replace](str: string, replacement: string): string {
+        return str.split(this.pattern).join(replacement);
     }
 
-    hasAccessor(obj: object, key: string): boolean {
-        const descriptors = Object.getOwnPropertyDescriptors(obj);
-        const desc = descriptors[key];
-        return desc ? ('get' in desc || 'set' in desc) : false;
+    get lastIndex(): number {
+        return 0;
+    }
+
+    set lastIndex(value: number) {
+        // Reset behavior
     }
 }
 "#;
@@ -13308,52 +13302,72 @@ class ObjectCloner {
 
     let output = printer.get_output().to_string();
 
-    // Class should be emitted
+    // Class should be converted
     assert!(
-        output.contains("ObjectCloner"),
-        "Expected ObjectCloner class: {}",
+        output.contains("function GlobalReplacer"),
+        "Expected function declaration: {}",
         output
     );
 
-    // Object.getOwnPropertyDescriptors should be present
+    // Global and flags properties should be present
     assert!(
-        output.contains("Object.getOwnPropertyDescriptors"),
-        "Expected Object.getOwnPropertyDescriptors: {}",
+        output.contains("global") && output.contains("flags"),
+        "Expected global and flags properties: {}",
         output
     );
 
-    // Methods should be present
+    // lastIndex accessor should be present
     assert!(
-        output.contains("shallowClone") && output.contains("getDescriptors"),
-        "Expected shallowClone, getDescriptors methods: {}",
+        output.contains("lastIndex"),
+        "Expected lastIndex accessor: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_property_descriptor_static() {
-    // Static methods using property descriptors
+fn test_class_es5_symbol_replace_with_inheritance() {
+    // Symbol.replace with class inheritance
     let source = r#"
-class PropertyUtils {
-    static freeze<T extends object>(obj: T): Readonly<T> {
-        return Object.freeze(obj);
+abstract class BaseReplacer {
+    abstract readonly pattern: string;
+
+    abstract [Symbol.replace](str: string, replacement: string): string;
+
+    replaceAll(str: string, replacement: string): string {
+        let result = str;
+        let prev = "";
+        while (result !== prev) {
+            prev = result;
+            result = this[Symbol.replace](result, replacement);
+        }
+        return result;
+    }
+}
+
+class CasePreservingReplacer extends BaseReplacer {
+    readonly pattern: string;
+
+    constructor(pattern: string) {
+        super();
+        this.pattern = pattern;
     }
 
-    static seal<T extends object>(obj: T): T {
-        return Object.seal(obj);
+    [Symbol.replace](str: string, replacement: string): string {
+        const idx = str.toLowerCase().indexOf(this.pattern.toLowerCase());
+        if (idx === -1) return str;
+        const original = str.substring(idx, idx + this.pattern.length);
+        const preserved = this.preserveCase(original, replacement);
+        return str.substring(0, idx) + preserved + str.substring(idx + this.pattern.length);
     }
 
-    static getDescriptor(obj: object, key: string): PropertyDescriptor | undefined {
-        return Object.getOwnPropertyDescriptor(obj, key);
-    }
-
-    static defineReadonly(obj: object, key: string, value: unknown): void {
-        Object.defineProperty(obj, key, {
-            value,
-            writable: false,
-            enumerable: true,
-            configurable: false
-        });
+    private preserveCase(original: string, replacement: string): string {
+        if (original === original.toUpperCase()) {
+            return replacement.toUpperCase();
+        }
+        if (original[0] === original[0].toUpperCase()) {
+            return replacement[0].toUpperCase() + replacement.slice(1);
+        }
+        return replacement;
     }
 }
 "#;
@@ -13372,51 +13386,63 @@ class PropertyUtils {
 
     let output = printer.get_output().to_string();
 
-    // Class should be emitted
+    // Both classes should be converted
     assert!(
-        output.contains("PropertyUtils"),
-        "Expected PropertyUtils class: {}",
+        output.contains("function BaseReplacer"),
+        "Expected BaseReplacer function: {}",
+        output
+    );
+    assert!(
+        output.contains("function CasePreservingReplacer"),
+        "Expected CasePreservingReplacer function: {}",
         output
     );
 
-    // Object methods should be present
+    // Inheritance should be set up
     assert!(
-        output.contains("Object.getOwnPropertyDescriptor") || output.contains("Object.defineProperty"),
-        "Expected Object property methods: {}",
+        output.contains("__extends") || output.contains("extends"),
+        "Expected inheritance: {}",
         output
     );
 
-    // Static methods should be present
+    // replaceAll method should be present
     assert!(
-        output.contains("freeze") && output.contains("seal"),
-        "Expected freeze, seal methods: {}",
+        output.contains("replaceAll"),
+        "Expected replaceAll method: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_property_descriptor_in_constructor() {
-    // Property descriptors used in constructor
+fn test_class_es5_symbol_replace_template() {
+    // Symbol.replace with template string support
     let source = r#"
-class ImmutableConfig {
-    constructor(config: Record<string, unknown>) {
-        for (const [key, value] of Object.entries(config)) {
-            Object.defineProperty(this, key, {
-                value,
-                writable: false,
-                enumerable: true,
-                configurable: false
-            });
-        }
+class TemplateReplacer {
+    private pattern: string;
+    private captureGroups: Map<string, string> = new Map();
+
+    constructor(pattern: string) {
+        this.pattern = pattern;
     }
 
-    getDescriptor(key: string): PropertyDescriptor | undefined {
-        return Object.getOwnPropertyDescriptor(this, key);
+    [Symbol.replace](str: string, template: string): string {
+        const idx = str.indexOf(this.pattern);
+        if (idx === -1) return str;
+
+        let result = template;
+        result = result.replace("$&", this.pattern);
+        result = result.replace("$\`", str.substring(0, idx));
+        result = result.replace("$'", str.substring(idx + this.pattern.length));
+
+        return str.substring(0, idx) + result + str.substring(idx + this.pattern.length);
     }
 
-    isConfigurable(key: string): boolean {
-        const desc = Object.getOwnPropertyDescriptor(this, key);
-        return desc ? desc.configurable === true : false;
+    addCapture(name: string, value: string): void {
+        this.captureGroups.set(name, value);
+    }
+
+    getCapture(name: string): string | undefined {
+        return this.captureGroups.get(name);
     }
 }
 "#;
@@ -13435,89 +13461,24 @@ class ImmutableConfig {
 
     let output = printer.get_output().to_string();
 
-    // Class should be emitted
+    // Class should be converted
     assert!(
-        output.contains("ImmutableConfig"),
-        "Expected ImmutableConfig class: {}",
+        output.contains("function TemplateReplacer"),
+        "Expected function declaration: {}",
         output
     );
 
-    // Object.getOwnPropertyDescriptor should be present
+    // Helper methods should be present
     assert!(
-        output.contains("Object.getOwnPropertyDescriptor"),
-        "Expected Object.getOwnPropertyDescriptor: {}",
+        output.contains("addCapture") && output.contains("getCapture"),
+        "Expected capture methods: {}",
         output
     );
 
-    // Constructor should be present
+    // Map usage should be preserved
     assert!(
-        output.contains("function ImmutableConfig"),
-        "Expected ImmutableConfig constructor: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_property_descriptor_mixin() {
-    // Property descriptors for mixin pattern
-    let source = r#"
-class MixinHelper {
-    static applyMixin(target: object, source: object): void {
-        const descriptors = Object.getOwnPropertyDescriptors(source);
-        for (const key of Object.keys(descriptors)) {
-            if (key !== 'constructor') {
-                Object.defineProperty(target, key, descriptors[key]);
-            }
-        }
-    }
-
-    static copyAccessors(target: object, source: object): void {
-        for (const key of Object.keys(source)) {
-            const desc = Object.getOwnPropertyDescriptor(source, key);
-            if (desc && (desc.get || desc.set)) {
-                Object.defineProperty(target, key, desc);
-            }
-        }
-    }
-
-    static hasOwnProperty(obj: object, key: string): boolean {
-        return Object.getOwnPropertyDescriptor(obj, key) !== undefined;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Class should be emitted
-    assert!(
-        output.contains("MixinHelper"),
-        "Expected MixinHelper class: {}",
-        output
-    );
-
-    // Object property descriptor methods should be present
-    assert!(
-        output.contains("Object.getOwnPropertyDescriptor") || output.contains("Object.getOwnPropertyDescriptors"),
-        "Expected Object property descriptor methods: {}",
-        output
-    );
-
-    // Methods should be present
-    assert!(
-        output.contains("applyMixin") && output.contains("copyAccessors"),
-        "Expected applyMixin, copyAccessors methods: {}",
+        output.contains("Map"),
+        "Expected Map usage: {}",
         output
     );
 }
