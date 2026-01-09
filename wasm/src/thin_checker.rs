@@ -6092,6 +6092,9 @@ impl<'a> ThinCheckerState<'a> {
         if !func.body.is_none() {
             self.cache_parameter_types(&func.parameters.nodes, Some(&param_types));
 
+            // Check that parameter default values are assignable to declared types (TS2322)
+            self.check_parameter_initializers(&func.parameters.nodes);
+
             let mut has_contextual_return = false;
             if !has_type_annotation {
                 let return_context = ctx_helper.as_ref().and_then(|helper| helper.get_return_type());
@@ -9417,6 +9420,9 @@ impl<'a> ThinCheckerState<'a> {
                         };
 
                         self.cache_parameter_types(&func.parameters.nodes, None);
+
+                        // Check that parameter default values are assignable to declared types (TS2322)
+                        self.check_parameter_initializers(&func.parameters.nodes);
 
                         if !has_type_annotation {
                             return_type = self.infer_return_type_from_body(func.body, None);
@@ -13641,6 +13647,39 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    /// Check that parameter default values (initializers) are assignable to declared parameter types.
+    /// This emits TS2322 when the default value type doesn't match the parameter type annotation.
+    fn check_parameter_initializers(&mut self, parameters: &[NodeIndex]) {
+        for &param_idx in parameters {
+            let Some(param_node) = self.ctx.arena.get(param_idx) else {
+                continue;
+            };
+            let Some(param) = self.ctx.arena.get_parameter(param_node) else {
+                continue;
+            };
+
+            // Only check if there's both a type annotation and an initializer
+            if param.type_annotation.is_none() || param.initializer.is_none() {
+                continue;
+            }
+
+            // Get the declared parameter type
+            let declared_type = self.get_type_from_type_node(param.type_annotation);
+
+            // Get the type of the initializer
+            let init_type = self.get_type_of_node(param.initializer);
+
+            // Check if the initializer type is assignable to the declared type
+            if !self.is_assignable_to(init_type, declared_type) {
+                self.error_type_not_assignable_with_reason_at(
+                    init_type,
+                    declared_type,
+                    param_idx,
+                );
+            }
+        }
+    }
+
     fn node_text(&self, node_idx: NodeIndex) -> Option<String> {
         let (start, end) = self.get_node_span(node_idx)?;
         let source = self.ctx.arena.source_files.first()?.text.as_str();
@@ -14123,6 +14162,9 @@ impl<'a> ThinCheckerState<'a> {
 
         self.cache_parameter_types(&method.parameters.nodes, None);
 
+        // Check that parameter default values are assignable to declared types (TS2322)
+        self.check_parameter_initializers(&method.parameters.nodes);
+
         // Check for parameter properties (error 2369)
         // Parameter properties are only allowed in constructors, not in methods
         self.check_parameter_properties(&method.parameters.nodes);
@@ -14236,6 +14278,9 @@ impl<'a> ThinCheckerState<'a> {
 
         self.cache_parameter_types(&ctor.parameters.nodes, None);
 
+        // Check that parameter default values are assignable to declared types (TS2322)
+        self.check_parameter_initializers(&ctor.parameters.nodes);
+
         // Set in_constructor flag for abstract property checks (error 2715)
         if let Some(ref mut class_info) = self.ctx.enclosing_class {
             class_info.in_constructor = true;
@@ -14291,6 +14336,9 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         self.cache_parameter_types(&accessor.parameters.nodes, None);
+
+        // Check that parameter default values are assignable to declared types (TS2322)
+        self.check_parameter_initializers(&accessor.parameters.nodes);
 
         // Check for parameter properties (error 2369)
         // Parameter properties are only allowed in constructors, not in accessors
