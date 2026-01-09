@@ -3464,7 +3464,7 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Get type of call expression.
     fn get_type_of_call_expression(&mut self, idx: NodeIndex) -> TypeId {
-        use crate::solver::{CallEvaluator, CallResult, CompatChecker};
+        use crate::solver::{CallEvaluator, CallResult, CompatChecker, TypeKey};
 
         let Some(node) = self.ctx.arena.get(idx) else {
             return TypeId::ANY;
@@ -3485,38 +3485,32 @@ impl<'a> ThinCheckerState<'a> {
         // Get arguments list (may be None for calls without arguments)
         let args = call.arguments.as_ref().map(|a| &a.nodes).map(|n| n.as_slice()).unwrap_or(&[]);
 
-        // Prepare for contextual typing of arguments
-        let mut arg_types = Vec::with_capacity(args.len());
+        let overload_signatures = match self.ctx.types.lookup(callee_type) {
+            Some(TypeKey::Callable(shape_id)) => {
+                let shape = self.ctx.types.callable_shape(shape_id);
+                if shape.call_signatures.len() > 1 {
+                    Some(shape.call_signatures.clone())
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        };
+
+        // Overload candidates need signature-specific contextual typing.
+        if let Some(signatures) = overload_signatures.as_deref() {
+            if let Some(return_type) = self.resolve_overloaded_call_with_signatures(args, signatures) {
+                return return_type;
+            }
+        }
 
         // Create contextual context from callee type
         let ctx_helper = ContextualTypeContext::with_expected(self.ctx.types, callee_type);
-
-        let arg_count = args.len();
-        for (i, &arg_idx) in args.iter().enumerate() {
-            // Determine expected type for this argument
-            let expected_type = ctx_helper.get_parameter_type_for_call(i, arg_count);
-
-            // Set contextual type for the argument
-            let prev_context = self.ctx.contextual_type;
-            self.ctx.contextual_type = expected_type;
-
-            // Check the argument with context
-            let arg_type = self.get_type_of_node(arg_idx);
-            arg_types.push(arg_type);
-
-            if let Some(expected) = expected_type {
-                if expected != TypeId::ANY && expected != TypeId::UNKNOWN {
-                    if let Some(arg_node) = self.ctx.arena.get(arg_idx) {
-                        if arg_node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION {
-                            self.check_object_literal_excess_properties(arg_type, expected, arg_idx);
-                        }
-                    }
-                }
-            }
-
-            // Restore previous context
-            self.ctx.contextual_type = prev_context;
-        }
+        let arg_types = self.collect_call_argument_types_with_context(
+            args,
+            |i, arg_count| ctx_helper.get_parameter_type_for_call(i, arg_count),
+            overload_signatures.is_none(),
+        );
 
         // Use CallEvaluator to resolve the call
         let mut checker = CompatChecker::new(self.ctx.types);
@@ -3550,6 +3544,124 @@ impl<'a> ThinCheckerState<'a> {
                 TypeId::ERROR
             }
         }
+    }
+
+    fn collect_call_argument_types_with_context<F>(
+        &mut self,
+        args: &[NodeIndex],
+        mut expected_for_index: F,
+        check_excess_properties: bool,
+    ) -> Vec<TypeId>
+    where
+        F: FnMut(usize, usize) -> Option<TypeId>,
+    {
+        let arg_count = args.len();
+        let mut arg_types = Vec::with_capacity(arg_count);
+
+        for (i, &arg_idx) in args.iter().enumerate() {
+            let expected_type = expected_for_index(i, arg_count);
+
+            let prev_context = self.ctx.contextual_type;
+            self.ctx.contextual_type = expected_type;
+
+            let arg_type = self.get_type_of_node(arg_idx);
+            arg_types.push(arg_type);
+
+            if check_excess_properties {
+                if let Some(expected) = expected_type {
+                    if expected != TypeId::ANY && expected != TypeId::UNKNOWN {
+                        if let Some(arg_node) = self.ctx.arena.get(arg_idx) {
+                            if arg_node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION {
+                                self.check_object_literal_excess_properties(arg_type, expected, arg_idx);
+                            }
+                        }
+                    }
+                }
+            }
+
+            self.ctx.contextual_type = prev_context;
+        }
+
+        arg_types
+    }
+
+    fn check_call_argument_excess_properties<F>(
+        &mut self,
+        args: &[NodeIndex],
+        arg_types: &[TypeId],
+        mut expected_for_index: F,
+    ) where
+        F: FnMut(usize, usize) -> Option<TypeId>,
+    {
+        let arg_count = args.len();
+        for (i, &arg_idx) in args.iter().enumerate() {
+            let expected = expected_for_index(i, arg_count);
+            if let Some(expected) = expected {
+                if expected != TypeId::ANY && expected != TypeId::UNKNOWN {
+                    if let Some(arg_node) = self.ctx.arena.get(arg_idx) {
+                        if arg_node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION {
+                            let arg_type = arg_types.get(i).copied().unwrap_or(TypeId::ANY);
+                            self.check_object_literal_excess_properties(arg_type, expected, arg_idx);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn resolve_overloaded_call_with_signatures(
+        &mut self,
+        args: &[NodeIndex],
+        signatures: &[crate::solver::CallSignature],
+    ) -> Option<TypeId> {
+        use crate::solver::{CallEvaluator, CallResult, CompatChecker, FunctionShape};
+
+        if signatures.is_empty() {
+            return None;
+        }
+
+        let mut checker = CompatChecker::new(self.ctx.types);
+        let mut evaluator = CallEvaluator::new(self.ctx.types, &mut checker);
+        let mut original_node_types = std::mem::take(&mut self.ctx.node_types);
+
+        for sig in signatures {
+            let func_shape = FunctionShape {
+                params: sig.params.clone(),
+                this_type: sig.this_type,
+                return_type: sig.return_type,
+                type_params: sig.type_params.clone(),
+                type_predicate: sig.type_predicate.clone(),
+                is_constructor: false,
+            };
+            let func_type = self.ctx.types.function(func_shape);
+            let ctx_helper = ContextualTypeContext::with_expected(self.ctx.types, func_type);
+
+            self.ctx.node_types = Default::default();
+            let arg_types = self.collect_call_argument_types_with_context(
+                args,
+                |i, arg_count| ctx_helper.get_parameter_type_for_call(i, arg_count),
+                false,
+            );
+            let temp_node_types = std::mem::take(&mut self.ctx.node_types);
+
+            self.ctx.node_types = std::mem::take(&mut original_node_types);
+            let result = evaluator.resolve_call(func_type, &arg_types);
+
+            if let CallResult::Success(return_type) = result {
+                self.ctx.node_types.extend(temp_node_types);
+                self.check_call_argument_excess_properties(
+                    args,
+                    &arg_types,
+                    |i, arg_count| ctx_helper.get_parameter_type_for_call(i, arg_count),
+                );
+                return Some(return_type);
+            }
+
+            original_node_types = std::mem::take(&mut self.ctx.node_types);
+        }
+
+        self.ctx.node_types = original_node_types;
+        None
     }
 
     /// Get type of new expression.
@@ -3636,31 +3748,31 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         let args = new_expr.arguments.as_ref().map(|a| &a.nodes).map(|n| n.as_slice()).unwrap_or(&[]);
-        let mut arg_types = Vec::with_capacity(args.len());
-        let ctx_helper = ContextualTypeContext::with_expected(self.ctx.types, construct_type);
-        let arg_count = args.len();
 
-        for (i, &arg_idx) in args.iter().enumerate() {
-            let expected_type = ctx_helper.get_parameter_type_for_call(i, arg_count);
-
-            let prev_context = self.ctx.contextual_type;
-            self.ctx.contextual_type = expected_type;
-
-            let arg_type = self.get_type_of_node(arg_idx);
-            arg_types.push(arg_type);
-
-            if let Some(expected) = expected_type {
-                if expected != TypeId::ANY && expected != TypeId::UNKNOWN {
-                    if let Some(arg_node) = self.ctx.arena.get(arg_idx) {
-                        if arg_node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION {
-                            self.check_object_literal_excess_properties(arg_type, expected, arg_idx);
-                        }
-                    }
+        let overload_signatures = match self.ctx.types.lookup(construct_type) {
+            Some(TypeKey::Callable(shape_id)) => {
+                let shape = self.ctx.types.callable_shape(shape_id);
+                if shape.call_signatures.len() > 1 {
+                    Some(shape.call_signatures.clone())
+                } else {
+                    None
                 }
             }
+            _ => None,
+        };
 
-            self.ctx.contextual_type = prev_context;
+        if let Some(signatures) = overload_signatures.as_deref() {
+            if let Some(return_type) = self.resolve_overloaded_call_with_signatures(args, signatures) {
+                return return_type;
+            }
         }
+
+        let ctx_helper = ContextualTypeContext::with_expected(self.ctx.types, construct_type);
+        let arg_types = self.collect_call_argument_types_with_context(
+            args,
+            |i, arg_count| ctx_helper.get_parameter_type_for_call(i, arg_count),
+            overload_signatures.is_none(),
+        );
 
         let mut checker = CompatChecker::new(self.ctx.types);
         let mut evaluator = CallEvaluator::new(self.ctx.types, &mut checker);
