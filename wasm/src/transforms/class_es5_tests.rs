@@ -19210,3 +19210,442 @@ class AsyncEventStream<T> {
         output
     );
 }
+
+// ============================================================================
+// Generator/yield pattern tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_generator_basic() {
+    // Basic generator function in class
+    let source = r#"
+class NumberSequence {
+    private start: number;
+    private end: number;
+
+    constructor(start: number, end: number) {
+        this.start = start;
+        this.end = end;
+    }
+
+    *generate(): Generator<number> {
+        for (let i = this.start; i <= this.end; i++) {
+            yield i;
+        }
+    }
+
+    *generateEven(): Generator<number> {
+        for (let i = this.start; i <= this.end; i++) {
+            if (i % 2 === 0) {
+                yield i;
+            }
+        }
+    }
+
+    *generateOdd(): Generator<number> {
+        for (let i = this.start; i <= this.end; i++) {
+            if (i % 2 !== 0) {
+                yield i;
+            }
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function NumberSequence"),
+        "Expected NumberSequence function: {}",
+        output
+    );
+    assert!(
+        output.contains("generate") && output.contains("generateEven") && output.contains("generateOdd"),
+        "Expected generator methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_yield_expressions() {
+    // Yield expressions with values
+    let source = r#"
+class MessageProducer {
+    private messages: string[];
+
+    constructor(messages: string[]) {
+        this.messages = messages;
+    }
+
+    *produceMessages(): Generator<string, void, unknown> {
+        for (const message of this.messages) {
+            yield message;
+        }
+    }
+
+    *produceWithIndex(): Generator<[number, string], void, unknown> {
+        for (let i = 0; i < this.messages.length; i++) {
+            yield [i, this.messages[i]];
+        }
+    }
+
+    *produceTransformed(transform: (s: string) => string): Generator<string> {
+        for (const message of this.messages) {
+            yield transform(message);
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function MessageProducer"),
+        "Expected MessageProducer function: {}",
+        output
+    );
+    assert!(
+        output.contains("produceMessages") && output.contains("produceWithIndex"),
+        "Expected generator methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_yield_delegation() {
+    // Yield delegation with yield*
+    let source = r#"
+class CompositeIterator<T> {
+    private sources: Iterable<T>[];
+
+    constructor(...sources: Iterable<T>[]) {
+        this.sources = sources;
+    }
+
+    *iterate(): Generator<T> {
+        for (const source of this.sources) {
+            yield* source;
+        }
+    }
+
+    *iterateWithSeparator(separator: T): Generator<T> {
+        let first = true;
+        for (const source of this.sources) {
+            if (!first) {
+                yield separator;
+            }
+            yield* source;
+            first = false;
+        }
+    }
+
+    *flatMap<U>(fn: (item: T) => Iterable<U>): Generator<U> {
+        for (const source of this.sources) {
+            for (const item of source) {
+                yield* fn(item);
+            }
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function CompositeIterator"),
+        "Expected CompositeIterator function: {}",
+        output
+    );
+    assert!(
+        output.contains("iterate") && output.contains("flatMap"),
+        "Expected generator methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_generator_with_state() {
+    // Generator with internal state management
+    let source = r#"
+class StatefulGenerator {
+    private counter: number = 0;
+    private paused: boolean = false;
+
+    *countUp(limit: number): Generator<number, string, boolean | undefined> {
+        while (this.counter < limit) {
+            const shouldStop = yield this.counter;
+            if (shouldStop) {
+                return "Stopped early";
+            }
+            this.counter++;
+        }
+        return "Completed";
+    }
+
+    *countWithPause(limit: number): Generator<number> {
+        for (let i = 0; i < limit; i++) {
+            if (this.paused) {
+                return;
+            }
+            yield i;
+        }
+    }
+
+    pause(): void {
+        this.paused = true;
+    }
+
+    resume(): void {
+        this.paused = false;
+    }
+
+    reset(): void {
+        this.counter = 0;
+        this.paused = false;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function StatefulGenerator"),
+        "Expected StatefulGenerator function: {}",
+        output
+    );
+    assert!(
+        output.contains("countUp") && output.contains("countWithPause"),
+        "Expected generator methods: {}",
+        output
+    );
+    assert!(
+        output.contains("pause") && output.contains("resume") && output.contains("reset"),
+        "Expected control methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_async_generator_class() {
+    // Async generator patterns in class
+    let source = r#"
+class AsyncDataFetcher {
+    private urls: string[];
+    private delay: number;
+
+    constructor(urls: string[], delay: number = 100) {
+        this.urls = urls;
+        this.delay = delay;
+    }
+
+    async *fetchAll(): AsyncGenerator<Response> {
+        for (const url of this.urls) {
+            await this.sleep(this.delay);
+            const response = await fetch(url);
+            yield response;
+        }
+    }
+
+    async *fetchWithRetry(retries: number = 3): AsyncGenerator<Response> {
+        for (const url of this.urls) {
+            let lastError: Error | undefined;
+            for (let attempt = 0; attempt < retries; attempt++) {
+                try {
+                    const response = await fetch(url);
+                    yield response;
+                    break;
+                } catch (e) {
+                    lastError = e as Error;
+                    await this.sleep(this.delay * (attempt + 1));
+                }
+            }
+        }
+    }
+
+    private sleep(ms: number): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function AsyncDataFetcher"),
+        "Expected AsyncDataFetcher function: {}",
+        output
+    );
+    assert!(
+        output.contains("fetchAll") && output.contains("fetchWithRetry"),
+        "Expected async generator methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_generator_combined() {
+    // Combined generator patterns
+    let source = r#"
+class Pipeline<T> {
+    private source: Iterable<T>;
+
+    constructor(source: Iterable<T>) {
+        this.source = source;
+    }
+
+    *filter(predicate: (item: T) => boolean): Generator<T> {
+        for (const item of this.source) {
+            if (predicate(item)) {
+                yield item;
+            }
+        }
+    }
+
+    *map<U>(fn: (item: T) => U): Generator<U> {
+        for (const item of this.source) {
+            yield fn(item);
+        }
+    }
+
+    *take(count: number): Generator<T> {
+        let i = 0;
+        for (const item of this.source) {
+            if (i >= count) break;
+            yield item;
+            i++;
+        }
+    }
+
+    *skip(count: number): Generator<T> {
+        let i = 0;
+        for (const item of this.source) {
+            if (i >= count) {
+                yield item;
+            }
+            i++;
+        }
+    }
+
+    *chunk(size: number): Generator<T[]> {
+        let chunk: T[] = [];
+        for (const item of this.source) {
+            chunk.push(item);
+            if (chunk.length === size) {
+                yield chunk;
+                chunk = [];
+            }
+        }
+        if (chunk.length > 0) {
+            yield chunk;
+        }
+    }
+
+    static *range(start: number, end: number): Generator<number> {
+        for (let i = start; i <= end; i++) {
+            yield i;
+        }
+    }
+
+    static *repeat<U>(value: U, count: number): Generator<U> {
+        for (let i = 0; i < count; i++) {
+            yield value;
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function Pipeline"),
+        "Expected Pipeline function: {}",
+        output
+    );
+    assert!(
+        output.contains("filter") && output.contains("map") && output.contains("take"),
+        "Expected generator methods: {}",
+        output
+    );
+    assert!(
+        output.contains("chunk") && output.contains("skip"),
+        "Expected more generator methods: {}",
+        output
+    );
+    assert!(
+        output.contains("range") && output.contains("repeat"),
+        "Expected static generator methods: {}",
+        output
+    );
+}
