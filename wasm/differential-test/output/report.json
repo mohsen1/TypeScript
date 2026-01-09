@@ -1,0 +1,216 @@
+{
+  "timestamp": "2026-01-09T09:55:30.517Z",
+  "summary": {
+    "total": 15,
+    "passed": 6,
+    "failed": 9,
+    "passRate": "40.0%"
+  },
+  "severity": {
+    "high": 2,
+    "medium": 7
+  },
+  "missingErrorCodes": {
+    "2322": [
+      "unsoundness-31-inline-1"
+    ],
+    "2559": [
+      "unsoundness-13-inline-1"
+    ]
+  },
+  "prioritizedBugList": [
+    {
+      "id": "unsoundness-13-inline-1",
+      "title": "Weak Type Detection (inline example 1)",
+      "phase": 4,
+      "missingErrors": [
+        2559
+      ],
+      "code": "interface Weak { a?: number }\nconst x = { b: \"unrelated\" };\nconst y: Weak = x; // Error in TS (Safety check), but valid structurally!"
+    },
+    {
+      "id": "unsoundness-31-inline-1",
+      "title": "Base Constraint Assignability (Generic Erasure) (inline example 1)",
+      "phase": 4,
+      "missingErrors": [
+        2322
+      ],
+      "code": "function f<T extends string, U>(x: T, y: U) {\n    let s: string = x; // OK: T extends string\n    let t: T = \"hello\"; // Error: string is not T (T could be \"world\")\n}"
+    }
+  ],
+  "results": [
+    {
+      "id": "unsoundness-13-inline-1",
+      "passed": false,
+      "severity": "high",
+      "tscErrors": 1,
+      "wasmErrors": 0,
+      "missingInWasm": [
+        2559
+      ],
+      "extraInWasm": [],
+      "duration": 582
+    },
+    {
+      "id": "unsoundness-16-inline-1",
+      "passed": true,
+      "severity": "low",
+      "tscErrors": 0,
+      "wasmErrors": 0,
+      "missingInWasm": [],
+      "extraInWasm": [],
+      "duration": 222
+    },
+    {
+      "id": "unsoundness-19-inline-1",
+      "passed": true,
+      "severity": "low",
+      "tscErrors": 0,
+      "wasmErrors": 0,
+      "missingInWasm": [],
+      "extraInWasm": [],
+      "duration": 218
+    },
+    {
+      "id": "unsoundness-31-inline-1",
+      "passed": false,
+      "severity": "high",
+      "tscErrors": 1,
+      "wasmErrors": 3,
+      "missingInWasm": [
+        2322
+      ],
+      "extraInWasm": [
+        2304
+      ],
+      "duration": 178
+    },
+    {
+      "id": "custom-basic-types",
+      "passed": true,
+      "severity": "low",
+      "tscErrors": 0,
+      "wasmErrors": 0,
+      "missingInWasm": [],
+      "extraInWasm": [],
+      "duration": 185
+    },
+    {
+      "id": "custom-phase1-critical-AnyTypeTests",
+      "passed": false,
+      "severity": "medium",
+      "tscErrors": 1,
+      "wasmErrors": 7,
+      "missingInWasm": [],
+      "extraInWasm": [
+        2304
+      ],
+      "duration": 221
+    },
+    {
+      "id": "custom-phase1-critical-ObjectTrifectaTests",
+      "passed": false,
+      "severity": "medium",
+      "tscErrors": 1,
+      "wasmErrors": 8,
+      "missingInWasm": [],
+      "extraInWasm": [
+        2304,
+        2322,
+        2353
+      ],
+      "duration": 171
+    },
+    {
+      "id": "custom-phase1-critical-VoidReturnTests",
+      "passed": false,
+      "severity": "medium",
+      "tscErrors": 1,
+      "wasmErrors": 4,
+      "missingInWasm": [],
+      "extraInWasm": [
+        2304
+      ],
+      "duration": 165
+    },
+    {
+      "id": "custom-phase1-critical-ErrorPoisoningTests",
+      "passed": true,
+      "severity": "low",
+      "tscErrors": 1,
+      "wasmErrors": 1,
+      "missingInWasm": [],
+      "extraInWasm": [],
+      "duration": 177
+    },
+    {
+      "id": "custom-phase1-critical-CovariantArrayTests",
+      "passed": false,
+      "severity": "medium",
+      "tscErrors": 1,
+      "wasmErrors": 3,
+      "missingInWasm": [],
+      "extraInWasm": [
+        2322,
+        2304
+      ],
+      "duration": 166
+    },
+    {
+      "id": "custom-phase1-critical-FunctionBivarianceTests",
+      "passed": true,
+      "severity": "low",
+      "tscErrors": 1,
+      "wasmErrors": 1,
+      "missingInWasm": [],
+      "extraInWasm": [],
+      "duration": 173
+    },
+    {
+      "id": "custom-phase1-critical-NullUndefinedTests",
+      "passed": false,
+      "severity": "medium",
+      "tscErrors": 1,
+      "wasmErrors": 3,
+      "missingInWasm": [],
+      "extraInWasm": [
+        2304
+      ],
+      "duration": 171
+    },
+    {
+      "id": "custom-phase1-critical-LiteralWideningTests",
+      "passed": true,
+      "severity": "low",
+      "tscErrors": 1,
+      "wasmErrors": 1,
+      "missingInWasm": [],
+      "extraInWasm": [],
+      "duration": 168
+    },
+    {
+      "id": "custom-phase1-critical-OptionalityTests",
+      "passed": false,
+      "severity": "medium",
+      "tscErrors": 1,
+      "wasmErrors": 4,
+      "missingInWasm": [],
+      "extraInWasm": [
+        2304
+      ],
+      "duration": 244
+    },
+    {
+      "id": "custom-phase1-critical-ExcessPropertyTests",
+      "passed": false,
+      "severity": "medium",
+      "tscErrors": 0,
+      "wasmErrors": 4,
+      "missingInWasm": [],
+      "extraInWasm": [
+        2304
+      ],
+      "duration": 164
+    }
+  ]
+}
