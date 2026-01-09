@@ -6221,6 +6221,65 @@ var x: string;
 }
 
 #[test]
+fn test_variable_redeclaration_typeof_ok_no_2403() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test for bi-directional assignability in var redeclaration:
+    // `var e = E;` and `var e: typeof E;` should be allowed because
+    // the types are bi-directionally assignable (even if TypeIds differ).
+    // Based on TypeScript conformance test: enumBasics.ts
+    let source = r#"
+enum E { A, B, C }
+var e = E;
+var e: typeof E;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let error_2403_count = codes.iter().filter(|&&c| c == 2403).count();
+
+    assert_eq!(error_2403_count, 0,
+        "Expected no error 2403 for enum typeof redeclaration, got: {:?}", codes);
+}
+
+#[test]
+fn test_variable_redeclaration_inferred_vs_annotated_no_2403() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test that inferred type from initializer matches explicit annotation
+    // Based on conformance test: ambientDeclarationsExternal.ts pattern
+    let source = r#"
+var n = 42;
+var n: number;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let error_2403_count = codes.iter().filter(|&&c| c == 2403).count();
+
+    assert_eq!(error_2403_count, 0,
+        "Expected no error 2403 for inferred vs annotated redeclaration, got: {:?}", codes);
+}
+
+#[test]
 fn test_namespace_member_not_found() {
     use crate::thin_parser::ThinParserState;
 
