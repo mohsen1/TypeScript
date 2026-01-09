@@ -472,6 +472,9 @@ setup_role_agents() {
     if [ -n "$em_dir" ] && [ -d "$em_dir" ]; then
       mkdir -p "$em_dir/.role"
       cp "$ROOT_DIR/SQUAD_LEAD_AGENT.md" "$em_dir/.role/AGENTS.md" 2>/dev/null || true
+      if [ -f "$em_dir/.role/AGENTS.md" ]; then
+        git -C "$em_dir" update-index --skip-worktree -- .role/AGENTS.md 2>/dev/null || true
+      fi
       echo "  EM-${squad}: .role/AGENTS.md = SQUAD_LEAD_AGENT.md"
     fi
   done
@@ -484,6 +487,9 @@ setup_role_agents() {
       if [ -n "$worker_dir" ] && [ -d "$worker_dir" ]; then
         mkdir -p "$worker_dir/.role"
         cp "$ROOT_DIR/AGENTS.md" "$worker_dir/.role/AGENTS.md" 2>/dev/null || true
+        if [ -f "$worker_dir/.role/AGENTS.md" ]; then
+          git -C "$worker_dir" update-index --skip-worktree -- .role/AGENTS.md 2>/dev/null || true
+        fi
       fi
     done
   done
