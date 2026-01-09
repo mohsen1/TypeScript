@@ -13812,3 +13812,394 @@ class MultiPatternSearcher {
         output
     );
 }
+
+// ============================================================================
+// Array.isArray/Array.of pattern tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_array_isarray_basic() {
+    // Basic Array.isArray usage
+    let source = r#"
+class TypeChecker {
+    isArray(value: unknown): boolean {
+        return Array.isArray(value);
+    }
+
+    ensureArray<T>(value: T | T[]): T[] {
+        return Array.isArray(value) ? value : [value];
+    }
+
+    flattenIfArray<T>(value: T | T[]): T[] {
+        if (Array.isArray(value)) {
+            return value;
+        }
+        return [value];
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("TypeChecker"),
+        "Expected TypeChecker class: {}",
+        output
+    );
+
+    // Array.isArray should be present
+    assert!(
+        output.contains("Array.isArray"),
+        "Expected Array.isArray: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("isArray") && output.contains("ensureArray"),
+        "Expected isArray, ensureArray methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_array_of_basic() {
+    // Basic Array.of usage
+    let source = r#"
+class ArrayFactory {
+    createFromValues<T>(...values: T[]): T[] {
+        return Array.of(...values);
+    }
+
+    createSingletonArray<T>(value: T): T[] {
+        return Array.of(value);
+    }
+
+    createNumberArray(): number[] {
+        return Array.of(1, 2, 3, 4, 5);
+    }
+
+    createStringArray(): string[] {
+        return Array.of('a', 'b', 'c');
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("ArrayFactory"),
+        "Expected ArrayFactory class: {}",
+        output
+    );
+
+    // Array.of should be present
+    assert!(
+        output.contains("Array.of"),
+        "Expected Array.of: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("createFromValues") && output.contains("createSingletonArray"),
+        "Expected createFromValues, createSingletonArray methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_array_isarray_guard() {
+    // Array.isArray as type guard
+    let source = r#"
+class DataProcessor {
+    private data: unknown[] = [];
+
+    add(item: unknown): void {
+        if (Array.isArray(item)) {
+            this.data.push(...item);
+        } else {
+            this.data.push(item);
+        }
+    }
+
+    processInput(input: string | string[]): string[] {
+        if (Array.isArray(input)) {
+            return input.map(s => s.trim());
+        }
+        return [input.trim()];
+    }
+
+    normalizeToArray<T>(value: T | readonly T[]): T[] {
+        return Array.isArray(value) ? [...value] : [value];
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("DataProcessor"),
+        "Expected DataProcessor class: {}",
+        output
+    );
+
+    // Array.isArray should be present
+    assert!(
+        output.contains("Array.isArray"),
+        "Expected Array.isArray: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("add") && output.contains("processInput"),
+        "Expected add, processInput methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_array_static_methods() {
+    // Static methods using Array utilities
+    let source = r#"
+class ArrayUtils {
+    static isArrayLike(value: unknown): boolean {
+        return Array.isArray(value) ||
+               (typeof value === 'object' && value !== null && 'length' in value);
+    }
+
+    static toArray<T>(value: T | T[]): T[] {
+        if (Array.isArray(value)) {
+            return value;
+        }
+        return Array.of(value);
+    }
+
+    static wrap<T>(...items: T[]): T[] {
+        return Array.of(...items);
+    }
+
+    static isEmpty(value: unknown): boolean {
+        return Array.isArray(value) && value.length === 0;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("ArrayUtils"),
+        "Expected ArrayUtils class: {}",
+        output
+    );
+
+    // Array.isArray and Array.of should be present
+    assert!(
+        output.contains("Array.isArray") && output.contains("Array.of"),
+        "Expected Array.isArray and Array.of: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("isArrayLike") && output.contains("toArray"),
+        "Expected isArrayLike, toArray methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_array_in_constructor() {
+    // Array methods used in constructor
+    let source = r#"
+class CollectionWrapper<T> {
+    private items: T[];
+
+    constructor(input: T | T[]) {
+        this.items = Array.isArray(input) ? [...input] : Array.of(input);
+    }
+
+    add(item: T | T[]): void {
+        if (Array.isArray(item)) {
+            this.items.push(...item);
+        } else {
+            this.items.push(item);
+        }
+    }
+
+    toArray(): T[] {
+        return [...this.items];
+    }
+
+    static from<T>(value: T | T[]): CollectionWrapper<T> {
+        return new CollectionWrapper(value);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("CollectionWrapper"),
+        "Expected CollectionWrapper class: {}",
+        output
+    );
+
+    // Array methods should be present
+    assert!(
+        output.contains("Array.isArray") || output.contains("Array.of"),
+        "Expected Array methods: {}",
+        output
+    );
+
+    // Constructor should be present
+    assert!(
+        output.contains("function CollectionWrapper"),
+        "Expected CollectionWrapper constructor: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_array_combined_patterns() {
+    // Combined Array.isArray and Array.of patterns
+    let source = r#"
+class SafeArrayHandler {
+    private readonly data: unknown[];
+
+    constructor() {
+        this.data = Array.of<unknown>();
+    }
+
+    push(value: unknown): number {
+        if (Array.isArray(value)) {
+            return this.data.push(...value);
+        }
+        return this.data.push(value);
+    }
+
+    concat(other: unknown | unknown[]): unknown[] {
+        const otherArray = Array.isArray(other) ? other : Array.of(other);
+        return [...this.data, ...otherArray];
+    }
+
+    filter(predicate: (item: unknown) => boolean): unknown[] {
+        return this.data.filter(item => {
+            if (Array.isArray(item)) {
+                return item.some(predicate);
+            }
+            return predicate(item);
+        });
+    }
+
+    static empty<T>(): T[] {
+        return Array.of<T>();
+    }
+
+    static single<T>(value: T): T[] {
+        return Array.of(value);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("SafeArrayHandler"),
+        "Expected SafeArrayHandler class: {}",
+        output
+    );
+
+    // Array.isArray and Array.of should be present
+    assert!(
+        output.contains("Array.isArray") && output.contains("Array.of"),
+        "Expected Array.isArray and Array.of: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("push") && output.contains("concat") && output.contains("filter"),
+        "Expected push, concat, filter methods: {}",
+        output
+    );
+}
