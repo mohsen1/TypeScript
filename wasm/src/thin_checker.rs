@@ -3555,11 +3555,63 @@ impl<'a> ThinCheckerState<'a> {
     where
         F: FnMut(usize, usize) -> Option<TypeId>,
     {
-        let arg_count = args.len();
-        let mut arg_types = Vec::with_capacity(arg_count);
+        use crate::solver::TypeKey;
 
-        for (i, &arg_idx) in args.iter().enumerate() {
-            let expected_type = expected_for_index(i, arg_count);
+        // First pass: count expanded arguments (spreads of tuple types expand to multiple args)
+        let mut expanded_count = 0usize;
+        for &arg_idx in args.iter() {
+            if let Some(arg_node) = self.ctx.arena.get(arg_idx) {
+                if arg_node.kind == syntax_kind_ext::SPREAD_ELEMENT {
+                    if let Some(spread_data) = self.ctx.arena.get_spread(arg_node) {
+                        let spread_type = self.get_type_of_node(spread_data.expression);
+                        if let Some(TypeKey::Tuple(elems_id)) = self.ctx.types.lookup(spread_type) {
+                            let elems = self.ctx.types.tuple_list(elems_id);
+                            expanded_count += elems.len();
+                            continue;
+                        }
+                    }
+                }
+            }
+            expanded_count += 1;
+        }
+
+        let mut arg_types = Vec::with_capacity(expanded_count);
+        let mut effective_index = 0usize;
+
+        for &arg_idx in args.iter() {
+            if let Some(arg_node) = self.ctx.arena.get(arg_idx) {
+                // Handle spread elements specially - expand tuple types
+                if arg_node.kind == syntax_kind_ext::SPREAD_ELEMENT {
+                    if let Some(spread_data) = self.ctx.arena.get_spread(arg_node) {
+                        let spread_type = self.get_type_of_node(spread_data.expression);
+
+                        // If it's a tuple type, expand its elements
+                        if let Some(TypeKey::Tuple(elems_id)) = self.ctx.types.lookup(spread_type) {
+                            let elems = self.ctx.types.tuple_list(elems_id);
+                            for elem in elems.iter() {
+                                arg_types.push(elem.type_id);
+                                effective_index += 1;
+                            }
+                            continue;
+                        }
+
+                        // If it's an array type, push the element type (variadic handling)
+                        if let Some(TypeKey::Array(elem_type)) = self.ctx.types.lookup(spread_type) {
+                            arg_types.push(elem_type);
+                            effective_index += 1;
+                            continue;
+                        }
+
+                        // Otherwise just push the spread type as-is
+                        arg_types.push(spread_type);
+                        effective_index += 1;
+                        continue;
+                    }
+                }
+            }
+
+            // Regular (non-spread) argument
+            let expected_type = expected_for_index(effective_index, expanded_count);
 
             let prev_context = self.ctx.contextual_type;
             self.ctx.contextual_type = expected_type;
@@ -3580,6 +3632,7 @@ impl<'a> ThinCheckerState<'a> {
             }
 
             self.ctx.contextual_type = prev_context;
+            effective_index += 1;
         }
 
         arg_types
