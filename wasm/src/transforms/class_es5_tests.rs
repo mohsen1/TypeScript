@@ -17819,3 +17819,425 @@ class DataProcessor {
         output
     );
 }
+
+// ============================================================================
+// Map/Set pattern tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_map_basic_operations() {
+    // Basic Map operations in class
+    let source = r#"
+class KeyValueStore<K, V> {
+    private store: Map<K, V> = new Map();
+
+    set(key: K, value: V): void {
+        this.store.set(key, value);
+    }
+
+    get(key: K): V | undefined {
+        return this.store.get(key);
+    }
+
+    has(key: K): boolean {
+        return this.store.has(key);
+    }
+
+    delete(key: K): boolean {
+        return this.store.delete(key);
+    }
+
+    clear(): void {
+        this.store.clear();
+    }
+
+    get size(): number {
+        return this.store.size;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function KeyValueStore"),
+        "Expected KeyValueStore function: {}",
+        output
+    );
+    assert!(
+        output.contains("Map"),
+        "Expected Map: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_set_basic_operations() {
+    // Basic Set operations in class
+    let source = r#"
+class UniqueCollection<T> {
+    private items: Set<T> = new Set();
+
+    add(item: T): void {
+        this.items.add(item);
+    }
+
+    remove(item: T): boolean {
+        return this.items.delete(item);
+    }
+
+    contains(item: T): boolean {
+        return this.items.has(item);
+    }
+
+    clear(): void {
+        this.items.clear();
+    }
+
+    toArray(): T[] {
+        return Array.from(this.items);
+    }
+
+    get size(): number {
+        return this.items.size;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function UniqueCollection"),
+        "Expected UniqueCollection function: {}",
+        output
+    );
+    assert!(
+        output.contains("Set"),
+        "Expected Set: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_map_iteration_pattern() {
+    // Map iteration with forEach, keys, values, entries
+    let source = r#"
+class MapIterator<K, V> {
+    private data: Map<K, V> = new Map();
+
+    constructor(entries?: [K, V][]) {
+        if (entries) {
+            for (const [key, value] of entries) {
+                this.data.set(key, value);
+            }
+        }
+    }
+
+    forEachEntry(callback: (value: V, key: K) => void): void {
+        this.data.forEach((value, key) => callback(value, key));
+    }
+
+    getKeys(): K[] {
+        return Array.from(this.data.keys());
+    }
+
+    getValues(): V[] {
+        return Array.from(this.data.values());
+    }
+
+    getEntries(): [K, V][] {
+        return Array.from(this.data.entries());
+    }
+
+    map<U>(fn: (value: V, key: K) => U): U[] {
+        const result: U[] = [];
+        this.data.forEach((value, key) => result.push(fn(value, key)));
+        return result;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function MapIterator"),
+        "Expected MapIterator function: {}",
+        output
+    );
+    assert!(
+        output.contains("Map"),
+        "Expected Map: {}",
+        output
+    );
+    assert!(
+        output.contains("forEach"),
+        "Expected forEach: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_set_operations_pattern() {
+    // Set operations: union, intersection, difference
+    let source = r#"
+class SetOperations<T> {
+    private set: Set<T>;
+
+    constructor(items?: T[]) {
+        this.set = new Set(items);
+    }
+
+    union(other: SetOperations<T>): SetOperations<T> {
+        const result = new SetOperations<T>();
+        this.set.forEach(item => result.add(item));
+        other.forEach(item => result.add(item));
+        return result;
+    }
+
+    intersection(other: SetOperations<T>): SetOperations<T> {
+        const result = new SetOperations<T>();
+        this.set.forEach(item => {
+            if (other.has(item)) {
+                result.add(item);
+            }
+        });
+        return result;
+    }
+
+    difference(other: SetOperations<T>): SetOperations<T> {
+        const result = new SetOperations<T>();
+        this.set.forEach(item => {
+            if (!other.has(item)) {
+                result.add(item);
+            }
+        });
+        return result;
+    }
+
+    add(item: T): void {
+        this.set.add(item);
+    }
+
+    has(item: T): boolean {
+        return this.set.has(item);
+    }
+
+    forEach(callback: (item: T) => void): void {
+        this.set.forEach(callback);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function SetOperations"),
+        "Expected SetOperations function: {}",
+        output
+    );
+    assert!(
+        output.contains("Set"),
+        "Expected Set: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_map_set_in_constructor() {
+    // Map and Set initialized in constructor
+    let source = r#"
+class DataManager<K, V> {
+    private cache: Map<K, V>;
+    private processedKeys: Set<K>;
+    private accessLog: Map<K, number>;
+
+    constructor() {
+        this.cache = new Map();
+        this.processedKeys = new Set();
+        this.accessLog = new Map();
+    }
+
+    process(key: K, value: V): void {
+        this.cache.set(key, value);
+        this.processedKeys.add(key);
+        const count = this.accessLog.get(key) || 0;
+        this.accessLog.set(key, count + 1);
+    }
+
+    get(key: K): V | undefined {
+        if (this.cache.has(key)) {
+            const count = this.accessLog.get(key) || 0;
+            this.accessLog.set(key, count + 1);
+            return this.cache.get(key);
+        }
+        return undefined;
+    }
+
+    isProcessed(key: K): boolean {
+        return this.processedKeys.has(key);
+    }
+
+    getAccessCount(key: K): number {
+        return this.accessLog.get(key) || 0;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function DataManager"),
+        "Expected DataManager function: {}",
+        output
+    );
+    assert!(
+        output.contains("Map") && output.contains("Set"),
+        "Expected Map and Set: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_map_set_eventbus_pattern() {
+    // Combined Map/Set usage patterns - EventBus
+    let source = r#"
+class EventBus {
+    private handlers: Map<string, Set<Function>> = new Map();
+    private onceHandlers: Map<string, Set<Function>> = new Map();
+
+    on(event: string, handler: Function): void {
+        if (!this.handlers.has(event)) {
+            this.handlers.set(event, new Set());
+        }
+        this.handlers.get(event)!.add(handler);
+    }
+
+    once(event: string, handler: Function): void {
+        if (!this.onceHandlers.has(event)) {
+            this.onceHandlers.set(event, new Set());
+        }
+        this.onceHandlers.get(event)!.add(handler);
+    }
+
+    off(event: string, handler: Function): void {
+        this.handlers.get(event)?.delete(handler);
+        this.onceHandlers.get(event)?.delete(handler);
+    }
+
+    emit(event: string, ...args: any[]): void {
+        this.handlers.get(event)?.forEach(handler => handler(...args));
+
+        const onceSet = this.onceHandlers.get(event);
+        if (onceSet) {
+            onceSet.forEach(handler => handler(...args));
+            onceSet.clear();
+        }
+    }
+
+    listenerCount(event: string): number {
+        const regular = this.handlers.get(event)?.size || 0;
+        const once = this.onceHandlers.get(event)?.size || 0;
+        return regular + once;
+    }
+
+    static create(): EventBus {
+        return new EventBus();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function EventBus"),
+        "Expected EventBus function: {}",
+        output
+    );
+    assert!(
+        output.contains("Map"),
+        "Expected Map: {}",
+        output
+    );
+    assert!(
+        output.contains("Set"),
+        "Expected Set: {}",
+        output
+    );
+    assert!(
+        output.contains("create"),
+        "Expected create static method: {}",
+        output
+    );
+}
