@@ -1002,8 +1002,29 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             }
         }
 
-        // Step 2: Check for naked type parameter (defer)
-        if let Some(TypeKey::TypeParameter(_)) = self.interner.lookup(check_type) {
+        // Step 2: Check for naked type parameter
+        if let Some(TypeKey::TypeParameter(param)) = self.interner.lookup(check_type) {
+            // If extends_type contains infer patterns and the type parameter has a constraint,
+            // try to infer from the constraint. This handles cases like:
+            // R extends Reducer<infer S, any> ? S : never
+            // where R is constrained to Reducer<any, any>
+            if self.type_contains_infer(extends_type) {
+                if let Some(constraint) = param.constraint {
+                    let mut checker = SubtypeChecker::with_resolver(self.interner, self.resolver);
+                    let mut bindings = FxHashMap::default();
+                    let mut visited = FxHashSet::default();
+                    if self.match_infer_pattern(
+                        constraint,
+                        extends_type,
+                        &mut bindings,
+                        &mut visited,
+                        &mut checker,
+                    ) {
+                        let substituted_true = self.substitute_infer(cond.true_type, &bindings);
+                        return self.evaluate(substituted_true);
+                    }
+                }
+            }
             // Type parameter hasn't been substituted - defer evaluation
             return self.interner.conditional(cond.clone());
         }
