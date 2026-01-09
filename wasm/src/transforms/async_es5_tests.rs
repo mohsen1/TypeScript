@@ -6198,3 +6198,196 @@ fn test_async_class_expression_conditional() {
         output
     );
 }
+
+// ============================================================================
+// ASYNC OBJECT METHOD TESTS
+// ============================================================================
+
+fn parse_and_emit_async_object_method(source: &str) -> String {
+    use crate::parser::syntax_kind_ext;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &stmt_idx in &source_file.statements.nodes {
+                if let Some(stmt_node) = parser.arena.get(stmt_idx) {
+                    if stmt_node.kind == syntax_kind_ext::FUNCTION_DECLARATION {
+                        if let Some(func_data) = parser.arena.get_function(stmt_node) {
+                            let emitter = AsyncES5Emitter::new(&parser.arena);
+                            let has_await = emitter.body_contains_await(func_data.body);
+                            let mut emitter = AsyncES5Emitter::new(&parser.arena);
+                            if has_await {
+                                return emitter.emit_generator_body_with_await(func_data.body);
+                            } else {
+                                return emitter.emit_simple_generator_body(func_data.body);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    String::new()
+}
+
+fn object_method_contains_await(source: &str) -> bool {
+    use crate::parser::syntax_kind_ext;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &stmt_idx in &source_file.statements.nodes {
+                if let Some(stmt_node) = parser.arena.get(stmt_idx) {
+                    if stmt_node.kind == syntax_kind_ext::FUNCTION_DECLARATION {
+                        if let Some(func_data) = parser.arena.get_function(stmt_node) {
+                            let emitter = AsyncES5Emitter::new(&parser.arena);
+                            return emitter.body_contains_await(func_data.body);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+#[test]
+fn test_async_object_method_basic() {
+    let output = parse_and_emit_async_object_method(
+        "async function foo() { await init(); const obj = { getValue() { return 42; } }; return obj.getValue(); }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Object method after await should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_object_method_async_method() {
+    let output = parse_and_emit_async_object_method(
+        "async function foo() { await setup(); const obj = { async run() { return 1; } }; return obj; }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Object with async method should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_object_method_no_await() {
+    let output = parse_and_emit_async_object_method(
+        "async function foo() { const obj = { getValue() { return 42; } }; return obj.getValue(); }",
+    );
+    assert!(
+        output.contains("[2 /*return*/"),
+        "Sync object method should have return: {}",
+        output
+    );
+    assert!(
+        !output.contains("switch"),
+        "No await should skip switch: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_object_method_shorthand() {
+    let output = parse_and_emit_async_object_method(
+        "async function foo(x: number) { await init(); const obj = { x, double() { return this.x * 2; } }; return obj; }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Object with shorthand property should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_object_method_body_contains_await() {
+    assert!(
+        object_method_contains_await(
+            "async function foo() { await process(); const obj = { x: 1 }; return obj; }"
+        ),
+        "Should detect await with object method"
+    );
+}
+
+#[test]
+fn test_async_object_method_body_no_await() {
+    assert!(
+        !object_method_contains_await(
+            "async function foo() { const obj = { getValue() { return 1; } }; return obj; }"
+        ),
+        "Should not detect await when none present"
+    );
+}
+
+#[test]
+fn test_async_object_method_ignores_nested_async() {
+    assert!(
+        !object_method_contains_await(
+            "async function foo() { const obj = { async method() { await x; } }; return 1; }"
+        ),
+        "Should ignore await in nested async method"
+    );
+}
+
+#[test]
+fn test_async_object_method_getter_setter() {
+    let output = parse_and_emit_async_object_method(
+        "async function foo() { await init(); const obj = { get value() { return 1; }, set value(v) {} }; return obj; }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Object with getter/setter should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_object_method_with_try_catch() {
+    assert!(
+        object_method_contains_await(
+            "async function foo() { try { await riskyOp(); const obj = { x: 1 }; return obj; } catch (e) { return null; } }"
+        ),
+        "Should detect await in try block with object method"
+    );
+}
+
+#[test]
+fn test_async_object_method_computed_property() {
+    let output = parse_and_emit_async_object_method(
+        "async function foo(key: string) { await init(); const obj = { [key]: 42 }; return obj; }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Object with computed property should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_object_method_nested_objects() {
+    let output = parse_and_emit_async_object_method(
+        "async function foo() { await init(); const obj = { inner: { value: 1, get() { return this.value; } } }; return obj; }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Nested objects should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_object_method_conditional() {
+    let output = parse_and_emit_async_object_method(
+        "async function foo(cond: boolean) { if (cond) { await process(); } const obj = { x: 1 }; return obj; }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Conditional object method should have switch or yield: {}",
+        output
+    );
+}
