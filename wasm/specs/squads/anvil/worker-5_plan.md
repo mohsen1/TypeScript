@@ -7,34 +7,14 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-Add async ES5 tests for generator yield delegation patterns
-
-Per GOALS.md Objective 1: ES5 downleveling correctness
-
-Steps:
-1. Add 12 async generator yield delegation tests to `wasm/src/transforms/async_es5_tests.rs`:
-   - async generator yield* basic
-   - yield* with async iterable
-   - yield* with return value
-   - yield* in try/catch
-   - yield* with await before
-   - yield* with await after
-   - nested yield* delegation
-   - yield* with break/continue
-   - async generator yield* in class
-   - body_contains_await for yield*
-   - ignores nested async
-   - Combined yield* patterns
-2. Run `./wasm/test.sh async_es5_tests` to verify all tests pass
-3. Commit with message: `[wasm] async_es5: add generator yield delegation tests`
-4. Push to `origin/worker/anvil-5`
-5. Update this plan file and push
+(none - awaiting new task from EM)
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
 
 
 ## Completed
+- [x] Added 12 async generator yield delegation tests (basic, async_iterable, return_value, try_catch, await_before, await_after, nested, loop, class, combined, no_await, ignores_nested) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (1024 tests PASS).
 - [x] Added 12 async class decorator method tests (basic, multiple, factory, static, accessor, super, parameter, class, body, combined, no await, ignores nested) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (1012 tests PASS).
 - [x] Added 12 async private field access tests (read, write, method_call, static, arrow_capture, accessor, try_catch, multiple, increment, compound, no await, ignores nested) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (1000 tests PASS).
 - [x] Added 12 async computed super property access tests (computed_key, computed_call, string_key, symbol, computed_read, computed_write, try_catch, chain, conditional, template, no await, ignores nested) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (988 tests PASS).
