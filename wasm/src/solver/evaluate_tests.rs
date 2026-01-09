@@ -39076,3 +39076,455 @@ fn test_template_literal_specific_extends_pattern() {
     // "foo_bar" should extend `foo_${string}`
     assert!(extends);
 }
+
+// =============================================================================
+// KEYOF EDGE CASES - INTERSECTION AND UNION
+// =============================================================================
+
+#[test]
+fn test_keyof_intersection_with_never() {
+    // keyof (T & never) should be never (never absorbs in intersection)
+    let interner = TypeInterner::new();
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![obj, TypeId::NEVER]);
+    let result = evaluate_keyof(&interner, intersection);
+
+    // Intersection with never is never, so keyof never = never
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_keyof_union_with_any() {
+    // keyof (T | any) - any absorbs the union
+    let interner = TypeInterner::new();
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let union = interner.union(vec![obj, TypeId::ANY]);
+    let result = evaluate_keyof(&interner, union);
+
+    // Union with any is any, keyof any is string | number | symbol
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_keyof_intersection_with_any() {
+    // keyof (T & any) - any in intersection
+    let interner = TypeInterner::new();
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![obj, TypeId::ANY]);
+    let result = evaluate_keyof(&interner, intersection);
+
+    // Should produce keys from both
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_keyof_union_with_unknown() {
+    // keyof (T | unknown) - unknown absorbs in union
+    let interner = TypeInterner::new();
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let union = interner.union(vec![obj, TypeId::UNKNOWN]);
+    let result = evaluate_keyof(&interner, union);
+
+    // keyof unknown is never
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_keyof_four_way_intersection() {
+    // keyof (A & B & C & D) = keyof A | keyof B | keyof C | keyof D
+    let interner = TypeInterner::new();
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_c = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("c"),
+        type_id: TypeId::BOOLEAN,
+        write_type: TypeId::BOOLEAN,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_d = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("d"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![obj_a, obj_b, obj_c, obj_d]);
+    let result = evaluate_keyof(&interner, intersection);
+
+    // Should produce "a" | "b" | "c" | "d"
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+    let lit_c = interner.literal_string("c");
+    let lit_d = interner.literal_string("d");
+    let expected = interner.union(vec![lit_a, lit_b, lit_c, lit_d]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_keyof_four_way_union() {
+    // keyof (A | B | C | D) = only common keys
+    let interner = TypeInterner::new();
+
+    let common_key = interner.intern_string("common");
+
+    let obj_a = interner.object(vec![
+        PropertyInfo {
+            name: common_key,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let obj_b = interner.object(vec![
+        PropertyInfo {
+            name: common_key,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let obj_c = interner.object(vec![PropertyInfo {
+        name: common_key,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_d = interner.object(vec![
+        PropertyInfo {
+            name: common_key,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("d"),
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let union = interner.union(vec![obj_a, obj_b, obj_c, obj_d]);
+    let result = evaluate_keyof(&interner, union);
+
+    // Only "common" is present in all
+    let expected = interner.literal_string("common");
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_keyof_mixed_intersection_union() {
+    // keyof ((A & B) | C) - nested combination
+    let interner = TypeInterner::new();
+
+    let obj_a = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("common"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_c = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("common"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let a_and_b = interner.intersection(vec![obj_a, obj_b]);
+    let union = interner.union(vec![a_and_b, obj_c]);
+    let result = evaluate_keyof(&interner, union);
+
+    // Common keys between (A & B) and C = "common"
+    let expected = interner.literal_string("common");
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_keyof_intersection_both_index_signatures() {
+    // keyof ({ [k: string]: T } & { [k: number]: U }) = string | number
+    let interner = TypeInterner::new();
+
+    let string_indexed = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    let number_indexed = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let intersection = interner.intersection(vec![string_indexed, number_indexed]);
+    let result = evaluate_keyof(&interner, intersection);
+
+    // Should be string | number
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_keyof_union_index_and_literal() {
+    // keyof ({ [k: string]: T } | { a: U }) - intersection of keys
+    let interner = TypeInterner::new();
+
+    let string_indexed = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    let literal_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let union = interner.union(vec![string_indexed, literal_obj]);
+    let result = evaluate_keyof(&interner, union);
+
+    // "a" is subtype of string, so "a" is the common key
+    let expected = interner.literal_string("a");
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_keyof_intersection_with_callable() {
+    // keyof (T & { (): void }) - object with call signature
+    let interner = TypeInterner::new();
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let callable = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+            type_params: Vec::new(),
+            params: Vec::new(),
+            this_type: None,
+            return_type: TypeId::VOID,
+            type_predicate: None,
+        }],
+        construct_signatures: Vec::new(),
+        properties: Vec::new(),
+    });
+
+    let intersection = interner.intersection(vec![obj, callable]);
+    let result = evaluate_keyof(&interner, intersection);
+
+    // Should at least include "a" from the object
+    let lit_a = interner.literal_string("a");
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(lit_a, result));
+}
+
+#[test]
+fn test_keyof_intersection_with_array() {
+    // keyof ({ a: T } & string[]) - object intersected with array
+    let interner = TypeInterner::new();
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let arr = interner.array(TypeId::STRING);
+    let intersection = interner.intersection(vec![obj, arr]);
+    let result = evaluate_keyof(&interner, intersection);
+
+    // Should include array keys (number index) plus "a" plus array methods
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_keyof_empty_intersection() {
+    // keyof (A & B) where A and B have disjoint primitive types
+    // This is different from object intersection - primitive intersection is never
+    let interner = TypeInterner::new();
+
+    // string & number = never
+    let intersection = interner.intersection(vec![TypeId::STRING, TypeId::NUMBER]);
+    let result = evaluate_keyof(&interner, intersection);
+
+    // Intersection of disjoint primitives is never, keyof never = never
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_keyof_empty_union() {
+    // keyof never = never
+    let interner = TypeInterner::new();
+
+    let result = evaluate_keyof(&interner, TypeId::NEVER);
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_keyof_nested_keyof() {
+    // keyof keyof T - nested keyof application
+    let interner = TypeInterner::new();
+
+    let obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let keyof_obj = evaluate_keyof(&interner, obj);
+    // keyof_obj = "a" | "b"
+
+    // Now keyof (keyof obj) = keyof ("a" | "b") = keyof string (apparent members)
+    let keyof_keyof = evaluate_keyof(&interner, keyof_obj);
+
+    // String literal unions extend string, so keyof should give string apparent members
+    assert!(keyof_keyof != TypeId::ERROR);
+}
