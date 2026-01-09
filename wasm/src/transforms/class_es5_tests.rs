@@ -41287,3 +41287,682 @@ const Utility = (function() {
         output
     );
 }
+
+// =============================================================================
+// CONSTRUCTOR PARAMETER PROPERTY PATTERN TESTS
+// =============================================================================
+
+/// Test ES5 class with public parameter property
+#[test]
+fn test_class_es5_public_parameter_property() {
+    let source = r#"
+class Person {
+    constructor(public name: string, public age: number) {}
+
+    greet(): string {
+        return "Hello, " + this.name;
+    }
+}
+
+class Product {
+    constructor(
+        public id: string,
+        public title: string,
+        public price: number,
+        public category: string
+    ) {}
+
+    getInfo(): string {
+        return this.title + " - $" + this.price;
+    }
+
+    updatePrice(newPrice: number): void {
+        this.price = newPrice;
+    }
+}
+
+class Coordinate {
+    constructor(public x: number, public y: number, public z: number = 0) {}
+
+    distanceFromOrigin(): number {
+        return Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Person") && output.contains("Product") && output.contains("Coordinate"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("greet") && output.contains("getInfo") && output.contains("updatePrice") && output.contains("distanceFromOrigin"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Parameter property syntax should be stripped (no "public name:" in output)
+    assert!(
+        !output.contains("public name:") && !output.contains("public id:"),
+        "Expected parameter property syntax to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with private parameter property
+#[test]
+fn test_class_es5_private_parameter_property() {
+    let source = r#"
+class BankAccount {
+    constructor(
+        private accountNumber: string,
+        private balance: number,
+        private owner: string
+    ) {}
+
+    getBalance(): number {
+        return this.balance;
+    }
+
+    deposit(amount: number): void {
+        const update = () => {
+            this.balance += amount;
+        };
+        update();
+    }
+
+    withdraw(amount: number): boolean {
+        if (amount <= this.balance) {
+            this.balance -= amount;
+            return true;
+        }
+        return false;
+    }
+
+    getOwner(): string {
+        return this.owner;
+    }
+}
+
+class SecureStorage {
+    constructor(
+        private key: string,
+        private data: Map<string, any> = new Map()
+    ) {}
+
+    get(id: string): any {
+        const retrieve = () => this.data.get(id);
+        return retrieve();
+    }
+
+    set(id: string, value: any): void {
+        const store = () => {
+            this.data.set(id, value);
+        };
+        store();
+    }
+
+    getKey(): string {
+        return this.key;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("BankAccount") && output.contains("SecureStorage"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("getBalance") && output.contains("deposit") && output.contains("withdraw"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Parameter property syntax should be stripped
+    assert!(
+        !output.contains("private accountNumber:") && !output.contains("private key:"),
+        "Expected parameter property syntax to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with protected parameter property
+#[test]
+fn test_class_es5_protected_parameter_property() {
+    let source = r#"
+class BaseEntity {
+    constructor(
+        protected id: string,
+        protected createdAt: Date,
+        protected updatedAt: Date
+    ) {}
+
+    getId(): string {
+        return this.id;
+    }
+
+    getCreatedAt(): Date {
+        return this.createdAt;
+    }
+
+    touch(): void {
+        this.updatedAt = new Date();
+    }
+}
+
+class User extends BaseEntity {
+    constructor(
+        id: string,
+        createdAt: Date,
+        updatedAt: Date,
+        protected email: string,
+        protected role: string
+    ) {
+        super(id, createdAt, updatedAt);
+    }
+
+    getEmail(): string {
+        return this.email;
+    }
+
+    getRole(): string {
+        return this.role;
+    }
+
+    updateRole(newRole: string): void {
+        const update = () => {
+            this.role = newRole;
+            this.touch();
+        };
+        update();
+    }
+}
+
+class Document extends BaseEntity {
+    constructor(
+        id: string,
+        createdAt: Date,
+        updatedAt: Date,
+        protected title: string,
+        protected content: string
+    ) {
+        super(id, createdAt, updatedAt);
+    }
+
+    getTitle(): string {
+        return this.title;
+    }
+
+    updateContent(content: string): void {
+        this.content = content;
+        this.touch();
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("BaseEntity") && output.contains("User") && output.contains("Document"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("getId") && output.contains("getEmail") && output.contains("updateRole"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Parameter property syntax should be stripped
+    assert!(
+        !output.contains("protected id:") && !output.contains("protected email:"),
+        "Expected parameter property syntax to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with readonly parameter property pattern
+#[test]
+fn test_class_es5_readonly_parameter_property_pattern() {
+    let source = r#"
+class ImmutableConfig {
+    constructor(
+        public readonly version: string,
+        public readonly environment: string,
+        public readonly debug: boolean
+    ) {}
+
+    getVersion(): string {
+        return this.version;
+    }
+
+    isDebug(): boolean {
+        return this.debug;
+    }
+
+    getEnvironment(): string {
+        return this.environment;
+    }
+}
+
+class Point {
+    constructor(
+        public readonly x: number,
+        public readonly y: number
+    ) {}
+
+    distanceTo(other: Point): number {
+        const dx = this.x - other.x;
+        const dy = this.y - other.y;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    toString(): string {
+        return "(" + this.x + ", " + this.y + ")";
+    }
+}
+
+class DatabaseConnection {
+    constructor(
+        private readonly host: string,
+        private readonly port: number,
+        private readonly database: string,
+        private readonly user: string
+    ) {}
+
+    getConnectionString(): string {
+        const build = () => {
+            return this.user + "@" + this.host + ":" + this.port + "/" + this.database;
+        };
+        return build();
+    }
+
+    getHost(): string {
+        return this.host;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("ImmutableConfig") && output.contains("Point") && output.contains("DatabaseConnection"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("getVersion") && output.contains("distanceTo") && output.contains("getConnectionString"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Parameter property syntax should be stripped
+    assert!(
+        !output.contains("public readonly version:") && !output.contains("private readonly host:"),
+        "Expected parameter property syntax to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with parameter property with default value
+#[test]
+fn test_class_es5_parameter_property_default_value() {
+    let source = r#"
+class Logger {
+    constructor(
+        public name: string = "default",
+        public level: string = "info",
+        private prefix: string = "[LOG]"
+    ) {}
+
+    log(message: string): void {
+        console.log(this.prefix + " " + this.name + " [" + this.level + "]: " + message);
+    }
+
+    setLevel(level: string): void {
+        this.level = level;
+    }
+}
+
+class HttpClient {
+    constructor(
+        private baseUrl: string = "http://localhost",
+        private timeout: number = 5000,
+        private retries: number = 3,
+        public headers: Record<string, string> = {}
+    ) {}
+
+    async fetch(endpoint: string): Promise<any> {
+        const url = this.baseUrl + endpoint;
+        const options = {
+            timeout: this.timeout,
+            headers: this.headers
+        };
+        return { url, options };
+    }
+
+    setTimeout(timeout: number): void {
+        this.timeout = timeout;
+    }
+
+    getBaseUrl(): string {
+        return this.baseUrl;
+    }
+}
+
+class Counter {
+    constructor(
+        private value: number = 0,
+        private step: number = 1,
+        public readonly min: number = 0,
+        public readonly max: number = 100
+    ) {}
+
+    increment(): number {
+        const update = () => {
+            this.value = Math.min(this.value + this.step, this.max);
+        };
+        update();
+        return this.value;
+    }
+
+    decrement(): number {
+        const update = () => {
+            this.value = Math.max(this.value - this.step, this.min);
+        };
+        update();
+        return this.value;
+    }
+
+    getValue(): number {
+        return this.value;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Logger") && output.contains("HttpClient") && output.contains("Counter"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("log") && output.contains("fetch") && output.contains("increment") && output.contains("decrement"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Parameter property syntax should be stripped
+    assert!(
+        !output.contains("public name: string =") && !output.contains("private baseUrl: string ="),
+        "Expected parameter property syntax to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with combined parameter property patterns
+#[test]
+fn test_class_es5_combined_parameter_property_patterns() {
+    let source = r#"
+class ComplexEntity<T> {
+    constructor(
+        public readonly id: string,
+        private data: T,
+        protected metadata: Record<string, any> = {},
+        public name: string = "unnamed",
+        private readonly createdAt: Date = new Date()
+    ) {}
+
+    getId(): string {
+        return this.id;
+    }
+
+    getData(): T {
+        const retrieve = () => this.data;
+        return retrieve();
+    }
+
+    setData(data: T): void {
+        const update = () => {
+            this.data = data;
+        };
+        update();
+    }
+
+    getMetadata(): Record<string, any> {
+        return { ...this.metadata };
+    }
+
+    setMetadata(key: string, value: any): void {
+        this.metadata[key] = value;
+    }
+
+    getCreatedAt(): Date {
+        return this.createdAt;
+    }
+}
+
+class ServiceConfig {
+    constructor(
+        public readonly serviceName: string,
+        private readonly apiKey: string,
+        protected baseUrl: string = "https://api.example.com",
+        public timeout: number = 30000,
+        private retryConfig: { attempts: number; delay: number } = { attempts: 3, delay: 1000 }
+    ) {}
+
+    getApiKey(): string {
+        return this.apiKey;
+    }
+
+    getBaseUrl(): string {
+        return this.baseUrl;
+    }
+
+    getRetryConfig(): { attempts: number; delay: number } {
+        const clone = () => ({ ...this.retryConfig });
+        return clone();
+    }
+
+    updateRetryConfig(attempts: number, delay: number): void {
+        const update = () => {
+            this.retryConfig = { attempts, delay };
+        };
+        update();
+    }
+}
+
+class InheritedEntity extends ComplexEntity<string> {
+    constructor(
+        id: string,
+        data: string,
+        protected priority: number = 0,
+        private tags: string[] = []
+    ) {
+        super(id, data, {}, "inherited");
+    }
+
+    getPriority(): number {
+        return this.priority;
+    }
+
+    addTag(tag: string): void {
+        const add = () => {
+            this.tags.push(tag);
+        };
+        add();
+    }
+
+    getTags(): string[] {
+        return [...this.tags];
+    }
+
+    getFullInfo(): string {
+        const build = () => {
+            return this.getId() + ": " + this.name + " (priority: " + this.priority + ")";
+        };
+        return build();
+    }
+}
+
+class FactoryProduct {
+    private static counter = 0;
+
+    constructor(
+        public readonly productId: string = "P" + (++FactoryProduct.counter),
+        public name: string,
+        private internalCode: string = Math.random().toString(36).substring(7),
+        protected category: string = "general",
+        public readonly timestamp: number = Date.now()
+    ) {}
+
+    getCode(): string {
+        return this.internalCode;
+    }
+
+    getCategory(): string {
+        return this.category;
+    }
+
+    updateCategory(category: string): void {
+        this.category = category;
+    }
+
+    getInfo(): string {
+        const format = () => {
+            return this.productId + " - " + this.name + " [" + this.category + "]";
+        };
+        return format();
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("ComplexEntity") && output.contains("ServiceConfig") && output.contains("InheritedEntity") && output.contains("FactoryProduct"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("getId") && output.contains("getData") && output.contains("getApiKey") && output.contains("getPriority"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Parameter property syntax should be stripped
+    assert!(
+        !output.contains("public readonly id:") && !output.contains("private readonly apiKey:"),
+        "Expected parameter property syntax to be stripped: {}",
+        output
+    );
+
+    // Generic parameters should be stripped
+    assert!(
+        !output.contains("ComplexEntity<T>"),
+        "Expected generic parameters to be stripped: {}",
+        output
+    );
+}
