@@ -17078,3 +17078,359 @@ class ReactiveValue<T> {
         output
     );
 }
+
+// ============================================================================
+// Object.getOwnPropertyNames/getOwnPropertySymbols pattern tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_get_own_property_names_basic() {
+    // Basic Object.getOwnPropertyNames usage in class
+    let source = r#"
+class PropertyInspector {
+    private target: object;
+
+    constructor(target: object) {
+        this.target = target;
+    }
+
+    getPropertyNames(): string[] {
+        return Object.getOwnPropertyNames(this.target);
+    }
+
+    hasProperty(name: string): boolean {
+        return Object.getOwnPropertyNames(this.target).includes(name);
+    }
+
+    countProperties(): number {
+        return Object.getOwnPropertyNames(this.target).length;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function PropertyInspector"),
+        "Expected PropertyInspector function: {}",
+        output
+    );
+    assert!(
+        output.contains("Object.getOwnPropertyNames"),
+        "Expected getOwnPropertyNames: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_get_own_property_symbols_basic() {
+    // Basic Object.getOwnPropertySymbols usage in class
+    let source = r#"
+class SymbolInspector<T extends object> {
+    private target: T;
+
+    constructor(target: T) {
+        this.target = target;
+    }
+
+    getSymbols(): symbol[] {
+        return Object.getOwnPropertySymbols(this.target);
+    }
+
+    hasSymbol(sym: symbol): boolean {
+        return Object.getOwnPropertySymbols(this.target).includes(sym);
+    }
+
+    getSymbolCount(): number {
+        return Object.getOwnPropertySymbols(this.target).length;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function SymbolInspector"),
+        "Expected SymbolInspector function: {}",
+        output
+    );
+    assert!(
+        output.contains("Object.getOwnPropertySymbols"),
+        "Expected getOwnPropertySymbols: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_get_all_property_keys() {
+    // Combining getOwnPropertyNames and getOwnPropertySymbols
+    let source = r#"
+class KeyEnumerator {
+    getAllKeys(obj: object): (string | symbol)[] {
+        const names = Object.getOwnPropertyNames(obj);
+        const symbols = Object.getOwnPropertySymbols(obj);
+        return [...names, ...symbols];
+    }
+
+    getEnumerableKeys(obj: object): string[] {
+        return Object.getOwnPropertyNames(obj).filter(key => {
+            const descriptor = Object.getOwnPropertyDescriptor(obj, key);
+            return descriptor?.enumerable === true;
+        });
+    }
+
+    getNonEnumerableKeys(obj: object): string[] {
+        return Object.getOwnPropertyNames(obj).filter(key => {
+            const descriptor = Object.getOwnPropertyDescriptor(obj, key);
+            return descriptor?.enumerable === false;
+        });
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function KeyEnumerator"),
+        "Expected KeyEnumerator function: {}",
+        output
+    );
+    assert!(
+        output.contains("Object.getOwnPropertyNames") && output.contains("Object.getOwnPropertySymbols"),
+        "Expected both property methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_property_reflection() {
+    // Property reflection pattern with iteration
+    let source = r#"
+class ObjectReflector {
+    static copyOwnProperties<T extends object>(source: T, target: object): void {
+        for (const key of Object.getOwnPropertyNames(source)) {
+            const descriptor = Object.getOwnPropertyDescriptor(source, key);
+            if (descriptor) {
+                Object.defineProperty(target, key, descriptor);
+            }
+        }
+        for (const sym of Object.getOwnPropertySymbols(source)) {
+            const descriptor = Object.getOwnPropertyDescriptor(source, sym);
+            if (descriptor) {
+                Object.defineProperty(target, sym, descriptor);
+            }
+        }
+    }
+
+    static getPropertyMap(obj: object): Map<string | symbol, PropertyDescriptor> {
+        const map = new Map<string | symbol, PropertyDescriptor>();
+        for (const key of Object.getOwnPropertyNames(obj)) {
+            const desc = Object.getOwnPropertyDescriptor(obj, key);
+            if (desc) map.set(key, desc);
+        }
+        return map;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function ObjectReflector"),
+        "Expected ObjectReflector function: {}",
+        output
+    );
+    assert!(
+        output.contains("Object.getOwnPropertyNames"),
+        "Expected getOwnPropertyNames: {}",
+        output
+    );
+    assert!(
+        output.contains("Object.defineProperty"),
+        "Expected defineProperty: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_property_methods_in_constructor() {
+    // Property enumeration methods used in constructor
+    let source = r#"
+class ConfigLoader {
+    private properties: string[];
+    private symbols: symbol[];
+    private allKeys: (string | symbol)[];
+
+    constructor(config: object) {
+        this.properties = Object.getOwnPropertyNames(config);
+        this.symbols = Object.getOwnPropertySymbols(config);
+        this.allKeys = [...this.properties, ...this.symbols];
+    }
+
+    getProperties(): string[] {
+        return this.properties;
+    }
+
+    getSymbols(): symbol[] {
+        return this.symbols;
+    }
+
+    getAllKeys(): (string | symbol)[] {
+        return this.allKeys;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function ConfigLoader"),
+        "Expected ConfigLoader function: {}",
+        output
+    );
+    assert!(
+        output.contains("Object.getOwnPropertyNames") && output.contains("Object.getOwnPropertySymbols"),
+        "Expected property methods in constructor: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_property_methods_combined() {
+    // Combined pattern with deep cloning and property enumeration
+    let source = r#"
+class DeepCloner<T extends object> {
+    clone(source: T): T {
+        const target = Object.create(Object.getPrototypeOf(source));
+
+        // Copy string-keyed properties
+        for (const key of Object.getOwnPropertyNames(source)) {
+            const descriptor = Object.getOwnPropertyDescriptor(source, key);
+            if (descriptor) {
+                Object.defineProperty(target, key, descriptor);
+            }
+        }
+
+        // Copy symbol-keyed properties
+        for (const sym of Object.getOwnPropertySymbols(source)) {
+            const descriptor = Object.getOwnPropertyDescriptor(source, sym);
+            if (descriptor) {
+                Object.defineProperty(target, sym, descriptor);
+            }
+        }
+
+        return target;
+    }
+
+    compareKeys(a: object, b: object): boolean {
+        const aNames = Object.getOwnPropertyNames(a);
+        const bNames = Object.getOwnPropertyNames(b);
+        const aSyms = Object.getOwnPropertySymbols(a);
+        const bSyms = Object.getOwnPropertySymbols(b);
+
+        return aNames.length === bNames.length && aSyms.length === bSyms.length;
+    }
+
+    static getKeyDifference(a: object, b: object): string[] {
+        const aKeys = Object.getOwnPropertyNames(a);
+        const bKeys = new Set(Object.getOwnPropertyNames(b));
+        return aKeys.filter(key => !bKeys.has(key));
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function DeepCloner"),
+        "Expected DeepCloner function: {}",
+        output
+    );
+    assert!(
+        output.contains("Object.getOwnPropertyNames"),
+        "Expected getOwnPropertyNames: {}",
+        output
+    );
+    assert!(
+        output.contains("Object.getOwnPropertySymbols"),
+        "Expected getOwnPropertySymbols: {}",
+        output
+    );
+    assert!(
+        output.contains("Object.getPrototypeOf"),
+        "Expected getPrototypeOf: {}",
+        output
+    );
+}
