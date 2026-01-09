@@ -5257,3 +5257,70 @@ fn test_context_sensitive_default_param_inference() {
     let result = ctx.resolve_with_constraints(var_t).unwrap();
     assert_eq!(result, default_val);
 }
+
+// =============================================================================
+// Callback Parameter Inference Tests
+// =============================================================================
+
+#[test]
+fn test_callback_param_inferred_from_array_map() {
+    // Test: arr.map((x) => x.toUpperCase()) where arr: string[]
+    // The callback parameter x should be inferred as string from array element type
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Array<string>.map provides callback with (element: string) => U
+    // So T (the callback param type) has upper bound string
+    ctx.add_upper_bound(var_t, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    // Callback param inferred from array element type
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_callback_param_inferred_with_index() {
+    // Test: arr.forEach((item, index) => ...) where arr: number[]
+    // First param is number (element), second is number (index)
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    // T is the element type from Array<number>
+    ctx.add_upper_bound(var_t, TypeId::NUMBER);
+    // U is the index type (always number)
+    ctx.add_upper_bound(var_u, TypeId::NUMBER);
+
+    let result_t = ctx.resolve_with_constraints(var_t).unwrap();
+    let result_u = ctx.resolve_with_constraints(var_u).unwrap();
+
+    assert_eq!(result_t, TypeId::NUMBER);
+    assert_eq!(result_u, TypeId::NUMBER);
+}
+
+#[test]
+fn test_callback_param_inferred_from_generic_higher_order() {
+    // Test: Generic higher-order function like filter<T>(arr: T[], pred: (x: T) => boolean)
+    // When called with string[], T is inferred as string, so callback param is string
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Lower bound from argument: array contains strings
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+    // Upper bound from callback usage: predicate receives T
+    // (callback param type flows from T)
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    // T inferred as string, so callback param is string
+    assert_eq!(result, TypeId::STRING);
+}
