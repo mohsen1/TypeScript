@@ -6,13 +6,39 @@ Execute tasks assigned by EM-Forge for the Forge squad (type system).
 Status: Active
 Priority: 5
 
-## Current Assignment (TS7008 - Member Implicit Any)
+## Current Assignment (TS7006 - Parameter Implicit Any)
+- [x] Gather failing samples (call/construct/method signatures + function type aliases)
+- [x] Add implicit-any checks for signature parameters and function type nodes
+- [x] Add regression tests in `thin_checker_tests.rs`
+- [x] Run `./wasm/test.sh`
+
+### Failing Samples (Pre-fix)
+- Interface call signature: `interface ICall { (x): void; }`
+- Interface method signature: `interface IMethod { method(y): void; }`
+- Interface construct signature: `interface IConstruct { new (z): CtorTarget; }`
+- Type literal call signature: `type TLCall = { (a): void; };`
+- Type literal method signature: `type TLMethod = { method(b): void; };`
+- Type literal construct signature: `type TLConstruct = { new (c): CtorTarget; };`
+- Function type alias: `type FnAlias = (d) => void;`
+- Constructor type alias: `type CtorAlias = new (e) => CtorTarget;`
+- Property signature with function type: `interface HandlerProp { handler: (f) => void; }`
+- Type literal property with function type: `type PropAlias = { handler: (g) => void; };`
+
+### Implementation Details
+- Added TS7006 checks for parameters in call/construct/method signatures
+- Added TS7006 checks for parameters in function/constructor type nodes
+- Property signatures now recurse into their type annotations for signature checks
+
+### Test Status
+- `./wasm/test.sh` failed: `cli::driver_tests::compile_class_with_generic_constructor` (pre-existing)
+
+## Previous Assignment (TS7008 - Member Implicit Any) - COMPLETED
 - [x] Implement member implicit any checking (TS7008) in `thin_checker.rs`
 - [x] Add `MEMBER_IMPLICIT_ANY` diagnostic message and `IMPLICIT_ANY_MEMBER` code (7008)
 - [x] Check class properties without type annotation and no initializer
 - [x] Check interface/type literal property signatures without type annotation
 
-### Implementation Details
+### TS7008 Implementation Details
 - Added TS7008 check in `check_property_declaration()` for class properties
 - Added TS7008 check in `check_type_member_for_parameter_properties()` for interface/type literal properties
 - Class properties: emit error when no type annotation AND no initializer (can't infer type)

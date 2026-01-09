@@ -9704,6 +9704,16 @@ impl<'a> ThinCheckerState<'a> {
             if let Some(func_type) = self.ctx.arena.get_function_type(node) {
                 // Check each parameter for parameter property modifiers
                 self.check_parameter_properties(&func_type.parameters.nodes);
+                for &param_idx in &func_type.parameters.nodes {
+                    if let Some(param_node) = self.ctx.arena.get(param_idx) {
+                        if let Some(param) = self.ctx.arena.get_parameter(param_node) {
+                            if !param.type_annotation.is_none() {
+                                self.check_type_for_parameter_properties(param.type_annotation);
+                            }
+                            self.maybe_report_implicit_any_parameter(param, false);
+                        }
+                    }
+                }
                 // Recursively check the return type
                 self.check_type_for_parameter_properties(func_type.type_annotation);
             }
@@ -9749,6 +9759,16 @@ impl<'a> ThinCheckerState<'a> {
             if let Some(sig) = self.ctx.arena.get_signature(node) {
                 if let Some(params) = &sig.parameters {
                     self.check_parameter_properties(&params.nodes);
+                    for &param_idx in &params.nodes {
+                        if let Some(param_node) = self.ctx.arena.get(param_idx) {
+                            if let Some(param) = self.ctx.arena.get_parameter(param_node) {
+                                if !param.type_annotation.is_none() {
+                                    self.check_type_for_parameter_properties(param.type_annotation);
+                                }
+                                self.maybe_report_implicit_any_parameter(param, false);
+                            }
+                        }
+                    }
                 }
                 // Recursively check the return type
                 self.check_type_for_parameter_properties(sig.type_annotation);
@@ -9759,6 +9779,16 @@ impl<'a> ThinCheckerState<'a> {
             if let Some(sig) = self.ctx.arena.get_signature(node) {
                 if let Some(params) = &sig.parameters {
                     self.check_parameter_properties(&params.nodes);
+                    for &param_idx in &params.nodes {
+                        if let Some(param_node) = self.ctx.arena.get(param_idx) {
+                            if let Some(param) = self.ctx.arena.get_parameter(param_node) {
+                                if !param.type_annotation.is_none() {
+                                    self.check_type_for_parameter_properties(param.type_annotation);
+                                }
+                                self.maybe_report_implicit_any_parameter(param, false);
+                            }
+                        }
+                    }
                 }
                 self.check_type_for_parameter_properties(sig.type_annotation);
             }
@@ -9766,6 +9796,9 @@ impl<'a> ThinCheckerState<'a> {
         // Check property signatures for implicit any (error 7008)
         else if node.kind == syntax_kind_ext::PROPERTY_SIGNATURE {
             if let Some(sig) = self.ctx.arena.get_signature(node) {
+                if !sig.type_annotation.is_none() {
+                    self.check_type_for_parameter_properties(sig.type_annotation);
+                }
                 // Property signature without type annotation implicitly has 'any' type
                 if sig.type_annotation.is_none() {
                     if let Some(member_name) = self.get_property_name(sig.name) {

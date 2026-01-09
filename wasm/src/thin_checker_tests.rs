@@ -4053,6 +4053,54 @@ const anon = () => { return null; };
 }
 
 #[test]
+fn test_implicit_any_parameters_in_type_signatures() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// @noImplicitAny: true
+interface CtorTarget {}
+
+interface ICall {
+    (x): void;
+}
+interface IMethod {
+    method(y): void;
+}
+interface IConstruct {
+    new (z): CtorTarget;
+}
+
+type TLCall = { (a): void; };
+type TLMethod = { method(b): void; };
+type TLConstruct = { new (c): CtorTarget; };
+
+type FnAlias = (d) => void;
+type CtorAlias = new (e) => CtorTarget;
+
+interface HandlerProp {
+    handler: (f) => void;
+}
+type PropAlias = { handler: (g) => void; };
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count = |code| codes.iter().filter(|&&c| c == code).count();
+
+    assert_eq!(count(7006), 10, "Expected ten 7006 errors, got codes: {:?}", codes);
+}
+
+#[test]
 fn test_checker_lowers_element_access_array() {
     use crate::thin_parser::ThinParserState;
 
