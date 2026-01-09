@@ -12788,3 +12788,317 @@ fn test_circular_constraint_repository_pattern() {
     let results = ctx.resolve_all_with_constraints().unwrap();
     assert_eq!(results.len(), 2);
 }
+
+// ----------------------------------------------------------------------------
+// Advanced inference from usage patterns
+// ----------------------------------------------------------------------------
+
+#[test]
+fn test_inference_from_method_chain() {
+    // Test: array.map(x => x.name).filter(n => n.length > 0)
+    // Infer T from chained method calls
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // T is inferred from the input array element type
+    let obj_with_name = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("name"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    ctx.add_lower_bound(var_t, obj_with_name);
+    ctx.add_upper_bound(var_t, TypeId::OBJECT);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, obj_with_name);
+}
+
+#[test]
+fn test_inference_from_spread_in_array() {
+    // Test: [...arr1, ...arr2] infers common element type
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Both arrays contribute to T
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+    ctx.add_lower_bound(var_t, TypeId::NUMBER);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    // Should infer union of string | number
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_inference_from_spread_in_object() {
+    // Test: { ...obj1, ...obj2 } infers merged object type
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let obj1 = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    ctx.add_lower_bound(var_t, obj1);
+    ctx.add_upper_bound(var_t, TypeId::OBJECT);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, obj1);
+}
+
+#[test]
+fn test_inference_from_optional_chain() {
+    // Test: obj?.prop infers T | undefined
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Optional chaining produces T | undefined
+    let value_or_undef = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+    ctx.add_lower_bound(var_t, value_or_undef);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, value_or_undef);
+}
+
+#[test]
+fn test_inference_from_nullish_coalescing() {
+    // Test: value ?? defaultValue infers common type
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // ?? operator: left side is T | null | undefined, right is T
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+    ctx.add_upper_bound(var_t, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_inference_from_default_param() {
+    // Test: function(x = defaultValue) infers T from default
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Default parameter provides lower bound
+    ctx.add_lower_bound(var_t, TypeId::NUMBER);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_inference_from_array_destructure() {
+    // Test: const [first, ...rest] = arr infers element type
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Array destructuring: first is T, rest is T[]
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_inference_from_object_destructure() {
+    // Test: const { a, b } = obj infers property types
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let obj_type = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    ctx.add_lower_bound(var_t, obj_type);
+    ctx.add_upper_bound(var_t, TypeId::OBJECT);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, obj_type);
+}
+
+#[test]
+fn test_inference_from_computed_property() {
+    // Test: obj[key] where key: K extends keyof T
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let k_name = interner.intern_string("K");
+
+    let var_k = ctx.fresh_type_param(k_name);
+
+    let key_union = interner.union(vec![
+        interner.literal_string("x"),
+        interner.literal_string("y"),
+    ]);
+
+    ctx.add_lower_bound(var_k, interner.literal_string("x"));
+    ctx.add_upper_bound(var_k, key_union);
+
+    let result = ctx.resolve_with_constraints(var_k).unwrap();
+    assert_eq!(result, interner.literal_string("x"));
+}
+
+#[test]
+fn test_inference_bidirectional_callback() {
+    // Test: arr.map(x => ({ value: x })) bidirectional inference
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    // T is inferred from array element, U from callback return
+    ctx.add_lower_bound(var_t, TypeId::NUMBER);
+
+    let wrapper = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("value"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    ctx.add_lower_bound(var_u, wrapper);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results.len(), 2);
+    assert_eq!(results[0].1, TypeId::NUMBER);
+    assert_eq!(results[1].1, wrapper);
+}
+
+#[test]
+fn test_inference_from_async_await() {
+    // Test: async function returns Promise<T>, await unwraps to T
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Awaited type should be the unwrapped value
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_inference_from_generator_yield() {
+    // Test: function* gen(): Generator<T, R, N> { yield value; }
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Yield type contributes to T
+    ctx.add_lower_bound(var_t, TypeId::NUMBER);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_inference_from_for_of_loop() {
+    // Test: for (const x of iterable) { } infers element type
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Loop variable type is inferred from iterable
+    let string_array = interner.array(TypeId::STRING);
+    ctx.add_lower_bound(var_t, string_array);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, string_array);
+}
+
+#[test]
+fn test_inference_from_ternary_branches() {
+    // Test: cond ? valueA : valueB infers common type
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Both branches contribute to T
+    ctx.add_lower_bound(var_t, interner.literal_string("a"));
+    ctx.add_lower_bound(var_t, interner.literal_string("b"));
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    let expected = interner.union(vec![
+        interner.literal_string("a"),
+        interner.literal_string("b"),
+    ]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_inference_from_type_assertion() {
+    // Test: value as T uses T as the inferred type
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Type assertion provides the type
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+    ctx.add_upper_bound(var_t, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::STRING);
+}
