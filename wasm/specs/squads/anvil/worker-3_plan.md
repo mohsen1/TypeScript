@@ -50,13 +50,33 @@ After fixes, direct checker runs on the private name test files produce **no err
 - `privateNameStaticsAndStaticMethods.ts` - No errors
 - `privateNameStaticAccessorsAccess.ts` - No errors
 
-### Remaining Issues Identified
+### Session 2: Abstract Constructor Type Parsing (2026-01-09)
 
-The mixin class tests (`mixinAbstractClasses.ts`, `mixinClassesAnonymous.ts`) fail due to **`abstract new` syntax** not being supported by the parser:
-```typescript
-function Mixin<TBaseClass extends abstract new (...args: any) => any>(baseClass: TBaseClass)
-```
-This is a separate parser issue - the abstract constructor type syntax needs parser support.
+5. **Support abstract constructor types** (`thin_parser.rs:6583-6597, thin_node.rs:672-674`)
+   - Issue: `abstract new (...args: any) => any` caused parser errors (TS1005, TS1109)
+   - Root cause: `parse_primary_type` didn't recognize `abstract` before `new`
+   - Fix:
+     - Added `is_abstract: bool` field to `FunctionTypeData`
+     - Added look-ahead in `parse_primary_type` to detect `abstract new`
+     - Updated `parse_constructor_type` to accept `is_abstract` parameter
+
+6. **Unit test added** (`thin_checker_tests.rs`):
+   - `test_abstract_constructor_type_parses` - Tests abstract constructor type syntax in generic constraints
+
+### Verification Results - Session 2
+
+After abstract constructor type fix:
+- `mixinAbstractClasses.ts` - Parser errors eliminated (0 → remaining TS2339 are type inference issues)
+- `mixinClassesAnonymous.ts` - Parser errors eliminated (remaining TS2339 are type inference issues)
+
+### Remaining Issues
+
+The mixin class tests still have TS2339 errors, but these are now **type inference issues** (not parser issues):
+- Complex generic type parameter inference with constraints
+- Intersection types with callable signatures
+- Class extends via call expressions (`extends Mixin(ConcreteBase)`)
+
+These require deeper checker work beyond the scope of basic TS2339 false positive fixes.
 
 TSC correctly finds `name` by walking up the inheritance chain.
 
