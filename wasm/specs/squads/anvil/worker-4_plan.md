@@ -7,12 +7,13 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [ ] Add ES5 class tests for Symbol.asyncIterator in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
+- [ ] (none)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Add ES5 class tests for Symbol.asyncIterator. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for Symbol.species. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for Symbol.isConcatSpreadable. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for Symbol.toPrimitive. Tests: `./wasm/test.sh class_es5_tests`
