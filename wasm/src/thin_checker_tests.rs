@@ -12922,3 +12922,63 @@ x.type;
     let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
 }
+
+#[test]
+fn test_builtin_types_no_ts2304_errors() {
+    // Regression test: Global types like Promise, Array, Map should not cause
+    // TS2304 "Cannot find name" errors when lib.d.ts is not loaded.
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// Type references with type arguments
+declare const promise: Promise<string>;
+declare const promiseLike: PromiseLike<number>;
+declare const map: Map<string, number>;
+declare const set: Set<string>;
+declare const array: Array<number>;
+declare const readonlyArray: ReadonlyArray<string>;
+declare const partial: Partial<{x: number}>;
+declare const required: Required<{x?: number}>;
+declare const readonly: Readonly<{x: number}>;
+declare const record: Record<string, number>;
+declare const iterator: Iterator<number>;
+declare const iterable: Iterable<string>;
+
+// Type alias with builtin generic
+type MyPromise<T> = Promise<T>;
+declare const myPromise: MyPromise<boolean>;
+
+// typeof with global constructor
+declare const PromiseConstructor: typeof Promise;
+declare const ArrayConstructor: typeof Array;
+declare const MapConstructor: typeof Map;
+
+// Interface extending builtin
+interface MyError extends Error {
+    customField: string;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Filter for TS2304 errors (Cannot find name)
+    let ts2304_errors: Vec<_> = checker.ctx.diagnostics
+        .iter()
+        .filter(|d| d.code == 2304)
+        .collect();
+
+    assert!(
+        ts2304_errors.is_empty(),
+        "Should not emit TS2304 errors for builtin types, got: {:?}",
+        ts2304_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+}
