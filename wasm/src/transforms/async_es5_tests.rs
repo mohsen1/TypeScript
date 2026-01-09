@@ -2397,6 +2397,26 @@ fn test_async_method_expr_conditional() {
     );
 }
 
+#[test]
+fn test_async_method_expr_computed_name() {
+    let source = "const obj = { async [key]() { return await load(key); } };";
+    let output = parse_and_emit_async_method_expr(source);
+    assert!(
+        output.contains("switch (_a.label)"),
+        "Computed async method should emit switch: {}",
+        output
+    );
+    assert!(
+        output.contains("[4 /*yield*/"),
+        "Computed async method should emit yield: {}",
+        output
+    );
+    assert!(
+        method_expr_body_contains_await(source),
+        "Should detect await in computed async method expression"
+    );
+}
+
 // =============================================================================
 // Async generator function tests (async function*)
 // =============================================================================

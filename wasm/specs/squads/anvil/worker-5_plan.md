@@ -14,6 +14,7 @@ Priority: 5
 
 
 ## Completed
+- [x] Added computed-name async method expression test in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (PASS).
 - [x] Fixed async object literal method parsing to set async/generator context flags in `wasm/src/thin_parser.rs`; ran `./wasm/test.sh async_es5_tests` (PASS).
 - [x] Verified async Map/Set pattern tests already present in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (fails: `test_async_method_expr_basic`, `test_async_method_expr_body_contains_await`).
 - [x] Added 6 async Proxy/Reflect pattern tests (proxy_handler, reflect_apply, proxy_revocable, reflect_construct, trap_chain, combined) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (1066 tests PASS).
