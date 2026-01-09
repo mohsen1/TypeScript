@@ -17,7 +17,7 @@ Priority: 3
 - [ ] Once class inheritance type checking works, update `test_concrete_extends_abstract` and `test_best_common_type_class_hierarchy` to expect 0 errors.
 - [ ] Once namespace-interface value merging works, update `test_namespace_interface_merging` to expect 0 errors.
 - [ ] Once enum member access works, update `test_enum_namespace_merging` to expect 0 errors.
-- [ ] Pick the next unsoundness case from `wasm/specs/TS_UNSOUNDNESS_CATALOG.md` and add coverage if missing.
+- [x] Pick the next unsoundness case from `wasm/specs/TS_UNSOUNDNESS_CATALOG.md` and add coverage if missing. All 44 catalog items are already covered.
 
 ## Completed
 - [x] Object vs object vs {} trifecta (TS unsoundness #20): add thin checker coverage for object keyword vs empty object. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).

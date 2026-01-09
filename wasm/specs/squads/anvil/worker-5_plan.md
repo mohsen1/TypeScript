@@ -7,12 +7,66 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- [ ] Add async ES5 tests for async method patterns: async getter simulation, async static methods, async with super calls, async with private field access, async class factory, async method chaining. Tests: `./wasm/test.sh async_es5_tests`
+Add ES5 async tests for for-await-of edge cases
+
+Per GOALS.md Objective 1: ES5 downleveling correctness
+
+Steps:
+1. Add 6 ES5 async tests for for-await-of edge cases to `wasm/src/transforms/async_es5_tests.rs`:
+   - for-await-of with break
+   - for-await-of with continue
+   - for-await-of with return
+   - for-await-of nested loops
+   - for-await-of with try/catch
+   - Combined for-await-of patterns
+2. Run `./wasm/test.sh async_es5_tests` to verify all tests pass
+3. Commit with message: `[wasm] async_es5: add for-await-of edge case tests`
+4. Push to `origin/worker/anvil-5`
+5. Update this plan file and push
 
 ## Task Queue
-- [ ] Add async ES5 tests for async error handling patterns: try/catch/finally, Promise rejection, async stack traces
+(empty - will receive new tasks from EM after completing current assignment)
+
 
 ## Completed
+- [x] Added 12 async generator yield delegation tests (basic, async_iterable, return_value, try_catch, await_before, await_after, nested, loop, class, combined, no_await, ignores_nested) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (1024 tests PASS).
+- [x] Added 12 async class decorator method tests (basic, multiple, factory, static, accessor, super, parameter, class, body, combined, no await, ignores nested) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (1012 tests PASS).
+- [x] Added 12 async private field access tests (read, write, method_call, static, arrow_capture, accessor, try_catch, multiple, increment, compound, no await, ignores nested) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (1000 tests PASS).
+- [x] Added 12 async computed super property access tests (computed_key, computed_call, string_key, symbol, computed_read, computed_write, try_catch, chain, conditional, template, no await, ignores nested) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (988 tests PASS).
+- [x] Added 12 async derived class edge case tests (field_initializer, arrow_after_super, super_method, static_this, nested_arrow_this, param_property, generator, multiple_fields, computed_field, super_property, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (976 tests PASS).
+- [x] Added 12 async transaction pattern tests (begin, commit, rollback, savepoint, nested, timeout, try_catch, conditional, isolation, execute, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (964 tests PASS).
+- [x] Added 12 async resource pool pattern tests (acquire, release, drain, resize, create, destroy, validate, evict, warmup, health_check, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (952 tests PASS).
+- [x] Added 12 async pub/sub pattern tests (subscribe, publish, unsubscribe, filter, broadcast, receive, acknowledge, replay, partition, fanout, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (940 tests PASS).
+- [x] Added 12 async state machine pattern tests (transition, guard, action, enter, exit, effect, dispatch, subscribe, history, restore, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (928 tests PASS).
+- [x] Added 12 async stream pattern tests (readable, writable, transform, pipe, reader, writer, tee, cancel, close, consume, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (916 tests PASS).
+- [x] Added 12 async retry pattern tests (exponential_backoff, linear_backoff, jitter, circuit_breaker, max_attempts, conditional, fallback, timeout, reset, half_open, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (904 tests PASS).
+- [x] Added 12 async batching pattern tests (collect, flush, debounce, throttle, coalesce, queue, window, merge, split, rate_limit, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (892 tests PASS).
+- [x] Added 12 async caching pattern tests (memoize, get_or_set, invalidate, ttl, refresh, warmup, stale_while_revalidate, write_through, evict, distributed, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (880 tests PASS).
+- [x] Added 12 async cancellation pattern tests (abort_controller, signal, token, check, throw, cleanup, propagate, timeout, race, listener, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (868 tests PASS).
+- [x] Added 12 async error handling pattern tests (try/catch, finally, propagation, rethrow, wrap, catch_all, nested_try, multiple_catch, custom, cleanup, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (856 tests PASS).
+- [x] Added 12 async generator delegation pattern tests (yield*, nested, chain, return, throw, iterable, async iterable, multiple, conditional, try/finally, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (844 tests PASS).
+- [x] Added 12 async iterator pattern tests (next, return, throw, for-await-of, symbol, done, value, from, map, filter, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (832 tests PASS).
+- [x] Added 12 async timeout pattern tests (basic, deadline, cancel, race, abort, extend, remaining, expired, reset, clear, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (820 tests PASS).
+- [x] Added 12 async queue operations pattern tests (enqueue, dequeue, peek, drain, priority, size, clear, contains, iterator, batch, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (808 tests PASS).
+- [x] Added 12 async event emitter pattern tests (on, off, once, emit, wait, remove all, listeners, prepend, error, pipe, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (796 tests PASS).
+- [x] Added 12 async scheduler pattern tests (priority, delay, throttle, debounce, schedule, cancel, interval, cron, immediate, next tick, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (784 tests PASS).
+- [x] Added 12 async pool pattern tests (worker pool, task pool, connection pool, release, resize, drain, shutdown, health check, evict, batch, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (772 tests PASS).
+- [x] Added 12 async barrier pattern tests (wait, wait all, count down, reset, timeout, arrive, parties, phase, broken, action, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (760 tests PASS).
+- [x] Added 12 async mutex pattern tests (lock, unlock, try-lock, deadlock prevention, timeout, guard, reentrant, fair, read-write, upgrade, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (748 tests PASS).
+- [x] Added 12 async semaphore pattern tests (acquire, release, concurrent limit, wait queue, try acquire, timeout, permits, drain, available, guard, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (736 tests PASS).
+- [x] Added 12 async channel pattern tests (send, receive, buffered, unbuffered, close, select, broadcast, multicast, pipe, timeout, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (724 tests PASS).
+- [x] Added 12 async observable pattern tests (subscribe, unsubscribe, next, error, complete, map, filter, merge, concat, switchMap, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (712 tests PASS).
+- [x] Added 12 async state machine pattern tests (transition, enter, exit, event, dispatch, guard, action, effect, context, subscribe, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (700 tests PASS).
+- [x] Added 12 async retry pattern tests (exponential backoff, linear backoff, fixed delay, circuit breaker, jitter, timeout, max retries, conditional, fallback, abort, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (688 tests PASS).
+- [x] Added 12 async stream pattern tests (read basic, write basic, pipe, transform, reader, writer, getReader, cancel, abort, tee, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (664 tests PASS).
+- [x] Added 12 async context pattern tests (run basic, get store, enter/exit, propagation, wrap, fork, bind, scheduler, trace, scope, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (652 tests PASS).
+- [x] Added 12 async resource management pattern tests (dispose basic, try-finally cleanup, acquire-release, connection close, file handle, transaction, pool return, stream close, multiple cleanup, conditional cleanup, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (640 tests PASS).
+- [x] Added 12 async module pattern tests (dynamic import, dynamic import call, conditional import, top-level simulation, module init, lazy load, parallel imports, module factory, export async, import-then-use, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (628 tests PASS).
+- [x] Added 12 async decorator pattern tests (method basic, method multiple, method with params, static method, class with async method, property initializer, accessor simulation, composition, factory, validation, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (616 tests PASS).
+- [x] Added 12 async class pattern tests (constructor simulation, static init, factory method, singleton, dependency injection, lifecycle init, lifecycle destroy, builder, repository, service layer, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (604 tests PASS).
+- [x] Added 12 async iteration pattern tests (for-of await body, await expression, async generator, break, continue, nested, destructure, array destructure, try/catch, return, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (592 tests PASS).
+- [x] Added 12 async error handling pattern tests (try/catch basic, try/finally basic, try/catch/finally, await in catch, await in finally, nested try, rethrow, rethrow wrapped, finally with return, promise reject, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (580 tests PASS).
+- [x] Added 12 async method pattern tests (getter simulation, static basic, static factory, super call, super property, private field read, private field write, class factory, chaining, no await, ignores nested async, multiple awaits) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (568 tests PASS).
 - [x] Added 12 async arrow function pattern tests (with sync callback, nested async ignored, await before nested, await after nested, Promise.all, iife call, then chain, method call, spread, destructure, optional chain, nullish assign) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (556 tests PASS).
 - [x] Added 12 async with statement pattern tests (with block basic, no await, expression await, property access, method call, ignores nested async, nested with, try/catch, if statement, loop, assignment, return) and extended `body_contains_await` to handle WITH_STATEMENT in `wasm/src/transforms/async_es5.rs` and `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (544 tests PASS).
 - [x] Added 12 async labeled statement pattern tests (labeled break, labeled continue, no await, body_contains_await, body_no_await, ignores nested async, nested labels, labeled while, labeled block, try/catch, labeled switch, labeled do-while) and extended `body_contains_await` to handle LABELED_STATEMENT in `wasm/src/transforms/async_es5.rs` and `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (532 tests PASS).

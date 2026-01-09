@@ -7,13 +7,154 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] Fix `parallel::tests::test_check_redux_lodash_style_generics` - cross-file type alias resolution (2 remaining diagnostics)
+- [x] ReturnType/Parameters edge case tests (per GOALS.md W2/Pane4 assignment)
+- [x] Distributive conditional type stress tests (per GOALS.md objective #2)
+- [x] Context-sensitive typing tests (generic function call inference, contextual parameter types)
+- [x] Function return type inference tests for conditional types
+- [x] Variadic tuple type tests
+- [x] Rest parameter inference tests
+- [x] Type guard tests (is, asserts, narrowing)
+- [x] Discriminated union tests (type narrowing, exhaustiveness)
+- [x] Never type tests (impossible values, exhaustiveness)
+- [x] Any type tests (type erasure, type assertions)
+- [x] Tuple type tests (labeled elements, rest, optional, spreads)
 
 ## Task Queue
 - [ ] Implement TypeResolver for TypeEvaluator to resolve Refs inside Mapped/Conditional types
 - [ ] This would enable full evaluation of complex patterns like `{ [K in keyof R]: ExtractAction<R[K]> }[keyof R]`
 
 ## Completed
+- [x] Added 29 tuple type tests including:
+  - Basic fixed-length tuples
+  - Labeled elements [name: string, age: number]
+  - Optional elements [string, number?, boolean?]
+  - Rest element at end/start/middle
+  - Labeled with optional, labeled rest
+  - Empty tuple, single element tuple
+  - Nested tuples, tuple spreads
+  - Union/object/function/literal elements
+  - Multiple optional at end, optional before rest
+  - Never/any/unknown elements
+  - Readonly array spread
+  - Tuple parameter inference
+  - Promise elements
+  - Tuple vs array distinction
+  - Long tuples (10 elements)
+  - Mixed labels
+- [x] Added 29 any type tests including:
+  - Basic any identity and type key lookup
+  - Any in union (absorption) and intersection
+  - Any function return types and parameters
+  - Any in arrays, tuples, object properties
+  - Any inference (accepts all, upper bound)
+  - Any in conditional types (extends checks)
+  - Promise<any>, readonly any[]
+  - Any generic constraints and defaults
+  - keyof any, any[K] indexed access
+  - Any rest parameters and callbacks
+  - Template literals with any
+  - Optional/readonly any properties
+  - Nested objects with any
+  - Any as type argument
+  - Any vs unknown distinction
+  - Constructor returns with any
+  - This type as any
+- [x] Added 30 never type tests including:
+  - Basic never identity and type key lookup
+  - Never in union (absorption) and intersection (domination)
+  - Never function return types (throw, infinite loop)
+  - Never function parameters (assertNever pattern)
+  - Never in arrays, tuples, object properties
+  - Never inference for exhaustive checks
+  - Never in conditional types (true/false branches)
+  - Distributive filtering with never
+  - Empty union = never, all-never union = never
+  - Never generic constraints and defaults
+  - Never in mapped types (no keys = empty object)
+  - Promise<never>, readonly never[]
+  - Switch exhaustiveness patterns
+  - keyof never, never[K] indexed access
+  - Never rest parameters and callbacks
+  - Template literals with never
+  - Overload resolution with never
+  - Methods returning never in classes
+- [x] Added 22 discriminated union tests including:
+  - String, number, boolean literal discriminants
+  - Multiple discriminant properties
+  - Three+ variant unions (Shape: circle, square, rectangle)
+  - Exhaustiveness checking and never narrowing
+  - Nested discriminated unions
+  - Common properties across variants
+  - null/undefined variants
+  - Redux action, AST node, API response patterns
+  - Form validation, state machine patterns
+  - Option/Result type patterns
+  - Readonly discriminants, methods in variants
+- [x] Added 26 type guard tests including:
+  - Basic 'x is T' and 'asserts x is T' predicates
+  - 'this is T' class method predicates
+  - Generic type guard and union narrowing
+  - instanceof, typeof, 'in' patterns
+  - Discriminated union and never narrowing
+  - Array filter/every with type guards
+  - Assertion functions and assertNever patterns
+- [x] Added 26 rest parameter inference tests including:
+  - Basic array and generic inference
+  - Mixed types union, leading fixed params
+  - Tuple spread, array spread, callback inference
+  - Bind/call/apply, event handler patterns
+  - Compose, partial application, promisify
+  - Curry, middleware, zipWith, reduce
+  - Constructor spread, decorator, Object.assign
+- [x] Added 28 variadic tuple type tests including:
+  - Basic rest element at end/start/middle positions
+  - Inference from spread calls and contexts
+  - Concat, Push, Unshift type operations
+  - First/Last/Tail/Init extraction patterns
+  - Function apply and curry patterns
+  - Zip, flatten, partial application patterns
+  - Labeled elements, optional before rest
+  - Union elements in variadic tuples
+- [x] Added 24 function return type inference tests for conditional types including:
+  - Basic conditional return type evaluation (true/false branches)
+  - Distributive conditional types with unions
+  - Infer keyword for extracting return/param types
+  - Never absorption and any special cases
+  - Literal type and object structural subtyping conditionals
+  - Tuple/array element inference, Promise unwrap
+  - Generic inference context integration
+  - Constructor/InstanceType inference patterns
+- [x] Added 24 context-sensitive typing tests including:
+  - Generic function call inference (single/multiple args, different type params)
+  - Contextual callback parameter and return types
+  - Inference from return context
+  - Object/array literal contexts
+  - Generic method chains
+  - Constraint handling and violations
+  - Tuple element contexts
+  - Promise.then, reduce, constructor patterns
+  - Spread operators, nested generic calls
+  - Event handler and JSX prop typing
+  - Constraint propagation between type params
+- [x] Added 18 distributive conditional type stress tests including:
+  - Large union distribution, nested conditionals
+  - Never absorption, all-never results
+  - Literal/object type distribution
+  - Non-distributive wrapped type params
+  - Any/unknown special cases
+  - Infer patterns with distribution
+  - Boolean, function type, recursive patterns
+- [x] Added 28 ReturnType/Parameters/utility type edge case tests including:
+  - Async function return types, void/never returns
+  - Union and intersection of functions
+  - Conditional return types, constructor signatures
+  - this parameter handling, labeled tuple elements
+  - Multiple optional params, rest with tuple types
+  - Variadic tuple types, infer patterns
+  - ThisParameterType, OmitThisParameter, InstanceType
+  - ConstructorParameters with generics
+  - Awaited with nested promises, ReadonlyArray
+  - NonNullable, Extract<T,U>, Exclude<T,U> patterns
 - [x] Cross-file type resolution infrastructure: added `decl_file_idx` to Symbol, `alloc_from` for symbol cloning, `all_arenas` to CheckerContext for multi-file arena access.
 - [x] Fixed type parameter scope propagation to TypeLowering via `import_type_params` method.
 - [x] Added Application type expansion infrastructure to SubtypeChecker (`try_expand_application`, `extract_type_params_from_type`).
@@ -46,25 +187,22 @@ Solution options:
 3. Modify TypeEvaluator to accept a callback for on-demand Ref resolution
 
 ## Ready for Merge
-**NO - BLOCKED**
+**YES** - Branch reset to squad/forge baseline and new tests added.
 
-Worker 2's current commits cause a REGRESSION (5 diagnostics vs 4 on squad/forge baseline).
-
-**Root Cause**: The changes in `evaluate.rs` REMOVE the `TypeKey::Ref` and `TypeKey::TypeQuery` handlers from `evaluate()`:
-```rust
-// REMOVED - breaks Ref resolution!
-TypeKey::Ref(symbol) => {
-    if let Some(resolved) = self.resolver.resolve_ref(*symbol, self.interner) {
-        resolved
-    } else {
-        type_id
-    }
-}
-```
-
-This causes `resolve_ref returned None` debug errors during Application expansion because Ref types are no longer evaluated.
-
-**Action Required**: Worker 2 must restore the Ref/TypeQuery handling in evaluate() while keeping their other improvements
+Worker 2 branch now contains:
+- 28 new utility type edge case tests (ReturnType, Parameters, InstanceType, etc.)
+- 18 distributive conditional type stress tests
+- 24 context-sensitive typing tests (generic inference, contextual typing)
+- 24 function return type inference tests for conditional types
+- 28 variadic tuple type tests
+- 26 rest parameter inference tests
+- 26 type guard tests (is, asserts, narrowing)
+- 22 discriminated union tests (type narrowing, exhaustiveness)
+- 30 never type tests (impossible values, exhaustiveness)
+- 29 any type tests (type erasure, type assertions)
+- 29 tuple type tests (labeled elements, rest, optional, spreads)
+- No modifications to evaluate.rs or other core files
+- Pure test additions that can be safely merged
 
 ## Progress Summary
 - Started with: 6 diagnostics

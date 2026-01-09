@@ -7,7 +7,32 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- [ ] [EM: Add queued tasks]
+- [x] Investigate `ExtractState<R>` and `ExtractAction<R>` conditional infer patterns from `test_check_redux_lodash_style_generics`. These use `infer S` inside mapped type values. Test in isolation in `wasm/src/solver/evaluate_tests.rs`.
+
+### Investigation Results
+
+**Pattern Analysis:**
+- `ExtractState<R> = R extends Reducer<infer S, AnyAction> ? S : never` where `Reducer<S,A> = (state: S | undefined, action: A) => S`
+- The key pattern is matching `(state: infer S | undefined, action: AnyAction) => infer S` against a concrete reducer function
+- This requires matching source union `number | undefined` against pattern union `infer S | undefined`
+
+**Implementation:**
+1. Added `TypeKey::Union` pattern handling in `match_infer_pattern` (evaluate.rs:3382-3489)
+   - Handles union patterns containing a single `infer` type variable
+   - When source is a union: matches source members against non-infer pattern members, binds infer to remaining
+   - When source is not a union: binds infer to source if source doesn't match any non-infer pattern member
+
+2. Added isolated tests in `evaluate_tests.rs`:
+   - `test_conditional_infer_union_pattern_simple` - basic `number | undefined` vs `infer S | undefined`
+   - `test_conditional_infer_union_pattern_multiple_non_infer` - with multiple non-infer members
+   - `test_conditional_infer_union_pattern_multiple_source_members` - source has more members than pattern
+   - `test_conditional_infer_function_param_union_pattern` - full function pattern with union param (TODO: needs function-level integration)
+   - `test_conditional_infer_extract_state_pattern` - existing test updated with TODO
+
+**Status:**
+- Basic union pattern matching works (3 tests pass)
+- Function-level integration (ExtractState pattern) still returns `never` due to complex function matching flow
+- Pre-existing test failures in origin/rust merge unrelated to this change
 
 ## Task Queue
 - [x] Add tests for function `this`-parameter inference (contextual typing + call-site inference) in `wasm/src/solver/infer_tests.rs`.
@@ -216,7 +241,7 @@ type Guard = (x: any) => x is Guard;  // Guard references itself in predicate
 - [x] Updated non-distributive union object inference expectation (tests not run).
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize solver correctness (inference/conditional/subtype) before new features.

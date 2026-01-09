@@ -7,12 +7,61 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] Add ES5 parity tests for private method patterns: private async methods, private generator methods, private accessors. Tests: `./wasm/test.sh emitter_parity`
+Add ES5 mixin patterns parity tests
+
+Per GOALS.md Objective 1: ES5 downleveling correctness
+
+Steps:
+1. Add 6 ES5 mixin patterns parity tests to `wasm/src/thin_emitter/emitter_parity_tests.rs`:
+   - Basic mixin function pattern
+   - Mixin with generics
+   - Multiple mixin composition
+   - Mixin with static members
+   - Mixin with private fields
+   - Combined mixin patterns
+2. Run `./wasm/test.sh emitter_parity` to verify all tests pass
+3. Commit with message: `[wasm] emitter: add mixin patterns parity tests`
+4. Push to `origin/worker/anvil-2`
+5. Update this plan file and push
 
 ## Task Queue
 (empty)
 
 ## Completed
+- [x] Added ES5 abstract class patterns parity tests (abstract-methods, implemented-methods, static-members, inheritance-chain, generics, combined-patterns) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (407 tests).
+- [x] Added ES5 private class features parity tests (inheritance-chain, static-initialization-order, async-patterns, accessor-computed-values, conditional-expr, combined-generics) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (401 tests).
+- [x] Added ES5 class decorator patterns parity tests (class-private-fields, method-computed-name, accessor-pair, parameter-constructor, inheritance-override, combined-all) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (395 tests).
+- [x] Added ES5 Generator patterns parity tests (basic-yield, yield-star, conditional-return, throw, resource-management, combined) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (389 tests).
+- [x] Added ES5 Iterator patterns parity tests (Symbol.iterator, next, return, throw) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (383 tests).
+- [x] Added ES5 Promise patterns parity tests (all, race, allSettled, any) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (379 tests).
+- [x] Added ES5 WeakRef patterns parity tests (deref, FinalizationRegistry, weak-cache, async) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (375 tests).
+- [x] Added ES5 Proxy patterns parity tests (handler-traps, revocable, Reflect-integration, class-wrapper) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (371 tests).
+- [x] Added ES5 Symbol patterns parity tests (well-known, Symbol.for, Symbol.keyFor, computed-class) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (367 tests).
+- [x] Added ES5 BigInt patterns parity tests (literal, arithmetic, comparison, method-calls) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (363 tests).
+- [x] Added ES5 nullish coalescing patterns parity tests (complex-expressions, class-context, function-calls, nested-defaults) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (359 tests).
+- [x] Added ES5 optional chaining patterns parity tests (deep-nested, class-methods, generics, mixed-access) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (355 tests).
+- [x] Added ES5 spread/rest patterns parity tests (object-literal-methods, async-error-handling, custom-iterables, generic-signatures) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (351 tests).
+- [x] Added ES5 destructuring patterns parity tests (function-params-complex, mixed-patterns, computed-defaults, class-methods) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (347 tests).
+- [x] Added ES5 arrow function edge case parity tests (deeply-nested-this, class-field-context, rest-spread-complex, callback-chains) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (343 tests).
+- [x] Added ES5 class field patterns parity tests (public-initializers, decorated, computed-dynamic, inheritance-chain) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (339 tests).
+- [x] Added ES5 for-of/for-in patterns parity tests (for-in-typed, for-in-computed, custom-iterator, map-set-destruct) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (335 tests).
+- [x] Added ES5 async function patterns parity tests (arrow-destructuring, method-computed-this, generator-symbol-iterator, await-advanced) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (331 tests).
+- [x] Added ES5 generator method patterns parity tests (yield-conditional, yield-argument, delegation-nested, async-promise-all) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (327 tests).
+- [x] Added ES5 super call patterns parity tests (property-access, method-computed, async-method, in-arrow) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (323 tests).
+- [x] Added ES5 static block patterns parity tests (complex-init-order, interleaved, async-pattern) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (319 tests).
+- [x] Added ES5 private field patterns parity tests (instance-methods, static-complex, method-context, accessor-validation) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (316 tests).
+- [x] Added ES5 class accessor patterns parity tests (auto-accessor, computed-symbol, inherited-override) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (312 tests).
+- [x] Added ES5 template literal patterns parity tests (tagged-complex, spans-complex, deeply-nested, raw-strings) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (309 tests).
+- [x] Added ES5 module patterns parity tests (dynamic-import, top-level-await, import-meta) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (305 tests).
+- [x] Added ES5 async iteration patterns parity tests (for-await-generator, async-iterator-protocol, symbol-asyncIterator) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (302 tests).
+- [x] Added ES5 decorator patterns parity tests (class-chaining, method-descriptor, parameter-injection) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (299 tests).
+- [x] Added ES5 class inheritance patterns parity tests (extends-clause, super-calls, method-overrides, abstract-class) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (296 tests).
+- [x] Added ES5 import/export patterns parity tests (reexport, barrel-file, type-only-imports) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (292 tests).
+- [x] Added ES5 enum patterns parity tests (const-usage, reverse-mapping, string-values, computed-complex) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (289 tests).
+- [x] Added ES5 namespace patterns parity tests (merging, exports, deeply-nested) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (285 tests).
+- [x] Added ES5 computed property patterns parity tests (method-call, function-call, typed) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (282 tests).
+- [x] Added ES5 class expression patterns parity tests (return, argument, extends-computed, implements, array, iife) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (279 tests).
+- [x] Added ES5 private method patterns parity tests (async-method-complex, generator-method, accessor-complex) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (273 tests).
 - [x] Added ES5 class static block patterns parity tests (async, private-access, init-order, super) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (270 tests).
 - [x] Added ES5 for-await-of patterns parity tests (class-method, error-handling, nested-destructuring) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (266 tests).
 - [x] Added ES5 generator function patterns parity tests (typed-yields, delegation, async-await, class-method-this, try-finally, complex-return) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (263 tests).

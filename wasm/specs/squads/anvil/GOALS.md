@@ -5,49 +5,37 @@ Updated: 2026-01-09
 Priority: 2
 
 ---
-## 🚨 URGENT: EM-ANVIL ACTION REQUIRED
+## ⚠️ TMUX REMINDER - CHECK FOR HANGING PROMPTS
 
-**CHECK WORKER ASSIGNMENTS - CORRECT IF WRONG**
+**NEVER forget to pause 1 second before pressing Enter in tmux!**
 
-If any worker is NOT following their assigned task:
-1. **Send ESC key** to stop their active work
-2. Reassign per the assignments below
-3. Workers 3-5 MUST be on CONFORMANCE HARNESS, not manual tests
-4. Workers 1-2 MUST be on bug fixes only, not new features
+1. After sending any message, wait 1 second, THEN send Enter (C-m)
+2. Check all worker panes for prompts that may be hanging (message sent but no activity)
+3. If a prompt is hanging, send Enter again: `sleep 1 && tmux send-keys -t <pane> C-m`
+
+**Do this check NOW and periodically throughout your session.**
 
 ---
-## 📢 EM-ANVIL: DIRECTIVE UPDATE
+## 📢 EM-ANVIL: READ THIS - DIRECTIVE FROM DIRECTOR
 
-**Operation Crucible - NEW APPROACH:**
+**Operation Crucible is NOW IN EFFECT.** Your squad has been restructured:
 
-1. **Workers 1-2**: Bug fixes ONLY (`super["m"]` in async, nested arrow `this` capture)
-2. **Workers 3-5**: Build CONFORMANCE HARNESS (not manual parity tests)
-3. **⛔ STOP writing manual parity tests** - low leverage approach
+1. **Workers 1-2**: Bug fixes ONLY. No new ES5 tests, no new transforms.
+2. **Workers 3-5**: REASSIGNED to Crucible. They now port solver tests from official TS repo.
+3. **Reject any PR** that adds new emitter features.
 
-### Why Conformance Harness > Manual Tests
-
-The `tests/cases/compiler/` directory has **6,500+ test files** with expected baselines.
-We have **124+ hand-written parity tests** that duplicate this effort.
-
-**Better approach:**
-```rust
-#[test]
-fn test_conformance_2dArrays() {
-    run_conformance_test("tests/cases/compiler/2dArrays.ts");
-}
-```
-
-Where `run_conformance_test` reads the file, compiles it, and diffs against `tests/baselines/reference/`.
+Please acknowledge by updating Squad Status below.
 
 ---
 
-## ⚠️ OPERATION CRUCIBLE - CONFORMANCE HARNESS
+## ⚠️ OPERATION CRUCIBLE - TACTICAL SHIFT
 
-**Build automated conformance testing, not manual parity tests.**
+**Emitter is 80% complete. MAINTENANCE MODE activated.**
 
-- **Squad reduced to 2 workers** (workers 1-2) on bug fixes
-- **Workers 3-5**: Build conformance harness infrastructure
-- **⛔ NO MORE MANUAL PARITY TESTS** - invest in automation
+- **Squad reduced to 2 workers** (workers 1-2)
+- **Bug fixes ONLY** - critical source map bugs and blocking ES5 regressions
+- **⛔ NO NEW TRANSFORMS** - stop feature work
+- Workers 3-5 reassigned to **Crucible Tasks** (test porting)
 
 ## Current Milestone
 Phase 8 - Conformance, Convergence, and Hardening: Output fidelity across the integrated pipeline, driven by conformance tests.
@@ -63,28 +51,24 @@ Phase 8 - Conformance, Convergence, and Hardening: Output fidelity across the in
 
 ## Objectives (Ranked)
 
-1. **Build Conformance Harness** (Workers 3-5)
-   - Read test files from `tests/cases/compiler/*.ts`
-   - Compile through Rust pipeline
-   - Compare output against `tests/baselines/reference/*.js`
-   - Track pass rate (currently ~40/76 for JS)
-   - Key Files: New `wasm/src/conformance_harness.rs`
-
-2. **Critical Bug Fixes Only** (Workers 1-2)
-   - Fix blocking ES5 regressions (`super["m"]` in async, nested arrow `this` capture)
+1. **Critical Bug Fixes Only**
+   - Context: Emitter is in maintenance mode per Operation Crucible
+   - Success Criteria: Fix blocking ES5 regressions (`super["m"]` in async, nested arrow `this` capture)
    - Key Files: `transforms/class_es5.rs`, `transforms/async_es5.rs`
    - ⛔ NO NEW FEATURES
 
-3. **Source Map Bug Fixes**
-   - Only fix bugs that block debugger attachment
+2. **Source Map Bug Fixes**
+   - Context: Only fix bugs that block debugger attachment
+   - Success Criteria: Source maps validate and attach correctly
    - Key Files: `thin_emitter/source_writer.rs`, `thin_emitter/source_map.rs`
+   - ⛔ NO NEW MAPPINGS
 
 ## Anti-Priorities (ENFORCED)
-- ⛔ **Manual parity tests** - use conformance harness instead
 - ⛔ **New Emitter transforms** - we have enough
-- ⛔ **Hand-written expected output** - compare against existing baselines
+- ⛔ **New test coverage** - workers 3-5 reassigned to Crucible
 - New LSP features
 - CLI argument parsing
+- Performance micro-optimizations
 
 ## Cross-Squad Dependencies
 - Forge squad owns type checking; coordinate on shared conformance regressions
@@ -102,13 +86,15 @@ Per Project Direction: **Autocratic Scheduling + Bisect-on-Merge**
 - Zero-Idle: If a high-priority task is blocked, swarm it
 
 ## Squad Status
-- Last EM Report: 2026-01-09 - Conformance harness approach adopted
-- Workers Active: 5/5
-- Current Focus: Conformance harness + bug fixes
-- Direction: Automation over manual tests
+- Last EM Report: 2026-01-08 - Operation Crucible activated
+- Workers Active: 2/5 (workers 1-2 on bug fixes)
+- Workers Reassigned: 3/5 (workers 3-5 on Crucible test porting)
+- Current Focus: Critical bug fixes only
+- Direction: MAINTENANCE MODE - no new transforms
+- Blockers: None
 - Worker Assignments:
-  - W1: Bug fixes - `super["m"]` in async (`transforms/async_es5.rs`)
-  - W2: Bug fixes - nested arrow `this` capture (`transforms/class_es5.rs`)
-  - W3: **HARNESS** - Build `run_conformance_test()` function
-  - W4: **HARNESS** - Read `tests/cases/compiler/*.ts`, parse test directives
-  - W5: **HARNESS** - Diff against `tests/baselines/reference/*.js`, report pass rate
+  - W1: Bug fixes - blocking ES5 regressions
+  - W2: Bug fixes - critical source map issues
+  - W3: **CRUCIBLE** - Port conditional type tests from official TS repo
+  - W4: **CRUCIBLE** - Port mapped type tests from official TS repo
+  - W5: **CRUCIBLE** - Port conditional/mapped type tests from official TS repo

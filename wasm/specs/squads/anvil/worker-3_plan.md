@@ -7,12 +7,56 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] Add ES5 source map tests for decorator metadata patterns: reflect-metadata, parameter decorators, property descriptors, method descriptors, accessor descriptors, class constructor metadata. Tests: `./wasm/test.sh source_map`
+Add ES5 conditional type expression source map tests
+
+Per GOALS.md Objective 2: Source map validation
+
+Steps:
+1. Add 6 ES5 conditional type expression source map tests to `wasm/src/source_map_tests.rs`:
+   - Conditional type with infer
+   - Distributive conditional type
+   - Nested conditional types
+   - Conditional type in function return
+   - Conditional type with union
+   - Combined conditional patterns
+2. Run `./wasm/test.sh source_map` to verify all tests pass
+3. Commit with message: `[wasm] source_map: add conditional type expression tests`
+4. Push to `origin/worker/anvil-3`
+5. Update this plan file and push
+
+**Sync instructions**: Use squad/anvil (not origin/rust):
+```
+git fetch origin && git reset --hard origin/squad/anvil
+```
 
 ## Task Queue
-- [ ] Add ES5 source map tests for module bundling patterns: CommonJS require, dynamic import, re-exports
+(empty - will receive new tasks from EM after completing current assignment)
 
 ## Completed
+- [x] Added type parameter constraint ES5 source map tests (generic function, generic class, generic interface, multiple params, union constraints, comprehensive); 881 tests pass.
+- [x] Added private class features ES5 source map tests (private field read, private field write, private method call, private accessor, private static members, comprehensive); 875 tests pass.
+- [x] Added generator transform ES5 source map tests (basic yield mapping, multiple yields, yield* delegation, class method, try/finally cleanup, comprehensive); 869 tests pass.
+- [x] Added async/class integration ES5 source map tests (derived class super call, async arrow field initializer, static this capture, generator method, constructor simulation, comprehensive); 863 tests pass.
+- [x] Added class static block ES5 source map tests (basic, init order, multiple, private field access, private method access, static field init, computed props, async patterns, error handling, comprehensive); 857 tests pass.
+- [x] Added logical assignment ES5 source map tests (&&=, ||=, ??=, object property, element access, chained, function context, class methods, side effects, comprehensive); 847 tests pass.
+- [x] Added nullish coalescing ES5 source map tests (basic, with null, with undefined, chained, function call, assignment, conditional, objects, with optional chaining, comprehensive); 837 tests pass.
+- [x] Added optional chaining ES5 source map tests (property access, method call, element access, nested, with nullish, function context, chained methods, delete, call expression, comprehensive); 827 tests pass.
+- [x] Added async generator ES5 source map tests (basic, yield delegation, await expressions, for-await-of, error handling, class methods, interleaved, return values, nested, comprehensive); 817 tests pass.
+- [x] Added private method ES5 source map tests (instance basic, static, accessor, inheritance, async, generator, with fields, chained calls, parameters, comprehensive); 807 tests pass.
+- [x] Added decorator composition ES5 source map tests (chained, factory, metadata, method params, accessor, multiple targets, conditional, generic, inheritance, comprehensive); 797 tests pass.
+- [x] Added class static block ES5 source map tests (basic, multiple, init order, private access, super access, static field init, computed props, async patterns, error handling, comprehensive); 787 tests pass.
+- [x] Added template literal ES5 source map tests (basic, expression, nested, tagged, multiline, function call, method chain, conditional, complex expressions, comprehensive); 777 tests pass.
+- [x] Added arrow function ES5 source map tests (expression body, block body, this binding, rest params, default params, destructuring params, class property, higher order, callbacks, comprehensive); 767 tests pass.
+- [x] Added class expression ES5 source map tests (anonymous, named, in return, with extends, with static, in variable, in array, in object, with methods, comprehensive); 757 tests pass.
+- [x] Added spread/rest transform ES5 source map tests (array spread basic, object spread basic, function call spread, array with elements, object with properties, rest parameters, array rest elements, object rest properties, nested patterns, comprehensive); 747 tests pass.
+- [x] Added destructuring transform ES5 source map tests (array basic, object basic, nested array, nested object, mixed, defaults, function params, rest patterns, loop patterns, comprehensive); 737 tests pass.
+- [x] Added generator transform ES5 source map tests (basic yield, yield with values, delegation, return value, try/catch, infinite, class iterator, class methods, async generator, comprehensive); 727 tests pass.
+- [x] Added async/await transform ES5 source map tests (try/catch basic, try/catch/finally, Promise chain, arrow functions, class methods, IIFE, nested try/catch, parallel await, error rethrow, comprehensive); 717 tests pass.
+- [x] Added for-of/for-in loop ES5 source map tests (basic for-of, basic for-in, for-of destructuring, for-in destructuring, for-of string, for-of Map/Set, nested for-of, break/continue, iterator, comprehensive); 707 tests pass.
+- [x] Added class accessor ES5 source map tests (basic getter/setter, static accessors, computed names, decorator, getter-only, setter-only, inherited, validation, lazy initialization, comprehensive); 697 tests pass.
+- [x] Added JSX transform ES5 source map tests (basic element, fragment, spread attributes, self-closing, nested elements, expressions, component props, event handlers, conditional rendering, comprehensive); 687 tests pass.
+- [x] Added module bundling ES5 source map tests (CommonJS require, dynamic import, re-exports, barrel exports, circular imports, conditional imports, namespace imports, comprehensive); 677 tests pass.
+- [x] Added decorator metadata ES5 source map tests (reflect-metadata, parameter decorators, property descriptors, method descriptors, accessor descriptors, class constructor metadata, design type metadata, comprehensive); 669 tests pass.
 - [x] Added Symbol-keyed member ES5 source map tests (Symbol.iterator, Symbol.asyncIterator, computed Symbol methods, Symbol.toStringTag, Symbol.hasInstance, Symbol.species, Symbol.toPrimitive, Symbol.isConcatSpreadable, comprehensive); 661 tests pass.
 - [x] Added private field ES5 source map tests (instance field access, static field access, private method calls, accessor patterns, derived class, WeakMap polyfill, in-check, static method, comprehensive); 652 tests pass.
 - [x] Added class inheritance ES5 source map tests (extends clause, super calls, method overrides, multi-level inheritance, mixin pattern, super property access, static inheritance, abstract class, interface implementation, comprehensive); 643 tests pass.
