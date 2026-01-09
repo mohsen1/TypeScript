@@ -20,12 +20,30 @@ Priority: 2
 - [x] Tuple type tests (labeled elements, rest, optional, spreads)
 - [x] Array type tests (readonly, generic, type inference)
 - [x] Union type tests (type narrowing, union distribution)
+- [x] Spread type tests (tuple spreads, object spreads)
 
 ## Task Queue
 - [ ] Implement TypeResolver for TypeEvaluator to resolve Refs inside Mapped/Conditional types
 - [ ] This would enable full evaluation of complex patterns like `{ [K in keyof R]: ExtractAction<R[K]> }[keyof R]`
 
 ## Completed
+- [x] Added 45 spread type tests including:
+  - Tuple spreads: basic, leading/trailing elements, multiple spreads
+  - Empty/single element tuple spreads
+  - Rest elements at start/end positions
+  - Optional elements, labeled elements
+  - Generic tuple spread inference
+  - Union/literal types in spread elements
+  - Nested tuples, readonly tuples
+  - Object spreads: basic, two/three-way merge
+  - Property override (later wins)
+  - Optional/readonly property handling
+  - Methods, union/intersection properties
+  - Nested objects, array/function/tuple properties
+  - Generic object spread inference
+  - Combined spread patterns
+  - Special types (never, any, unknown) in spreads
+  - Long tuples/objects (10 elements)
 - [x] Added 40 union type tests including:
   - Basic unions (string | number, 3+ types)
   - Nullable types (string | null, string | undefined)
@@ -221,6 +239,7 @@ Solution options:
 **YES** - Branch reset to squad/forge baseline and new tests added.
 
 Worker 2 branch now contains:
+- 45 spread type tests (tuple spreads, object spreads)
 - 40 union type tests (type narrowing, union distribution)
 - 32 array type tests (readonly, generic, type inference)
 - 28 new utility type edge case tests (ReturnType, Parameters, InstanceType, etc.)

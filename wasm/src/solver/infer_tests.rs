@@ -15033,3 +15033,1135 @@ fn test_union_mixed_literals_and_primitives() {
         assert!(members.len() >= 1);
     }
 }
+
+// =============================================================================
+// SPREAD TYPE TESTS
+// =============================================================================
+// Tests for tuple spreads and object spreads in the type system
+
+// -----------------------------------------------------------------------------
+// Tuple Spread Type Tests
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_spread_basic_tuple_into_tuple() {
+    // [...[string, number]] = [string, number]
+    let interner = TypeInterner::new();
+
+    let inner_tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+
+    // Spreading a tuple preserves element types
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(inner_tuple) {
+        assert_eq!(elements.len(), 2);
+        assert_eq!(elements[0].type_id, TypeId::STRING);
+        assert_eq!(elements[1].type_id, TypeId::NUMBER);
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_spread_tuple_with_leading_element() {
+    // [boolean, ...[string, number]] = [boolean, string, number]
+    let interner = TypeInterner::new();
+
+    let combined = interner.tuple(vec![
+        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(combined) {
+        assert_eq!(elements.len(), 3);
+        assert_eq!(elements[0].type_id, TypeId::BOOLEAN);
+        assert_eq!(elements[1].type_id, TypeId::STRING);
+        assert_eq!(elements[2].type_id, TypeId::NUMBER);
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_spread_tuple_with_trailing_element() {
+    // [...[string, number], boolean] = [string, number, boolean]
+    let interner = TypeInterner::new();
+
+    let combined = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(combined) {
+        assert_eq!(elements.len(), 3);
+        assert_eq!(elements[0].type_id, TypeId::STRING);
+        assert_eq!(elements[1].type_id, TypeId::NUMBER);
+        assert_eq!(elements[2].type_id, TypeId::BOOLEAN);
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_spread_multiple_tuples() {
+    // [...[string], ...[number], ...[boolean]] = [string, number, boolean]
+    let interner = TypeInterner::new();
+
+    let combined = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(combined) {
+        assert_eq!(elements.len(), 3);
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_spread_empty_tuple() {
+    // [...[]] = []
+    let interner = TypeInterner::new();
+
+    let empty = interner.tuple(vec![]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(empty) {
+        assert_eq!(elements.len(), 0);
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_spread_single_element_tuple() {
+    // [...[string]] = [string]
+    let interner = TypeInterner::new();
+
+    let single = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(single) {
+        assert_eq!(elements.len(), 1);
+        assert_eq!(elements[0].type_id, TypeId::STRING);
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_spread_tuple_with_rest_element() {
+    // [...T, ...rest: number[]] - rest at end
+    let interner = TypeInterner::new();
+
+    let number_array = interner.array(TypeId::NUMBER);
+    let with_rest = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: number_array, name: None, optional: false, rest: true },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(with_rest) {
+        assert_eq!(elements.len(), 2);
+        assert!(!elements[0].rest);
+        assert!(elements[1].rest);
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_spread_tuple_rest_at_start() {
+    // [...rest: string[], number] - rest at start
+    let interner = TypeInterner::new();
+
+    let string_array = interner.array(TypeId::STRING);
+    let with_rest = interner.tuple(vec![
+        TupleElement { type_id: string_array, name: None, optional: false, rest: true },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(with_rest) {
+        assert_eq!(elements.len(), 2);
+        assert!(elements[0].rest);
+        assert!(!elements[1].rest);
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_spread_tuple_with_optional_elements() {
+    // [...[string, number?]] - spread with optional
+    let interner = TypeInterner::new();
+
+    let with_optional = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: true, rest: false },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(with_optional) {
+        assert_eq!(elements.len(), 2);
+        assert!(!elements[0].optional);
+        assert!(elements[1].optional);
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_spread_tuple_preserves_labels() {
+    // [...[x: string, y: number]] - labels preserved
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+    let y_name = interner.intern_string("y");
+
+    let labeled = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: Some(x_name), optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: Some(y_name), optional: false, rest: false },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(labeled) {
+        assert_eq!(elements[0].name, Some(x_name));
+        assert_eq!(elements[1].name, Some(y_name));
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_spread_tuple_inference_generic() {
+    // function spread<T extends any[]>(arr: T): [...T]
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Infer T from tuple argument
+    let input = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+    ctx.add_lower_bound(var_t, input);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, input);
+}
+
+#[test]
+fn test_spread_tuple_in_function_params() {
+    // function f(...args: [...T, extra: string])
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let param_tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+    ]);
+    ctx.add_lower_bound(var_t, param_tuple);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, param_tuple);
+}
+
+#[test]
+fn test_spread_tuple_with_union_elements() {
+    // [...[string | number, boolean | null]]
+    let interner = TypeInterner::new();
+
+    let union1 = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let union2 = interner.union(vec![TypeId::BOOLEAN, TypeId::NULL]);
+
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: union1, name: None, optional: false, rest: false },
+        TupleElement { type_id: union2, name: None, optional: false, rest: false },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(tuple) {
+        assert_eq!(elements.len(), 2);
+        assert_eq!(elements[0].type_id, union1);
+        assert_eq!(elements[1].type_id, union2);
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_spread_tuple_with_literal_types() {
+    // [...["hello", 42, true]]
+    let interner = TypeInterner::new();
+
+    let lit_str = interner.literal_string("hello");
+    let lit_num = interner.literal_number(42.0);
+    let lit_bool = interner.literal_boolean(true);
+
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: lit_str, name: None, optional: false, rest: false },
+        TupleElement { type_id: lit_num, name: None, optional: false, rest: false },
+        TupleElement { type_id: lit_bool, name: None, optional: false, rest: false },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(tuple) {
+        assert_eq!(elements.len(), 3);
+        assert_eq!(elements[0].type_id, lit_str);
+        assert_eq!(elements[1].type_id, lit_num);
+        assert_eq!(elements[2].type_id, lit_bool);
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_spread_tuple_nested() {
+    // [...[[string, number], boolean]] - nested tuple
+    let interner = TypeInterner::new();
+
+    let inner = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+
+    let outer = interner.tuple(vec![
+        TupleElement { type_id: inner, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(outer) {
+        assert_eq!(elements.len(), 2);
+        assert_eq!(elements[0].type_id, inner);
+        assert_eq!(elements[1].type_id, TypeId::BOOLEAN);
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_spread_readonly_tuple() {
+    // readonly [...[string, number]]
+    let interner = TypeInterner::new();
+
+    // Create tuple elements (readonly is on the tuple type, not elements)
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(tuple) {
+        assert_eq!(elements.len(), 2);
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_spread_tuple_inference_multiple_vars() {
+    // [...A, ...B] where A and B are inferred separately
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let a_name = interner.intern_string("A");
+    let b_name = interner.intern_string("B");
+
+    let var_a = ctx.fresh_type_param(a_name);
+    let var_b = ctx.fresh_type_param(b_name);
+
+    let tuple_a = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+    let tuple_b = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+    ]);
+
+    ctx.add_lower_bound(var_a, tuple_a);
+    ctx.add_lower_bound(var_b, tuple_b);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results.len(), 2);
+}
+
+// -----------------------------------------------------------------------------
+// Object Spread Type Tests
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_spread_basic_object() {
+    // { ...{ a: string } }
+    let interner = TypeInterner::new();
+
+    let a_name = interner.intern_string("a");
+    let obj = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(obj) {
+        assert_eq!(props.len(), 1);
+        assert_eq!(props[0].name, a_name);
+        assert_eq!(props[0].type_id, TypeId::STRING);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_spread_two_objects_merged() {
+    // { ...{ a: string }, ...{ b: number } } = { a: string, b: number }
+    let interner = TypeInterner::new();
+
+    let a_name = interner.intern_string("a");
+    let b_name = interner.intern_string("b");
+
+    let merged = interner.object(vec![
+        PropertyInfo {
+            name: a_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(merged) {
+        assert_eq!(props.len(), 2);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_spread_object_override_property() {
+    // { ...{ a: string }, a: number } - later wins
+    let interner = TypeInterner::new();
+
+    let a_name = interner.intern_string("a");
+
+    // Result after spread: a is number (overridden)
+    let result = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(result) {
+        assert_eq!(props.len(), 1);
+        assert_eq!(props[0].type_id, TypeId::NUMBER);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_spread_object_preserves_optional() {
+    // { ...{ a?: string } } - optional preserved
+    let interner = TypeInterner::new();
+
+    let a_name = interner.intern_string("a");
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(obj) {
+        assert!(props[0].optional);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_spread_object_removes_readonly() {
+    // { ...{ readonly a: string } } - readonly typically removed in spread
+    let interner = TypeInterner::new();
+
+    let a_name = interner.intern_string("a");
+
+    // In TS, spread creates mutable copy (readonly removed)
+    let obj = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false, // Removed after spread
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(obj) {
+        assert!(!props[0].readonly);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_spread_object_with_methods() {
+    // { ...{ m(): void } } - methods spread
+    let interner = TypeInterner::new();
+
+    let m_name = interner.intern_string("m");
+    let void_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        this_param: None,
+        params: vec![],
+        rest_param: None,
+        return_type: TypeId::VOID,
+    });
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: m_name,
+        type_id: void_fn,
+        write_type: void_fn,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(obj) {
+        assert!(props[0].is_method);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_spread_object_multiple_properties() {
+    // { ...{ a: string, b: number, c: boolean } }
+    let interner = TypeInterner::new();
+
+    let a_name = interner.intern_string("a");
+    let b_name = interner.intern_string("b");
+    let c_name = interner.intern_string("c");
+
+    let obj = interner.object(vec![
+        PropertyInfo {
+            name: a_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: c_name,
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(obj) {
+        assert_eq!(props.len(), 3);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_spread_object_empty() {
+    // { ...{} } = {}
+    let interner = TypeInterner::new();
+
+    let empty = interner.object(vec![]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(empty) {
+        assert_eq!(props.len(), 0);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_spread_object_with_union_property() {
+    // { ...{ a: string | number } }
+    let interner = TypeInterner::new();
+
+    let a_name = interner.intern_string("a");
+    let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: union,
+        write_type: union,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(obj) {
+        assert_eq!(props[0].type_id, union);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_spread_object_nested() {
+    // { ...{ nested: { a: string } } }
+    let interner = TypeInterner::new();
+
+    let a_name = interner.intern_string("a");
+    let nested_name = interner.intern_string("nested");
+
+    let inner = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let outer = interner.object(vec![PropertyInfo {
+        name: nested_name,
+        type_id: inner,
+        write_type: inner,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(outer) {
+        assert_eq!(props[0].type_id, inner);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_spread_object_inference() {
+    // function spread<T extends object>(obj: T): { ...T }
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let input = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    ctx.add_lower_bound(var_t, input);
+    ctx.add_upper_bound(var_t, TypeId::OBJECT);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, input);
+}
+
+#[test]
+fn test_spread_object_with_array_property() {
+    // { ...{ items: string[] } }
+    let interner = TypeInterner::new();
+
+    let items_name = interner.intern_string("items");
+    let string_array = interner.array(TypeId::STRING);
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: items_name,
+        type_id: string_array,
+        write_type: string_array,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(obj) {
+        assert_eq!(props[0].type_id, string_array);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_spread_object_with_function_property() {
+    // { ...{ handler: (x: string) => number } }
+    let interner = TypeInterner::new();
+
+    let handler_name = interner.intern_string("handler");
+    let x_name = interner.intern_string("x");
+
+    let fn_type = interner.function(FunctionShape {
+        type_params: vec![],
+        this_param: None,
+        params: vec![ParamInfo {
+            name: x_name,
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        rest_param: None,
+        return_type: TypeId::NUMBER,
+    });
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: handler_name,
+        type_id: fn_type,
+        write_type: fn_type,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(obj) {
+        assert_eq!(props[0].type_id, fn_type);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_spread_object_three_way_merge() {
+    // { ...A, ...B, ...C }
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let a_name = interner.intern_string("A");
+    let b_name = interner.intern_string("B");
+    let c_name = interner.intern_string("C");
+
+    let var_a = ctx.fresh_type_param(a_name);
+    let var_b = ctx.fresh_type_param(b_name);
+    let var_c = ctx.fresh_type_param(c_name);
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_c = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("c"),
+        type_id: TypeId::BOOLEAN,
+        write_type: TypeId::BOOLEAN,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    ctx.add_lower_bound(var_a, obj_a);
+    ctx.add_lower_bound(var_b, obj_b);
+    ctx.add_lower_bound(var_c, obj_c);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results.len(), 3);
+}
+
+#[test]
+fn test_spread_object_with_literal_property() {
+    // { ...{ status: "success" } }
+    let interner = TypeInterner::new();
+
+    let status_name = interner.intern_string("status");
+    let success_lit = interner.literal_string("success");
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: status_name,
+        type_id: success_lit,
+        write_type: success_lit,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(obj) {
+        assert_eq!(props[0].type_id, success_lit);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_spread_object_with_intersection_property() {
+    // { ...{ data: A & B } }
+    let interner = TypeInterner::new();
+
+    let data_name = interner.intern_string("data");
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![obj_a, obj_b]);
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: data_name,
+        type_id: intersection,
+        write_type: intersection,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(obj) {
+        assert_eq!(props[0].type_id, intersection);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_spread_object_mixed_optional_required() {
+    // { ...{ a: string, b?: number } }
+    let interner = TypeInterner::new();
+
+    let a_name = interner.intern_string("a");
+    let b_name = interner.intern_string("b");
+
+    let obj = interner.object(vec![
+        PropertyInfo {
+            name: a_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: true,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(obj) {
+        assert!(!props[0].optional);
+        assert!(props[1].optional);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_spread_object_with_promise_property() {
+    // { ...{ result: Promise<string> } }
+    let interner = TypeInterner::new();
+
+    let result_name = interner.intern_string("result");
+    let promise_string = interner.promise(TypeId::STRING);
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: result_name,
+        type_id: promise_string,
+        write_type: promise_string,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(obj) {
+        assert_eq!(props[0].type_id, promise_string);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_spread_object_with_tuple_property() {
+    // { ...{ coords: [number, number] } }
+    let interner = TypeInterner::new();
+
+    let coords_name = interner.intern_string("coords");
+    let coords = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: coords_name,
+        type_id: coords,
+        write_type: coords,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(obj) {
+        assert_eq!(props[0].type_id, coords);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Combined Spread Tests
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_spread_tuple_into_object_context() {
+    // Spreading tuple into array, then assigning to object with array property
+    let interner = TypeInterner::new();
+
+    let items_name = interner.intern_string("items");
+
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: items_name,
+        type_id: tuple,
+        write_type: tuple,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(obj) {
+        assert_eq!(props[0].type_id, tuple);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_spread_in_generic_return() {
+    // function merge<T, U>(a: T, b: U): { ...T, ...U }
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    let obj_t = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_u = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("y"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    ctx.add_lower_bound(var_t, obj_t);
+    ctx.add_lower_bound(var_u, obj_u);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results.len(), 2);
+    assert_eq!(results[0].1, obj_t);
+    assert_eq!(results[1].1, obj_u);
+}
+
+#[test]
+fn test_spread_preserves_never_elements() {
+    // [...[never]] - never in tuple spread
+    let interner = TypeInterner::new();
+
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NEVER, name: None, optional: false, rest: false },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(tuple) {
+        assert_eq!(elements[0].type_id, TypeId::NEVER);
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_spread_preserves_any_elements() {
+    // [...[any]] - any in tuple spread
+    let interner = TypeInterner::new();
+
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::ANY, name: None, optional: false, rest: false },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(tuple) {
+        assert_eq!(elements[0].type_id, TypeId::ANY);
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_spread_preserves_unknown_elements() {
+    // [...[unknown]] - unknown in tuple spread
+    let interner = TypeInterner::new();
+
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::UNKNOWN, name: None, optional: false, rest: false },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(tuple) {
+        assert_eq!(elements[0].type_id, TypeId::UNKNOWN);
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_spread_object_never_property() {
+    // { ...{ impossible: never } }
+    let interner = TypeInterner::new();
+
+    let impossible_name = interner.intern_string("impossible");
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: impossible_name,
+        type_id: TypeId::NEVER,
+        write_type: TypeId::NEVER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(obj) {
+        assert_eq!(props[0].type_id, TypeId::NEVER);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_spread_object_any_property() {
+    // { ...{ data: any } }
+    let interner = TypeInterner::new();
+
+    let data_name = interner.intern_string("data");
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: data_name,
+        type_id: TypeId::ANY,
+        write_type: TypeId::ANY,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(obj) {
+        assert_eq!(props[0].type_id, TypeId::ANY);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_spread_long_tuple() {
+    // [...[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]]
+    let interner = TypeInterner::new();
+
+    let elements: Vec<TupleElement> = (1..=10)
+        .map(|n| TupleElement {
+            type_id: interner.literal_number(n as f64),
+            name: None,
+            optional: false,
+            rest: false,
+        })
+        .collect();
+
+    let tuple = interner.tuple(elements);
+
+    if let Some(TypeKey::Tuple(elems)) = interner.lookup(tuple) {
+        assert_eq!(elems.len(), 10);
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_spread_object_many_properties() {
+    // { ...{ a, b, c, d, e, f, g, h, i, j } }
+    let interner = TypeInterner::new();
+
+    let props: Vec<PropertyInfo> = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"]
+        .iter()
+        .map(|name| PropertyInfo {
+            name: interner.intern_string(name),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        })
+        .collect();
+
+    let obj = interner.object(props);
+
+    if let Some(TypeKey::Object(properties)) = interner.lookup(obj) {
+        assert_eq!(properties.len(), 10);
+    } else {
+        panic!("Expected object type");
+    }
+}
