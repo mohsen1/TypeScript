@@ -7,10 +7,10 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- (none – awaiting assignment)
+- [ ] Add ES5 class tests for TypeScript-specific patterns: namespace merging with class, module augmentation, declaration merging, ambient declarations, triple-slash directives, const assertions. Tests: `./wasm/test.sh class_es5_tests`
 
 ## Task Queue
-- [ ] Add ES5 class tests for TypeScript-specific patterns: namespace merging with class, module augmentation
+- [ ] Add ES5 class tests for generic constraint patterns: extends constraints, keyof constraints, conditional types
 
 ## Completed
 - [x] Add ES5 class tests for mixed decorator patterns. Tests: `./wasm/test.sh class_es5_tests`
