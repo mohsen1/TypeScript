@@ -6,10 +6,25 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-(none - awaiting new assignment from EM-Anvil)
+Add ES5 class tests for class expression patterns
+
+Per GOALS.md Objective 1: ES5 downleveling correctness
+
+Steps:
+1. Add 6 ES5 class tests for class expression patterns to `wasm/src/transforms/class_es5_tests.rs`:
+   - Anonymous class expression
+   - Named class expression
+   - Class expression with extends
+   - Class expression in function return
+   - Class expression with static members
+   - Combined class expression patterns
+2. Run `./wasm/test.sh class_es5_tests` to verify all tests pass
+3. Commit with message: `[wasm] transforms: add class expression ES5 class tests`
+4. Push to `origin/worker/anvil-1`
+5. Update this plan file and push
 
 ## Task Queue
-(empty)
+(empty - will receive new tasks from EM after completing current assignment)
 
 ## Completed
 - [x] Added ES5 tests for static block initialization (6 tests): basic init, private field access, multiple blocks ordering, super reference, computed properties, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 488 pass).
