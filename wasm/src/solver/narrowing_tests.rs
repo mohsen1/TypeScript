@@ -1051,3 +1051,388 @@ fn test_narrow_to_interface_type() {
     // Should be narrowed to Cat
     assert_eq!(narrowed, cat_type);
 }
+
+// =============================================================================
+// Unknown Type Tests (Type Guards, Narrowing from Unknown)
+// =============================================================================
+
+#[test]
+fn test_narrow_unknown_by_typeof_boolean() {
+    let interner = TypeInterner::new();
+
+    let narrowed = narrow_by_typeof(&interner, TypeId::UNKNOWN, "boolean");
+    assert_eq!(narrowed, TypeId::BOOLEAN);
+}
+
+#[test]
+fn test_narrow_unknown_by_typeof_bigint() {
+    let interner = TypeInterner::new();
+
+    let narrowed = narrow_by_typeof(&interner, TypeId::UNKNOWN, "bigint");
+    assert_eq!(narrowed, TypeId::BIGINT);
+}
+
+#[test]
+fn test_narrow_unknown_by_typeof_symbol() {
+    let interner = TypeInterner::new();
+
+    let narrowed = narrow_by_typeof(&interner, TypeId::UNKNOWN, "symbol");
+    assert_eq!(narrowed, TypeId::SYMBOL);
+}
+
+#[test]
+fn test_narrow_unknown_by_typeof_undefined() {
+    let interner = TypeInterner::new();
+
+    let narrowed = narrow_by_typeof(&interner, TypeId::UNKNOWN, "undefined");
+    assert_eq!(narrowed, TypeId::UNDEFINED);
+}
+
+#[test]
+fn test_narrow_unknown_by_typeof_number() {
+    let interner = TypeInterner::new();
+
+    let narrowed = narrow_by_typeof(&interner, TypeId::UNKNOWN, "number");
+    assert_eq!(narrowed, TypeId::NUMBER);
+}
+
+#[test]
+fn test_narrow_unknown_by_equality_to_null() {
+    let interner = TypeInterner::new();
+    let ctx = NarrowingContext::new(&interner);
+
+    // x === null should narrow unknown to null
+    let narrowed = ctx.narrow_to_type(TypeId::UNKNOWN, TypeId::NULL);
+    assert_eq!(narrowed, TypeId::NULL);
+}
+
+#[test]
+fn test_narrow_unknown_by_equality_to_undefined() {
+    let interner = TypeInterner::new();
+    let ctx = NarrowingContext::new(&interner);
+
+    // x === undefined should narrow unknown to undefined
+    let narrowed = ctx.narrow_to_type(TypeId::UNKNOWN, TypeId::UNDEFINED);
+    assert_eq!(narrowed, TypeId::UNDEFINED);
+}
+
+#[test]
+fn test_narrow_unknown_by_equality_to_literal() {
+    let interner = TypeInterner::new();
+    let ctx = NarrowingContext::new(&interner);
+
+    // x === "hello" should narrow unknown to "hello"
+    let hello = interner.literal_string("hello");
+    let narrowed = ctx.narrow_to_type(TypeId::UNKNOWN, hello);
+    assert_eq!(narrowed, hello);
+}
+
+#[test]
+fn test_narrow_unknown_by_truthiness() {
+    let interner = TypeInterner::new();
+    let ctx = NarrowingContext::new(&interner);
+
+    // if (x) where x: unknown should exclude nullish values
+    let narrowed = ctx.narrow_excluding_type(TypeId::UNKNOWN, TypeId::NULL);
+    // Should still include other values
+    assert!(narrowed != TypeId::NEVER);
+}
+
+#[test]
+fn test_narrow_unknown_by_in_operator() {
+    let interner = TypeInterner::new();
+    let ctx = NarrowingContext::new(&interner);
+
+    // "prop" in x where x: unknown should narrow to object with that property
+    let prop_name = interner.intern_string("prop");
+    let obj_with_prop = interner.object(vec![PropertyInfo {
+        name: prop_name,
+        type_id: TypeId::UNKNOWN,
+        write_type: TypeId::UNKNOWN,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let narrowed = ctx.narrow_to_type(TypeId::UNKNOWN, obj_with_prop);
+    assert_eq!(narrowed, obj_with_prop);
+}
+
+#[test]
+fn test_narrow_unknown_by_type_predicate() {
+    let interner = TypeInterner::new();
+    let ctx = NarrowingContext::new(&interner);
+
+    // isString(x) where x is string predicate
+    let narrowed = ctx.narrow_to_type(TypeId::UNKNOWN, TypeId::STRING);
+    assert_eq!(narrowed, TypeId::STRING);
+}
+
+#[test]
+fn test_narrow_unknown_by_type_predicate_to_object() {
+    let interner = TypeInterner::new();
+    let ctx = NarrowingContext::new(&interner);
+
+    // isUser(x) where x is User predicate
+    let name_prop = interner.intern_string("name");
+    let user_type = interner.object(vec![PropertyInfo {
+        name: name_prop,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let narrowed = ctx.narrow_to_type(TypeId::UNKNOWN, user_type);
+    assert_eq!(narrowed, user_type);
+}
+
+#[test]
+fn test_narrow_unknown_excludes_null() {
+    let interner = TypeInterner::new();
+    let ctx = NarrowingContext::new(&interner);
+
+    // x !== null
+    let narrowed = ctx.narrow_excluding_type(TypeId::UNKNOWN, TypeId::NULL);
+    // Should not be unknown anymore, but also not never
+    assert!(narrowed != TypeId::NEVER);
+}
+
+#[test]
+fn test_narrow_unknown_excludes_undefined() {
+    let interner = TypeInterner::new();
+    let ctx = NarrowingContext::new(&interner);
+
+    // x !== undefined
+    let narrowed = ctx.narrow_excluding_type(TypeId::UNKNOWN, TypeId::UNDEFINED);
+    assert!(narrowed != TypeId::NEVER);
+}
+
+#[test]
+fn test_narrow_unknown_by_typeof_negation_object() {
+    let interner = TypeInterner::new();
+
+    // typeof x !== "object"
+    let narrowed = narrow_by_typeof_negation(&interner, TypeId::UNKNOWN, "object");
+    // Should exclude object and null, keeping primitives
+    assert!(narrowed != TypeId::NEVER);
+    assert!(narrowed != TypeId::UNKNOWN);
+}
+
+#[test]
+fn test_narrow_unknown_by_typeof_negation_function() {
+    let interner = TypeInterner::new();
+
+    // typeof x !== "function"
+    let narrowed = narrow_by_typeof_negation(&interner, TypeId::UNKNOWN, "function");
+    // Should exclude functions
+    assert!(narrowed != TypeId::NEVER);
+}
+
+#[test]
+fn test_narrow_unknown_by_typeof_negation_string() {
+    let interner = TypeInterner::new();
+
+    // typeof x !== "string"
+    let narrowed = narrow_by_typeof_negation(&interner, TypeId::UNKNOWN, "string");
+    // Should exclude string
+    assert!(narrowed != TypeId::NEVER);
+}
+
+#[test]
+fn test_narrow_unknown_by_typeof_negation_number() {
+    let interner = TypeInterner::new();
+
+    // typeof x !== "number"
+    let narrowed = narrow_by_typeof_negation(&interner, TypeId::UNKNOWN, "number");
+    assert!(narrowed != TypeId::NEVER);
+}
+
+#[test]
+fn test_narrow_unknown_sequential_typeof() {
+    let interner = TypeInterner::new();
+
+    // First: typeof x === "object"
+    let after_object = narrow_by_typeof(&interner, TypeId::UNKNOWN, "object");
+    // Result should be object | null
+    let expected = interner.union(vec![TypeId::OBJECT, TypeId::NULL]);
+    assert_eq!(after_object, expected);
+
+    // Second: x !== null (on the narrowed type)
+    let ctx = NarrowingContext::new(&interner);
+    let final_narrowed = ctx.narrow_excluding_type(after_object, TypeId::NULL);
+    // Should be just object
+    assert_eq!(final_narrowed, TypeId::OBJECT);
+}
+
+#[test]
+fn test_narrow_unknown_to_array() {
+    let interner = TypeInterner::new();
+    let ctx = NarrowingContext::new(&interner);
+
+    // Array.isArray(x)
+    let array_type = interner.array(TypeId::UNKNOWN);
+    let narrowed = ctx.narrow_to_type(TypeId::UNKNOWN, array_type);
+    assert_eq!(narrowed, array_type);
+}
+
+#[test]
+fn test_narrow_unknown_to_tuple() {
+    let interner = TypeInterner::new();
+    let ctx = NarrowingContext::new(&interner);
+
+    // x is [string, number]
+    let tuple_type = interner.tuple_with_info(vec![
+        TupleElementInfo {
+            type_id: TypeId::STRING,
+            optional: false,
+            label: None,
+        },
+        TupleElementInfo {
+            type_id: TypeId::NUMBER,
+            optional: false,
+            label: None,
+        },
+    ]);
+
+    let narrowed = ctx.narrow_to_type(TypeId::UNKNOWN, tuple_type);
+    assert_eq!(narrowed, tuple_type);
+}
+
+#[test]
+fn test_narrow_unknown_to_function() {
+    let interner = TypeInterner::new();
+    let ctx = NarrowingContext::new(&interner);
+
+    // x is (a: number) => string
+    let fn_type = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("a")),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let narrowed = ctx.narrow_to_type(TypeId::UNKNOWN, fn_type);
+    assert_eq!(narrowed, fn_type);
+}
+
+#[test]
+fn test_narrow_unknown_to_union() {
+    let interner = TypeInterner::new();
+    let ctx = NarrowingContext::new(&interner);
+
+    // x is string | number
+    let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let narrowed = ctx.narrow_to_type(TypeId::UNKNOWN, union);
+    assert_eq!(narrowed, union);
+}
+
+#[test]
+fn test_narrow_unknown_to_intersection() {
+    let interner = TypeInterner::new();
+    let ctx = NarrowingContext::new(&interner);
+
+    // x is A & B
+    let a_name = interner.intern_string("a");
+    let b_name = interner.intern_string("b");
+
+    let type_a = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let type_b = interner.object(vec![PropertyInfo {
+        name: b_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![type_a, type_b]);
+    let narrowed = ctx.narrow_to_type(TypeId::UNKNOWN, intersection);
+    assert_eq!(narrowed, intersection);
+}
+
+#[test]
+fn test_narrow_unknown_with_discriminated_union() {
+    let interner = TypeInterner::new();
+    let ctx = NarrowingContext::new(&interner);
+
+    // x.kind === "success"
+    let kind_name = interner.intern_string("kind");
+    let success_lit = interner.literal_string("success");
+    let error_lit = interner.literal_string("error");
+
+    let success_type = interner.object(vec![PropertyInfo {
+        name: kind_name,
+        type_id: success_lit,
+        write_type: success_lit,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let error_type = interner.object(vec![PropertyInfo {
+        name: kind_name,
+        type_id: error_lit,
+        write_type: error_lit,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let union = interner.union(vec![success_type, error_type]);
+
+    // Narrow unknown to the union first
+    let narrowed_to_union = ctx.narrow_to_type(TypeId::UNKNOWN, union);
+    assert_eq!(narrowed_to_union, union);
+
+    // Then narrow by discriminant
+    let narrowed_to_success = ctx.narrow_by_discriminant(narrowed_to_union, kind_name, success_lit);
+    assert_eq!(narrowed_to_success, success_type);
+}
+
+#[test]
+fn test_narrow_unknown_excludes_nullish() {
+    let interner = TypeInterner::new();
+    let ctx = NarrowingContext::new(&interner);
+
+    // x != null (excludes both null and undefined)
+    let nullish = interner.union(vec![TypeId::NULL, TypeId::UNDEFINED]);
+    let narrowed = ctx.narrow_excluding_type(TypeId::UNKNOWN, nullish);
+    assert!(narrowed != TypeId::NEVER);
+}
+
+#[test]
+fn test_narrow_unknown_intersection_preserves_unknown() {
+    // unknown & T = T
+    let interner = TypeInterner::new();
+
+    let intersection = interner.intersection(vec![TypeId::UNKNOWN, TypeId::STRING]);
+    // unknown & string should simplify to string
+    assert!(intersection != TypeId::ERROR);
+}
+
+#[test]
+fn test_narrow_unknown_union_with_unknown() {
+    // T | unknown = unknown
+    let interner = TypeInterner::new();
+
+    let union = interner.union(vec![TypeId::STRING, TypeId::UNKNOWN]);
+    // string | unknown should be unknown (unknown absorbs all)
+    assert_eq!(union, TypeId::UNKNOWN);
+}
