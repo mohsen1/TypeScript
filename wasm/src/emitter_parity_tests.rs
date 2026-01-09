@@ -16355,3 +16355,149 @@ enum Computed {
         output
     );
 }
+
+/// Parity test for ES5 re-export patterns.
+/// Re-exports should be transformed to CommonJS require/exports pattern.
+#[test]
+fn test_parity_es5_reexport_patterns() {
+    let source = r#"export { foo, bar } from './module';
+export { baz as qux } from './other';
+export * from './all';
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::CommonJS;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should have require calls
+    assert!(
+        output.contains("require"),
+        "Output should use require for imports: {}",
+        output
+    );
+    // No ES6 export/import syntax
+    assert!(
+        !output.contains("export {") && !output.contains("from '"),
+        "ES5 output should not contain ES6 export syntax: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 barrel file pattern.
+/// Barrel files re-exporting from multiple modules.
+#[test]
+fn test_parity_es5_barrel_file() {
+    let source = r#"export { User } from './user';
+export { Product } from './product';
+export { Order } from './order';
+export type { UserType } from './types';
+"#;
+    let mut parser = ThinParserState::new("index.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::CommonJS;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should have require calls for value exports
+    assert!(
+        output.contains("require"),
+        "Output should use require for barrel imports: {}",
+        output
+    );
+    // Type-only exports should be erased
+    assert!(
+        !output.contains("UserType"),
+        "Type-only exports should be erased: {}",
+        output
+    );
+    // No ES6 syntax
+    assert!(
+        !output.contains("export {") && !output.contains("from '"),
+        "ES5 output should not contain ES6 syntax: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 type-only imports.
+/// Type-only imports should be completely erased.
+#[test]
+fn test_parity_es5_type_only_imports() {
+    let source = r#"import type { User, Product } from './types';
+import type * as Types from './all-types';
+import { type Order, createOrder } from './orders';
+
+function process(user: User): Product {
+    return createOrder();
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::CommonJS;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Type-only imports should be erased - no import type
+    assert!(
+        !output.contains("import type"),
+        "Type-only imports should be erased: {}",
+        output
+    );
+    // Function should be present
+    assert!(
+        output.contains("function process"),
+        "Output should contain process function: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": User") && !output.contains(": Product"),
+        "Type annotations should be erased: {}",
+        output
+    );
+    // Value import should remain (createOrder)
+    assert!(
+        output.contains("createOrder"),
+        "Value imports should remain: {}",
+        output
+    );
+}
