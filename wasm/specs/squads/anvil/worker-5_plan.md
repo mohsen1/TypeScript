@@ -7,7 +7,22 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-(none - awaiting new task from EM)
+Add ES5 async tests for Promise.allSettled patterns
+
+Per GOALS.md Objective 1: ES5 downleveling correctness
+
+Steps:
+1. Add 6 ES5 async tests for Promise.allSettled patterns to `wasm/src/transforms/async_es5_tests.rs`:
+   - Basic Promise.allSettled with await
+   - Promise.allSettled with error handling
+   - Promise.allSettled with mixed results
+   - Promise.allSettled in class method
+   - Promise.allSettled with destructuring
+   - Combined Promise.allSettled patterns
+2. Run `./wasm/test.sh async_es5_tests` to verify all tests pass
+3. Commit with message: `[wasm] async_es5: add Promise.allSettled pattern tests`
+4. Push to `origin/worker/anvil-5`
+5. Update this plan file and push
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
