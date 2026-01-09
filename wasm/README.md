@@ -12,48 +12,14 @@ engine on top to match TypeScript behavior while preserving correctness where po
 
 **Current Phase: Phase 8 - Conformance, Convergence, and Hardening**
 
-**Strategic Shift:** We have crossed the threshold of "building the engine." The components (ThinParser, ThinBinder, Solver, ThinEmitter) exist. We are now shifting to **Integration and Correctness**. We are no longer building features in isolation; we are driving the entire pipeline to pass official TypeScript conformance tests.
+### Priority number one is Conformance
 
-**Top Priority:** The **Solver** is the bottleneck for correctness (estimated 55% complete). The Emitter is 80% complete - **stop adding new Emitter features** and redirect effort to Solver and test coverage.
+#### HEADLINER
 
-### ⚠️ Velocity Warning
-We are coding faster than we can verify. Current velocity (~70 commits/day) is accumulating "verification debt." Many recent changes show regressions (`current behavior yields never`). **Slow down and gate harder.**
+We need to keep working on our project and while maintaining the architectural integrity of our codebase, increase conformance with TypeScript.
 
-### Tactical Shift: Operation Crucible
-- **Anvil Squad (Emitter):** Reduced to 2 workers. Focus ONLY on critical source map bugs and blocking ES5 regressions. **No new transforms.**
-- **Forge Squad (Solver):** 5 workers. Primary focus: `solver/evaluate.rs` deferral logic for the Redux blocker.
-- **Crucible Tasks (Test Porting):** 3 workers reassigned from Anvil. Their ONLY job:
-  - Port conditional type and mapped type tests from official TypeScript repo into `tests/cases/`
-  - Target: 50 new solver test cases this week
-  - Goal: Give Forge workers failing tests to triangulate correct behavior
 
-### Management Strategy: Autocratic Scheduling
-- **The Manager** is the single source of truth for priority.
-- **Tracks** are generic workers. If the Solver needs 3 workers, the Manager assigns 3 workers to the Solver, regardless of their previous "track name."
-- **Zero-Idle:** If a high-priority task is blocked, swarm it.
-- **Bisect-on-Merge:** PRs that regress ANY existing baseline are auto-rejected. No exceptions.
-
-### Critical Objectives (Ranked)
-
-1.  **Solver Hardening (The "Brain")**
-    *   **🚨 BLOCKER: Redux/Lodash Generics** - `test_check_redux_lodash_style_generics` must pass. This test combines mapped types, conditional inference, AND cross-file resolution simultaneously. **Swarm this until it's green.**
-    *   **ROOT CAUSE:** The bug is eager evaluation of conditional types when `InferenceVar`s are not yet bound. **FIX:** Refactor `solver/evaluate.rs` to introduce a `Deferred` state for `ConditionalResult`. When `check_type` contains an unbound `InferenceVar`, do NOT return `Any` or `Never`. Return a `TypeKey::Conditional` that preserves the constraint. Only evaluate when inference context is finalized.
-    *   **Generic Inference:** `solver/infer.rs` is critical. Focus on inference from usage, context-sensitive typing, and handling circular constraints in `extends` clauses.
-    *   **Conditional Types:** Stress test `solver/evaluate.rs` with distributive conditional types over unions. This is where most "toy" compilers fail.
-
-2.  **Emitter Fidelity (The "Voice")** - MAINTENANCE MODE
-    *   **⛔ NO NEW TRANSFORMS.** The Emitter is 80% complete. Stop feature work.
-    *   **Bug fixes only:** Focus on critical source map bugs and blocking ES5 regressions (`super["m"]` in async, nested arrow `this` capture).
-    *   **⚠️ Anti-pattern alert:** Do NOT use regex substitutions for code transforms. Always operate on AST.
-
-3.  **Test Coverage (Crucible)**
-    *   Port 50 conditional type and mapped type tests from official TypeScript repo.
-    *   Every Solver fix must come with a regression test.
-    *   **Metric:** Increase solver test coverage by 20% this week.
-
-4.  **Performance Regression Check**
-    *   Run `./wasm/bench.sh` regularly. The 500 MB/s throughput goal must not regress.
-    *   **Metric:** Successfully compile `redux` or `lodash` types without panicking.
+Output of `wasm/differential-test/run-conformance.sh --max=10000` dictates where we are and where should we go from here
 
 ### Anti-Priorities (Do Not Work On)
 *   **New Emitter transforms** (ES3, obscure module formats) - we have enough
