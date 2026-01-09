@@ -13,6 +13,7 @@ Priority: 4
 - [ ] (empty)
 
 ## Completed
+- [x] Add ES5 class tests for Symbol.unscopables patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for Symbol.split patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for Symbol.search patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for Symbol.replace patterns. Tests: `./wasm/test.sh class_es5_tests`
