@@ -7,28 +7,14 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-Add ES5 async tests for async Proxy/Reflect patterns
-
-Per GOALS.md Objective 1: ES5 downleveling correctness
-
-Steps:
-1. Add 6 ES5 async tests for async Proxy/Reflect patterns to `wasm/src/transforms/async_es5_tests.rs`:
-   - Async Proxy handler get/set
-   - Async Reflect.apply
-   - Async Proxy with revocable
-   - Async Reflect.construct
-   - Async Proxy trap chain
-   - Combined async Proxy/Reflect patterns
-2. Run `./wasm/test.sh async_es5_tests` to verify all tests pass
-3. Commit with message: `[wasm] async_es5: add async Proxy/Reflect pattern tests`
-4. Push to `origin/worker/anvil-5`
-5. Update this plan file and push
+(none - awaiting new task from EM)
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
 
 
 ## Completed
+- [x] Added 6 async Proxy/Reflect pattern tests (proxy_handler, reflect_apply, proxy_revocable, reflect_construct, trap_chain, combined) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (1066 tests PASS).
 - [x] Added 6 async WeakRef pattern tests (deref, cache, finalization, retry, cleanup, combined) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (1060 tests PASS).
 - [x] Added 6 async disposable pattern tests (basic, using, stack, error, symbol, combined) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (1054 tests PASS).
 - [x] Added 6 async method chaining tests (basic, with_await, fluent_builder, pipeline, error_handling, combined) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (1048 tests PASS).
