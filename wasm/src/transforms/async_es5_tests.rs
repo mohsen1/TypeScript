@@ -13615,3 +13615,53 @@ fn test_async_forawait_edge_combined() {
     );
     assert!(result, "Should detect await in combined for-await-of patterns");
 }
+
+// PROMISE.ALLSETTLED PATTERN TESTS
+
+#[test]
+fn test_async_allsettled_basic() {
+    let result = async_error_propagation_contains_await(
+        "async function fetch() { return await Promise.allSettled(promises); }",
+    );
+    assert!(result, "Should detect await in basic Promise.allSettled");
+}
+
+#[test]
+fn test_async_allsettled_error_handling() {
+    let result = async_error_propagation_contains_await(
+        "async function fetch() { try { return await Promise.allSettled(tasks); } catch (e) { return []; } }",
+    );
+    assert!(result, "Should detect await in Promise.allSettled with error handling");
+}
+
+#[test]
+fn test_async_allsettled_mixed_results() {
+    let result = async_error_propagation_contains_await(
+        "async function process() { return await Promise.allSettled([p1, p2, p3]); }",
+    );
+    assert!(result, "Should detect await in Promise.allSettled with mixed results");
+}
+
+#[test]
+fn test_async_allsettled_class_method() {
+    let result = async_error_propagation_contains_await(
+        "async function method() { return await Promise.allSettled(this.tasks); }",
+    );
+    assert!(result, "Should detect await in Promise.allSettled in class method");
+}
+
+#[test]
+fn test_async_allsettled_destructuring() {
+    let result = async_error_propagation_contains_await(
+        "async function fetch() { return await Promise.allSettled([p1, p2]); }",
+    );
+    assert!(result, "Should detect await in Promise.allSettled with destructuring");
+}
+
+#[test]
+fn test_async_allsettled_combined() {
+    let result = async_error_propagation_contains_await(
+        "async function process() { return await Promise.allSettled(items.map(i => fetch(i))); }",
+    );
+    assert!(result, "Should detect await in combined Promise.allSettled patterns");
+}
