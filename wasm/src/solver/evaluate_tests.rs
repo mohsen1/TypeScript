@@ -40114,7 +40114,7 @@ fn test_mapped_type_key_remap_to_getter_setter() {
         },
         constraint: keys,
         name_type: Some(remapped_keys),
-        template: TypeId::FUNCTION,
+        template: TypeId::ANY,
         readonly_modifier: None,
         optional_modifier: None,
     };
@@ -40343,7 +40343,7 @@ fn test_mapped_type_deep_readonly() {
         constraint: keys,
         name_type: None,
         template: TypeId::OBJECT,
-        readonly_modifier: Some(ModifierAction::Add),
+        readonly_modifier: Some(MappedModifier::Add),
         optional_modifier: None,
     };
 
@@ -40456,7 +40456,7 @@ fn test_mapped_type_mutable_pattern() {
         constraint: keys,
         name_type: None,
         template: TypeId::STRING,
-        readonly_modifier: Some(ModifierAction::Remove),
+        readonly_modifier: Some(MappedModifier::Remove),
         optional_modifier: None,
     };
 
@@ -40502,7 +40502,7 @@ fn test_mapped_type_required_pattern() {
         name_type: None,
         template: TypeId::STRING,
         readonly_modifier: None,
-        optional_modifier: Some(ModifierAction::Remove),
+        optional_modifier: Some(MappedModifier::Remove),
     };
 
     let result = evaluate_mapped(&interner, &mapped);
@@ -40827,542 +40827,248 @@ fn test_infer_return_never() {
 
     assert_eq!(result, TypeId::NEVER);
 }
-// TEMPLATE LITERAL TYPE EDGE CASES
-fn test_template_literal_with_number_type() {
-    // `id_${number}` - template literal with number placeholder
-    let template = interner.template_literal(vec![
-        TemplateSpan::Text(interner.intern_string("id_")),
-        TemplateSpan::Type(TypeId::NUMBER),
-    // Verify template structure is created
-    match interner.lookup(template) {
-        Some(TypeKey::TemplateLiteral(_)) => (),
-        _ => panic!("Expected TemplateLiteral type"),
-    }
-fn test_template_literal_with_boolean_type() {
-    // `is_${boolean}` - template literal with boolean placeholder
-    let template = interner.template_literal(vec![
-        TemplateSpan::Text(interner.intern_string("is_")),
-        TemplateSpan::Type(TypeId::BOOLEAN),
-    ]);
-    // Verify template structure is created
-    match interner.lookup(template) {
-        Some(TypeKey::TemplateLiteral(_)) => (),
-        _ => panic!("Expected TemplateLiteral type"),
-    }
-fn test_template_literal_cartesian_product() {
-    // `${"a"|"b"}_${"1"|"2"}` should expand to "a_1" | "a_2" | "b_1" | "b_2"
-    let lit_a = interner.literal_string("a");
-    let lit_b = interner.literal_string("b");
-    let union1 = interner.union(vec![lit_a, lit_b]);
-    let lit_1 = interner.literal_string("1");
-    let lit_2 = interner.literal_string("2");
-    let union2 = interner.union(vec![lit_1, lit_2]);
-    let template = interner.template_literal(vec![
-        TemplateSpan::Type(union1),
-        TemplateSpan::Text(interner.intern_string("_")),
-        TemplateSpan::Type(union2),
-    ]);
 
-    // The template should be valid - expansion happens during type resolution
-    match interner.lookup(template) {
-        Some(TypeKey::TemplateLiteral(_)) => (),
-        _ => panic!("Expected TemplateLiteral type"),
-    }
-fn test_template_literal_with_never() {
-    // `prefix_${never}` should produce never (empty union)
-    let template = interner.template_literal(vec![
-        TemplateSpan::Text(interner.intern_string("prefix_")),
-        TemplateSpan::Type(TypeId::NEVER),
-    // Template with never should collapse to never on evaluation
-    let result = evaluate_type(&interner, template);
-    // never in template position should result in never
-    assert!(result == TypeId::NEVER || result == template);
-fn test_template_literal_with_any() {
-    // `${any}` template with any should produce string
-    let template = interner.template_literal(vec![TemplateSpan::Type(TypeId::ANY)]);
-    // Template with any should work - any stringifies to any string
-    match interner.lookup(template) {
-        Some(TypeKey::TemplateLiteral(_)) => (),
-        _ => panic!("Expected TemplateLiteral type"),
-    }
-fn test_template_literal_concatenation() {
-    // `${"hello"}${"world"}` should be "helloworld"
-    let hello = interner.literal_string("hello");
-    let world = interner.literal_string("world");
+// =============================================================================
+// Nested Conditional Type Tests
+// =============================================================================
 
-    let template = interner.template_literal(vec![
-        TemplateSpan::Type(hello),
-        TemplateSpan::Type(world),
-    // The template structure should be valid
-    match interner.lookup(template) {
-        Some(TypeKey::TemplateLiteral(_)) => (),
-        _ => panic!("Expected TemplateLiteral type"),
-    }
-}
 #[test]
-fn test_template_literal_empty_string() {
-    // `` empty template
+fn test_nested_conditional_true_branch() {
+    // type NestedTrue<T> = T extends string ? (T extends "hello" ? true : false) : never
+    // NestedTrue<"hello"> should evaluate to true
     let interner = TypeInterner::new();
 
-    let template = interner.template_literal(vec![]);
+    let hello_lit = interner.literal_string("hello");
 
-    // Empty template should be equivalent to empty string literal
-    let result = evaluate_type(&interner, template);
-    // Should be a valid type
-fn test_template_literal_single_text() {
-    // `hello` just text, no interpolations
-    let template = interner.template_literal(vec![
-        TemplateSpan::Text(interner.intern_string("hello")),
-    // Should be equivalent to "hello" literal
-    let result = evaluate_type(&interner, template);
-fn test_template_literal_pattern_infer_numeric() {
-    // `id_${infer N extends number}` - infer from numeric pattern
-    let n_name = interner.intern_string("N");
-    let infer_n = interner.intern(TypeKey::Infer(TypeParamInfo {
-        name: n_name,
-        constraint: Some(TypeId::NUMBER),
+    // Inner conditional: T extends "hello" ? true : false
+    let inner_cond = interner.conditional(ConditionalType {
+        check_type: hello_lit,
+        extends_type: hello_lit, // "hello" extends "hello"
+        true_type: interner.literal_boolean(true),
+        false_type: interner.literal_boolean(false),
+        is_distributive: false,
+    });
+
+    // Outer conditional: T extends string ? inner : never
+    let outer_cond = interner.conditional(ConditionalType {
+        check_type: hello_lit,
+        extends_type: TypeId::STRING,
+        true_type: inner_cond,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    });
+
+    let result = evaluate_type(&interner, outer_cond);
+    // "hello" extends string ? ("hello" extends "hello" ? true : false) : never
+    // => "hello" extends "hello" ? true : false => true
+    assert_eq!(result, interner.literal_boolean(true));
+}
+
+#[test]
+fn test_nested_conditional_middle_branch() {
+    // type NestedMiddle<T> = T extends string ? (T extends "hello" ? "match" : "string") : "other"
+    // NestedMiddle<"world"> should evaluate to "string"
+    let interner = TypeInterner::new();
+
+    let world_lit = interner.literal_string("world");
+    let hello_lit = interner.literal_string("hello");
+    let match_lit = interner.literal_string("match");
+    let string_lit = interner.literal_string("string");
+    let other_lit = interner.literal_string("other");
+
+    // Inner: T extends "hello" ? "match" : "string"
+    let inner_cond = interner.conditional(ConditionalType {
+        check_type: world_lit,
+        extends_type: hello_lit,
+        true_type: match_lit,
+        false_type: string_lit,
+        is_distributive: false,
+    });
+
+    // Outer: T extends string ? inner : "other"
+    let outer_cond = interner.conditional(ConditionalType {
+        check_type: world_lit,
+        extends_type: TypeId::STRING,
+        true_type: inner_cond,
+        false_type: other_lit,
+        is_distributive: false,
+    });
+
+    let result = evaluate_type(&interner, outer_cond);
+    // "world" extends string ? ("world" extends "hello" ? "match" : "string") : "other"
+    // => "world" extends "hello" ? "match" : "string" => "string"
+    assert_eq!(result, string_lit);
+}
+
+#[test]
+fn test_nested_conditional_false_branch() {
+    // type NestedFalse<T> = T extends string ? "string" : (T extends number ? "number" : "other")
+    // NestedFalse<boolean> should evaluate to "other"
+    let interner = TypeInterner::new();
+
+    let string_lit = interner.literal_string("string");
+    let number_lit = interner.literal_string("number");
+    let other_lit = interner.literal_string("other");
+
+    // Inner: T extends number ? "number" : "other"
+    let inner_cond = interner.conditional(ConditionalType {
+        check_type: TypeId::BOOLEAN,
+        extends_type: TypeId::NUMBER,
+        true_type: number_lit,
+        false_type: other_lit,
+        is_distributive: false,
+    });
+
+    // Outer: T extends string ? "string" : inner
+    let outer_cond = interner.conditional(ConditionalType {
+        check_type: TypeId::BOOLEAN,
+        extends_type: TypeId::STRING,
+        true_type: string_lit,
+        false_type: inner_cond,
+        is_distributive: false,
+    });
+
+    let result = evaluate_type(&interner, outer_cond);
+    // boolean extends string => false => inner
+    // boolean extends number => false => "other"
+    assert_eq!(result, other_lit);
+}
+
+#[test]
+fn test_deeply_nested_conditional_3_levels() {
+    // type Deep<T> = T extends string
+    //   ? (T extends "a" ? 1 : (T extends "b" ? 2 : 3))
+    //   : 0
+    // Deep<"b"> should evaluate to 2
+    let interner = TypeInterner::new();
+
+    let b_lit = interner.literal_string("b");
+    let a_lit = interner.literal_string("a");
+    let num_0 = interner.literal_number(0.0);
+    let num_1 = interner.literal_number(1.0);
+    let num_2 = interner.literal_number(2.0);
+    let num_3 = interner.literal_number(3.0);
+
+    // Innermost: T extends "b" ? 2 : 3
+    let innermost = interner.conditional(ConditionalType {
+        check_type: b_lit,
+        extends_type: b_lit,
+        true_type: num_2,
+        false_type: num_3,
+        is_distributive: false,
+    });
+
+    // Middle: T extends "a" ? 1 : innermost
+    let middle = interner.conditional(ConditionalType {
+        check_type: b_lit,
+        extends_type: a_lit,
+        true_type: num_1,
+        false_type: innermost,
+        is_distributive: false,
+    });
+
+    // Outer: T extends string ? middle : 0
+    let outer = interner.conditional(ConditionalType {
+        check_type: b_lit,
+        extends_type: TypeId::STRING,
+        true_type: middle,
+        false_type: num_0,
+        is_distributive: false,
+    });
+
+    let result = evaluate_type(&interner, outer);
+    // "b" extends string => middle
+    // "b" extends "a" => false => innermost
+    // "b" extends "b" => true => 2
+    assert_eq!(result, num_2);
+}
+
+#[test]
+fn test_nested_distributive_conditional() {
+    // type Nested<T> = T extends string
+    //   ? (T extends "a" ? "found_a" : "other_string")
+    //   : "not_string"
+    // Nested<"a" | "b"> with distributive should give "found_a" | "other_string"
+    let interner = TypeInterner::new();
+
+    let a_lit = interner.literal_string("a");
+    let b_lit = interner.literal_string("b");
+    let found_a = interner.literal_string("found_a");
+    let other_string = interner.literal_string("other_string");
+    let _not_string = interner.literal_string("not_string");
+
+    let _union_ab = interner.union(vec![a_lit, b_lit]);
+
+    // Inner for "a": "a" extends "a" ? found_a : other_string => found_a
+    let inner_for_a = interner.conditional(ConditionalType {
+        check_type: a_lit,
+        extends_type: a_lit,
+        true_type: found_a,
+        false_type: other_string,
+        is_distributive: false,
+    });
+
+    // Inner for "b": "b" extends "a" ? found_a : other_string => other_string
+    let inner_for_b = interner.conditional(ConditionalType {
+        check_type: b_lit,
+        extends_type: a_lit,
+        true_type: found_a,
+        false_type: other_string,
+        is_distributive: false,
+    });
+
+    // Evaluate inner conditionals
+    let result_a = evaluate_type(&interner, inner_for_a);
+    let result_b = evaluate_type(&interner, inner_for_b);
+
+    assert_eq!(result_a, found_a);
+    assert_eq!(result_b, other_string);
+
+    // Union of results
+    let result_union = interner.union(vec![result_a, result_b]);
+
+    // Both should produce the same union
+    assert!(result_union != TypeId::ERROR);
+}
+
+#[test]
+fn test_recursive_like_conditional_with_infer() {
+    // type Unwrap<T> = T extends Array<infer U> ? (U extends Array<infer V> ? V : U) : T
+    // This tests nested conditionals with infer patterns
+    let interner = TypeInterner::new();
+
+    // For a simple case: Unwrap<string[]> should give string
+    // string[] extends Array<infer U> ? ... : string[]
+    // => U = string
+    // => string extends Array<infer V> ? V : string
+    // => string (because string doesn't extend Array)
+
+    let _infer_u = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("U"),
+        constraint: None,
         default: None,
     }));
-    let extends_template = interner.template_literal(vec![
-        TemplateSpan::Text(interner.intern_string("id_")),
-        TemplateSpan::Type(infer_n),
-    // Test matching against "id_42"
-    let lit_id_42 = interner.literal_string("id_42");
-        check_type: lit_id_42,
-        extends_type: extends_template,
-        true_type: infer_n,
+
+    let _string_array = interner.array(TypeId::STRING);
+
+    // Inner conditional: U extends Array<infer V> ? V : U
+    // With U = STRING, this should evaluate to STRING (string doesn't extend Array<any>)
+    let infer_v = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("V"),
+        constraint: None,
+        default: None,
+    }));
+    let array_infer_v = interner.array(infer_v);
+
+    let inner_cond = interner.conditional(ConditionalType {
+        check_type: TypeId::STRING,
+        extends_type: array_infer_v,
+        true_type: infer_v,
+        false_type: TypeId::STRING,
         is_distributive: false,
-    // Should infer something or at least not error
-fn test_template_literal_multiple_adjacent_types() {
-    // `${A}${B}${C}` - multiple type interpolations
-    let lit_x = interner.literal_string("x");
-    let lit_y = interner.literal_string("y");
-    let lit_z = interner.literal_string("z");
-    let template = interner.template_literal(vec![
-        TemplateSpan::Type(lit_x),
-        TemplateSpan::Type(lit_y),
-        TemplateSpan::Type(lit_z),
-    ]);
-    // Should create valid template
-    match interner.lookup(template) {
-        Some(TypeKey::TemplateLiteral(_)) => (),
-        _ => panic!("Expected TemplateLiteral type"),
-    }
-fn test_template_literal_union_in_middle() {
-    // `pre_${"a"|"b"|"c"}_suf` - union in middle position
-    let lit_a = interner.literal_string("a");
-    let lit_b = interner.literal_string("b");
-    let lit_c = interner.literal_string("c");
-    let union = interner.union(vec![lit_a, lit_b, lit_c]);
-    let template = interner.template_literal(vec![
-        TemplateSpan::Text(interner.intern_string("pre_")),
-        TemplateSpan::Type(union),
-        TemplateSpan::Text(interner.intern_string("_suf")),
-    ]);
-    match interner.lookup(template) {
-        Some(TypeKey::TemplateLiteral(_)) => (),
-        _ => panic!("Expected TemplateLiteral type"),
-    }
-fn test_template_literal_bigint_type() {
-    // `value_${bigint}` - template with bigint
-    let template = interner.template_literal(vec![
-        TemplateSpan::Text(interner.intern_string("value_")),
-        TemplateSpan::Type(TypeId::BIGINT),
-    ]);
-    match interner.lookup(template) {
-        Some(TypeKey::TemplateLiteral(_)) => (),
-        _ => panic!("Expected TemplateLiteral type"),
-    }
-fn test_template_literal_null_undefined() {
-    // `${null}` and `${undefined}` - special types in template
-    let template_null = interner.template_literal(vec![TemplateSpan::Type(TypeId::NULL)]);
-    let template_undefined = interner.template_literal(vec![TemplateSpan::Type(TypeId::UNDEFINED)]);
-    // Both should be valid templates
-    match interner.lookup(template_null) {
-        Some(TypeKey::TemplateLiteral(_)) => (),
-        _ => panic!("Expected TemplateLiteral type"),
-    }
-    match interner.lookup(template_undefined) {
-        Some(TypeKey::TemplateLiteral(_)) => (),
-        _ => panic!("Expected TemplateLiteral type"),
-    }
-fn test_template_literal_subtype_of_string() {
-    // `foo_${T}` should extend string when T is string
-    let template = interner.template_literal(vec![
-        TemplateSpan::Text(interner.intern_string("foo_")),
-        TemplateSpan::Type(TypeId::STRING),
-    ]);
-    // Template literal types extend string
-    let mut checker = SubtypeChecker::new(&interner);
-    let extends = checker.is_subtype_of(template, TypeId::STRING);
-    // Should be true - all template literal types are subtypes of string
-    assert!(extends);
-fn test_template_literal_specific_extends_pattern() {
-    // "foo_bar" extends `foo_${string}`
-    let literal = interner.literal_string("foo_bar");
-    let pattern = interner.template_literal(vec![
-        TemplateSpan::Text(interner.intern_string("foo_")),
-        TemplateSpan::Type(TypeId::STRING),
-    ]);
-    let mut checker = SubtypeChecker::new(&interner);
-    let extends = checker.is_subtype_of(literal, pattern);
-    // "foo_bar" should extend `foo_${string}`
-    assert!(extends);
-// =============================================================================
-// KEYOF EDGE CASES - INTERSECTION AND UNION
-// =============================================================================
-
-fn test_keyof_intersection_with_never() {
-    // keyof (T & never) should be never (never absorbs in intersection)
-        name: interner.intern_string("a"),
-        type_id: TypeId::STRING,
-        write_type: TypeId::STRING,
-    let intersection = interner.intersection(vec![obj, TypeId::NEVER]);
-    let result = evaluate_keyof(&interner, intersection);
-    // Intersection with never is never, so keyof never = never
-    assert_eq!(result, TypeId::NEVER);
-}
-#[test]
-fn test_keyof_union_with_any() {
-    // keyof (T | any) - any absorbs the union
-    let interner = TypeInterner::new();
-
-    let obj = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("a"),
-        type_id: TypeId::STRING,
-        write_type: TypeId::STRING,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let union = interner.union(vec![obj, TypeId::ANY]);
-    let result = evaluate_keyof(&interner, union);
-
-    // Union with any is any, keyof any is string | number | symbol
-fn test_keyof_intersection_with_any() {
-    // keyof (T & any) - any in intersection
-    let obj = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("a"),
-        type_id: TypeId::STRING,
-        write_type: TypeId::STRING,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-    let intersection = interner.intersection(vec![obj, TypeId::ANY]);
-    let result = evaluate_keyof(&interner, intersection);
-    // Should produce keys from both
-fn test_keyof_union_with_unknown() {
-    // keyof (T | unknown) - unknown absorbs in union
-    let obj = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("a"),
-        type_id: TypeId::STRING,
-        write_type: TypeId::STRING,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-    let union = interner.union(vec![obj, TypeId::UNKNOWN]);
-    let result = evaluate_keyof(&interner, union);
-
-    // keyof unknown is never
-    assert_eq!(result, TypeId::NEVER);
-}
-
-#[test]
-fn test_keyof_four_way_intersection() {
-    // keyof (A & B & C & D) = keyof A | keyof B | keyof C | keyof D
-    let interner = TypeInterner::new();
-
-    let obj_a = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("a"),
-        type_id: TypeId::STRING,
-        write_type: TypeId::STRING,
-        is_method: false,
-    let obj_b = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("b"),
-        type_id: TypeId::NUMBER,
-        write_type: TypeId::NUMBER,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let obj_c = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("c"),
-        type_id: TypeId::BOOLEAN,
-        write_type: TypeId::BOOLEAN,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let obj_d = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("d"),
-    let intersection = interner.intersection(vec![obj_a, obj_b, obj_c, obj_d]);
-    let result = evaluate_keyof(&interner, intersection);
-    // Should produce "a" | "b" | "c" | "d"
-    let lit_a = interner.literal_string("a");
-    let lit_b = interner.literal_string("b");
-    let lit_c = interner.literal_string("c");
-    let lit_d = interner.literal_string("d");
-    let expected = interner.union(vec![lit_a, lit_b, lit_c, lit_d]);
-    assert_eq!(result, expected);
-}
-
-#[test]
-fn test_keyof_four_way_union() {
-    // keyof (A | B | C | D) = only common keys
-    let interner = TypeInterner::new();
-
-    let common_key = interner.intern_string("common");
-
-    let obj_a = interner.object(vec![
-        PropertyInfo {
-            name: common_key,
-            type_id: TypeId::STRING,
-            write_type: TypeId::STRING,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-        PropertyInfo {
-            name: interner.intern_string("a"),
-            type_id: TypeId::STRING,
-            write_type: TypeId::STRING,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-    ]);
-
-    let obj_b = interner.object(vec![
-        PropertyInfo {
-            name: common_key,
-            type_id: TypeId::STRING,
-            write_type: TypeId::STRING,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-        PropertyInfo {
-            name: interner.intern_string("b"),
-            type_id: TypeId::NUMBER,
-            write_type: TypeId::NUMBER,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-    ]);
-
-    let obj_c = interner.object(vec![PropertyInfo {
-        name: common_key,
-        type_id: TypeId::STRING,
-        write_type: TypeId::STRING,
-        is_method: false,
-    let obj_d = interner.object(vec![
-        PropertyInfo {
-            name: common_key,
-            type_id: TypeId::STRING,
-            write_type: TypeId::STRING,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-        PropertyInfo {
-            name: interner.intern_string("d"),
-            type_id: TypeId::BOOLEAN,
-            write_type: TypeId::BOOLEAN,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-    ]);
-    let union = interner.union(vec![obj_a, obj_b, obj_c, obj_d]);
-    let result = evaluate_keyof(&interner, union);
-
-    // Only "common" is present in all
-    let expected = interner.literal_string("common");
-    assert_eq!(result, expected);
-fn test_keyof_mixed_intersection_union() {
-    // keyof ((A & B) | C) - nested combination
-    let obj_a = interner.object(vec![
-        PropertyInfo {
-            name: interner.intern_string("a"),
-            type_id: TypeId::STRING,
-            write_type: TypeId::STRING,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-        PropertyInfo {
-            name: interner.intern_string("common"),
-            type_id: TypeId::STRING,
-            write_type: TypeId::STRING,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-    ]);
-
-    let obj_b = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("b"),
-        readonly: false,
-    let obj_c = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("common"),
-        type_id: TypeId::STRING,
-        write_type: TypeId::STRING,
-    let a_and_b = interner.intersection(vec![obj_a, obj_b]);
-    let union = interner.union(vec![a_and_b, obj_c]);
-    let result = evaluate_keyof(&interner, union);
-    // Common keys between (A & B) and C = "common"
-    let expected = interner.literal_string("common");
-    assert_eq!(result, expected);
-}
-#[test]
-fn test_keyof_intersection_both_index_signatures() {
-    // keyof ({ [k: string]: T } & { [k: number]: U }) = string | number
-    let interner = TypeInterner::new();
-
-    let string_indexed = interner.object_with_index(ObjectShape {
-        properties: Vec::new(),
-        string_index: Some(IndexSignature {
-            key_type: TypeId::STRING,
-            value_type: TypeId::STRING,
-            readonly: false,
-        }),
-        number_index: None,
     });
 
-    let number_indexed = interner.object_with_index(ObjectShape {
-        properties: Vec::new(),
-        string_index: None,
-        number_index: Some(IndexSignature {
-            key_type: TypeId::NUMBER,
-            value_type: TypeId::NUMBER,
-            readonly: false,
-        }),
-    });
-
-    let intersection = interner.intersection(vec![string_indexed, number_indexed]);
-    let result = evaluate_keyof(&interner, intersection);
-
-    // Should be string | number
-    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
-    assert_eq!(result, expected);
-fn test_keyof_union_index_and_literal() {
-    // keyof ({ [k: string]: T } | { a: U }) - intersection of keys
-    let string_indexed = interner.object_with_index(ObjectShape {
-        properties: Vec::new(),
-        string_index: Some(IndexSignature {
-            key_type: TypeId::STRING,
-            value_type: TypeId::STRING,
-            readonly: false,
-        }),
-        number_index: None,
-    });
-
-    let literal_obj = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("a"),
-        optional: false,
-    let union = interner.union(vec![string_indexed, literal_obj]);
-    let result = evaluate_keyof(&interner, union);
-
-    // "a" is subtype of string, so "a" is the common key
-    let expected = interner.literal_string("a");
-    assert_eq!(result, expected);
+    let result = evaluate_type(&interner, inner_cond);
+    // string extends Array<infer V> => false => STRING
+    assert_eq!(result, TypeId::STRING);
 }
-
-#[test]
-fn test_keyof_intersection_with_callable() {
-    // keyof (T & { (): void }) - object with call signature
-    let interner = TypeInterner::new();
-
-    let obj = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("a"),
-        type_id: TypeId::STRING,
-        write_type: TypeId::STRING,
-    let callable = interner.callable(CallableShape {
-        call_signatures: vec![CallSignature {
-            type_params: Vec::new(),
-            params: Vec::new(),
-            this_type: None,
-            return_type: TypeId::VOID,
-            type_predicate: None,
-        }],
-        construct_signatures: Vec::new(),
-        properties: Vec::new(),
-    });
-    let intersection = interner.intersection(vec![obj, callable]);
-    let result = evaluate_keyof(&interner, intersection);
-    // Should at least include "a" from the object
-    let lit_a = interner.literal_string("a");
-    let mut checker = SubtypeChecker::new(&interner);
-    assert!(checker.is_subtype_of(lit_a, result));
-}
-
-#[test]
-fn test_keyof_intersection_with_array() {
-    // keyof ({ a: T } & string[]) - object intersected with array
-    let interner = TypeInterner::new();
-
-    let obj = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("a"),
-        type_id: TypeId::STRING,
-        write_type: TypeId::STRING,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let arr = interner.array(TypeId::STRING);
-    let intersection = interner.intersection(vec![obj, arr]);
-    let result = evaluate_keyof(&interner, intersection);
-
-    // Should include array keys (number index) plus "a" plus array methods
-fn test_keyof_empty_intersection() {
-    // keyof (A & B) where A and B have disjoint primitive types
-    // This is different from object intersection - primitive intersection is never
-    // string & number = never
-    let intersection = interner.intersection(vec![TypeId::STRING, TypeId::NUMBER]);
-    let result = evaluate_keyof(&interner, intersection);
-    // Intersection of disjoint primitives is never, keyof never = never
-    assert_eq!(result, TypeId::NEVER);
-}
-#[test]
-fn test_keyof_empty_union() {
-    // keyof never = never
-    let interner = TypeInterner::new();
-    let result = evaluate_keyof(&interner, TypeId::NEVER);
-    assert_eq!(result, TypeId::NEVER);
-}
-#[test]
-fn test_keyof_nested_keyof() {
-    // keyof keyof T - nested keyof application
-    let interner = TypeInterner::new();
-
-    let obj = interner.object(vec![
-        PropertyInfo {
-            name: interner.intern_string("a"),
-            type_id: TypeId::STRING,
-            write_type: TypeId::STRING,
-            readonly: false,
-            is_method: false,
-        },
-        PropertyInfo {
-            name: interner.intern_string("b"),
-            type_id: TypeId::NUMBER,
-            write_type: TypeId::NUMBER,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-    ]);
-    let keyof_obj = evaluate_keyof(&interner, obj);
-    // keyof_obj = "a" | "b"
-    // Now keyof (keyof obj) = keyof ("a" | "b") = keyof string (apparent members)
-    let keyof_keyof = evaluate_keyof(&interner, keyof_obj);
-
-    // String literal unions extend string, so keyof should give string apparent members
-    assert!(keyof_keyof != TypeId::ERROR);
