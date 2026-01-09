@@ -3078,7 +3078,89 @@ impl<'a> ThinCheckerState<'a> {
             return false;
         }
 
+        // Skip if the variable declaration has an initializer
+        if self.symbol_has_initializer(sym_id) {
+            return false;
+        }
+
+        // Skip if the variable is in an ambient context (declare var x: T)
+        if self.symbol_is_in_ambient_context(sym_id) {
+            return false;
+        }
+
         true
+    }
+
+    /// Check if a variable symbol is in an ambient context (declared with `declare`).
+    fn symbol_is_in_ambient_context(&self, sym_id: SymbolId) -> bool {
+        let Some(symbol) = self.ctx.binder.get_symbol(sym_id) else {
+            return false;
+        };
+
+        for &decl_idx in &symbol.declarations {
+            // Check if the variable statement has a declare modifier
+            if let Some(var_stmt_idx) = self.find_enclosing_variable_statement(decl_idx) {
+                if let Some(var_stmt_node) = self.ctx.arena.get(var_stmt_idx) {
+                    if let Some(var_stmt) = self.ctx.arena.get_variable(var_stmt_node) {
+                        if self.has_declare_modifier(&var_stmt.modifiers) {
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            // Also check node flags for AMBIENT
+            if let Some(node) = self.ctx.arena.get(decl_idx) {
+                if (node.flags as u32) & crate::parser::node_flags::AMBIENT != 0 {
+                    return true;
+                }
+            }
+        }
+
+        false
+    }
+
+    /// Find the enclosing variable statement for a node.
+    fn find_enclosing_variable_statement(&self, idx: NodeIndex) -> Option<NodeIndex> {
+        let mut current = idx;
+        while !current.is_none() {
+            if let Some(node) = self.ctx.arena.get(current) {
+                if node.kind == syntax_kind_ext::VARIABLE_STATEMENT {
+                    return Some(current);
+                }
+            }
+            let ext = self.ctx.arena.get_extended(current)?;
+            if ext.parent.is_none() {
+                return None;
+            }
+            current = ext.parent;
+        }
+        None
+    }
+
+    /// Check if a variable symbol's declaration has an initializer.
+    fn symbol_has_initializer(&self, sym_id: SymbolId) -> bool {
+        let Some(symbol) = self.ctx.binder.get_symbol(sym_id) else {
+            return false;
+        };
+
+        for &decl_idx in &symbol.declarations {
+            let Some(var_decl_idx) = self.find_enclosing_variable_declaration(decl_idx) else {
+                continue;
+            };
+            let Some(var_decl_node) = self.ctx.arena.get(var_decl_idx) else {
+                continue;
+            };
+            let Some(var_decl) = self.ctx.arena.get_variable_declaration(var_decl_node) else {
+                continue;
+            };
+            // Variable has an initializer - it's definitely assigned at declaration
+            if !var_decl.initializer.is_none() {
+                return true;
+            }
+        }
+
+        false
     }
 
     fn is_definitely_assigned_at(&self, idx: NodeIndex) -> bool {
