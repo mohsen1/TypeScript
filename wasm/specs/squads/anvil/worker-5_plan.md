@@ -7,12 +7,13 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- [ ] Add async method with optional chaining tests in `wasm/src/transforms/async_es5_tests.rs`. Run `./wasm/test.sh async_es5_tests`.
+- [ ] Add async method with nullish coalescing tests in `wasm/src/transforms/async_es5_tests.rs`. Run `./wasm/test.sh async_es5_tests`.
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added 12 async optional chaining tests (property access, method call, no await, nested, body_contains_await, body_no_await, ignores nested async, element access, try/catch, nullish coalescing, call expression, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (256 tests PASS).
 - [x] Added 12 async static field access tests (read after await, write after await, no await, with return, body_contains_await, body_no_await, ignores nested async, in loop, try/catch, multiple fields, static method call, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (244 tests PASS).
 - [x] Added 12 async private field access tests (read after await, write after await, no await, compound assignment, body_contains_await, body_no_await, ignores nested async, in loop, try/catch, multiple fields, method call, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (232 tests PASS).
 - [x] Added 12 async super property access tests (read basic, with return, no await, multiple accesses, body_contains_await, body_no_await, ignores nested async, in expression, try/catch, assignment, getter, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (220 tests PASS).
