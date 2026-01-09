@@ -35661,3 +35661,247 @@ fn test_callable_multiple_params_infer() {
     ]);
     assert_eq!(result, expected);
 }
+
+// ==================== Function return inference edge case tests ====================
+
+#[test]
+fn test_infer_return_void_vs_undefined() {
+    // T extends () => infer R ? R : never
+    // where T = () => void
+    // Result should be void (not undefined)
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let r_name = interner.intern_string("R");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: r_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let pattern_fn = interner.function(FunctionShape {
+        params: Vec::new(),
+        return_type: infer_r,
+        type_predicate: None,
+        this_type: None,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: pattern_fn,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+
+    let source_fn = interner.function(FunctionShape {
+        params: Vec::new(),
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        this_type: None,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, source_fn);
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::VOID);
+}
+
+#[test]
+fn test_infer_return_promise_like() {
+    // T extends () => infer R ? R : never
+    // where T = () => Promise<string>
+    // Result should be Promise<string> (as an object type)
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let r_name = interner.intern_string("R");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: r_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let pattern_fn = interner.function(FunctionShape {
+        params: Vec::new(),
+        return_type: infer_r,
+        type_predicate: None,
+        this_type: None,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: pattern_fn,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+
+    // Create a simple Promise-like object { then(cb: (v: string) => void): void }
+    let then_name = interner.intern_string("then");
+    let promise_string = interner.object(vec![PropertyInfo {
+        name: then_name,
+        type_id: TypeId::ANY, // Simplified, normally this would be a function
+        write_type: TypeId::ANY,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let source_fn = interner.function(FunctionShape {
+        params: Vec::new(),
+        return_type: promise_string,
+        type_predicate: None,
+        this_type: None,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, source_fn);
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, promise_string);
+}
+
+#[test]
+fn test_infer_return_union() {
+    // T extends () => infer R ? R : never
+    // where T = () => (string | number)
+    // Result should be string | number
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let r_name = interner.intern_string("R");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: r_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let pattern_fn = interner.function(FunctionShape {
+        params: Vec::new(),
+        return_type: infer_r,
+        type_predicate: None,
+        this_type: None,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: pattern_fn,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+
+    let union_return = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let source_fn = interner.function(FunctionShape {
+        params: Vec::new(),
+        return_type: union_return,
+        type_predicate: None,
+        this_type: None,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, source_fn);
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    // Result should be string | number
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_infer_return_never() {
+    // T extends () => infer R ? R : unknown
+    // where T = () => never
+    // Result should be never
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let r_name = interner.intern_string("R");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: r_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let pattern_fn = interner.function(FunctionShape {
+        params: Vec::new(),
+        return_type: infer_r,
+        type_predicate: None,
+        this_type: None,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: pattern_fn,
+        true_type: infer_r,
+        false_type: TypeId::UNKNOWN,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+
+    let source_fn = interner.function(FunctionShape {
+        params: Vec::new(),
+        return_type: TypeId::NEVER,
+        type_predicate: None,
+        this_type: None,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, source_fn);
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
