@@ -8125,6 +8125,313 @@ class CustomPlugin extends BasePlugin {
 }
 
 // =============================================================================
+// Const Assertion Tests
+// =============================================================================
+
+#[test]
+fn test_class_es5_const_assertion_object_field() {
+    // const assertion on object literal in field - should be erased
+    let source = r#"
+class Config {
+    settings = { theme: "dark", fontSize: 14 } as const;
+
+    getTheme(): string {
+        return this.settings.theme;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function Config"),
+        "Expected Config class: {}",
+        output
+    );
+
+    // as const should be erased
+    assert!(
+        !output.contains("as const"),
+        "as const should be erased: {}",
+        output
+    );
+
+    // Field should be present
+    assert!(
+        output.contains("settings"),
+        "Expected settings field: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_const_assertion_array_field() {
+    // const assertion on array literal in field - should be erased
+    let source = r#"
+class Permissions {
+    roles = ["admin", "user", "guest"] as const;
+
+    hasRole(role: string): boolean {
+        return this.roles.includes(role);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function Permissions"),
+        "Expected Permissions class: {}",
+        output
+    );
+
+    // as const should be erased
+    assert!(
+        !output.contains("as const"),
+        "as const should be erased: {}",
+        output
+    );
+
+    // Field should be present
+    assert!(
+        output.contains("roles"),
+        "Expected roles field: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_const_assertion_static_field() {
+    // const assertion in static field - should be erased
+    let source = r#"
+class HttpStatus {
+    static OK = 200 as const;
+    static NOT_FOUND = 404 as const;
+    static SERVER_ERROR = 500 as const;
+
+    static isSuccess(code: number): boolean {
+        return code >= 200 && code < 300;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function HttpStatus") || output.contains("HttpStatus"),
+        "Expected HttpStatus class: {}",
+        output
+    );
+
+    // as const should be erased
+    assert!(
+        !output.contains("as const"),
+        "as const should be erased: {}",
+        output
+    );
+
+    // Static fields should be present
+    assert!(
+        output.contains("OK") || output.contains("200"),
+        "Expected OK field: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_const_assertion_in_method() {
+    // const assertion in method return - should be erased
+    let source = r#"
+class Factory {
+    createConfig() {
+        return { debug: true, level: "info" } as const;
+    }
+
+    createList() {
+        return [1, 2, 3] as const;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function Factory"),
+        "Expected Factory class: {}",
+        output
+    );
+
+    // as const should be erased
+    assert!(
+        !output.contains("as const"),
+        "as const should be erased: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("createConfig") && output.contains("createList"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_const_assertion_in_constructor() {
+    // const assertion in constructor - should be erased
+    let source = r#"
+class State {
+    data: readonly string[];
+
+    constructor() {
+        this.data = ["a", "b", "c"] as const;
+    }
+
+    getData(): readonly string[] {
+        return this.data;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function State"),
+        "Expected State class: {}",
+        output
+    );
+
+    // as const should be erased
+    assert!(
+        !output.contains("as const"),
+        "as const should be erased: {}",
+        output
+    );
+
+    // Field should be present
+    assert!(
+        output.contains("data"),
+        "Expected data field: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_const_assertion_in_derived_class() {
+    // const assertion in derived class - should be erased
+    let source = r#"
+class BaseStore {
+    name: string = "base";
+}
+
+class ConfigStore extends BaseStore {
+    defaults = { timeout: 5000, retries: 3 } as const;
+
+    getDefaults() {
+        return this.defaults;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Second statement is the ConfigStore class
+    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function ConfigStore"),
+        "Expected ConfigStore class: {}",
+        output
+    );
+
+    // as const should be erased
+    assert!(
+        !output.contains("as const"),
+        "as const should be erased: {}",
+        output
+    );
+
+    // Should have inheritance
+    assert!(
+        output.contains("__extends") || output.contains("_super"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+
+    // Field should be present
+    assert!(
+        output.contains("defaults"),
+        "Expected defaults field: {}",
+        output
+    );
+}
+
+// =============================================================================
 // Namespace Merging Tests
 // =============================================================================
 
