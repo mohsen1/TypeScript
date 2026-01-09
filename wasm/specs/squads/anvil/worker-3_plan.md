@@ -7,10 +7,10 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-(awaiting assignment)
+- [ ] Add ES5 source map tests for arrow function patterns: expression body, block body, this binding, rest params, defaults. Tests: `./wasm/test.sh source_map`
 
 ## Task Queue
-- [ ] Add ES5 source map tests for arrow function patterns: expression body, block body, this binding
+- [ ] Add ES5 source map tests for template literal patterns: basic, tagged, nested expressions
 
 ## Completed
 - [x] Added class expression ES5 source map tests (anonymous, named, in return, with extends, with static, in variable, in array, in object, with methods, comprehensive); 757 tests pass.
