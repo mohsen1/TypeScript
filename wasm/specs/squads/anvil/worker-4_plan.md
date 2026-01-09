@@ -7,12 +7,15 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [ ] Add ES5 class tests for decorator factory patterns: decorator with parameters, composed decorators, metadata decorators. Tests: `./wasm/test.sh class_es5_tests`
+- [ ] Add ES5 class tests for private method patterns: static private, async private, generator private, private accessors. Tests: `./wasm/test.sh class_es5_tests`
 
 ## Task Queue
-- [ ] Add ES5 class tests for class field initializer patterns: complex initializers, computed field names
+- [ ] Add ES5 class tests for using declarations patterns: sync using, async using, dispose patterns
 
 ## Completed
+- [x] Add ES5 class tests for class field initializer patterns. Tests: `./wasm/test.sh class_es5_tests`
+- [x] Add ES5 class tests for decorator factory patterns. Tests: `./wasm/test.sh class_es5_tests`
+- [x] Add ES5 class tests for mixin factory patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for branded type patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for utility type patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for generic constraint patterns. Tests: `./wasm/test.sh class_es5_tests`

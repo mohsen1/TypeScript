@@ -6,12 +6,14 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-- [ ] Add ES5 class tests for conditional type patterns: infer keyword in class context, distributive conditionals, Extract/Exclude types. Tests: `./wasm/test.sh class_es5_tests`
+- [ ] Add ES5 class tests for variadic tuple patterns: spread in tuples, labeled tuple elements, rest elements. Tests: `./wasm/test.sh class_es5_tests`
 
 ## Task Queue
-- [ ] Add ES5 class tests for template literal type patterns: string manipulation types, key remapping
+- [ ] Add ES5 class tests for recursive type patterns: recursive type aliases, tree structures
 
 ## Completed
+- [x] Added ES5 tests for template literal type patterns (6 tests): Uppercase/Lowercase types, Capitalize/Uncapitalize types, key remapping patterns, template literal unions, string manipulation types, combined template literal patterns. Ran `./wasm/test.sh class_es5_tests` (all 374 pass).
+- [x] Added ES5 tests for conditional type patterns (6 tests): infer keyword patterns, distributive conditionals, Extract types, Exclude types, nested conditional types, combined conditional types. Ran `./wasm/test.sh class_es5_tests` (all 365 pass).
 - [x] Added ES5 tests for type guard patterns (6 tests): user-defined type guards, in operator guards, typeof guards, instanceof guards, discriminated unions, assertion functions. Ran `./wasm/test.sh class_es5_tests` (all 347 pass).
 - [x] Added ES5 tests for module pattern variations (6 tests): CommonJS class exports, ESM default class, ESM named exports, re-export patterns, barrel export pattern, mixed module patterns. Ran `./wasm/test.sh class_es5_tests` (all 341 pass).
 - [x] Added ES5 tests for namespace merging patterns (6 tests): class with namespace augmentation, namespace with interface, namespace with enum, namespace with function, nested namespaces, namespace exports. Ran `./wasm/test.sh class_es5_tests` (all 330 pass).
