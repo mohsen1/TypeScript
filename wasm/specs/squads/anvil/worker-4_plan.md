@@ -7,10 +7,10 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-None - awaiting assignment from EM-Anvil
+Add ES5 class tests for infer keyword patterns: array element, function return, promise unwrap. Tests: `./wasm/test.sh class_es5_tests`
 
 ## Task Queue
-- [ ] Add ES5 class tests for infer keyword patterns: array element, function return, promise unwrap
+- [ ] Add ES5 class tests for recursive type patterns: tree, linked list, JSON
 
 ## Completed
 - [x] Add ES5 class tests for template literal type patterns: Uppercase, Lowercase, Capitalize. Tests: `./wasm/test.sh class_es5_tests`
