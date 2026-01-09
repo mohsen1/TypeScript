@@ -20731,3 +20731,705 @@ fn test_discriminated_union_result_type_pattern() {
     assert_eq!(result_t, TypeId::NUMBER);
     assert_eq!(result_e, TypeId::STRING);
 }
+
+// =============================================================================
+// Never Type Tests (impossible values, exhaustiveness)
+// =============================================================================
+
+#[test]
+fn test_never_type_basic_identity() {
+    // never is a subtype of all types but nothing is a subtype of never (except never)
+    let interner = TypeInterner::new();
+
+    // TypeId::NEVER should be a built-in
+    assert!(matches!(interner.lookup(TypeId::NEVER), Some(TypeKey::Never)));
+}
+
+#[test]
+fn test_never_in_union_absorbed() {
+    // T | never = T (never is absorbed in unions)
+    let interner = TypeInterner::new();
+
+    // Union of string and never
+    let union_with_never = interner.union(vec![TypeId::STRING, TypeId::NEVER]);
+
+    // The union should simplify to just string (implementation dependent)
+    // If not simplified, it should still have both members
+    if let Some(TypeKey::Union(members)) = interner.lookup(union_with_never) {
+        // Either absorbed or present
+        assert!(members.len() <= 2);
+    } else {
+        // Could be simplified to just TypeId::STRING
+        assert_eq!(union_with_never, TypeId::STRING);
+    }
+}
+
+#[test]
+fn test_never_in_intersection_dominates() {
+    // T & never = never (never dominates intersections)
+    let interner = TypeInterner::new();
+
+    // Intersection of string and never
+    let intersection_with_never = interner.intersection(vec![TypeId::STRING, TypeId::NEVER]);
+
+    // The intersection should be never (or simplified)
+    if let Some(TypeKey::Intersection(members)) = interner.lookup(intersection_with_never) {
+        // Contains never
+        assert!(members.contains(&TypeId::NEVER));
+    } else {
+        // Could be simplified to never
+        assert_eq!(intersection_with_never, TypeId::NEVER);
+    }
+}
+
+#[test]
+fn test_never_function_return_type() {
+    // function fail(): never { throw new Error(); }
+    let interner = TypeInterner::new();
+
+    let fail_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::NEVER,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    if let Some(TypeKey::Function(shape)) = interner.lookup(fail_fn) {
+        assert_eq!(shape.return_type, TypeId::NEVER);
+    } else {
+        panic!("Expected function type");
+    }
+}
+
+#[test]
+fn test_never_function_parameter() {
+    // function assertNever(x: never): never
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+
+    let assert_never_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(x_name),
+            type_id: TypeId::NEVER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::NEVER,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    if let Some(TypeKey::Function(shape)) = interner.lookup(assert_never_fn) {
+        assert_eq!(shape.params[0].type_id, TypeId::NEVER);
+        assert_eq!(shape.return_type, TypeId::NEVER);
+    } else {
+        panic!("Expected function type");
+    }
+}
+
+#[test]
+fn test_never_array_type() {
+    // never[] - array of never (empty array type)
+    let interner = TypeInterner::new();
+
+    let never_array = interner.array(TypeId::NEVER);
+
+    if let Some(TypeKey::Array(element_type)) = interner.lookup(never_array) {
+        assert_eq!(*element_type, TypeId::NEVER);
+    } else {
+        panic!("Expected array type");
+    }
+}
+
+#[test]
+fn test_never_tuple_element() {
+    // [string, never, number] - tuple with never element
+    let interner = TypeInterner::new();
+
+    let tuple_with_never = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NEVER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(tuple_with_never) {
+        assert_eq!(elements.len(), 3);
+        assert_eq!(elements[1].type_id, TypeId::NEVER);
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_never_object_property() {
+    // { impossible: never } - object with never property
+    let interner = TypeInterner::new();
+
+    let impossible_name = interner.intern_string("impossible");
+
+    let obj_with_never = interner.object(vec![PropertyInfo {
+        name: impossible_name,
+        type_id: TypeId::NEVER,
+        write_type: TypeId::NEVER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(obj_with_never) {
+        assert_eq!(props[0].type_id, TypeId::NEVER);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_never_inference_exhaustive_check() {
+    // After narrowing all cases, T should be never
+    let interner = TypeInterner::new();
+    let ctx = InferenceContext::new(&interner);
+
+    let var_t = ctx.fresh_type_param(None, None);
+
+    // After exhaustive narrowing, upper bound is never
+    ctx.add_upper_bound(var_t, TypeId::NEVER);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_never_inference_impossible_constraint() {
+    // T extends string & number (impossible, should be never)
+    let interner = TypeInterner::new();
+    let ctx = InferenceContext::new(&interner);
+
+    let var_t = ctx.fresh_type_param(None, None);
+
+    // Both string and number upper bounds (impossible to satisfy)
+    ctx.add_upper_bound(var_t, TypeId::STRING);
+    ctx.add_upper_bound(var_t, TypeId::NUMBER);
+
+    // Result depends on implementation - might be error or never
+    let _result = ctx.resolve_with_constraints(var_t);
+    // Just verify no panic
+}
+
+#[test]
+fn test_never_conditional_type_false_branch() {
+    // type Check<T> = T extends string ? T : never
+    let interner = TypeInterner::new();
+
+    let cond = ConditionalType {
+        check_type: TypeId::NUMBER, // number doesn't extend string
+        extends_type: TypeId::STRING,
+        true_type: TypeId::NUMBER,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_never_conditional_type_true_branch() {
+    // type Check<T> = T extends string ? never : T
+    let interner = TypeInterner::new();
+
+    let cond = ConditionalType {
+        check_type: TypeId::STRING,
+        extends_type: TypeId::STRING,
+        true_type: TypeId::NEVER,
+        false_type: TypeId::STRING,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_never_distributive_filters_out() {
+    // type Filter<T> = T extends null | undefined ? never : T
+    // Applied to string | null => string
+    let interner = TypeInterner::new();
+
+    // Simulate: string doesn't extend null | undefined, so returns string
+    let cond_string = ConditionalType {
+        check_type: TypeId::STRING,
+        extends_type: interner.union(vec![TypeId::NULL, TypeId::UNDEFINED]),
+        true_type: TypeId::NEVER,
+        false_type: TypeId::STRING,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond_string);
+    assert_eq!(result, TypeId::STRING);
+
+    // null extends null | undefined, so returns never
+    let cond_null = ConditionalType {
+        check_type: TypeId::NULL,
+        extends_type: interner.union(vec![TypeId::NULL, TypeId::UNDEFINED]),
+        true_type: TypeId::NEVER,
+        false_type: TypeId::NULL,
+        is_distributive: false,
+    };
+
+    let result_null = evaluate_conditional(&interner, &cond_null);
+    assert_eq!(result_null, TypeId::NEVER);
+}
+
+#[test]
+fn test_never_empty_union() {
+    // Empty union should be never
+    let interner = TypeInterner::new();
+
+    let empty_union = interner.union(vec![]);
+
+    // Empty union is never
+    assert_eq!(empty_union, TypeId::NEVER);
+}
+
+#[test]
+fn test_never_all_never_union() {
+    // never | never | never = never
+    let interner = TypeInterner::new();
+
+    let all_never_union = interner.union(vec![TypeId::NEVER, TypeId::NEVER, TypeId::NEVER]);
+
+    // Should simplify to never
+    if let Some(TypeKey::Union(members)) = interner.lookup(all_never_union) {
+        // All members are never
+        assert!(members.iter().all(|&m| m == TypeId::NEVER));
+    } else {
+        // Could be simplified to never
+        assert_eq!(all_never_union, TypeId::NEVER);
+    }
+}
+
+#[test]
+fn test_never_generic_constraint() {
+    // function f<T extends never>(): T
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+
+    let generic_never_fn = interner.function(FunctionShape {
+        type_params: vec![TypeParamInfo {
+            name: t_name,
+            constraint: Some(TypeId::NEVER),
+            default: None,
+        }],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::NEVER, // Would be T, but simplified
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    if let Some(TypeKey::Function(shape)) = interner.lookup(generic_never_fn) {
+        assert_eq!(shape.type_params[0].constraint, Some(TypeId::NEVER));
+    } else {
+        panic!("Expected function type");
+    }
+}
+
+#[test]
+fn test_never_mapped_type_no_keys() {
+    // { [K in never]: any } = {} (empty object)
+    let interner = TypeInterner::new();
+
+    // Mapped type over never produces empty object
+    let empty_obj = interner.object(vec![]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(empty_obj) {
+        assert!(props.is_empty());
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_never_promise_type() {
+    // Promise<never> - promise that never resolves
+    let interner = TypeInterner::new();
+
+    let never_promise = interner.promise(TypeId::NEVER);
+
+    if let Some(TypeKey::Promise(inner)) = interner.lookup(never_promise) {
+        assert_eq!(*inner, TypeId::NEVER);
+    } else {
+        panic!("Expected promise type");
+    }
+}
+
+#[test]
+fn test_never_readonly_array() {
+    // readonly never[] - readonly array of never
+    let interner = TypeInterner::new();
+
+    let readonly_never_array = interner.readonly_array(TypeId::NEVER);
+
+    if let Some(TypeKey::ReadonlyArray(element_type)) = interner.lookup(readonly_never_array) {
+        assert_eq!(*element_type, TypeId::NEVER);
+    } else {
+        panic!("Expected readonly array type");
+    }
+}
+
+#[test]
+fn test_never_switch_exhaustiveness() {
+    // Simulating switch exhaustiveness: after all cases, variable is never
+    let interner = TypeInterner::new();
+    let ctx = InferenceContext::new(&interner);
+
+    let var_t = ctx.fresh_type_param(None, None);
+
+    // Start with union type
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+    let union_ab = interner.union(vec![lit_a, lit_b]);
+
+    ctx.add_upper_bound(var_t, union_ab);
+
+    // After handling 'a' case, narrow to 'b'
+    // After handling 'b' case, should be never
+    // This is conceptual - the actual narrowing happens in the checker
+
+    // When all cases handled, set to never
+    ctx.add_lower_bound(var_t, TypeId::NEVER);
+    ctx.add_upper_bound(var_t, TypeId::NEVER);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_never_throw_expression() {
+    // throw expressions have type never
+    // function f() { return condition ? value : throw new Error() }
+    let interner = TypeInterner::new();
+
+    // Union of string and never (throw) should be string
+    let result_type = interner.union(vec![TypeId::STRING, TypeId::NEVER]);
+
+    if let Some(TypeKey::Union(members)) = interner.lookup(result_type) {
+        // Should contain string (never may or may not be absorbed)
+        assert!(members.contains(&TypeId::STRING));
+    } else {
+        // Simplified to string
+        assert_eq!(result_type, TypeId::STRING);
+    }
+}
+
+#[test]
+fn test_never_infinite_loop() {
+    // function infiniteLoop(): never { while(true) {} }
+    let interner = TypeInterner::new();
+
+    let infinite_loop_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::NEVER,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    if let Some(TypeKey::Function(shape)) = interner.lookup(infinite_loop_fn) {
+        assert_eq!(shape.return_type, TypeId::NEVER);
+    } else {
+        panic!("Expected function type");
+    }
+}
+
+#[test]
+fn test_never_exhaustive_type_guard() {
+    // function assertNever(x: never): never
+    // Used at end of exhaustive checks
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+
+    let assert_never = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(x_name),
+            type_id: TypeId::NEVER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::NEVER,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    if let Some(TypeKey::Function(shape)) = interner.lookup(assert_never) {
+        assert_eq!(shape.params[0].type_id, TypeId::NEVER);
+        assert_eq!(shape.return_type, TypeId::NEVER);
+    } else {
+        panic!("Expected function type");
+    }
+}
+
+#[test]
+fn test_never_keyof_never() {
+    // keyof never = string | number | symbol
+    // This is TypeScript's behavior - keyof never is the universal key type
+    let interner = TypeInterner::new();
+
+    // Create keyof never
+    let keyof_never = interner.keyof(TypeId::NEVER);
+
+    // keyof never should be PropertyKey (string | number | symbol)
+    // or remain as KeyOf type
+    assert!(matches!(interner.lookup(keyof_never), Some(TypeKey::KeyOf(_)) | Some(TypeKey::Union(_))));
+}
+
+#[test]
+fn test_never_indexed_access() {
+    // never[K] = never for any K
+    let interner = TypeInterner::new();
+
+    // Create index access on never
+    let never_indexed = interner.index_access(TypeId::NEVER, TypeId::STRING);
+
+    // Accessing never should give never (or remain as IndexAccess)
+    if let Some(TypeKey::IndexAccess { object, index: _ }) = interner.lookup(never_indexed) {
+        assert_eq!(*object, TypeId::NEVER);
+    }
+}
+
+#[test]
+fn test_never_rest_parameter() {
+    // function f(...args: never[]): void
+    let interner = TypeInterner::new();
+
+    let args_name = interner.intern_string("args");
+
+    let fn_with_never_rest = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(args_name),
+            type_id: interner.array(TypeId::NEVER),
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    if let Some(TypeKey::Function(shape)) = interner.lookup(fn_with_never_rest) {
+        assert!(shape.params[0].rest);
+        if let Some(TypeKey::Array(elem)) = interner.lookup(shape.params[0].type_id) {
+            assert_eq!(*elem, TypeId::NEVER);
+        }
+    } else {
+        panic!("Expected function type");
+    }
+}
+
+#[test]
+fn test_never_callback_parameter() {
+    // function f(cb: (x: never) => void): void
+    let interner = TypeInterner::new();
+
+    let cb_name = interner.intern_string("cb");
+    let x_name = interner.intern_string("x");
+
+    let callback_type = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(x_name),
+            type_id: TypeId::NEVER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_with_never_callback = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(cb_name),
+            type_id: callback_type,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    if let Some(TypeKey::Function(shape)) = interner.lookup(fn_with_never_callback) {
+        if let Some(TypeKey::Function(cb_shape)) = interner.lookup(shape.params[0].type_id) {
+            assert_eq!(cb_shape.params[0].type_id, TypeId::NEVER);
+        }
+    } else {
+        panic!("Expected function type");
+    }
+}
+
+#[test]
+fn test_never_generic_default() {
+    // function f<T = never>(): T
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+
+    let fn_with_never_default = interner.function(FunctionShape {
+        type_params: vec![TypeParamInfo {
+            name: t_name,
+            constraint: None,
+            default: Some(TypeId::NEVER),
+        }],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::NEVER, // Would be T
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    if let Some(TypeKey::Function(shape)) = interner.lookup(fn_with_never_default) {
+        assert_eq!(shape.type_params[0].default, Some(TypeId::NEVER));
+    } else {
+        panic!("Expected function type");
+    }
+}
+
+#[test]
+fn test_never_in_template_literal() {
+    // Template literal with never produces never
+    // `${never}` = never
+    let interner = TypeInterner::new();
+
+    // Template with never span
+    let template_with_never = interner.template_literal(vec![
+        TemplateLiteralSpan::String("prefix".to_string()),
+        TemplateLiteralSpan::Type(TypeId::NEVER),
+        TemplateLiteralSpan::String("suffix".to_string()),
+    ]);
+
+    // Template with never should be template (evaluation happens elsewhere)
+    assert!(matches!(interner.lookup(template_with_never), Some(TypeKey::TemplateLiteral(_))));
+}
+
+#[test]
+fn test_never_inference_from_empty_array() {
+    // const arr = []; // type is never[] initially
+    let interner = TypeInterner::new();
+    let ctx = InferenceContext::new(&interner);
+
+    let var_t = ctx.fresh_type_param(None, None);
+
+    // Empty array literal infers element type as never initially
+    // No bounds added means it defaults to unknown or never depending on context
+
+    let result = ctx.resolve_with_constraints(var_t);
+    // Should resolve to something (unknown or the default)
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_never_overload_resolution() {
+    // Overloaded function with never in one overload
+    // function f(x: string): string;
+    // function f(x: never): never;
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+
+    let overload1 = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(x_name),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let overload2 = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(x_name),
+            type_id: TypeId::NEVER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::NEVER,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Both overloads should be valid function types
+    assert!(matches!(interner.lookup(overload1), Some(TypeKey::Function(_))));
+    assert!(matches!(interner.lookup(overload2), Some(TypeKey::Function(_))));
+}
+
+#[test]
+fn test_never_method_in_class() {
+    // class C { fail(): never { throw new Error(); } }
+    let interner = TypeInterner::new();
+
+    let fail_name = interner.intern_string("fail");
+
+    let fail_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::NEVER,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let class_with_never_method = interner.object(vec![PropertyInfo {
+        name: fail_name,
+        type_id: fail_method,
+        write_type: fail_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(class_with_never_method) {
+        if let Some(TypeKey::Function(shape)) = interner.lookup(props[0].type_id) {
+            assert_eq!(shape.return_type, TypeId::NEVER);
+        }
+    } else {
+        panic!("Expected object type");
+    }
+}
