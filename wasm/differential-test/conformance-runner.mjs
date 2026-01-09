@@ -16,6 +16,9 @@ const CONFIG = {
   wasmPkgPath: resolve(__dirname, '../pkg'),
   conformanceDir: resolve(__dirname, '../../tests/cases/conformance'),
 };
+const DEFAULT_LIB_PATH = resolve(__dirname, '../../tests/lib/lib.d.ts');
+const DEFAULT_LIB_SOURCE = readFileSync(DEFAULT_LIB_PATH, 'utf8');
+const DEFAULT_LIB_NAME = 'lib.d.ts';
 
 const colors = {
   reset: '\x1b[0m',
@@ -278,11 +281,14 @@ async function runTscMultiFile(files, testOptions = {}) {
   };
 }
 
-async function runWasm(code, fileName = 'test.ts') {
+async function runWasm(code, fileName = 'test.ts', testOptions = {}) {
   try {
     const wasm = await import(join(CONFIG.wasmPkgPath, 'wasm.js'));
 
     const parser = new wasm.ThinParser(fileName, code);
+    if (!testOptions.nolib) {
+      parser.addLibFile(DEFAULT_LIB_NAME, DEFAULT_LIB_SOURCE);
+    }
     parser.parseSourceFile();
 
     const parseDiagsJson = parser.getDiagnosticsJson();
@@ -325,12 +331,16 @@ async function runWasm(code, fileName = 'test.ts') {
  * Run WASM on multiple files (for multi-file tests)
  * Uses the new WasmProgram API for cross-file type checking
  */
-async function runWasmMultiFile(files) {
+async function runWasmMultiFile(files, testOptions = {}) {
   try {
     const wasm = await import(join(CONFIG.wasmPkgPath, 'wasm.js'));
 
     // Use the new WasmProgram API for multi-file support
     const program = new wasm.WasmProgram();
+
+    if (!testOptions.nolib) {
+      program.addFile(DEFAULT_LIB_NAME, DEFAULT_LIB_SOURCE);
+    }
 
     // Add all files to the program
     for (const file of files) {
@@ -443,13 +453,13 @@ async function main() {
         stats.multiFile++;
         [tscResult, wasmResult] = await Promise.all([
           runTscMultiFile(files, options),
-          runWasmMultiFile(files),
+          runWasmMultiFile(files, options),
         ]);
       } else {
         // Single-file test
         [tscResult, wasmResult] = await Promise.all([
           runTsc(cleanCode, fileName, options),
-          runWasm(cleanCode, fileName),
+          runWasm(cleanCode, fileName, options),
         ]);
       }
 
