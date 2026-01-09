@@ -7,7 +7,7 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] (awaiting assignment)
+- [ ] Add class inheritance ES5 source map tests (extends clause, super calls, method overrides, multi-level inheritance, mixin patterns) in `wasm/src/source_map_tests.rs`. Run `./wasm/test.sh source_map`.
 
 ## Task Queue
 - [ ] (empty)

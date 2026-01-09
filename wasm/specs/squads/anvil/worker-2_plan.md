@@ -7,7 +7,7 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] (awaiting assignment)
+- [ ] Add ES5 destructuring parity tests (object destructuring, array destructuring, nested destructuring, default values, rest patterns) in `wasm/src/emitter_parity_tests.rs`. Run `./wasm/test.sh emitter_parity`.
 
 ## Task Queue
 - [ ] (empty)
