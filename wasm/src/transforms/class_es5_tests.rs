@@ -26321,88 +26321,47 @@ class BoundMethods {
     );
 }
 
-// ============================================================================
-// PRIVATE METHOD PATTERN TESTS
-// ============================================================================
+// =============================================================================
+// VARIADIC TUPLE PATTERNS - ES5 TRANSFORMATION TESTS
+// =============================================================================
 
-/// Test ES5 class with static private methods
+/// Test: spread in tuple types
+/// Verifies that classes using spread in tuple types transform correctly to ES5
 #[test]
-fn test_class_es5_private_method_static() {
+fn test_class_es5_spread_in_tuples() {
     let source = r#"
-// Static private methods
-class Singleton {
-    static #instance: Singleton | null = null;
-    static #initialized = false;
+type Concat<T extends unknown[], U extends unknown[]> = [...T, ...U];
+type Prepend<T, U extends unknown[]> = [T, ...U];
+type Append<T extends unknown[], U> = [...T, U];
 
-    private constructor() {}
-
-    static #createInstance(): Singleton {
-        if (!Singleton.#instance) {
-            Singleton.#instance = new Singleton();
-            Singleton.#initialize();
-        }
-        return Singleton.#instance;
+class TupleConcatenator {
+    concat<T extends unknown[], U extends unknown[]>(first: T, second: U): Concat<T, U> {
+        return [...first, ...second] as Concat<T, U>;
     }
 
-    static #initialize(): void {
-        Singleton.#initialized = true;
-        console.log("Singleton initialized");
+    prepend<T, U extends unknown[]>(item: T, tuple: U): Prepend<T, U> {
+        return [item, ...tuple] as Prepend<T, U>;
     }
 
-    static getInstance(): Singleton {
-        return Singleton.#createInstance();
-    }
-
-    static isInitialized(): boolean {
-        return Singleton.#initialized;
+    append<T extends unknown[], U>(tuple: T, item: U): Append<T, U> {
+        return [...tuple, item] as Append<T, U>;
     }
 }
 
-class IdGenerator {
-    static #counter = 0;
-    static #prefix = "id_";
+class ArraySpreadHandler {
+    private items: unknown[] = [];
 
-    static #formatId(num: number): string {
-        return `${IdGenerator.#prefix}${num.toString().padStart(6, "0")}`;
+    spreadAndCollect<T extends unknown[]>(...args: T): T {
+        this.items.push(...args);
+        return args;
     }
 
-    static #incrementCounter(): number {
-        return ++IdGenerator.#counter;
+    mergeArrays<T extends unknown[], U extends unknown[]>(a: T, b: U): [...T, ...U] {
+        return [...a, ...b] as [...T, ...U];
     }
 
-    static generate(): string {
-        const num = IdGenerator.#incrementCounter();
-        return IdGenerator.#formatId(num);
-    }
-
-    static reset(): void {
-        IdGenerator.#counter = 0;
-    }
-}
-
-class ConfigLoader {
-    static #cache: Map<string, any> = new Map();
-    static #defaultConfig = { debug: false, version: "1.0" };
-
-    static #loadFromCache(key: string): any | undefined {
-        return ConfigLoader.#cache.get(key);
-    }
-
-    static #saveToCache(key: string, value: any): void {
-        ConfigLoader.#cache.set(key, value);
-    }
-
-    static #mergeWithDefaults(config: any): any {
-        return { ...ConfigLoader.#defaultConfig, ...config };
-    }
-
-    static load(key: string, config: any): any {
-        const cached = ConfigLoader.#loadFromCache(key);
-        if (cached) return cached;
-
-        const merged = ConfigLoader.#mergeWithDefaults(config);
-        ConfigLoader.#saveToCache(key, merged);
-        return merged;
+    wrapInTuple<T extends unknown[]>(items: T): [string, ...T, string] {
+        return ["start", ...items, "end"] as [string, ...T, string];
     }
 }
 "#;
@@ -26421,115 +26380,86 @@ class ConfigLoader {
 
     let output = printer.get_output().to_string();
 
-    // Classes should be converted
     assert!(
-        output.contains("Singleton") && output.contains("IdGenerator") && output.contains("ConfigLoader"),
-        "Expected static private method classes: {}",
+        output.contains("function TupleConcatenator"),
+        "Expected TupleConcatenator function: {}",
         output
     );
-
-    // Private method names should be transformed (WeakMap pattern or mangled)
     assert!(
-        output.contains("getInstance") && output.contains("generate") && output.contains("load"),
-        "Expected public methods to be preserved: {}",
+        output.contains("TupleConcatenator.prototype.concat"),
+        "Expected concat method: {}",
+        output
+    );
+    assert!(
+        output.contains("TupleConcatenator.prototype.prepend") && output.contains("TupleConcatenator.prototype.append"),
+        "Expected prepend and append methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function ArraySpreadHandler"),
+        "Expected ArraySpreadHandler function: {}",
+        output
+    );
+    assert!(
+        output.contains("ArraySpreadHandler.prototype.spreadAndCollect"),
+        "Expected spreadAndCollect method: {}",
+        output
+    );
+    assert!(
+        output.contains("ArraySpreadHandler.prototype.mergeArrays") && output.contains("ArraySpreadHandler.prototype.wrapInTuple"),
+        "Expected mergeArrays and wrapInTuple methods: {}",
         output
     );
 }
 
-/// Test ES5 class with async private methods
+/// Test: labeled tuple elements
+/// Verifies that classes using labeled tuple elements transform correctly to ES5
 #[test]
-fn test_class_es5_private_method_async() {
+fn test_class_es5_labeled_tuple_elements() {
     let source = r#"
-// Async private methods
-class DataFetcher {
-    #baseUrl: string;
-    #cache: Map<string, any> = new Map();
+type Point2D = [x: number, y: number];
+type Point3D = [x: number, y: number, z: number];
+type NamedRange = [start: number, end: number, label: string];
 
-    constructor(baseUrl: string) {
-        this.#baseUrl = baseUrl;
+class PointFactory {
+    create2D(x: number, y: number): Point2D {
+        return [x, y];
     }
 
-    async #fetchFromNetwork(endpoint: string): Promise<any> {
-        const response = await fetch(`${this.#baseUrl}${endpoint}`);
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-        return response.json();
+    create3D(x: number, y: number, z: number): Point3D {
+        return [x, y, z];
     }
 
-    async #processResponse(data: any): Promise<any> {
-        await new Promise(r => setTimeout(r, 10)); // simulate processing
-        return { ...data, processed: true };
+    distance2D(a: Point2D, b: Point2D): number {
+        const [ax, ay] = a;
+        const [bx, by] = b;
+        return Math.sqrt((bx - ax) ** 2 + (by - ay) ** 2);
     }
 
-    async #cacheResult(key: string, data: any): Promise<void> {
-        this.#cache.set(key, data);
-    }
-
-    async fetch(endpoint: string): Promise<any> {
-        const cached = this.#cache.get(endpoint);
-        if (cached) return cached;
-
-        const raw = await this.#fetchFromNetwork(endpoint);
-        const processed = await this.#processResponse(raw);
-        await this.#cacheResult(endpoint, processed);
-        return processed;
+    to3D(point: Point2D, z: number): Point3D {
+        return [...point, z];
     }
 }
 
-class AsyncValidator {
-    async #validateEmail(email: string): Promise<boolean> {
-        await new Promise(r => setTimeout(r, 50));
-        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+type PersonTuple = [name: string, age: number, active: boolean];
+type ExtendedPerson = [...PersonTuple, role: string];
+
+class TupleTransformer {
+    createPerson(name: string, age: number, active: boolean): PersonTuple {
+        return [name, age, active];
     }
 
-    async #validateUsername(username: string): Promise<boolean> {
-        await new Promise(r => setTimeout(r, 50));
-        return /^[a-zA-Z0-9_]{3,20}$/.test(username);
+    extendPerson(person: PersonTuple, role: string): ExtendedPerson {
+        return [...person, role];
     }
 
-    async #checkAvailability(username: string): Promise<boolean> {
-        await new Promise(r => setTimeout(r, 100));
-        return true; // simulate API call
+    extractName(person: PersonTuple): string {
+        const [name] = person;
+        return name;
     }
 
-    async validate(data: { email: string; username: string }): Promise<{ valid: boolean; errors: string[] }> {
-        const errors: string[] = [];
-
-        if (!await this.#validateEmail(data.email)) {
-            errors.push("Invalid email");
-        }
-
-        if (!await this.#validateUsername(data.username)) {
-            errors.push("Invalid username");
-        } else if (!await this.#checkAvailability(data.username)) {
-            errors.push("Username not available");
-        }
-
-        return { valid: errors.length === 0, errors };
-    }
-}
-
-class RetryHandler {
-    #maxRetries = 3;
-    #delay = 1000;
-
-    async #wait(ms: number): Promise<void> {
-        await new Promise(r => setTimeout(r, ms));
-    }
-
-    async #attempt<T>(fn: () => Promise<T>, attempt: number): Promise<T> {
-        try {
-            return await fn();
-        } catch (error) {
-            if (attempt >= this.#maxRetries) throw error;
-            await this.#wait(this.#delay * attempt);
-            return this.#attempt(fn, attempt + 1);
-        }
-    }
-
-    async execute<T>(fn: () => Promise<T>): Promise<T> {
-        return this.#attempt(fn, 1);
+    createRange(start: number, end: number, label: string): NamedRange {
+        return [start, end, label];
     }
 }
 "#;
@@ -26548,135 +26478,77 @@ class RetryHandler {
 
     let output = printer.get_output().to_string();
 
-    // Classes should be converted
     assert!(
-        output.contains("DataFetcher") && output.contains("AsyncValidator") && output.contains("RetryHandler"),
-        "Expected async private method classes: {}",
+        output.contains("function PointFactory"),
+        "Expected PointFactory function: {}",
         output
     );
-
-    // Public async methods should be preserved
     assert!(
-        output.contains("fetch") && output.contains("validate") && output.contains("execute"),
-        "Expected public methods to be preserved: {}",
+        output.contains("PointFactory.prototype.create2D") && output.contains("PointFactory.prototype.create3D"),
+        "Expected create2D and create3D methods: {}",
         output
     );
-
-    // Async/await should be transformed for ES5
     assert!(
-        output.contains("__awaiter") || output.contains("return") || output.contains("Promise"),
-        "Expected async transformation pattern: {}",
+        output.contains("PointFactory.prototype.distance2D"),
+        "Expected distance2D method: {}",
+        output
+    );
+    assert!(
+        output.contains("PointFactory.prototype.to3D"),
+        "Expected to3D method: {}",
+        output
+    );
+    assert!(
+        output.contains("function TupleTransformer"),
+        "Expected TupleTransformer function: {}",
+        output
+    );
+    assert!(
+        output.contains("TupleTransformer.prototype.createPerson") && output.contains("TupleTransformer.prototype.extendPerson"),
+        "Expected TupleTransformer methods: {}",
         output
     );
 }
 
-/// Test ES5 class with generator private methods
+/// Test: rest elements in tuple types
+/// Verifies that classes using rest elements in tuples transform correctly to ES5
 #[test]
-fn test_class_es5_private_method_generator() {
+fn test_class_es5_rest_elements_in_tuples() {
     let source = r#"
-// Generator private methods
-class RangeGenerator {
-    #start: number;
-    #end: number;
-    #step: number;
+type HeadAndTail<T extends unknown[]> = T extends [infer H, ...infer R] ? [H, R] : never;
+type FirstTwo<T extends unknown[]> = T extends [infer A, infer B, ...unknown[]] ? [A, B] : never;
+type Last<T extends unknown[]> = T extends [...unknown[], infer L] ? L : never;
 
-    constructor(start: number, end: number, step: number = 1) {
-        this.#start = start;
-        this.#end = end;
-        this.#step = step;
+class TupleDestructor {
+    getHead<T extends [unknown, ...unknown[]]>(tuple: T): T[0] {
+        return tuple[0];
     }
 
-    *#generateRange(): Generator<number> {
-        for (let i = this.#start; i <= this.#end; i += this.#step) {
-            yield i;
-        }
+    getTail<T extends [unknown, ...unknown[]]>(tuple: T): T extends [unknown, ...infer R] ? R : never {
+        const [, ...rest] = tuple;
+        return rest as any;
     }
 
-    *#generateReverse(): Generator<number> {
-        for (let i = this.#end; i >= this.#start; i -= this.#step) {
-            yield i;
-        }
+    getFirstTwo<T extends [unknown, unknown, ...unknown[]]>(tuple: T): [T[0], T[1]] {
+        return [tuple[0], tuple[1]];
     }
 
-    *values(): Generator<number> {
-        yield* this.#generateRange();
-    }
-
-    *reversed(): Generator<number> {
-        yield* this.#generateReverse();
-    }
-
-    toArray(): number[] {
-        return [...this.#generateRange()];
+    getLast<T extends [...unknown[], unknown]>(tuple: T): T extends [...unknown[], infer L] ? L : never {
+        return tuple[tuple.length - 1] as any;
     }
 }
 
-class TreeNode<T> {
-    value: T;
-    children: TreeNode<T>[] = [];
-
-    constructor(value: T) {
-        this.value = value;
+class RestParamHandler {
+    collectRest<H, T extends unknown[]>(head: H, ...tail: T): [H, ...T] {
+        return [head, ...tail];
     }
 
-    *#preOrder(): Generator<T> {
-        yield this.value;
-        for (const child of this.children) {
-            yield* child.#preOrder();
-        }
+    processWithRest<A, B, R extends unknown[]>(a: A, b: B, ...rest: R): { first: A; second: B; rest: R } {
+        return { first: a, second: b, rest };
     }
 
-    *#postOrder(): Generator<T> {
-        for (const child of this.children) {
-            yield* child.#postOrder();
-        }
-        yield this.value;
-    }
-
-    *#breadthFirst(): Generator<T> {
-        const queue: TreeNode<T>[] = [this];
-        while (queue.length > 0) {
-            const node = queue.shift()!;
-            yield node.value;
-            queue.push(...node.children);
-        }
-    }
-
-    *traverse(order: "pre" | "post" | "bfs" = "pre"): Generator<T> {
-        switch (order) {
-            case "pre": yield* this.#preOrder(); break;
-            case "post": yield* this.#postOrder(); break;
-            case "bfs": yield* this.#breadthFirst(); break;
-        }
-    }
-}
-
-class Paginator<T> {
-    #items: T[];
-    #pageSize: number;
-
-    constructor(items: T[], pageSize: number) {
-        this.#items = items;
-        this.#pageSize = pageSize;
-    }
-
-    *#getPages(): Generator<T[]> {
-        for (let i = 0; i < this.#items.length; i += this.#pageSize) {
-            yield this.#items.slice(i, i + this.#pageSize);
-        }
-    }
-
-    *pages(): Generator<T[]> {
-        yield* this.#getPages();
-    }
-
-    getPage(index: number): T[] | undefined {
-        let i = 0;
-        for (const page of this.#getPages()) {
-            if (i === index) return page;
-            i++;
-        }
-        return undefined;
+    spreadMiddle<H, M extends unknown[], T>(head: H, middle: M, tail: T): [H, ...M, T] {
+        return [head, ...middle, tail];
     }
 }
 "#;
@@ -26695,129 +26567,82 @@ class Paginator<T> {
 
     let output = printer.get_output().to_string();
 
-    // Classes should be converted
     assert!(
-        output.contains("RangeGenerator") && output.contains("TreeNode") && output.contains("Paginator"),
-        "Expected generator private method classes: {}",
+        output.contains("function TupleDestructor"),
+        "Expected TupleDestructor function: {}",
         output
     );
-
-    // Public methods should be preserved
     assert!(
-        output.contains("values") && output.contains("traverse") && output.contains("pages"),
-        "Expected public methods to be preserved: {}",
+        output.contains("TupleDestructor.prototype.getHead") && output.contains("TupleDestructor.prototype.getTail"),
+        "Expected getHead and getTail methods: {}",
+        output
+    );
+    assert!(
+        output.contains("TupleDestructor.prototype.getFirstTwo") && output.contains("TupleDestructor.prototype.getLast"),
+        "Expected getFirstTwo and getLast methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function RestParamHandler"),
+        "Expected RestParamHandler function: {}",
+        output
+    );
+    assert!(
+        output.contains("RestParamHandler.prototype.collectRest") && output.contains("RestParamHandler.prototype.processWithRest"),
+        "Expected RestParamHandler methods: {}",
         output
     );
 }
 
-/// Test ES5 class with private accessors
+/// Test: tuple manipulation utilities
+/// Verifies that classes using tuple manipulation types transform correctly to ES5
 #[test]
-fn test_class_es5_private_method_accessors() {
+fn test_class_es5_tuple_manipulation() {
     let source = r#"
-// Private accessors
-class SecureStorage {
-    #data: Map<string, string> = new Map();
-    #encryptionKey: string;
+type Reverse<T extends unknown[]> = T extends [infer H, ...infer R] ? [...Reverse<R>, H] : [];
+type Length<T extends unknown[]> = T["length"];
+type Pop<T extends unknown[]> = T extends [...infer R, unknown] ? R : never;
+type Shift<T extends unknown[]> = T extends [unknown, ...infer R] ? R : never;
 
-    constructor(key: string) {
-        this.#encryptionKey = key;
+class TupleManipulator {
+    reverse<T extends unknown[]>(tuple: T): unknown[] {
+        return [...tuple].reverse();
     }
 
-    get #secretKey(): string {
-        return this.#encryptionKey.split("").reverse().join("");
+    getLength<T extends unknown[]>(tuple: T): Length<T> {
+        return tuple.length as Length<T>;
     }
 
-    set #secretKey(value: string) {
-        this.#encryptionKey = value;
+    pop<T extends unknown[]>(tuple: T): Pop<T> {
+        const result = [...tuple];
+        result.pop();
+        return result as Pop<T>;
     }
 
-    #encrypt(value: string): string {
-        return btoa(value + this.#secretKey);
-    }
-
-    #decrypt(value: string): string {
-        const decrypted = atob(value);
-        return decrypted.slice(0, -this.#secretKey.length);
-    }
-
-    set(key: string, value: string): void {
-        this.#data.set(key, this.#encrypt(value));
-    }
-
-    get(key: string): string | undefined {
-        const encrypted = this.#data.get(key);
-        return encrypted ? this.#decrypt(encrypted) : undefined;
+    shift<T extends unknown[]>(tuple: T): Shift<T> {
+        const [, ...rest] = tuple;
+        return rest as Shift<T>;
     }
 }
 
-class ObservableValue<T> {
-    #value: T;
-    #listeners: Set<(value: T) => void> = new Set();
+type Take<T extends unknown[], N extends number, R extends unknown[] = []> =
+    R["length"] extends N ? R : T extends [infer H, ...infer T2] ? Take<T2, N, [...R, H]> : R;
 
-    constructor(initial: T) {
-        this.#value = initial;
+class TupleSlice {
+    take<T extends unknown[]>(tuple: T, count: number): unknown[] {
+        return tuple.slice(0, count);
     }
 
-    get #currentValue(): T {
-        return this.#value;
+    skip<T extends unknown[]>(tuple: T, count: number): unknown[] {
+        return tuple.slice(count);
     }
 
-    set #currentValue(value: T) {
-        this.#value = value;
-        this.#notifyListeners();
+    slice<T extends unknown[]>(tuple: T, start: number, end: number): unknown[] {
+        return tuple.slice(start, end);
     }
 
-    #notifyListeners(): void {
-        for (const listener of this.#listeners) {
-            listener(this.#value);
-        }
-    }
-
-    get value(): T {
-        return this.#currentValue;
-    }
-
-    set value(newValue: T) {
-        this.#currentValue = newValue;
-    }
-
-    subscribe(listener: (value: T) => void): () => void {
-        this.#listeners.add(listener);
-        return () => this.#listeners.delete(listener);
-    }
-}
-
-class LazyProperty {
-    #computed: number | null = null;
-    #baseValue: number;
-
-    constructor(base: number) {
-        this.#baseValue = base;
-    }
-
-    get #expensiveComputation(): number {
-        if (this.#computed === null) {
-            // Expensive calculation
-            let result = this.#baseValue;
-            for (let i = 0; i < 1000; i++) {
-                result = Math.sqrt(result * result + i);
-            }
-            this.#computed = result;
-        }
-        return this.#computed;
-    }
-
-    get value(): number {
-        return this.#expensiveComputation;
-    }
-
-    invalidate(): void {
-        this.#computed = null;
-    }
-
-    update(base: number): void {
-        this.#baseValue = base;
-        this.invalidate();
+    splitAt<T extends unknown[]>(tuple: T, index: number): [unknown[], unknown[]] {
+        return [tuple.slice(0, index), tuple.slice(index)];
     }
 }
 "#;
@@ -26836,17 +26661,234 @@ class LazyProperty {
 
     let output = printer.get_output().to_string();
 
-    // Classes should be converted
     assert!(
-        output.contains("SecureStorage") && output.contains("ObservableValue") && output.contains("LazyProperty"),
-        "Expected private accessor classes: {}",
+        output.contains("function TupleManipulator"),
+        "Expected TupleManipulator function: {}",
         output
     );
-
-    // Public methods should be preserved
     assert!(
-        output.contains("set") && output.contains("get") && output.contains("subscribe"),
-        "Expected public methods to be preserved: {}",
+        output.contains("TupleManipulator.prototype.reverse") && output.contains("TupleManipulator.prototype.getLength"),
+        "Expected reverse and getLength methods: {}",
+        output
+    );
+    assert!(
+        output.contains("TupleManipulator.prototype.pop") && output.contains("TupleManipulator.prototype.shift"),
+        "Expected pop and shift methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function TupleSlice"),
+        "Expected TupleSlice function: {}",
+        output
+    );
+    assert!(
+        output.contains("TupleSlice.prototype.take") && output.contains("TupleSlice.prototype.skip"),
+        "Expected take and skip methods: {}",
+        output
+    );
+    assert!(
+        output.contains("TupleSlice.prototype.splitAt"),
+        "Expected splitAt method: {}",
+        output
+    );
+}
+
+/// Test: optional tuple elements
+/// Verifies that classes using optional tuple elements transform correctly to ES5
+#[test]
+fn test_class_es5_optional_tuple_elements() {
+    let source = r#"
+type OptionalCoords = [x: number, y: number, z?: number];
+type ConfigTuple = [name: string, value: unknown, description?: string, tags?: string[]];
+
+class CoordinateHandler {
+    create(x: number, y: number, z?: number): OptionalCoords {
+        if (z !== undefined) {
+            return [x, y, z];
+        }
+        return [x, y];
+    }
+
+    is3D(coords: OptionalCoords): boolean {
+        return coords.length === 3;
+    }
+
+    normalize(coords: OptionalCoords): [number, number, number] {
+        const [x, y, z = 0] = coords;
+        return [x, y, z];
+    }
+}
+
+class ConfigBuilder {
+    private configs: ConfigTuple[] = [];
+
+    add(name: string, value: unknown, description?: string, tags?: string[]): this {
+        if (tags !== undefined) {
+            this.configs.push([name, value, description, tags]);
+        } else if (description !== undefined) {
+            this.configs.push([name, value, description]);
+        } else {
+            this.configs.push([name, value]);
+        }
+        return this;
+    }
+
+    getByName(name: string): ConfigTuple | undefined {
+        return this.configs.find(([n]) => n === name);
+    }
+
+    toObject(): Record<string, { value: unknown; description?: string; tags?: string[] }> {
+        const result: Record<string, any> = {};
+        for (const config of this.configs) {
+            const [name, value, description, tags] = config;
+            result[name] = { value, description, tags };
+        }
+        return result;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function CoordinateHandler"),
+        "Expected CoordinateHandler function: {}",
+        output
+    );
+    assert!(
+        output.contains("CoordinateHandler.prototype.create"),
+        "Expected create method: {}",
+        output
+    );
+    assert!(
+        output.contains("CoordinateHandler.prototype.is3D") && output.contains("CoordinateHandler.prototype.normalize"),
+        "Expected is3D and normalize methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function ConfigBuilder"),
+        "Expected ConfigBuilder function: {}",
+        output
+    );
+    assert!(
+        output.contains("ConfigBuilder.prototype.add") && output.contains("ConfigBuilder.prototype.getByName"),
+        "Expected add and getByName methods: {}",
+        output
+    );
+    assert!(
+        output.contains("ConfigBuilder.prototype.toObject"),
+        "Expected toObject method: {}",
+        output
+    );
+}
+
+/// Test: combined variadic tuple patterns
+/// Verifies that classes using multiple variadic tuple patterns together transform correctly to ES5
+#[test]
+fn test_class_es5_combined_variadic_tuple_patterns() {
+    let source = r#"
+type EventArgs<T extends unknown[]> = [eventName: string, ...args: T];
+type Middleware<In extends unknown[], Out extends unknown[]> = (...args: In) => Out;
+type Pipeline<T extends unknown[]> = [...T, done: boolean];
+
+class EventEmitter<Events extends Record<string, unknown[]>> {
+    private listeners: Map<string, Function[]> = new Map();
+
+    emit<K extends keyof Events>(event: K, ...args: Events[K]): void {
+        const handlers = this.listeners.get(event as string) || [];
+        handlers.forEach(h => h(...args));
+    }
+
+    on<K extends keyof Events>(event: K, handler: (...args: Events[K]) => void): void {
+        const handlers = this.listeners.get(event as string) || [];
+        handlers.push(handler);
+        this.listeners.set(event as string, handlers);
+    }
+
+    createEventArgs<K extends keyof Events>(event: K, ...args: Events[K]): EventArgs<Events[K]> {
+        return [event as string, ...args] as EventArgs<Events[K]>;
+    }
+}
+
+class PipelineBuilder<T extends unknown[]> {
+    private steps: Function[] = [];
+
+    pipe<U extends unknown[]>(fn: Middleware<T, U>): PipelineBuilder<U> {
+        this.steps.push(fn);
+        return this as unknown as PipelineBuilder<U>;
+    }
+
+    execute(...input: T): Pipeline<T> {
+        let result: unknown[] = input;
+        for (const step of this.steps) {
+            result = step(...result);
+        }
+        return [...result, true] as Pipeline<T>;
+    }
+
+    compose<A extends unknown[], B extends unknown[], C extends unknown[]>(
+        f: Middleware<A, B>,
+        g: Middleware<B, C>
+    ): Middleware<A, C> {
+        return (...args: A) => g(...f(...args));
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function EventEmitter"),
+        "Expected EventEmitter function: {}",
+        output
+    );
+    assert!(
+        output.contains("EventEmitter.prototype.emit") && output.contains("EventEmitter.prototype.on"),
+        "Expected emit and on methods: {}",
+        output
+    );
+    assert!(
+        output.contains("EventEmitter.prototype.createEventArgs"),
+        "Expected createEventArgs method: {}",
+        output
+    );
+    assert!(
+        output.contains("function PipelineBuilder"),
+        "Expected PipelineBuilder function: {}",
+        output
+    );
+    assert!(
+        output.contains("PipelineBuilder.prototype.pipe") && output.contains("PipelineBuilder.prototype.execute"),
+        "Expected pipe and execute methods: {}",
+        output
+    );
+    assert!(
+        output.contains("PipelineBuilder.prototype.compose"),
+        "Expected compose method: {}",
         output
     );
 }
