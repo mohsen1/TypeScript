@@ -7,12 +7,13 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] Add debugger statement ES5 source map tests in `wasm/src/source_map_tests.rs`. Run `./wasm/test.sh source_map`.
+(none)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added debugger statement ES5 source map tests (basic, in function, conditional, loop, class method, try-catch, arrow function, async, switch, combined); `./wasm/test.sh source_map` passes.
 - [x] Added throw statement ES5 source map tests (basic, string, custom error, expression, in function, conditional, class method, async, rethrow, combined); `./wasm/test.sh source_map` passes.
 - [x] Added with statement ES5 source map tests (basic, property access, method call, nested, function, loop, conditional, assignment, try-catch, combined); `./wasm/test.sh source_map` passes.
 - [x] Added labeled statement ES5 source map tests (basic, for break, while continue, nested, block, switch, in function, do-while, class method, combined); `./wasm/test.sh source_map` passes.
