@@ -24,10 +24,10 @@ Priority: 1
   - Next steps: Debug conditional type evaluation in `evaluate_conditional`
 
 ## Task Queue
-- [ ] Add callable-parameter inference regressions (e.g., union inputs, overload shapes) in `wasm/src/solver/evaluate_tests.rs`.
 - [ ] Validate function return inference in conditional types and fix any mismatches in `wasm/src/solver/evaluate.rs`.
 
 ## Completed
+- [x] Added callable-parameter inference regression tests: union of signatures, overloaded callable, mixed union, param+return extraction, multiple params. All tests pass.
 - [x] Fixed type param extraction for Mapped types: removed iteration var (K), added KeyOf/IndexAccess handlers. Reduced redux diagnostics from 3 to 2.
 - [x] Added 5 template literal hyphen pattern tests for type inference (prefix/suffix extraction, two-part extraction, distributive union, no-match returns never).
 - [x] Application type expansion in TypeEvaluator with fallback extraction of type params from resolved Object properties (reduced redux test from 4 to 3 diagnostics).
