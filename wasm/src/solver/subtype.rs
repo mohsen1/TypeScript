@@ -719,19 +719,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 if let Some(t_resolved) = self.resolver.resolve_ref(*t_sym, self.interner) {
                     self.check_subtype(source, t_resolved)
                 } else {
-                    // Try to resolve both symbols to their actual types
-                    let s_resolved = self.resolver.resolve_ref(*s_sym, self.interner);
-                    let t_resolved = self.resolver.resolve_ref(*t_sym, self.interner);
-                    match (s_resolved, t_resolved) {
-                        (Some(s_type), Some(t_type)) => {
-                            // Both resolved - compare the actual types structurally
-                            self.check_subtype(s_type, t_type)
-                        }
-                        _ => {
-                            // Can't resolve one or both - not assignable
-                            SubtypeResult::False
-                        }
-                    }
+                    SubtypeResult::False
                 }
             }
 
