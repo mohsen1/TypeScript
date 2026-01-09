@@ -7,12 +7,13 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] Add ES5 static block patterns parity tests: init order, multiple blocks, async init. Tests: `./wasm/test.sh emitter_parity`
+(awaiting assignment)
 
 ## Task Queue
 (empty)
 
 ## Completed
+- [x] Added ES5 static block patterns parity tests (complex-init-order, interleaved, async-pattern) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (319 tests).
 - [x] Added ES5 private field patterns parity tests (instance-methods, static-complex, method-context, accessor-validation) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (316 tests).
 - [x] Added ES5 class accessor patterns parity tests (auto-accessor, computed-symbol, inherited-override) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (312 tests).
 - [x] Added ES5 template literal patterns parity tests (tagged-complex, spans-complex, deeply-nested, raw-strings) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (309 tests).
