@@ -3737,6 +3737,21 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    /// Resolve a TypeQuery type to its structural type.
+    /// If the type is `typeof x`, this returns the actual type of `x`.
+    /// If the type is not a TypeQuery, it returns the type unchanged.
+    fn resolve_type_query_to_structural(&mut self, type_id: TypeId) -> TypeId {
+        use crate::solver::{TypeKey, SymbolRef};
+        use crate::binder::SymbolId;
+
+        if let Some(TypeKey::TypeQuery(SymbolRef(sym_id))) = self.ctx.types.lookup(type_id) {
+            // Resolve the symbol to its actual type
+            self.get_type_of_symbol(SymbolId(sym_id))
+        } else {
+            type_id
+        }
+    }
+
     /// Get type of binary expression.
     fn get_type_of_binary_expression(&mut self, idx: NodeIndex) -> TypeId {
         use crate::solver::{BinaryOpEvaluator, BinaryOpResult};
@@ -10370,8 +10385,14 @@ impl<'a> ThinCheckerState<'a> {
                     continue;
                 }
 
+                // Resolve TypeQuery types (typeof) before comparison
+                // If member_type is `typeof y` and base_type is `typeof x`,
+                // we need to compare the actual types of y and x
+                let resolved_member_type = self.resolve_type_query_to_structural(member_type);
+                let resolved_base_type = self.resolve_type_query_to_structural(base_type);
+
                 // Check type compatibility - derived type must be assignable to base type
-                if !self.is_assignable_to(member_type, base_type) {
+                if !self.is_assignable_to(resolved_member_type, resolved_base_type) {
                     // Format type strings for error message
                     let member_type_str = self.format_type(member_type);
                     let base_type_str = self.format_type(base_type);

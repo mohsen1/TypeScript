@@ -188,6 +188,7 @@ Priority: 2
 - [x] Added integration coverage for computed `super[...]` in class field arrow initializers; `./wasm/test.sh` failed at `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports` (unrelated).
 - [x] Confirmed `super()` ordering remains stable with computed field initializers via regression; `./wasm/test.sh` failed at `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports` (unrelated).
 - [x] Updated emitter edge case and parity tests for CommonJS export/parse error tolerance; `./wasm/test.sh` now fails at `solver::compat::tests::test_explain_failure_reports_rest_mismatch` (unrelated).
+- [x] Fixed TS2322/TS2416 false positives for TypeQuery (typeof) comparisons in class property inheritance: added `resolve_type_query_to_structural` helper in `thin_checker.rs` to resolve `typeof x` to structural types before assignability check; updated SubtypeChecker to resolve TypeQuery symbols; TS2322 eliminated from top 10 extra errors.
 
 ## Ready for Merge
 Yes
