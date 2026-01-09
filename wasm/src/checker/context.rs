@@ -21,6 +21,8 @@ use crate::binder::SymbolId;
 pub struct EnclosingClassInfo {
     /// Name of the class.
     pub name: String,
+    /// Node index for the class declaration.
+    pub class_idx: NodeIndex,
     /// Member node indices for symbol lookup.
     pub member_nodes: Vec<NodeIndex>,
     /// Whether we're in a constructor (for error 2715 checking).
@@ -105,6 +107,9 @@ pub struct CheckerContext<'a> {
 
     /// Current file name.
     pub file_name: String,
+
+    /// Whether noImplicitAny checks are enabled.
+    pub no_implicit_any: bool,
 
     // --- Caches ---
 
@@ -201,6 +206,7 @@ impl<'a> CheckerContext<'a> {
             binder,
             types,
             file_name,
+            no_implicit_any: true,
             symbol_types: FxHashMap::default(),
             node_types: FxHashMap::default(),
             type_parameter_names: FxHashMap::default(),
@@ -239,6 +245,7 @@ impl<'a> CheckerContext<'a> {
             binder,
             types,
             file_name,
+            no_implicit_any: true,
             symbol_types: cache.symbol_types,
             node_types: cache.node_types,
             type_parameter_names: cache.type_parameter_names,
