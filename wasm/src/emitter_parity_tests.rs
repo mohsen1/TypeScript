@@ -23232,3 +23232,433 @@ const manager = new AsyncWeakRefManager<AsyncResource>();
         output
     );
 }
+
+// =============================================================================
+// ES5 Promise patterns parity tests
+// =============================================================================
+
+/// Test Promise.all with type annotations
+#[test]
+fn test_parity_es5_promise_all() {
+    let source = r#"
+interface ApiResponse<T> {
+    data: T;
+    status: number;
+}
+
+type PromiseResult<T> = Promise<ApiResponse<T>>;
+
+async function fetchAll<T>(urls: string[]): Promise<T[]> {
+    const promises: Promise<T>[] = urls.map(url => fetch(url).then(r => r.json()));
+    return Promise.all(promises);
+}
+
+class ParallelFetcher<T> {
+    private baseUrl: string;
+
+    constructor(baseUrl: string) {
+        this.baseUrl = baseUrl;
+    }
+
+    async fetchMultiple(ids: string[]): Promise<T[]> {
+        const urls = ids.map(id => `${this.baseUrl}/${id}`);
+        const responses = await Promise.all(
+            urls.map(url => fetch(url))
+        );
+        return Promise.all(responses.map(r => r.json()));
+    }
+
+    async fetchWithMetadata(ids: string[]): Promise<Array<{ id: string; data: T }>> {
+        const results = await Promise.all(
+            ids.map(async (id) => {
+                const response = await fetch(`${this.baseUrl}/${id}`);
+                const data: T = await response.json();
+                return { id, data };
+            })
+        );
+        return results;
+    }
+}
+
+const fetcher = new ParallelFetcher<object>("/api");
+const results: object[] = await fetchAll<object>(["/a", "/b"]);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Interface should be erased
+    assert!(
+        !output.contains("interface ApiResponse"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Type alias should be erased
+    assert!(
+        !output.contains("type PromiseResult"),
+        "Type alias should be erased: {}",
+        output
+    );
+    // Function should be present
+    assert!(
+        output.contains("fetchAll"),
+        "Function should be present: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("ParallelFetcher"),
+        "Class should be present: {}",
+        output
+    );
+    // Promise.all should be preserved
+    assert!(
+        output.contains("Promise.all"),
+        "Promise.all should be preserved: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": Promise<") && !output.contains(": T[]"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test Promise.race with type annotations
+#[test]
+fn test_parity_es5_promise_race() {
+    let source = r#"
+interface TimeoutError {
+    message: string;
+    timeout: number;
+}
+
+function timeout<T>(ms: number, value?: T): Promise<T> {
+    return new Promise((resolve, reject) => {
+        setTimeout(() => {
+            if (value !== undefined) {
+                resolve(value);
+            } else {
+                reject(new Error("Timeout"));
+            }
+        }, ms);
+    });
+}
+
+async function fetchWithTimeout<T>(
+    url: string,
+    timeoutMs: number
+): Promise<T> {
+    return Promise.race([
+        fetch(url).then(r => r.json()) as Promise<T>,
+        timeout<T>(timeoutMs)
+    ]);
+}
+
+class RacingFetcher<T> {
+    private defaultTimeout: number;
+
+    constructor(defaultTimeout: number = 5000) {
+        this.defaultTimeout = defaultTimeout;
+    }
+
+    async fetchFirst(urls: string[]): Promise<T> {
+        return Promise.race(
+            urls.map(url => fetch(url).then(r => r.json()))
+        );
+    }
+
+    async fetchWithFallback(primary: string, fallback: string): Promise<T> {
+        try {
+            return await Promise.race([
+                fetch(primary).then(r => r.json()),
+                timeout<T>(this.defaultTimeout)
+            ]);
+        } catch {
+            return fetch(fallback).then(r => r.json());
+        }
+    }
+}
+
+const racer = new RacingFetcher<object>(3000);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Interface should be erased
+    assert!(
+        !output.contains("interface TimeoutError"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Functions should be present
+    assert!(
+        output.contains("timeout") && output.contains("fetchWithTimeout"),
+        "Functions should be present: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("RacingFetcher"),
+        "Class should be present: {}",
+        output
+    );
+    // Promise.race should be preserved
+    assert!(
+        output.contains("Promise.race"),
+        "Promise.race should be preserved: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": Promise<") && !output.contains(": T"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test Promise.allSettled with type annotations
+#[test]
+fn test_parity_es5_promise_all_settled() {
+    let source = r#"
+interface SettledResult<T> {
+    status: "fulfilled" | "rejected";
+    value?: T;
+    reason?: Error;
+}
+
+type BatchResult<T> = PromiseSettledResult<T>[];
+
+async function fetchAllSettled<T>(urls: string[]): Promise<PromiseSettledResult<T>[]> {
+    const promises = urls.map(url => fetch(url).then(r => r.json()));
+    return Promise.allSettled(promises);
+}
+
+class ResilientFetcher<T> {
+    async fetchBatch(requests: Array<() => Promise<T>>): Promise<{
+        succeeded: T[];
+        failed: Error[];
+    }> {
+        const results = await Promise.allSettled(requests.map(fn => fn()));
+
+        const succeeded: T[] = [];
+        const failed: Error[] = [];
+
+        for (const result of results) {
+            if (result.status === "fulfilled") {
+                succeeded.push(result.value);
+            } else {
+                failed.push(result.reason);
+            }
+        }
+
+        return { succeeded, failed };
+    }
+
+    async fetchWithRetry(urls: string[], maxRetries: number): Promise<T[]> {
+        let results = await Promise.allSettled(
+            urls.map(url => fetch(url).then(r => r.json()))
+        );
+
+        const successful: T[] = [];
+        for (const result of results) {
+            if (result.status === "fulfilled") {
+                successful.push(result.value);
+            }
+        }
+        return successful;
+    }
+}
+
+const fetcher = new ResilientFetcher<object>();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Interface should be erased
+    assert!(
+        !output.contains("interface SettledResult"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Type alias should be erased
+    assert!(
+        !output.contains("type BatchResult"),
+        "Type alias should be erased: {}",
+        output
+    );
+    // Function should be present
+    assert!(
+        output.contains("fetchAllSettled"),
+        "Function should be present: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("ResilientFetcher"),
+        "Class should be present: {}",
+        output
+    );
+    // Promise.allSettled should be preserved
+    assert!(
+        output.contains("Promise.allSettled"),
+        "Promise.allSettled should be preserved: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": PromiseSettledResult") && !output.contains(": BatchResult"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test Promise.any with type annotations
+#[test]
+fn test_parity_es5_promise_any() {
+    let source = r#"
+interface FetchOptions {
+    timeout?: number;
+    retries?: number;
+}
+
+class AnyFirstFetcher<T> {
+    private endpoints: string[];
+
+    constructor(endpoints: string[]) {
+        this.endpoints = endpoints;
+    }
+
+    async fetchFromAny(): Promise<T> {
+        return Promise.any(
+            this.endpoints.map(url => fetch(url).then(r => r.json()))
+        );
+    }
+
+    async fetchFirst(urls: string[]): Promise<T> {
+        const promises = urls.map(url => fetch(url).then(r => r.json()));
+        return Promise.any(promises);
+    }
+}
+
+async function fetchAnySuccessful<T>(urls: string[]): Promise<T> {
+    const promises: Promise<T>[] = urls.map(url =>
+        fetch(url).then(r => r.json())
+    );
+    return Promise.any(promises);
+}
+
+function checkAggregateError(e: unknown): boolean {
+    return e instanceof AggregateError;
+}
+
+const fetcher = new AnyFirstFetcher<object>(["/api1", "/api2"]);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Interface should be erased
+    assert!(
+        !output.contains("interface FetchOptions"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("AnyFirstFetcher"),
+        "Class should be present: {}",
+        output
+    );
+    // Function should be present
+    assert!(
+        output.contains("fetchAnySuccessful"),
+        "Function should be present: {}",
+        output
+    );
+    // Promise.any should be preserved
+    assert!(
+        output.contains("Promise.any"),
+        "Promise.any should be preserved: {}",
+        output
+    );
+    // AggregateError should be preserved
+    assert!(
+        output.contains("AggregateError"),
+        "AggregateError should be preserved: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": Promise<") && !output.contains(": T"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
