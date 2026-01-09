@@ -6005,3 +6005,196 @@ fn test_async_template_literal_conditional() {
         output
     );
 }
+
+// ============================================================================
+// ASYNC CLASS EXPRESSION TESTS
+// ============================================================================
+
+fn parse_and_emit_async_class_expression(source: &str) -> String {
+    use crate::parser::syntax_kind_ext;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &stmt_idx in &source_file.statements.nodes {
+                if let Some(stmt_node) = parser.arena.get(stmt_idx) {
+                    if stmt_node.kind == syntax_kind_ext::FUNCTION_DECLARATION {
+                        if let Some(func_data) = parser.arena.get_function(stmt_node) {
+                            let emitter = AsyncES5Emitter::new(&parser.arena);
+                            let has_await = emitter.body_contains_await(func_data.body);
+                            let mut emitter = AsyncES5Emitter::new(&parser.arena);
+                            if has_await {
+                                return emitter.emit_generator_body_with_await(func_data.body);
+                            } else {
+                                return emitter.emit_simple_generator_body(func_data.body);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    String::new()
+}
+
+fn class_expression_contains_await(source: &str) -> bool {
+    use crate::parser::syntax_kind_ext;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &stmt_idx in &source_file.statements.nodes {
+                if let Some(stmt_node) = parser.arena.get(stmt_idx) {
+                    if stmt_node.kind == syntax_kind_ext::FUNCTION_DECLARATION {
+                        if let Some(func_data) = parser.arena.get_function(stmt_node) {
+                            let emitter = AsyncES5Emitter::new(&parser.arena);
+                            return emitter.body_contains_await(func_data.body);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+#[test]
+fn test_async_class_expression_basic() {
+    let output = parse_and_emit_async_class_expression(
+        "async function foo() { await init(); const MyClass = class { value = 1; }; return new MyClass(); }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Class expression after await should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_class_expression_with_method() {
+    let output = parse_and_emit_async_class_expression(
+        "async function foo() { await setup(); const C = class { getValue() { return 42; } }; return new C().getValue(); }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Class expression with method should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_class_expression_no_await() {
+    let output = parse_and_emit_async_class_expression(
+        "async function foo() { const MyClass = class { x = 1; }; return new MyClass(); }",
+    );
+    assert!(
+        output.contains("[2 /*return*/"),
+        "Sync class expression should have return: {}",
+        output
+    );
+    assert!(
+        !output.contains("switch"),
+        "No await should skip switch: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_class_expression_named() {
+    let output = parse_and_emit_async_class_expression(
+        "async function foo() { await init(); const C = class MyClass { name = 'test'; }; return new C(); }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Named class expression should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_class_expression_body_contains_await() {
+    assert!(
+        class_expression_contains_await(
+            "async function foo() { await process(); const C = class {}; return C; }"
+        ),
+        "Should detect await with class expression"
+    );
+}
+
+#[test]
+fn test_async_class_expression_body_no_await() {
+    assert!(
+        !class_expression_contains_await(
+            "async function foo() { const C = class { x = 1; }; return new C(); }"
+        ),
+        "Should not detect await when none present"
+    );
+}
+
+#[test]
+fn test_async_class_expression_ignores_nested_async() {
+    assert!(
+        !class_expression_contains_await(
+            "async function foo() { const C = class { async method() { await x; } }; return 1; }"
+        ),
+        "Should ignore await in nested async method"
+    );
+}
+
+#[test]
+fn test_async_class_expression_extends() {
+    let output = parse_and_emit_async_class_expression(
+        "async function foo() { await init(); class Base {} const C = class extends Base { extra = true; }; return new C(); }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Class expression with extends should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_class_expression_with_try_catch() {
+    assert!(
+        class_expression_contains_await(
+            "async function foo() { try { await riskyOp(); const C = class {}; return new C(); } catch (e) { return null; } }"
+        ),
+        "Should detect await in try block with class expression"
+    );
+}
+
+#[test]
+fn test_async_class_expression_with_constructor() {
+    let output = parse_and_emit_async_class_expression(
+        "async function foo() { await init(); const C = class { constructor(public x: number) {} }; return new C(42); }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Class expression with constructor should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_class_expression_static_member() {
+    let output = parse_and_emit_async_class_expression(
+        "async function foo() { await init(); const C = class { static count = 0; }; return C.count; }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Class expression with static member should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_class_expression_conditional() {
+    let output = parse_and_emit_async_class_expression(
+        "async function foo(cond: boolean) { if (cond) { await process(); } const C = class { x = 1; }; return new C(); }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Conditional class expression should have switch or yield: {}",
+        output
+    );
+}
