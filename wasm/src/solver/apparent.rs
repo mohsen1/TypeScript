@@ -88,6 +88,12 @@ fn object_member_kind(name: &str, include_to_locale: bool) -> Option<ApparentMem
     if name == "constructor" {
         return Some(ApparentMemberKind::Value(TypeId::ANY));
     }
+    if name == "toString" {
+        return Some(ApparentMemberKind::Method(TypeId::STRING));
+    }
+    if name == "valueOf" {
+        return Some(ApparentMemberKind::Method(TypeId::ANY));
+    }
     if is_member(name, OBJECT_METHODS_RETURN_BOOLEAN) {
         return Some(ApparentMemberKind::Method(TypeId::BOOLEAN));
     }
@@ -101,6 +107,14 @@ fn push_object_members(members: &mut Vec<ApparentMember>, include_to_locale: boo
     members.push(ApparentMember {
         name: "constructor",
         kind: ApparentMemberKind::Value(TypeId::ANY),
+    });
+    members.push(ApparentMember {
+        name: "toString",
+        kind: ApparentMemberKind::Method(TypeId::STRING),
+    });
+    members.push(ApparentMember {
+        name: "valueOf",
+        kind: ApparentMemberKind::Method(TypeId::ANY),
     });
     for &name in OBJECT_METHODS_RETURN_BOOLEAN {
         members.push(ApparentMember {
@@ -184,6 +198,7 @@ pub fn apparent_primitive_member_kind(
             }
             object_member_kind(name, true)
         }
+        IntrinsicKind::Object => object_member_kind(name, true),
         _ => None,
     }
 }
@@ -286,6 +301,9 @@ pub fn apparent_primitive_members(
                 name: "valueOf",
                 kind: ApparentMemberKind::Method(TypeId::SYMBOL),
             });
+            push_object_members(&mut members, true);
+        }
+        IntrinsicKind::Object => {
             push_object_members(&mut members, true);
         }
         _ => {}

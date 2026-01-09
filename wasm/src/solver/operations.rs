@@ -1512,6 +1512,10 @@ impl<'a> PropertyAccessEvaluator<'a> {
                         from_index_signature: false,
                     };
                 }
+                let apparent = self.resolve_apparent_property(IntrinsicKind::Object, obj_type, prop_name, prop_atom);
+                if let PropertyAccessResult::Success { .. } = apparent {
+                    return apparent;
+                }
                 PropertyAccessResult::PropertyNotFound {
                     type_id: obj_type,
                     property_name: prop_atom,
@@ -1528,6 +1532,11 @@ impl<'a> PropertyAccessEvaluator<'a> {
                         type_id: self.optional_property_type(prop),
                         from_index_signature: false,
                     };
+                }
+
+                let apparent = self.resolve_apparent_property(IntrinsicKind::Object, obj_type, prop_name, prop_atom);
+                if let PropertyAccessResult::Success { .. } = apparent {
+                    return apparent;
                 }
 
                 // Check string index signature (THIS is the case for error 4111)
@@ -1666,6 +1675,25 @@ impl<'a> PropertyAccessEvaluator<'a> {
                 self.resolve_property_access_inner(inner, prop_name, prop_atom)
             }
 
+            TypeKey::TypeParameter(info) | TypeKey::Infer(info) => {
+                let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
+                if let Some(constraint) = info.constraint {
+                    if constraint == obj_type {
+                        PropertyAccessResult::PropertyNotFound {
+                            type_id: obj_type,
+                            property_name: prop_atom,
+                        }
+                    } else {
+                        self.resolve_property_access_inner(constraint, prop_name, Some(prop_atom))
+                    }
+                } else {
+                    PropertyAccessResult::PropertyNotFound {
+                        type_id: obj_type,
+                        property_name: prop_atom,
+                    }
+                }
+            }
+
             // TS apparent members: literals inherit primitive wrapper methods.
             TypeKey::Literal(ref literal) => {
                 let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
@@ -1701,6 +1729,11 @@ impl<'a> PropertyAccessEvaluator<'a> {
             TypeKey::Intrinsic(IntrinsicKind::Bigint) => {
                 let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
                 self.resolve_bigint_property(prop_name, prop_atom)
+            }
+
+            TypeKey::Intrinsic(IntrinsicKind::Object) => {
+                let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
+                self.resolve_apparent_property(IntrinsicKind::Object, obj_type, prop_name, prop_atom)
             }
 
             TypeKey::Array(_) => {

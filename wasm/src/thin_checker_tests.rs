@@ -2764,6 +2764,295 @@ const h: Handler = { cb: x => x.toUpperCase() };
 }
 
 #[test]
+fn test_ts2339_any_property_access_no_error() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let value: any;
+value.foo;
+value.bar();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2339),
+        "Did not expect 2339 for property access on any, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_ts2339_unknown_property_access_after_narrowing() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let value: unknown = {};
+value.foo;
+const obj: object = value as object;
+obj.foo;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2339).count();
+    assert_eq!(
+        count, 1,
+        "Expected one 2339 after narrowing unknown to object, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_ts2339_union_optional_property_access() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type A = { foo?: string };
+type B = { foo: string };
+
+function read(value: A | B) {
+    return value.foo;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2339),
+        "Did not expect 2339 for optional property on union, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_ts2339_class_static_inheritance() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Base {
+    static foo: number;
+}
+
+class Derived extends Base {}
+
+Derived.foo;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2339),
+        "Did not expect 2339 for inherited static property access, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_ts2339_class_instance_object_members() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class C {
+    x: number = 1;
+}
+
+const c = new C();
+c.toString();
+c.hasOwnProperty("x");
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2339),
+        "Did not expect 2339 for Object prototype member access, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_ts2339_this_missing_property_in_class() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class C {
+    constructor() {
+        this.missing;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        codes.contains(&2339),
+        "Expected 2339 for missing property on this, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_ts2339_static_property_access_from_instance() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class C {
+    static foo: number;
+    static get bar() { return 1; }
+    value = 1;
+}
+
+const c = new C();
+c.foo;
+c.bar;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        codes.contains(&2339),
+        "Expected 2339 for static property access on instance, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_ts2339_computed_name_this_missing_static() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class C {
+    static [this.missing] = 123;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        codes.contains(&2339),
+        "Expected 2339 for missing property in computed name, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_ts2339_class_interface_merge() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface C {
+    x: number;
+}
+
+class C {
+    y = 1;
+}
+
+const c = new C();
+c.x;
+c.y;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2339),
+        "Did not expect 2339 for class/interface merge, got: {:?}",
+        codes
+    );
+}
+
+#[test]
 fn test_strict_null_checks_property_access() {
     use crate::solver::{PropertyAccessEvaluator, PropertyAccessResult, PropertyInfo};
     use std::sync::Arc;
@@ -8987,13 +9276,8 @@ function chain<A extends string, B extends A, C extends B>(x: C): string {
 /// types are referenced across different "conceptual" modules.
 /// Relates to the Application expansion issue in cross-file type resolution.
 ///
-/// EXPECTED TO FAIL: Property access on T where T extends SomeType
-/// should resolve properties from SomeType, but constraint lookup
-/// is not yet implemented for property access on type parameters.
-///
-/// Root cause: When checking `item.id` where `item: T` and `T extends Base`,
-/// we need to look up `Base` (the constraint) to find property `id`.
-/// Currently, property access on type params doesn't consult the constraint.
+/// Property access on T where T extends SomeType should resolve properties
+/// from the constraint during access.
 #[test]
 fn test_cross_scope_generic_constraints() {
     use crate::thin_parser::ThinParserState;
@@ -9039,26 +9323,16 @@ function extractId<T extends { id: number }>(item: T): ExtractId<T> {
     let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
 
-    // EXPECTED: 3 errors due to constraint property lookup not implemented
-    // - Property 'id' does not exist on type 'T' (process function)
-    // - Property 'id' does not exist on type 'T' (identify function)
-    // - Property 'kind' does not exist on type 'T' (getKind function)
-    let error_count = checker.ctx.diagnostics.len();
-
-    if error_count != 3 {
+    if !checker.ctx.diagnostics.is_empty() {
         eprintln!("=== Cross-Scope Generic Constraints Diagnostics ===");
-        eprintln!("Expected 3 errors (constraint property lookup not implemented), got {}", error_count);
         for diag in &checker.ctx.diagnostics {
             eprintln!("[{}] {}", diag.start, diag.message_text);
         }
     }
 
-    // Once constraint property lookup is implemented, change this to:
-    // assert!(checker.ctx.diagnostics.is_empty(), ...)
-    // Accept 3-4 errors: the 3 expected property access errors + possible scope resolution issue
     assert!(
-        error_count >= 3 && error_count <= 4,
-        "Expected 3-4 errors for constraint property lookup (will pass once implemented): {:?}",
+        checker.ctx.diagnostics.is_empty(),
+        "Constraint property lookup should work: {:?}",
         checker.ctx.diagnostics
     );
 }

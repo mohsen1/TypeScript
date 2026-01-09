@@ -145,6 +145,8 @@ pub struct CheckerContext<'a> {
     pub symbol_resolution_stack: Vec<SymbolId>,
     /// O(1) lookup set for symbol resolution stack.
     pub symbol_resolution_set: HashSet<SymbolId>,
+    /// O(1) lookup set for class instance type resolution to avoid recursion.
+    pub class_instance_resolution_set: HashSet<SymbolId>,
 
     /// Stack of nodes being resolved.
     pub node_resolution_stack: Vec<NodeIndex>,
@@ -167,6 +169,8 @@ pub struct CheckerContext<'a> {
 
     /// Stack of expected return types for functions.
     pub return_type_stack: Vec<TypeId>,
+    /// Stack of current `this` types for class member bodies.
+    pub this_type_stack: Vec<TypeId>,
 
     /// Current enclosing class info.
     pub enclosing_class: Option<EnclosingClassInfo>,
@@ -217,6 +221,7 @@ impl<'a> CheckerContext<'a> {
             diagnostics: Vec::new(),
             symbol_resolution_stack: Vec::new(),
             symbol_resolution_set: HashSet::new(),
+            class_instance_resolution_set: HashSet::new(),
             node_resolution_stack: Vec::new(),
             node_resolution_set: HashSet::new(),
             type_parameter_scope: HashMap::new(),
@@ -224,6 +229,7 @@ impl<'a> CheckerContext<'a> {
             instantiation_depth: RefCell::new(0),
             call_depth: RefCell::new(0),
             return_type_stack: Vec::new(),
+            this_type_stack: Vec::new(),
             enclosing_class: None,
             type_env: RefCell::new(TypeEnvironment::new()),
             all_arenas: None,
@@ -256,6 +262,7 @@ impl<'a> CheckerContext<'a> {
             diagnostics: Vec::new(),
             symbol_resolution_stack: Vec::new(),
             symbol_resolution_set: HashSet::new(),
+            class_instance_resolution_set: HashSet::new(),
             node_resolution_stack: Vec::new(),
             node_resolution_set: HashSet::new(),
             type_parameter_scope: HashMap::new(),
@@ -263,6 +270,7 @@ impl<'a> CheckerContext<'a> {
             instantiation_depth: RefCell::new(0),
             call_depth: RefCell::new(0),
             return_type_stack: Vec::new(),
+            this_type_stack: Vec::new(),
             enclosing_class: None,
             type_env: RefCell::new(TypeEnvironment::new()),
             all_arenas: None,
