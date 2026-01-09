@@ -7,12 +7,13 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] Add decorator ES5 source map tests (class decorators, method decorators, property decorators, parameter decorators, decorator factories) in `wasm/src/source_map_tests.rs`. Run `./wasm/test.sh source_map`.
+- (awaiting assignment)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added decorator ES5 source map tests (class with metadata, method with descriptor, property validation, parameter injection, factory chain, accessor readonly, abstract class, static members, conditional, comprehensive); 613 tests pass.
 - [x] Added class field ES5 source map tests (public basic, public initializers, static basic, static initializers, computed, private ES5, static private, readonly, with accessors, combined); 603 tests pass.
 - [x] Added extended enum ES5 source map tests (bitwise flags, explicit numeric, expression initializers, ambient declare, member as type, keyof typeof, nested in module, with interface, function parameter, advanced combined); 593 tests pass.
 - [x] Added more interface ES5 source map tests (nested types, tuple types, literal types, never/unknown types, this type, overloaded methods, async methods, accessor signatures, symbol properties, complex combined); `./wasm/test.sh source_map` passes.
