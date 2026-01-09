@@ -35091,3 +35091,602 @@ class DataProcessor<T extends object> {
         output
     );
 }
+
+// =============================================================================
+// TEMPLATE LITERAL TYPE PATTERN TESTS - Uppercase, Lowercase, Capitalize
+// =============================================================================
+
+#[test]
+fn test_class_es5_template_literal_type_uppercase() {
+    let source = r#"
+// Uppercase template literal type pattern
+type EventName = "click" | "focus" | "blur";
+type UpperEventName = Uppercase<EventName>;
+
+type HttpMethod = "get" | "post" | "put" | "delete";
+type UpperHttpMethod = Uppercase<HttpMethod>;
+
+class EventRegistry<T extends string> {
+    private events: Map<T, Function[]> = new Map();
+
+    register(event: T, handler: Function): void {
+        if (!this.events.has(event)) {
+            this.events.set(event, []);
+        }
+        this.events.get(event)!.push(handler);
+    }
+
+    unregister(event: T, handler: Function): void {
+        const handlers = this.events.get(event);
+        if (handlers) {
+            const index = handlers.indexOf(handler);
+            if (index >= 0) {
+                handlers.splice(index, 1);
+            }
+        }
+    }
+
+    trigger(event: T, data?: unknown): void {
+        const handlers = this.events.get(event);
+        if (handlers) {
+            handlers.forEach(h => h(data));
+        }
+    }
+
+    getEventNames(): T[] {
+        return Array.from(this.events.keys());
+    }
+}
+
+class UppercaseEventRegistry extends EventRegistry<UpperEventName> {
+    registerClick(handler: Function): void {
+        this.register("CLICK", handler);
+    }
+
+    registerFocus(handler: Function): void {
+        this.register("FOCUS", handler);
+    }
+
+    registerBlur(handler: Function): void {
+        this.register("BLUR", handler);
+    }
+}
+
+class HttpClient<M extends string> {
+    protected baseUrl: string;
+
+    constructor(baseUrl: string) {
+        this.baseUrl = baseUrl;
+    }
+
+    request(method: M, path: string): Promise<Response> {
+        return fetch(this.baseUrl + path, { method: method as string });
+    }
+
+    getBaseUrl(): string {
+        return this.baseUrl;
+    }
+}
+
+class UppercaseHttpClient extends HttpClient<UpperHttpMethod> {
+    get(path: string): Promise<Response> {
+        return this.request("GET", path);
+    }
+
+    post(path: string): Promise<Response> {
+        return this.request("POST", path);
+    }
+
+    put(path: string): Promise<Response> {
+        return this.request("PUT", path);
+    }
+
+    delete(path: string): Promise<Response> {
+        return this.request("DELETE", path);
+    }
+}
+
+type StatusLevel = "info" | "warn" | "error";
+type UpperStatusLevel = Uppercase<StatusLevel>;
+
+class Logger<L extends string> {
+    private level: L;
+
+    constructor(level: L) {
+        this.level = level;
+    }
+
+    log(message: string): void {
+        console.log("[" + this.level + "]", message);
+    }
+
+    getLevel(): L {
+        return this.level;
+    }
+}
+
+class UppercaseLogger extends Logger<UpperStatusLevel> {
+    info(message: string): void {
+        console.log("[INFO]", message);
+    }
+
+    warn(message: string): void {
+        console.log("[WARN]", message);
+    }
+
+    error(message: string): void {
+        console.log("[ERROR]", message);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("EventRegistry") && output.contains("UppercaseEventRegistry"),
+        "Expected Uppercase template literal type classes: {}",
+        output
+    );
+
+    // EventRegistry methods
+    assert!(
+        output.contains("register") && output.contains("unregister") && output.contains("trigger"),
+        "Expected EventRegistry methods: {}",
+        output
+    );
+
+    // UppercaseEventRegistry methods
+    assert!(
+        output.contains("registerClick") && output.contains("registerFocus") && output.contains("registerBlur"),
+        "Expected UppercaseEventRegistry methods: {}",
+        output
+    );
+
+    // HttpClient classes
+    assert!(
+        output.contains("HttpClient") && output.contains("UppercaseHttpClient"),
+        "Expected HttpClient classes: {}",
+        output
+    );
+
+    // Logger classes
+    assert!(
+        output.contains("Logger") && output.contains("UppercaseLogger"),
+        "Expected Logger classes: {}",
+        output
+    );
+
+    // Type aliases should be stripped
+    assert!(
+        !output.contains("type EventName") && !output.contains("type UpperEventName") && !output.contains("type HttpMethod"),
+        "Expected type aliases to be stripped: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_template_literal_type_lowercase() {
+    let source = r#"
+// Lowercase template literal type pattern
+type Command = "START" | "STOP" | "PAUSE" | "RESUME";
+type LowerCommand = Lowercase<Command>;
+
+type Priority = "HIGH" | "MEDIUM" | "LOW";
+type LowerPriority = Lowercase<Priority>;
+
+class CommandProcessor<C extends string> {
+    private commands: Map<C, () => void> = new Map();
+
+    addCommand(name: C, action: () => void): void {
+        this.commands.set(name, action);
+    }
+
+    execute(name: C): void {
+        const action = this.commands.get(name);
+        if (action) {
+            action();
+        }
+    }
+
+    hasCommand(name: C): boolean {
+        return this.commands.has(name);
+    }
+
+    getCommands(): C[] {
+        return Array.from(this.commands.keys());
+    }
+}
+
+class LowercaseCommandProcessor extends CommandProcessor<LowerCommand> {
+    start(): void {
+        this.execute("start");
+    }
+
+    stop(): void {
+        this.execute("stop");
+    }
+
+    pause(): void {
+        this.execute("pause");
+    }
+
+    resume(): void {
+        this.execute("resume");
+    }
+}
+
+class TaskQueue<P extends string> {
+    private tasks: Array<{ priority: P; task: () => void }> = [];
+
+    add(priority: P, task: () => void): void {
+        this.tasks.push({ priority, task });
+    }
+
+    process(): void {
+        this.tasks.forEach(t => t.task());
+        this.tasks = [];
+    }
+
+    getCount(): number {
+        return this.tasks.length;
+    }
+
+    clear(): void {
+        this.tasks = [];
+    }
+}
+
+class LowercasePriorityQueue extends TaskQueue<LowerPriority> {
+    addHighPriority(task: () => void): void {
+        this.add("high", task);
+    }
+
+    addMediumPriority(task: () => void): void {
+        this.add("medium", task);
+    }
+
+    addLowPriority(task: () => void): void {
+        this.add("low", task);
+    }
+}
+
+type DatabaseAction = "SELECT" | "INSERT" | "UPDATE" | "DELETE";
+type LowerDatabaseAction = Lowercase<DatabaseAction>;
+
+class QueryBuilder<A extends string> {
+    protected action: A;
+    protected table: string = "";
+
+    constructor(action: A) {
+        this.action = action;
+    }
+
+    from(table: string): this {
+        this.table = table;
+        return this;
+    }
+
+    build(): string {
+        return this.action + " FROM " + this.table;
+    }
+
+    getAction(): A {
+        return this.action;
+    }
+}
+
+class LowercaseQueryBuilder extends QueryBuilder<LowerDatabaseAction> {
+    select(table: string): this {
+        this.table = table;
+        return this;
+    }
+
+    insert(table: string): this {
+        this.table = table;
+        return this;
+    }
+
+    update(table: string): this {
+        this.table = table;
+        return this;
+    }
+
+    deleteFrom(table: string): this {
+        this.table = table;
+        return this;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("CommandProcessor") && output.contains("LowercaseCommandProcessor"),
+        "Expected Lowercase template literal type classes: {}",
+        output
+    );
+
+    // CommandProcessor methods
+    assert!(
+        output.contains("addCommand") && output.contains("execute") && output.contains("hasCommand"),
+        "Expected CommandProcessor methods: {}",
+        output
+    );
+
+    // LowercaseCommandProcessor methods
+    assert!(
+        output.contains("start") && output.contains("stop") && output.contains("pause") && output.contains("resume"),
+        "Expected LowercaseCommandProcessor methods: {}",
+        output
+    );
+
+    // TaskQueue classes
+    assert!(
+        output.contains("TaskQueue") && output.contains("LowercasePriorityQueue"),
+        "Expected TaskQueue classes: {}",
+        output
+    );
+
+    // LowercasePriorityQueue methods
+    assert!(
+        output.contains("addHighPriority") && output.contains("addMediumPriority") && output.contains("addLowPriority"),
+        "Expected LowercasePriorityQueue methods: {}",
+        output
+    );
+
+    // QueryBuilder classes
+    assert!(
+        output.contains("QueryBuilder") && output.contains("LowercaseQueryBuilder"),
+        "Expected QueryBuilder classes: {}",
+        output
+    );
+
+    // Type aliases should be stripped
+    assert!(
+        !output.contains("type Command") && !output.contains("type LowerCommand") && !output.contains("type Priority"),
+        "Expected type aliases to be stripped: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_template_literal_type_capitalize() {
+    let source = r#"
+// Capitalize template literal type pattern
+type FieldName = "name" | "email" | "address" | "phone";
+type CapitalizedField = Capitalize<FieldName>;
+
+type ComponentType = "button" | "input" | "select" | "textarea";
+type CapitalizedComponent = Capitalize<ComponentType>;
+
+class FormFieldGenerator<F extends string> {
+    private fields: Map<F, HTMLElement> = new Map();
+
+    createField(name: F): HTMLElement {
+        const input = document.createElement("input");
+        input.name = name;
+        this.fields.set(name, input);
+        return input;
+    }
+
+    getField(name: F): HTMLElement | undefined {
+        return this.fields.get(name);
+    }
+
+    hasField(name: F): boolean {
+        return this.fields.has(name);
+    }
+
+    removeField(name: F): void {
+        this.fields.delete(name);
+    }
+
+    getAllFieldNames(): F[] {
+        return Array.from(this.fields.keys());
+    }
+}
+
+class CapitalizedFieldGenerator extends FormFieldGenerator<CapitalizedField> {
+    createNameField(): HTMLElement {
+        return this.createField("Name");
+    }
+
+    createEmailField(): HTMLElement {
+        return this.createField("Email");
+    }
+
+    createAddressField(): HTMLElement {
+        return this.createField("Address");
+    }
+
+    createPhoneField(): HTMLElement {
+        return this.createField("Phone");
+    }
+}
+
+class ComponentFactory<C extends string> {
+    protected registry: Map<C, () => HTMLElement> = new Map();
+
+    register(type: C, factory: () => HTMLElement): void {
+        this.registry.set(type, factory);
+    }
+
+    create(type: C): HTMLElement | null {
+        const factory = this.registry.get(type);
+        return factory ? factory() : null;
+    }
+
+    isRegistered(type: C): boolean {
+        return this.registry.has(type);
+    }
+
+    getTypes(): C[] {
+        return Array.from(this.registry.keys());
+    }
+}
+
+class CapitalizedComponentFactory extends ComponentFactory<CapitalizedComponent> {
+    createButton(): HTMLElement | null {
+        return this.create("Button");
+    }
+
+    createInput(): HTMLElement | null {
+        return this.create("Input");
+    }
+
+    createSelect(): HTMLElement | null {
+        return this.create("Select");
+    }
+
+    createTextarea(): HTMLElement | null {
+        return this.create("Textarea");
+    }
+}
+
+type ApiEndpoint = "users" | "posts" | "comments" | "likes";
+type CapitalizedEndpoint = Capitalize<ApiEndpoint>;
+
+class ApiRouter<E extends string> {
+    private baseUrl: string;
+    private routes: Map<E, string> = new Map();
+
+    constructor(baseUrl: string) {
+        this.baseUrl = baseUrl;
+    }
+
+    addRoute(endpoint: E, path: string): void {
+        this.routes.set(endpoint, path);
+    }
+
+    getUrl(endpoint: E): string {
+        const path = this.routes.get(endpoint) || endpoint;
+        return this.baseUrl + "/" + path;
+    }
+
+    hasRoute(endpoint: E): boolean {
+        return this.routes.has(endpoint);
+    }
+
+    getBaseUrl(): string {
+        return this.baseUrl;
+    }
+}
+
+class CapitalizedApiRouter extends ApiRouter<CapitalizedEndpoint> {
+    getUsersUrl(): string {
+        return this.getUrl("Users");
+    }
+
+    getPostsUrl(): string {
+        return this.getUrl("Posts");
+    }
+
+    getCommentsUrl(): string {
+        return this.getUrl("Comments");
+    }
+
+    getLikesUrl(): string {
+        return this.getUrl("Likes");
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("FormFieldGenerator") && output.contains("CapitalizedFieldGenerator"),
+        "Expected Capitalize template literal type classes: {}",
+        output
+    );
+
+    // FormFieldGenerator methods
+    assert!(
+        output.contains("createField") && output.contains("getField") && output.contains("hasField"),
+        "Expected FormFieldGenerator methods: {}",
+        output
+    );
+
+    // CapitalizedFieldGenerator methods
+    assert!(
+        output.contains("createNameField") && output.contains("createEmailField") && output.contains("createAddressField"),
+        "Expected CapitalizedFieldGenerator methods: {}",
+        output
+    );
+
+    // ComponentFactory classes
+    assert!(
+        output.contains("ComponentFactory") && output.contains("CapitalizedComponentFactory"),
+        "Expected ComponentFactory classes: {}",
+        output
+    );
+
+    // CapitalizedComponentFactory methods
+    assert!(
+        output.contains("createButton") && output.contains("createInput") && output.contains("createSelect"),
+        "Expected CapitalizedComponentFactory methods: {}",
+        output
+    );
+
+    // ApiRouter classes
+    assert!(
+        output.contains("ApiRouter") && output.contains("CapitalizedApiRouter"),
+        "Expected ApiRouter classes: {}",
+        output
+    );
+
+    // CapitalizedApiRouter methods
+    assert!(
+        output.contains("getUsersUrl") && output.contains("getPostsUrl") && output.contains("getCommentsUrl"),
+        "Expected CapitalizedApiRouter methods: {}",
+        output
+    );
+
+    // Type aliases should be stripped
+    assert!(
+        !output.contains("type FieldName") && !output.contains("type CapitalizedField") && !output.contains("type ComponentType"),
+        "Expected type aliases to be stripped: {}",
+        output
+    );
+}
