@@ -7,7 +7,7 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] (awaiting assignment)
+- [ ] Add ES5 accessor parity tests (getter-only, setter-only, getter-setter pairs, static accessors, computed accessors) in `wasm/src/emitter_parity_tests.rs`. Run `./wasm/test.sh emitter_parity`.
 
 ## Task Queue
 - [ ] (empty)
