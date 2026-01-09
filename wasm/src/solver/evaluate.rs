@@ -12,6 +12,7 @@
 //! - Supports distributivity for naked type parameters in unions
 
 use crate::interner::Atom;
+use std::cell::RefCell;
 use crate::solver::types::*;
 use crate::solver::{apparent_primitive_members, ApparentMemberKind, TypeDatabase};
 use crate::solver::infer::InferenceContext;
@@ -42,6 +43,8 @@ pub struct TypeEvaluator<'a, R: TypeResolver = NoopResolver> {
     interner: &'a dyn TypeDatabase,
     resolver: &'a R,
     no_unchecked_indexed_access: bool,
+    cache: RefCell<FxHashMap<TypeId, TypeId>>,
+    visiting: RefCell<FxHashSet<TypeId>>,
 }
 
 struct MappedKeys {
@@ -153,6 +156,8 @@ impl<'a> TypeEvaluator<'a, NoopResolver> {
             interner,
             resolver: &NOOP,
             no_unchecked_indexed_access: false,
+            cache: RefCell::new(FxHashMap::default()),
+            visiting: RefCell::new(FxHashSet::default()),
         }
     }
 }
@@ -164,6 +169,8 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             interner,
             resolver,
             no_unchecked_indexed_access: false,
+            cache: RefCell::new(FxHashMap::default()),
+            visiting: RefCell::new(FxHashSet::default()),
         }
     }
 
@@ -214,46 +221,83 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             return type_id;
         }
 
+        if let Some(&cached) = self.cache.borrow().get(&type_id) {
+            return cached;
+        }
+
         let key = match self.interner.lookup(type_id) {
             Some(k) => k,
             None => return type_id,
         };
 
+        {
+            let mut visiting = self.visiting.borrow_mut();
+            if !visiting.insert(type_id) {
+                // Recursion guard for self-referential mapped/application types.
+                return type_id;
+            }
+        }
+
         match &key {
             TypeKey::Conditional(cond_id) => {
                 let cond = self.interner.conditional_type(*cond_id);
-                self.evaluate_conditional(cond.as_ref())
+                let result = self.evaluate_conditional(cond.as_ref());
+                self.visiting.borrow_mut().remove(&type_id);
+                self.cache.borrow_mut().insert(type_id, result);
+                result
             }
             TypeKey::IndexAccess(obj, idx) => {
-                self.evaluate_index_access(*obj, *idx)
+                let result = self.evaluate_index_access(*obj, *idx);
+                self.visiting.borrow_mut().remove(&type_id);
+                self.cache.borrow_mut().insert(type_id, result);
+                result
             }
             TypeKey::Mapped(mapped_id) => {
                 let mapped = self.interner.mapped_type(*mapped_id);
-                self.evaluate_mapped(mapped.as_ref())
+                let result = self.evaluate_mapped(mapped.as_ref());
+                self.visiting.borrow_mut().remove(&type_id);
+                self.cache.borrow_mut().insert(type_id, result);
+                result
             }
             TypeKey::KeyOf(operand) => {
-                self.evaluate_keyof(*operand)
+                let result = self.evaluate_keyof(*operand);
+                self.visiting.borrow_mut().remove(&type_id);
+                self.cache.borrow_mut().insert(type_id, result);
+                result
             }
             TypeKey::TypeQuery(symbol) => {
-                if let Some(resolved) = self.resolver.resolve_ref(*symbol, self.interner) {
+                let result = if let Some(resolved) = self.resolver.resolve_ref(*symbol, self.interner) {
                     resolved
                 } else {
                     type_id
-                }
+                };
+                self.visiting.borrow_mut().remove(&type_id);
+                self.cache.borrow_mut().insert(type_id, result);
+                result
             }
             TypeKey::Application(app_id) => {
-                self.evaluate_application(*app_id)
+                let result = self.evaluate_application(*app_id);
+                self.visiting.borrow_mut().remove(&type_id);
+                self.cache.borrow_mut().insert(type_id, result);
+                result
             }
             // Resolve Ref types to their structural form
             TypeKey::Ref(symbol) => {
-                if let Some(resolved) = self.resolver.resolve_ref(*symbol, self.interner) {
+                let result = if let Some(resolved) = self.resolver.resolve_ref(*symbol, self.interner) {
                     resolved
                 } else {
                     type_id
-                }
+                };
+                self.visiting.borrow_mut().remove(&type_id);
+                self.cache.borrow_mut().insert(type_id, result);
+                result
             }
             // Other types pass through unchanged
-            _ => type_id,
+            _ => {
+                self.visiting.borrow_mut().remove(&type_id);
+                self.cache.borrow_mut().insert(type_id, type_id);
+                type_id
+            }
         }
     }
 
