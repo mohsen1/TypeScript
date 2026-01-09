@@ -7,10 +7,10 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-(none)
+- [ ] Add ES5 class tests for const type parameter patterns: const generics, readonly inference, immutable arrays. Tests: `./wasm/test.sh class_es5_tests`
 
 ## Task Queue
-- [ ] Add ES5 class tests for const type parameter patterns: const generics, readonly inference
+- [ ] Add ES5 class tests for import assertion patterns: json imports, type imports
 
 ## Completed
 - [x] Add ES5 class tests for satisfies expression patterns. Tests: `./wasm/test.sh class_es5_tests`
