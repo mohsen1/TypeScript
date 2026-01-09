@@ -18,7 +18,7 @@ use crate::parser::NodeIndex;
 use crate::parser::thin_node::ThinNodeArena;
 use crate::parser::syntax_kind_ext;
 use crate::scanner::SyntaxKind;
-use crate::binder::{ScopeId, SymbolId, symbol_flags};
+use crate::binder::{ContainerKind, ScopeId, SymbolId, symbol_flags};
 use crate::thin_binder::ThinBinderState;
 use crate::solver::{TypeId, TypeInterner, ContextualTypeContext};
 use crate::checker::types::diagnostics::{
@@ -268,18 +268,31 @@ impl<'a> ThinCheckerState<'a> {
         let name = self.ctx.arena.get_identifier(node)?.escaped_text.as_str();
 
         if let Some(mut scope_id) = self.find_enclosing_scope(idx) {
+            let mut require_export = false;
             while !scope_id.is_none() {
                 if let Some(scope) = self.ctx.binder.scopes.get(scope_id.0 as usize) {
                     if let Some(sym_id) = scope.table.get(name) {
                         if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
-                            if !Self::is_class_member_symbol(symbol.flags) {
+                            let export_ok = !require_export
+                                || scope.kind != ContainerKind::Module
+                                || symbol.is_exported
+                                || (symbol.flags & symbol_flags::EXPORT_VALUE) != 0;
+                            if export_ok && !Self::is_class_member_symbol(symbol.flags) {
                                 return Some(sym_id);
                             }
-                        } else {
+                        } else if !require_export || scope.kind != ContainerKind::Module {
                             return Some(sym_id);
                         }
                     }
-                    scope_id = scope.parent;
+                    let parent_id = scope.parent;
+                    if scope.kind == ContainerKind::Module {
+                        if let Some(parent_scope) = self.ctx.binder.scopes.get(parent_id.0 as usize) {
+                            require_export = parent_scope.kind == ContainerKind::Module;
+                        } else {
+                            require_export = false;
+                        }
+                    }
+                    scope_id = parent_id;
                 } else {
                     break;
                 }
@@ -9509,6 +9522,9 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
+        // Push type parameters (like <U> in `fn<U>(id: U)`) before checking types
+        let (_type_params, type_param_updates) = self.push_type_parameters(&method.type_parameters);
+
         // Get declared return type
         let return_type = if !method.type_annotation.is_none() {
             self.get_type_from_type_node(method.type_annotation)
@@ -9545,6 +9561,7 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         self.pop_return_type();
+        self.pop_type_parameters(type_param_updates);
     }
 
     /// Check a constructor declaration.

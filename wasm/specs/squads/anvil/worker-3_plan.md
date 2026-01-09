@@ -7,20 +7,20 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-Add ES5 async/await source map tests
+Add ES5 generator function source map tests
 
 Per GOALS.md Objective 2: Source Map Validation
 
 Steps:
-1. Add 6 ES5 async/await source map tests to `wasm/src/source_map_tests.rs`:
-   - Basic async function
-   - Async arrow function
-   - Async method
-   - Async with try/catch
-   - Nested async
-   - Combined async patterns
+1. Add 6 ES5 generator function source map tests to `wasm/src/source_map_tests.rs`:
+   - Basic generator yield
+   - Generator yield*
+   - Generator with return
+   - Async generator
+   - Generator in class method
+   - Combined generator patterns
 2. Run `./wasm/test.sh source_map` to verify all tests pass
-3. Commit with message: `[wasm] source_map: add async/await source map tests`
+3. Commit with message: `[wasm] source_map: add generator function source map tests`
 4. Push to `origin/worker/anvil-3`
 5. Update this plan file and push
 
