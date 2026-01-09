@@ -7,12 +7,13 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] Add async/await ES5 source map tests (await expressions, async arrow functions, async class methods, try/catch with await, for-await-of loops) in `wasm/src/source_map_tests.rs`. Run `./wasm/test.sh source_map`.
+- (awaiting assignment)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added async/await ES5 source map tests (Promise.all, Promise.race, error handling, sequential vs parallel, closure capture, inheritance, factory pattern, queue processing, event emitter, comprehensive); 623 tests pass.
 - [x] Added decorator ES5 source map tests (class with metadata, method with descriptor, property validation, parameter injection, factory chain, accessor readonly, abstract class, static members, conditional, comprehensive); 613 tests pass.
 - [x] Added class field ES5 source map tests (public basic, public initializers, static basic, static initializers, computed, private ES5, static private, readonly, with accessors, combined); 603 tests pass.
 - [x] Added extended enum ES5 source map tests (bitwise flags, explicit numeric, expression initializers, ambient declare, member as type, keyof typeof, nested in module, with interface, function parameter, advanced combined); 593 tests pass.
