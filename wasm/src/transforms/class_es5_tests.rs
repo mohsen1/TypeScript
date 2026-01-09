@@ -10947,3 +10947,312 @@ class PropertyDefiner {
         output
     );
 }
+
+// ============================================================================
+// Symbol.hasInstance Tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_symbol_has_instance_basic() {
+    // Basic Symbol.hasInstance static method
+    let source = r#"
+class MyClass {
+    static [Symbol.hasInstance](instance: unknown): boolean {
+        return typeof instance === "object" && instance !== null;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted to function
+    assert!(
+        output.contains("function MyClass"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // typeof check should be present
+    assert!(
+        output.contains("typeof") && output.contains("object"),
+        "Expected typeof check: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_has_instance_custom_check() {
+    // Custom instanceof behavior checking for specific property
+    let source = r#"
+class Validator {
+    private valid: boolean = true;
+
+    static [Symbol.hasInstance](instance: unknown): boolean {
+        return instance !== null &&
+               typeof instance === "object" &&
+               "valid" in instance;
+    }
+
+    isValid(): boolean {
+        return this.valid;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function Validator"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // isValid method should be present
+    assert!(
+        output.contains("isValid"),
+        "Expected isValid method: {}",
+        output
+    );
+
+    // in operator check should be present
+    assert!(
+        output.contains("in") || output.contains("valid"),
+        "Expected property check: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_has_instance_with_inheritance() {
+    // Symbol.hasInstance with class inheritance
+    let source = r#"
+class Animal {
+    name: string;
+
+    constructor(name: string) {
+        this.name = name;
+    }
+
+    static [Symbol.hasInstance](instance: unknown): boolean {
+        return instance !== null &&
+               typeof instance === "object" &&
+               "name" in instance;
+    }
+}
+
+class Dog extends Animal {
+    breed: string;
+
+    constructor(name: string, breed: string) {
+        super(name);
+        this.breed = breed;
+    }
+
+    static [Symbol.hasInstance](instance: unknown): boolean {
+        return instance !== null &&
+               typeof instance === "object" &&
+               "breed" in instance;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Both classes should be present
+    assert!(
+        output.contains("Animal") && output.contains("Dog"),
+        "Expected both classes: {}",
+        output
+    );
+
+    // Inheritance pattern should be present
+    assert!(
+        output.contains("__extends") || output.contains("prototype"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+
+    // super call should be present
+    assert!(
+        output.contains("_super") || output.contains(".call(this"),
+        "Expected super call: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_has_instance_duck_typing() {
+    // Duck typing pattern with Symbol.hasInstance
+    let source = r#"
+interface Stringifiable {
+    toString(): string;
+}
+
+class StringWrapper {
+    private value: string;
+
+    constructor(value: string) {
+        this.value = value;
+    }
+
+    static [Symbol.hasInstance](instance: unknown): instance is Stringifiable {
+        return instance !== null &&
+               typeof instance === "object" &&
+               typeof (instance as any).toString === "function";
+    }
+
+    toString(): string {
+        return this.value;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function StringWrapper"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // toString method should be present
+    assert!(
+        output.contains("toString"),
+        "Expected toString method: {}",
+        output
+    );
+
+    // typeof function check should be present
+    assert!(
+        output.contains("typeof") && output.contains("function"),
+        "Expected typeof function check: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_has_instance_with_other_static_members() {
+    // Symbol.hasInstance alongside other static members
+    let source = r#"
+class Registry<T> {
+    private items: Map<string, T> = new Map();
+
+    static readonly VERSION = "1.0.0";
+    static instanceCount = 0;
+
+    constructor() {
+        Registry.instanceCount++;
+    }
+
+    static [Symbol.hasInstance](instance: unknown): boolean {
+        return instance !== null &&
+               typeof instance === "object" &&
+               "items" in instance;
+    }
+
+    static create<U>(): Registry<U> {
+        return new Registry<U>();
+    }
+
+    add(key: string, value: T): void {
+        this.items.set(key, value);
+    }
+
+    get(key: string): T | undefined {
+        return this.items.get(key);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function Registry") || output.contains("Registry"),
+        "Expected class definition: {}",
+        output
+    );
+
+    // Static members should be present
+    assert!(
+        output.contains("VERSION") || output.contains("instanceCount"),
+        "Expected static members: {}",
+        output
+    );
+
+    // Instance methods should be present
+    assert!(
+        output.contains("add") && output.contains("get"),
+        "Expected instance methods: {}",
+        output
+    );
+
+    // Static create method should be present
+    assert!(
+        output.contains("create"),
+        "Expected static create method: {}",
+        output
+    );
+}
