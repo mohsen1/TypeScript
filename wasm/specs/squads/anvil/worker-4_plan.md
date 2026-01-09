@@ -7,12 +7,13 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [ ] Add ES5 class tests for generic constraint patterns: extends constraints, keyof constraints, conditional types, mapped types, infer keyword, template literal types. Tests: `./wasm/test.sh class_es5_tests`
+None - awaiting assignment from EM-Anvil.
 
 ## Task Queue
 - [ ] Add ES5 class tests for utility type patterns: Partial, Required, Pick, Omit, Record usage in classes
 
 ## Completed
+- [x] Add ES5 class tests for generic constraint patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for TypeScript-specific patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for mixed decorator patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for accessor decorator patterns. Tests: `./wasm/test.sh class_es5_tests`

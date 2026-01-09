@@ -22784,3 +22784,728 @@ export type PipelineStage = (input: any) => any | Promise<any>;
         output
     );
 }
+
+#[test]
+fn test_class_es5_generic_extends_constraint() {
+    // Extends constraints pattern
+    let source = r#"
+interface Lengthwise {
+    length: number;
+}
+
+interface Printable {
+    print(): string;
+}
+
+interface Entity {
+    id: number;
+    name: string;
+}
+
+class Container<T extends Lengthwise> {
+    private items: T[] = [];
+
+    add(item: T): void {
+        this.items.push(item);
+    }
+
+    getTotalLength(): number {
+        return this.items.reduce((sum, item) => sum + item.length, 0);
+    }
+
+    getAll(): T[] {
+        return [...this.items];
+    }
+}
+
+class PrintableContainer<T extends Printable> {
+    private items: T[] = [];
+
+    add(item: T): void {
+        this.items.push(item);
+    }
+
+    printAll(): string[] {
+        return this.items.map(item => item.print());
+    }
+}
+
+class EntityRepository<T extends Entity> {
+    protected entities: Map<number, T> = new Map();
+
+    save(entity: T): void {
+        this.entities.set(entity.id, entity);
+    }
+
+    findById(id: number): T | undefined {
+        return this.entities.get(id);
+    }
+
+    findByName(name: string): T | undefined {
+        return Array.from(this.entities.values()).find(e => e.name === name);
+    }
+
+    getAll(): T[] {
+        return Array.from(this.entities.values());
+    }
+}
+
+class MultiConstraint<T extends Entity & Printable> {
+    private item: T;
+
+    constructor(item: T) {
+        this.item = item;
+    }
+
+    getInfo(): string {
+        return `${this.item.name}: ${this.item.print()}`;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Container") && output.contains("EntityRepository"),
+        "Expected generic constraint classes: {}",
+        output
+    );
+
+    // Generic type parameters should be stripped
+    assert!(
+        !output.contains("<T extends"),
+        "Expected generic constraints to be stripped: {}",
+        output
+    );
+
+    // Class IIFE pattern should be present
+    assert!(
+        output.contains("(function ()") || output.contains("(function()") || output.contains("function Container"),
+        "Expected class IIFE pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_generic_keyof_constraint() {
+    // Keyof constraints pattern
+    let source = r#"
+interface Person {
+    name: string;
+    age: number;
+    email: string;
+}
+
+interface Product {
+    id: number;
+    title: string;
+    price: number;
+    inStock: boolean;
+}
+
+class PropertyAccessor<T, K extends keyof T> {
+    constructor(private obj: T, private key: K) {}
+
+    get(): T[K] {
+        return this.obj[this.key];
+    }
+
+    set(value: T[K]): void {
+        this.obj[this.key] = value;
+    }
+}
+
+class ObjectPicker<T> {
+    constructor(private obj: T) {}
+
+    pick<K extends keyof T>(key: K): T[K] {
+        return this.obj[key];
+    }
+
+    pickMultiple<K extends keyof T>(...keys: K[]): Pick<T, K> {
+        const result = {} as Pick<T, K>;
+        keys.forEach(key => {
+            result[key] = this.obj[key];
+        });
+        return result;
+    }
+}
+
+class FormValidator<T extends object> {
+    private errors: Map<keyof T, string> = new Map();
+
+    setError<K extends keyof T>(field: K, message: string): void {
+        this.errors.set(field, message);
+    }
+
+    getError<K extends keyof T>(field: K): string | undefined {
+        return this.errors.get(field);
+    }
+
+    hasError<K extends keyof T>(field: K): boolean {
+        return this.errors.has(field);
+    }
+
+    clearErrors(): void {
+        this.errors.clear();
+    }
+}
+
+class DeepAccessor<T extends object> {
+    constructor(private obj: T) {}
+
+    getProperty<K extends keyof T>(key: K): T[K] {
+        return this.obj[key];
+    }
+
+    setProperty<K extends keyof T>(key: K, value: T[K]): void {
+        this.obj[key] = value;
+    }
+
+    hasProperty<K extends keyof T>(key: K): boolean {
+        return key in this.obj;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("PropertyAccessor") && output.contains("ObjectPicker") && output.contains("FormValidator"),
+        "Expected keyof constraint classes: {}",
+        output
+    );
+
+    // Keyof constraints should be stripped
+    assert!(
+        !output.contains("keyof T"),
+        "Expected keyof to be stripped: {}",
+        output
+    );
+
+    // Class IIFE pattern should be present
+    assert!(
+        output.contains("(function ()") || output.contains("(function()") || output.contains("function PropertyAccessor"),
+        "Expected class IIFE pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_generic_conditional_types() {
+    // Conditional types pattern
+    let source = r#"
+type IsArray<T> = T extends any[] ? true : false;
+type ElementType<T> = T extends (infer E)[] ? E : never;
+type NonNullable<T> = T extends null | undefined ? never : T;
+type ReturnType<T> = T extends (...args: any[]) => infer R ? R : never;
+
+type Flatten<T> = T extends Array<infer U> ? U : T;
+type Awaited<T> = T extends Promise<infer U> ? Awaited<U> : T;
+
+class TypeChecker<T> {
+    private value: T;
+
+    constructor(value: T) {
+        this.value = value;
+    }
+
+    getValue(): T {
+        return this.value;
+    }
+
+    isArray(): boolean {
+        return Array.isArray(this.value);
+    }
+
+    isNull(): boolean {
+        return this.value === null;
+    }
+
+    isUndefined(): boolean {
+        return this.value === undefined;
+    }
+}
+
+class ArrayProcessor<T extends any[]> {
+    constructor(private array: T) {}
+
+    getFirst(): T[0] | undefined {
+        return this.array[0];
+    }
+
+    getLast(): T[number] | undefined {
+        return this.array[this.array.length - 1];
+    }
+
+    map<U>(fn: (item: T[number]) => U): U[] {
+        return this.array.map(fn);
+    }
+}
+
+class PromiseHandler<T> {
+    constructor(private promise: Promise<T>) {}
+
+    async unwrap(): Promise<T> {
+        return await this.promise;
+    }
+
+    then<U>(fn: (value: T) => U): Promise<U> {
+        return this.promise.then(fn);
+    }
+}
+
+class ConditionalWrapper<T, Condition extends boolean> {
+    private value: T;
+    private condition: Condition;
+
+    constructor(value: T, condition: Condition) {
+        this.value = value;
+        this.condition = condition;
+    }
+
+    get(): Condition extends true ? T : null {
+        return (this.condition ? this.value : null) as any;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("TypeChecker") && output.contains("ArrayProcessor") && output.contains("PromiseHandler"),
+        "Expected conditional type classes: {}",
+        output
+    );
+
+    // Type aliases should be stripped
+    assert!(
+        !output.contains("type IsArray") && !output.contains("type ElementType"),
+        "Expected type aliases to be stripped: {}",
+        output
+    );
+
+    // Class IIFE pattern should be present
+    assert!(
+        output.contains("(function ()") || output.contains("(function()") || output.contains("function TypeChecker"),
+        "Expected class IIFE pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_generic_mapped_types() {
+    // Mapped types pattern
+    let source = r#"
+type Readonly<T> = { readonly [P in keyof T]: T[P] };
+type Partial<T> = { [P in keyof T]?: T[P] };
+type Required<T> = { [P in keyof T]-?: T[P] };
+type Mutable<T> = { -readonly [P in keyof T]: T[P] };
+
+interface User {
+    id: number;
+    name: string;
+    email: string;
+    age?: number;
+}
+
+class ReadonlyWrapper<T extends object> {
+    private readonly data: Readonly<T>;
+
+    constructor(data: T) {
+        this.data = Object.freeze({ ...data }) as Readonly<T>;
+    }
+
+    get<K extends keyof T>(key: K): T[K] {
+        return this.data[key];
+    }
+
+    toObject(): Readonly<T> {
+        return this.data;
+    }
+}
+
+class PartialBuilder<T extends object> {
+    private data: Partial<T> = {};
+
+    set<K extends keyof T>(key: K, value: T[K]): this {
+        this.data[key] = value;
+        return this;
+    }
+
+    build(): Partial<T> {
+        return { ...this.data };
+    }
+
+    isComplete(requiredKeys: (keyof T)[]): boolean {
+        return requiredKeys.every(key => key in this.data);
+    }
+}
+
+class StateManager<T extends object> {
+    private state: T;
+    private history: Partial<T>[] = [];
+
+    constructor(initialState: T) {
+        this.state = { ...initialState };
+    }
+
+    update(changes: Partial<T>): void {
+        this.history.push({ ...this.state });
+        this.state = { ...this.state, ...changes };
+    }
+
+    getState(): Readonly<T> {
+        return this.state as Readonly<T>;
+    }
+
+    undo(): boolean {
+        const previous = this.history.pop();
+        if (previous) {
+            this.state = { ...this.state, ...previous };
+            return true;
+        }
+        return false;
+    }
+}
+
+class FormState<T extends object> {
+    private values: Partial<T> = {};
+    private touched: { [K in keyof T]?: boolean } = {};
+    private errors: { [K in keyof T]?: string } = {};
+
+    setValue<K extends keyof T>(field: K, value: T[K]): void {
+        this.values[field] = value;
+        this.touched[field] = true;
+    }
+
+    getValue<K extends keyof T>(field: K): T[K] | undefined {
+        return this.values[field];
+    }
+
+    setError<K extends keyof T>(field: K, error: string): void {
+        this.errors[field] = error;
+    }
+
+    isTouched<K extends keyof T>(field: K): boolean {
+        return this.touched[field] || false;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("ReadonlyWrapper") && output.contains("PartialBuilder") && output.contains("StateManager"),
+        "Expected mapped type classes: {}",
+        output
+    );
+
+    // Mapped type definitions should be stripped
+    assert!(
+        !output.contains("[P in keyof"),
+        "Expected mapped types to be stripped: {}",
+        output
+    );
+
+    // Class IIFE pattern should be present
+    assert!(
+        output.contains("(function ()") || output.contains("(function()") || output.contains("function ReadonlyWrapper"),
+        "Expected class IIFE pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_generic_infer_keyword() {
+    // Infer keyword pattern
+    let source = r#"
+type UnpackPromise<T> = T extends Promise<infer U> ? U : T;
+type UnpackArray<T> = T extends Array<infer U> ? U : T;
+type UnpackFunction<T> = T extends (...args: any[]) => infer R ? R : never;
+type FirstArg<T> = T extends (first: infer F, ...args: any[]) => any ? F : never;
+type ConstructorParams<T> = T extends new (...args: infer P) => any ? P : never;
+
+type Head<T extends any[]> = T extends [infer H, ...any[]] ? H : never;
+type Tail<T extends any[]> = T extends [any, ...infer R] ? R : never;
+
+class PromiseUnwrapper<T> {
+    constructor(private promise: Promise<T>) {}
+
+    async getValue(): Promise<T> {
+        return await this.promise;
+    }
+
+    map<U>(fn: (value: T) => U): Promise<U> {
+        return this.promise.then(fn);
+    }
+}
+
+class ArrayUnwrapper<T extends any[]> {
+    constructor(private array: T) {}
+
+    first(): T[0] {
+        return this.array[0];
+    }
+
+    rest(): T extends [any, ...infer R] ? R : never {
+        return this.array.slice(1) as any;
+    }
+
+    last(): T[number] {
+        return this.array[this.array.length - 1];
+    }
+}
+
+class FunctionWrapper<T extends (...args: any[]) => any> {
+    constructor(private fn: T) {}
+
+    call(...args: Parameters<T>): ReturnType<T> {
+        return this.fn(...args);
+    }
+
+    bind<U>(thisArg: U): (...args: Parameters<T>) => ReturnType<T> {
+        return this.fn.bind(thisArg);
+    }
+}
+
+class TupleProcessor<T extends any[]> {
+    constructor(private tuple: T) {}
+
+    getHead(): T extends [infer H, ...any[]] ? H : never {
+        return this.tuple[0] as any;
+    }
+
+    getTail(): T extends [any, ...infer R] ? R : never {
+        return this.tuple.slice(1) as any;
+    }
+
+    getLength(): T["length"] {
+        return this.tuple.length as any;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("PromiseUnwrapper") && output.contains("ArrayUnwrapper") && output.contains("FunctionWrapper"),
+        "Expected infer keyword classes: {}",
+        output
+    );
+
+    // Type aliases with infer should be stripped
+    assert!(
+        !output.contains("type UnpackPromise") && !output.contains("infer U"),
+        "Expected infer types to be stripped: {}",
+        output
+    );
+
+    // Class IIFE pattern should be present
+    assert!(
+        output.contains("(function ()") || output.contains("(function()") || output.contains("function PromiseUnwrapper"),
+        "Expected class IIFE pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_generic_template_literal_types() {
+    // Template literal types pattern
+    let source = r#"
+type EventName<T extends string> = `on${Capitalize<T>}`;
+type Getter<T extends string> = `get${Capitalize<T>}`;
+type Setter<T extends string> = `set${Capitalize<T>}`;
+type HttpMethod = "GET" | "POST" | "PUT" | "DELETE";
+type ApiEndpoint<M extends HttpMethod, P extends string> = `${M} ${P}`;
+
+type PropEventHandlers<T> = {
+    [K in keyof T as `on${Capitalize<string & K>}Change`]?: (value: T[K]) => void;
+};
+
+class EventEmitter<Events extends Record<string, any>> {
+    private listeners: Map<string, Function[]> = new Map();
+
+    on<K extends keyof Events & string>(
+        event: K,
+        handler: (data: Events[K]) => void
+    ): void {
+        const handlers = this.listeners.get(event) || [];
+        handlers.push(handler);
+        this.listeners.set(event, handlers);
+    }
+
+    emit<K extends keyof Events & string>(event: K, data: Events[K]): void {
+        const handlers = this.listeners.get(event) || [];
+        handlers.forEach(h => h(data));
+    }
+
+    off<K extends keyof Events & string>(event: K): void {
+        this.listeners.delete(event);
+    }
+}
+
+class PropertyAccessors<T extends object> {
+    constructor(private obj: T) {}
+
+    get<K extends keyof T & string>(key: K): T[K] {
+        return this.obj[key];
+    }
+
+    set<K extends keyof T & string>(key: K, value: T[K]): void {
+        this.obj[key] = value;
+    }
+
+    createGetter<K extends keyof T & string>(key: K): () => T[K] {
+        return () => this.obj[key];
+    }
+
+    createSetter<K extends keyof T & string>(key: K): (value: T[K]) => void {
+        return (value) => { this.obj[key] = value; };
+    }
+}
+
+class ApiClient {
+    private baseUrl: string;
+
+    constructor(baseUrl: string) {
+        this.baseUrl = baseUrl;
+    }
+
+    async request<M extends HttpMethod, P extends string>(
+        method: M,
+        path: P,
+        body?: any
+    ): Promise<any> {
+        const response = await fetch(`${this.baseUrl}${path}`, {
+            method,
+            body: body ? JSON.stringify(body) : undefined
+        });
+        return response.json();
+    }
+
+    get<P extends string>(path: P): Promise<any> {
+        return this.request("GET", path);
+    }
+
+    post<P extends string>(path: P, body: any): Promise<any> {
+        return this.request("POST", path, body);
+    }
+}
+
+class CssBuilder {
+    private styles: Record<string, string> = {};
+
+    set<P extends string>(property: P, value: string): this {
+        this.styles[property] = value;
+        return this;
+    }
+
+    build(): string {
+        return Object.entries(this.styles)
+            .map(([key, value]) => `${key}: ${value}`)
+            .join("; ");
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("EventEmitter") && output.contains("PropertyAccessors") && output.contains("ApiClient"),
+        "Expected template literal type classes: {}",
+        output
+    );
+
+    // Template literal type definitions should be stripped
+    assert!(
+        !output.contains("type EventName") && !output.contains("type Getter"),
+        "Expected template literal types to be stripped: {}",
+        output
+    );
+
+    // Class IIFE pattern should be present
+    assert!(
+        output.contains("(function ()") || output.contains("(function()") || output.contains("function EventEmitter"),
+        "Expected class IIFE pattern: {}",
+        output
+    );
+}
