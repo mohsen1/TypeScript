@@ -14,6 +14,7 @@ Blocked: Awaiting next EM-Anvil assignment.
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 tests for WeakRef and FinalizationRegistry (6 tests): basic WeakRef, with deref, FinalizationRegistry basic, with unregister, cache pattern, combined. Ran `./wasm/test.sh class_es5_tests` (all 186 pass).
 - [x] Added ES5 tests for Proxy patterns (6 tests): basic proxy, handler traps, apply trap, factory, with Reflect, revocable. Ran `./wasm/test.sh class_es5_tests` (all 180 pass).
 - [x] Added ES5 tests for new.target (6 tests): basic new.target, derived class, abstract pattern, with static, inheritance chain, undefined check. Ran `./wasm/test.sh class_es5_tests` (all 174 pass).
 - [x] Added ES5 tests for Symbol.species (6 tests): basic Symbol.species, derived class, with methods, returning base, with static members, returning null. Ran `./wasm/test.sh class_es5_tests` (all 163 pass).
