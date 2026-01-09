@@ -7,12 +7,13 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- [ ] Add async ES5 tests for async stream patterns: readable stream, writable stream, transform stream, pipe chains. Tests: `./wasm/test.sh async_es5_tests`
+None - awaiting next task
 
 ## Task Queue
 - [ ] Add async ES5 tests for async queue patterns: task queue, priority queue, rate limiting
 
 ## Completed
+- [x] Added 12 async stream pattern tests (read basic, write basic, pipe, transform, reader, writer, getReader, cancel, abort, tee, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (664 tests PASS).
 - [x] Added 12 async context pattern tests (run basic, get store, enter/exit, propagation, wrap, fork, bind, scheduler, trace, scope, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (652 tests PASS).
 - [x] Added 12 async resource management pattern tests (dispose basic, try-finally cleanup, acquire-release, connection close, file handle, transaction, pool return, stream close, multiple cleanup, conditional cleanup, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (640 tests PASS).
 - [x] Added 12 async module pattern tests (dynamic import, dynamic import call, conditional import, top-level simulation, module init, lazy load, parallel imports, module factory, export async, import-then-use, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (628 tests PASS).
