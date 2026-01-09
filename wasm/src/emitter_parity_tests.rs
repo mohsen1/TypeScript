@@ -9467,6 +9467,413 @@ const Rectangle = class {
     );
 }
 
+/// Parity test for ES5 class expression in return statement.
+/// Class expression returned from a factory function.
+#[test]
+fn test_parity_es5_class_expression_return() {
+    let source = r#"
+interface Component { render(): string }
+function createComponent(name: string): new () => Component {
+    return class implements Component {
+        private name: string = name;
+
+        render(): string {
+            return "<" + this.name + "/>";
+        }
+    };
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the function name
+    assert!(
+        output.contains("createComponent"),
+        "Output should contain createComponent function: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface"),
+        "ES5 output should erase interface: {}",
+        output
+    );
+    // implements should be erased
+    assert!(
+        !output.contains("implements"),
+        "ES5 output should erase implements: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": new ()"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+    // private keyword should be erased
+    assert!(
+        !output.contains("private"),
+        "ES5 output should erase private keyword: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 class expression as argument.
+/// Class expression passed as an argument to a function.
+#[test]
+fn test_parity_es5_class_expression_argument() {
+    let source = r#"
+interface Handler { handle(data: any): void }
+function registerHandler(HandlerClass: new () => Handler): void {
+    const instance = new HandlerClass();
+    instance.handle({ type: "init" });
+}
+
+registerHandler(class implements Handler {
+    private processed: number = 0;
+
+    handle(data: any): void {
+        this.processed++;
+        console.log("Handling:", data);
+    }
+});
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the function name
+    assert!(
+        output.contains("registerHandler"),
+        "Output should contain registerHandler function: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface"),
+        "ES5 output should erase interface: {}",
+        output
+    );
+    // implements should be erased
+    assert!(
+        !output.contains("implements"),
+        "ES5 output should erase implements: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": Handler") && !output.contains(": any") && !output.contains(": void"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+    // private keyword should be erased
+    assert!(
+        !output.contains("private"),
+        "ES5 output should erase private keyword: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 class expression extending expression.
+/// Class expression extending a computed base class.
+#[test]
+fn test_parity_es5_class_expression_extends_computed() {
+    let source = r#"
+interface Serializable { serialize(): string }
+function getMixin<T extends new (...args: any[]) => Serializable>(Base: T) {
+    return class extends Base {
+        toJSON(): string {
+            return this.serialize();
+        }
+    };
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the function name
+    assert!(
+        output.contains("getMixin"),
+        "Output should contain getMixin function: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface"),
+        "ES5 output should erase interface: {}",
+        output
+    );
+    // Generic type parameters should be erased
+    assert!(
+        !output.contains("<T extends"),
+        "ES5 output should erase generic constraints: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": T"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 class expression with implements.
+/// Class expression implementing multiple interfaces.
+#[test]
+fn test_parity_es5_class_expression_implements() {
+    let source = r#"
+interface Readable { read(): string }
+interface Writable { write(data: string): void }
+interface Closable { close(): void }
+
+const Stream = class implements Readable, Writable, Closable {
+    private buffer: string = "";
+
+    read(): string {
+        return this.buffer;
+    }
+
+    write(data: string): void {
+        this.buffer += data;
+    }
+
+    close(): void {
+        this.buffer = "";
+    }
+};
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the Stream class
+    assert!(
+        output.contains("Stream"),
+        "Output should contain Stream class: {}",
+        output
+    );
+    // Interfaces should be erased
+    assert!(
+        !output.contains("interface"),
+        "ES5 output should erase interfaces: {}",
+        output
+    );
+    // implements should be erased
+    assert!(
+        !output.contains("implements"),
+        "ES5 output should erase implements clause: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": void"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+    // private keyword should be erased
+    assert!(
+        !output.contains("private"),
+        "ES5 output should erase private keyword: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 class expression in array.
+/// Class expressions stored in an array.
+#[test]
+fn test_parity_es5_class_expression_array() {
+    let source = r#"
+interface Shape { area(): number }
+type ShapeConstructor = new () => Shape;
+
+const shapes: ShapeConstructor[] = [
+    class implements Shape {
+        area(): number { return 100; }
+    },
+    class implements Shape {
+        area(): number { return 200; }
+    }
+];
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the shapes variable
+    assert!(
+        output.contains("shapes"),
+        "Output should contain shapes variable: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface"),
+        "ES5 output should erase interface: {}",
+        output
+    );
+    // Type alias should be erased
+    assert!(
+        !output.contains("type ShapeConstructor"),
+        "ES5 output should erase type alias: {}",
+        output
+    );
+    // implements should be erased
+    assert!(
+        !output.contains("implements"),
+        "ES5 output should erase implements: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number") && !output.contains(": ShapeConstructor[]"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 class expression in IIFE.
+/// Class expression inside an immediately-invoked function expression.
+#[test]
+fn test_parity_es5_class_expression_iife() {
+    let source = r#"
+interface Singleton { getInstance(): Singleton }
+const singleton = (function(): new () => Singleton {
+    let instance: Singleton | null = null;
+
+    return class implements Singleton {
+        constructor() {
+            if (instance) return instance;
+            instance = this;
+        }
+
+        getInstance(): Singleton {
+            return instance!;
+        }
+    };
+})();
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the singleton variable
+    assert!(
+        output.contains("singleton"),
+        "Output should contain singleton variable: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface"),
+        "ES5 output should erase interface: {}",
+        output
+    );
+    // implements should be erased
+    assert!(
+        !output.contains("implements"),
+        "ES5 output should erase implements: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": Singleton") && !output.contains(": new ()"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+}
+
 // ============================================================================
 // ES5 GENERATOR FUNCTION PARITY TESTS (ADDITIONAL)
 // ============================================================================
