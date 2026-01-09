@@ -7,10 +7,10 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-(none)
+- [ ] Add ES5 class tests for explicit resource management: await using, Symbol.asyncDispose, Symbol.dispose. Tests: `./wasm/test.sh class_es5_tests`
 
 ## Task Queue
-- [ ] Add ES5 class tests for explicit resource management: await using, Symbol.asyncDispose
+- [ ] Add ES5 class tests for satisfies expression patterns: object satisfies, array satisfies, nested satisfies
 
 ## Completed
 - [x] Add ES5 class tests for accessor keyword patterns. Tests: `./wasm/test.sh class_es5_tests`

@@ -7,10 +7,10 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-(awaiting assignment)
+- [ ] Add ES5 async iteration patterns parity tests: for-await-of with generators, async iterator protocol, Symbol.asyncIterator. Tests: `./wasm/test.sh emitter_parity`
 
 ## Task Queue
-(empty)
+- [ ] Add ES5 module patterns parity tests: dynamic import, top-level await, import.meta
 
 ## Completed
 - [x] Added ES5 decorator patterns parity tests (class-chaining, method-descriptor, parameter-injection) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (299 tests).
