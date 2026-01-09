@@ -6,10 +6,10 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-(none)
+- [ ] Add ES5 class tests for nominal type patterns: branded types, opaque types. Tests: `./wasm/test.sh class_es5_tests`
 
 ## Task Queue
-- [ ] Add ES5 class tests for nominal type patterns: branded types, opaque types
+- [ ] Add ES5 class tests for utility type patterns: Awaited, NonNullable, ReturnType
 
 ## Completed
 - [x] Added ES5 tests for assertion function patterns (6 tests): basic asserts, type predicates, generic signatures, class methods, inheritance, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 431 pass).
