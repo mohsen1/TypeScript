@@ -16966,3 +16966,199 @@ class UserService {
         output
     );
 }
+
+/// Parity test for ES5 for-await-of with async generators.
+/// Async generators with for-await-of should be transformed properly.
+#[test]
+fn test_parity_es5_for_await_of_async_generator() {
+    let source = r#"async function* asyncRange(start: number, end: number): AsyncGenerator<number> {
+    for (let i = start; i <= end; i++) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        yield i;
+    }
+}
+
+async function consumeRange(): Promise<number[]> {
+    const results: number[] = [];
+    for await (const num of asyncRange(1, 5)) {
+        results.push(num);
+    }
+    return results;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions should be present
+    assert!(
+        output.contains("asyncRange") && output.contains("consumeRange"),
+        "Output should contain functions: {}",
+        output
+    );
+    // Should have async helpers
+    assert!(
+        output.contains("__awaiter") || output.contains("__asyncGenerator"),
+        "ES5 output should use async helpers: {}",
+        output
+    );
+    // No async function* syntax
+    assert!(
+        !output.contains("async function*"),
+        "ES5 output should not contain async function* syntax: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number") && !output.contains(": AsyncGenerator") && !output.contains(": Promise"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 async iterator protocol.
+/// Custom async iterators implementing Symbol.asyncIterator.
+#[test]
+fn test_parity_es5_async_iterator_protocol() {
+    let source = r#"class AsyncQueue<T> {
+    private items: T[] = [];
+
+    async *[Symbol.asyncIterator](): AsyncGenerator<T> {
+        while (this.items.length > 0) {
+            yield this.items.shift()!;
+        }
+    }
+
+    enqueue(item: T): void {
+        this.items.push(item);
+    }
+}
+
+async function processQueue(): Promise<void> {
+    const queue = new AsyncQueue<string>();
+    queue.enqueue("first");
+    queue.enqueue("second");
+
+    for await (const item of queue) {
+        console.log(item);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Class and function should be present
+    assert!(
+        output.contains("AsyncQueue") && output.contains("processQueue"),
+        "Output should contain class and function: {}",
+        output
+    );
+    // Should reference Symbol.asyncIterator
+    assert!(
+        output.contains("Symbol.asyncIterator"),
+        "Output should reference Symbol.asyncIterator: {}",
+        output
+    );
+    // Type parameters should be erased
+    assert!(
+        !output.contains("<T>") && !output.contains("<string>"),
+        "Type parameters should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 Symbol.asyncIterator implementation.
+/// Object implementing async iterable interface.
+#[test]
+fn test_parity_es5_symbol_async_iterator() {
+    let source = r#"const asyncIterable = {
+    data: [1, 2, 3, 4, 5],
+    [Symbol.asyncIterator](): AsyncIterator<number> {
+        let index = 0;
+        const data = this.data;
+        return {
+            async next(): Promise<IteratorResult<number>> {
+                if (index < data.length) {
+                    return { value: data[index++], done: false };
+                }
+                return { value: undefined, done: true };
+            }
+        };
+    }
+};
+
+async function iterate(): Promise<void> {
+    for await (const num of asyncIterable) {
+        console.log(num);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Variables and function should be present
+    assert!(
+        output.contains("asyncIterable") && output.contains("iterate"),
+        "Output should contain variable and function: {}",
+        output
+    );
+    // Should reference Symbol.asyncIterator
+    assert!(
+        output.contains("Symbol.asyncIterator"),
+        "Output should reference Symbol.asyncIterator: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": AsyncIterator") && !output.contains(": Promise<IteratorResult"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
