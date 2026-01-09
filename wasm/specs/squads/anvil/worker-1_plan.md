@@ -6,12 +6,13 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-- [ ] Add ES5 tests for Iterator/Iterable patterns (custom iterators, Symbol.iterator implementations, for-of with iterators, iterable class patterns) in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
+- [ ] (empty - awaiting next task)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 tests for Iterator/Iterable patterns (6 tests): custom iterator basic, iterable class pattern, iterator with state, for-of with iterator, in constructor, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 304 pass).
 - [x] Added ES5 tests for Map/Set patterns (6 tests): Map basic operations, Set basic operations, Map iteration pattern, Set operations pattern, in constructor, EventBus pattern. Ran `./wasm/test.sh class_es5_tests` (all 298 pass).
 - [x] Added ES5 tests for WeakMap/WeakSet patterns (6 tests): WeakMap cache pattern, WeakSet membership pattern, WeakMap metadata pattern, WeakSet visited pattern, in constructor, combined. Ran `./wasm/test.sh class_es5_tests` (all 293 pass).
 - [x] Added ES5 tests for Object.getOwnPropertyNames/getOwnPropertySymbols patterns (6 tests): getOwnPropertyNames basic, getOwnPropertySymbols basic, get all property keys, property reflection, in constructor, combined. Ran `./wasm/test.sh class_es5_tests` (all 288 pass).
