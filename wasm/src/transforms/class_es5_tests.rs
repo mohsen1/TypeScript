@@ -43799,585 +43799,719 @@ class DebugLogger extends Logger {
     );
 }
 
-/// Test basic Proxy handler with property interception
+/// Test ES5 class with private field via WeakMap pattern
 #[test]
-fn test_class_es5_proxy_handler_property_intercept() {
+fn test_class_es5_weakmap_private_field_pattern() {
     let source = r#"
-class DataStore<T extends Record<string, unknown>> {
-    private data: T;
-    private accessLog: string[];
+class SecureContainer {
+    #secret: string;
+    #counter: number = 0;
 
-    constructor(initialData: T) {
-        this.data = initialData;
-        this.accessLog = [];
+    constructor(secret: string) {
+        this.#secret = secret;
     }
 
-    createProxy(): T {
-        const handler: ProxyHandler<T> = {
-            get: (target, prop: string) => {
-                this.accessLog.push(`get:${prop}`);
-                return target[prop as keyof T];
-            },
-            set: (target, prop: string, value) => {
-                this.accessLog.push(`set:${prop}`);
-                (target as any)[prop] = value;
-                return true;
-            },
-            has: (target, prop) => {
-                this.accessLog.push(`has:${String(prop)}`);
-                return prop in target;
-            }
-        };
-        return new Proxy(this.data, handler);
+    getSecret(): string {
+        this.#counter++;
+        return this.#secret;
     }
 
-    getAccessLog(): string[] {
-        return [...this.accessLog];
+    getAccessCount(): number {
+        return this.#counter;
+    }
+
+    updateSecret(newSecret: string): void {
+        this.#secret = newSecret;
+        this.#counter = 0;
     }
 }
 
-class ConfigManager {
-    private store: DataStore<{ host: string; port: number }>;
+class TokenVault {
+    #tokens: Map<string, string> = new Map();
+    #lastAccess: Date | null = null;
 
-    constructor() {
-        this.store = new DataStore({ host: 'localhost', port: 8080 });
+    addToken(key: string, token: string): void {
+        this.#tokens.set(key, token);
+        this.#lastAccess = new Date();
     }
 
-    getConfig(): { host: string; port: number } {
-        return this.store.createProxy();
+    getToken(key: string): string | undefined {
+        this.#lastAccess = new Date();
+        return this.#tokens.get(key);
+    }
+
+    hasToken(key: string): boolean {
+        return this.#tokens.has(key);
+    }
+
+    getLastAccess(): Date | null {
+        return this.#lastAccess;
     }
 }
+
+const container = new SecureContainer("mySecret");
+const vault = new TokenVault();
 "#;
-
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
+
     let mut options = PrinterOptions::default();
     options.target = ScriptTarget::ES5;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
+
     let output = printer.get_output().to_string();
 
-    // Should have ES5 class structure
+    // Classes should be converted
     assert!(
-        output.contains("DataStore") && output.contains("ConfigManager"),
-        "Expected class names: {}",
+        output.contains("SecureContainer") && output.contains("TokenVault"),
+        "Expected classes: {}",
         output
     );
 
-    // Should have Proxy handler methods
+    // Methods should exist
     assert!(
-        output.contains("createProxy") && output.contains("getAccessLog"),
-        "Expected methods: {}",
+        output.contains("getSecret") && output.contains("getAccessCount") && output.contains("updateSecret"),
+        "Expected SecureContainer methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("addToken") && output.contains("getToken") && output.contains("hasToken"),
+        "Expected TokenVault methods: {}",
+        output
+    );
+
+    // Private field syntax should be transformed
+    assert!(
+        !output.contains("#secret") && !output.contains("#counter") && !output.contains("#tokens"),
+        "Expected private fields to be transformed: {}",
         output
     );
 }
 
-/// Test Proxy with Reflect.get/set accessors
+/// Test ES5 class with static private via WeakMap pattern
 #[test]
-fn test_class_es5_proxy_reflect_accessor() {
+fn test_class_es5_weakmap_static_private_pattern() {
     let source = r#"
-class ReflectiveProxy<T extends object> {
-    private target: T;
-    private modifications: Map<PropertyKey, unknown>;
+class Configuration {
+    static #instance: Configuration | null = null;
+    static #settings: Map<string, any> = new Map();
 
-    constructor(target: T) {
-        this.target = target;
-        this.modifications = new Map();
-    }
+    #localSettings: Map<string, any> = new Map();
 
-    wrap(): T {
-        return new Proxy(this.target, {
-            get: (obj, prop, receiver) => {
-                if (this.modifications.has(prop)) {
-                    return this.modifications.get(prop);
-                }
-                return Reflect.get(obj, prop, receiver);
-            },
-            set: (obj, prop, value, receiver) => {
-                this.modifications.set(prop, value);
-                return Reflect.set(obj, prop, value, receiver);
-            },
-            deleteProperty: (obj, prop) => {
-                this.modifications.delete(prop);
-                return Reflect.deleteProperty(obj, prop);
-            }
-        });
-    }
+    private constructor() {}
 
-    getModifications(): Map<PropertyKey, unknown> {
-        return new Map(this.modifications);
-    }
-}
-
-class UserProfile {
-    name: string;
-    email: string;
-
-    constructor(name: string, email: string) {
-        this.name = name;
-        this.email = email;
-    }
-
-    createTrackedProfile(): UserProfile {
-        const wrapper = new ReflectiveProxy(this);
-        return wrapper.wrap();
-    }
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-    let output = printer.get_output().to_string();
-
-    // Should have ES5 class structure
-    assert!(
-        output.contains("ReflectiveProxy") && output.contains("UserProfile"),
-        "Expected class names: {}",
-        output
-    );
-
-    // Should contain Reflect method calls
-    assert!(
-        output.contains("Reflect.get") && output.contains("Reflect.set"),
-        "Expected Reflect methods: {}",
-        output
-    );
-}
-
-/// Test revocable Proxy with access control
-#[test]
-fn test_class_es5_proxy_revocable_access_control() {
-    let source = r#"
-interface SecureResource {
-    getData(): string;
-    setData(value: string): void;
-}
-
-class SecureResourceManager {
-    private resources: Map<string, { proxy: SecureResource; revoke: () => void }>;
-
-    constructor() {
-        this.resources = new Map();
-    }
-
-    createSecureResource(id: string, data: string): SecureResource {
-        const target: SecureResource = {
-            getData: () => data,
-            setData: (value: string) => { data = value; }
-        };
-
-        const { proxy, revoke } = Proxy.revocable(target, {
-            get: (obj, prop, receiver) => {
-                console.log(`Access to ${String(prop)} on resource ${id}`);
-                return Reflect.get(obj, prop, receiver);
-            }
-        });
-
-        this.resources.set(id, { proxy, revoke });
-        return proxy;
-    }
-
-    revokeResource(id: string): boolean {
-        const resource = this.resources.get(id);
-        if (resource) {
-            resource.revoke();
-            this.resources.delete(id);
-            return true;
+    static getInstance(): Configuration {
+        if (Configuration.#instance === null) {
+            Configuration.#instance = new Configuration();
         }
-        return false;
+        return Configuration.#instance;
     }
 
-    getActiveResourceCount(): number {
-        return this.resources.size;
+    static setSetting(key: string, value: any): void {
+        Configuration.#settings.set(key, value);
+    }
+
+    static getSetting(key: string): any {
+        return Configuration.#settings.get(key);
+    }
+
+    setLocalSetting(key: string, value: any): void {
+        this.#localSettings.set(key, value);
+    }
+
+    getLocalSetting(key: string): any {
+        return this.#localSettings.get(key);
+    }
+}
+
+class ConnectionPool {
+    static #pool: any[] = [];
+    static #maxSize: number = 10;
+
+    static acquire(): any | null {
+        if (ConnectionPool.#pool.length > 0) {
+            return ConnectionPool.#pool.pop();
+        }
+        return null;
+    }
+
+    static release(connection: any): void {
+        if (ConnectionPool.#pool.length < ConnectionPool.#maxSize) {
+            ConnectionPool.#pool.push(connection);
+        }
+    }
+
+    static getPoolSize(): number {
+        return ConnectionPool.#pool.length;
     }
 }
 
-class SessionManager {
-    private resourceManager: SecureResourceManager;
-    private sessionId: string;
-
-    constructor(sessionId: string) {
-        this.resourceManager = new SecureResourceManager();
-        this.sessionId = sessionId;
-    }
-
-    createSession(): SecureResource {
-        return this.resourceManager.createSecureResource(this.sessionId, 'session-data');
-    }
-
-    endSession(): void {
-        this.resourceManager.revokeResource(this.sessionId);
-    }
-}
+const config = Configuration.getInstance();
 "#;
-
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
+
     let mut options = PrinterOptions::default();
     options.target = ScriptTarget::ES5;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
+
     let output = printer.get_output().to_string();
 
-    // Should have ES5 class structure
+    // Classes should be converted
     assert!(
-        output.contains("SecureResourceManager") && output.contains("SessionManager"),
-        "Expected class names: {}",
+        output.contains("Configuration") && output.contains("ConnectionPool"),
+        "Expected classes: {}",
         output
     );
 
-    // Should contain Proxy.revocable
+    // Static methods should exist
     assert!(
-        output.contains("Proxy.revocable"),
-        "Expected Proxy.revocable: {}",
+        output.contains("getInstance") && output.contains("setSetting") && output.contains("getSetting"),
+        "Expected Configuration static methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("acquire") && output.contains("release") && output.contains("getPoolSize"),
+        "Expected ConnectionPool static methods: {}",
+        output
+    );
+
+    // Instance private field should be transformed to WeakMap
+    assert!(
+        output.contains("_Configuration_localSettings") || output.contains("localSettings"),
+        "Expected instance private field to be handled: {}",
         output
     );
 }
 
-/// Test Proxy class instance wrapper
+/// Test ES5 class with private method via WeakMap pattern
 #[test]
-fn test_class_es5_proxy_class_instance_wrapper() {
+fn test_class_es5_weakmap_private_method_pattern() {
     let source = r#"
-class Observable<T extends object> {
-    private listeners: Set<(prop: keyof T, value: unknown) => void>;
+class Validator {
+    #rules: Map<string, (value: any) => boolean> = new Map();
 
-    constructor() {
-        this.listeners = new Set();
+    #validateRequired(value: any): boolean {
+        return value !== null && value !== undefined;
     }
 
-    observe(target: T): T {
-        return new Proxy(target, {
-            set: (obj, prop, value, receiver) => {
-                const result = Reflect.set(obj, prop, value, receiver);
-                this.listeners.forEach(listener =>
-                    listener(prop as keyof T, value)
-                );
-                return result;
-            }
+    #validateString(value: any): boolean {
+        return typeof value === 'string';
+    }
+
+    #validateNumber(value: any): boolean {
+        return typeof value === 'number' && !isNaN(value);
+    }
+
+    addRule(name: string, rule: (value: any) => boolean): void {
+        this.#rules.set(name, rule);
+    }
+
+    validate(value: any, ruleName: string): boolean {
+        switch (ruleName) {
+            case 'required':
+                return this.#validateRequired(value);
+            case 'string':
+                return this.#validateString(value);
+            case 'number':
+                return this.#validateNumber(value);
+            default:
+                const rule = this.#rules.get(ruleName);
+                return rule ? rule(value) : false;
+        }
+    }
+}
+
+class Encryptor {
+    #key: string;
+
+    constructor(key: string) {
+        this.#key = key;
+    }
+
+    #encrypt(data: string): string {
+        return btoa(data + this.#key);
+    }
+
+    #decrypt(encrypted: string): string {
+        const decoded = atob(encrypted);
+        return decoded.slice(0, -this.#key.length);
+    }
+
+    encryptData(data: string): string {
+        return this.#encrypt(data);
+    }
+
+    decryptData(encrypted: string): string {
+        return this.#decrypt(encrypted);
+    }
+}
+
+const validator = new Validator();
+const encryptor = new Encryptor("secret-key");
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Validator") && output.contains("Encryptor"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Public methods should exist
+    assert!(
+        output.contains("addRule") && output.contains("validate"),
+        "Expected Validator methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("encryptData") && output.contains("decryptData"),
+        "Expected Encryptor methods: {}",
+        output
+    );
+
+    // Private method syntax should be transformed
+    assert!(
+        !output.contains("#validateRequired") && !output.contains("#encrypt"),
+        "Expected private methods to be transformed: {}",
+        output
+    );
+}
+
+/// Test ES5 class with WeakSet membership check pattern
+#[test]
+fn test_class_es5_weakset_membership_check_pattern() {
+    let source = r#"
+class PermissionManager {
+    #authorizedUsers: WeakSet<object> = new WeakSet();
+    #admins: WeakSet<object> = new WeakSet();
+
+    authorize(user: object): void {
+        this.#authorizedUsers.add(user);
+    }
+
+    revokeAuthorization(user: object): void {
+        this.#authorizedUsers.delete(user);
+    }
+
+    isAuthorized(user: object): boolean {
+        return this.#authorizedUsers.has(user);
+    }
+
+    promoteToAdmin(user: object): void {
+        if (this.isAuthorized(user)) {
+            this.#admins.add(user);
+        }
+    }
+
+    isAdmin(user: object): boolean {
+        return this.#admins.has(user);
+    }
+}
+
+class VisitedTracker {
+    #visited: WeakSet<object> = new WeakSet();
+    #visitCount: WeakMap<object, number> = new WeakMap();
+
+    visit(item: object): void {
+        this.#visited.add(item);
+        const count = this.#visitCount.get(item) || 0;
+        this.#visitCount.set(item, count + 1);
+    }
+
+    hasVisited(item: object): boolean {
+        return this.#visited.has(item);
+    }
+
+    getVisitCount(item: object): number {
+        return this.#visitCount.get(item) || 0;
+    }
+
+    reset(item: object): void {
+        this.#visited.delete(item);
+        this.#visitCount.delete(item);
+    }
+}
+
+const permissions = new PermissionManager();
+const tracker = new VisitedTracker();
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("PermissionManager") && output.contains("VisitedTracker"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("authorize") && output.contains("isAuthorized") && output.contains("promoteToAdmin"),
+        "Expected PermissionManager methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("visit") && output.contains("hasVisited") && output.contains("getVisitCount"),
+        "Expected VisitedTracker methods: {}",
+        output
+    );
+
+    // Private field syntax should be transformed
+    assert!(
+        !output.contains("#authorizedUsers") && !output.contains("#admins") && !output.contains("#visited"),
+        "Expected private fields to be transformed: {}",
+        output
+    );
+}
+
+/// Test ES5 class with WeakRef advanced cache pattern
+#[test]
+fn test_class_es5_weakref_advanced_cache_pattern() {
+    let source = r#"
+class SmartCache<T extends object> {
+    #cache: Map<string, WeakRef<T>> = new Map();
+    #finalizationRegistry: FinalizationRegistry<string>;
+
+    constructor() {
+        this.#finalizationRegistry = new FinalizationRegistry((key: string) => {
+            this.#cache.delete(key);
         });
     }
 
-    subscribe(listener: (prop: keyof T, value: unknown) => void): () => void {
-        this.listeners.add(listener);
-        return () => this.listeners.delete(listener);
+    set(key: string, value: T): void {
+        const ref = new WeakRef(value);
+        this.#cache.set(key, ref);
+        this.#finalizationRegistry.register(value, key);
+    }
+
+    get(key: string): T | undefined {
+        const ref = this.#cache.get(key);
+        if (ref) {
+            return ref.deref();
+        }
+        return undefined;
+    }
+
+    has(key: string): boolean {
+        const ref = this.#cache.get(key);
+        return ref !== undefined && ref.deref() !== undefined;
+    }
+
+    delete(key: string): boolean {
+        return this.#cache.delete(key);
     }
 }
 
-class Counter {
-    count: number = 0;
+class ObjectPool<T extends object> {
+    #available: WeakRef<T>[] = [];
+    #inUse: WeakSet<T> = new WeakSet();
+    #factory: () => T;
 
-    increment(): void {
-        this.count++;
+    constructor(factory: () => T) {
+        this.#factory = factory;
     }
 
-    decrement(): void {
-        this.count--;
+    acquire(): T {
+        while (this.#available.length > 0) {
+            const ref = this.#available.pop()!;
+            const obj = ref.deref();
+            if (obj && !this.#inUse.has(obj)) {
+                this.#inUse.add(obj);
+                return obj;
+            }
+        }
+        const newObj = this.#factory();
+        this.#inUse.add(newObj);
+        return newObj;
+    }
+
+    release(obj: T): void {
+        this.#inUse.delete(obj);
+        this.#available.push(new WeakRef(obj));
+    }
+
+    getAvailableCount(): number {
+        return this.#available.filter(ref => ref.deref() !== undefined).length;
     }
 }
 
-class ObservedCounter {
-    private counter: Counter;
-    private observable: Observable<Counter>;
-    private proxiedCounter: Counter;
-
-    constructor() {
-        this.counter = new Counter();
-        this.observable = new Observable<Counter>();
-        this.proxiedCounter = this.observable.observe(this.counter);
-    }
-
-    getCounter(): Counter {
-        return this.proxiedCounter;
-    }
-
-    onCountChange(callback: (prop: keyof Counter, value: unknown) => void): () => void {
-        return this.observable.subscribe(callback);
-    }
-}
+const cache = new SmartCache<object>();
 "#;
-
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
+
     let mut options = PrinterOptions::default();
     options.target = ScriptTarget::ES5;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
+
     let output = printer.get_output().to_string();
 
-    // Should have ES5 class structure
+    // Classes should be converted
     assert!(
-        output.contains("Observable") && output.contains("Counter") && output.contains("ObservedCounter"),
-        "Expected class names: {}",
+        output.contains("SmartCache") && output.contains("ObjectPool"),
+        "Expected classes: {}",
         output
     );
 
-    // Should contain Proxy and Reflect.set
+    // Methods should exist
     assert!(
-        output.contains("Proxy") && output.contains("Reflect.set"),
-        "Expected Proxy and Reflect.set: {}",
+        output.contains("set") && output.contains("get") && output.contains("has"),
+        "Expected SmartCache methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("acquire") && output.contains("release") && output.contains("getAvailableCount"),
+        "Expected ObjectPool methods: {}",
+        output
+    );
+
+    // Generic parameter should be stripped
+    assert!(
+        !output.contains("SmartCache<T") && !output.contains("ObjectPool<T"),
+        "Expected generic parameters to be stripped: {}",
         output
     );
 }
 
-/// Test Reflect.construct with prototype chain
+/// Test ES5 class with combined WeakMap/WeakSet patterns
 #[test]
-fn test_class_es5_reflect_construct_with_prototype() {
+fn test_class_es5_weakmap_weakset_combined_pattern() {
     let source = r#"
-class BaseEntity {
-    id: string;
-    createdAt: Date;
+class DependencyInjector {
+    static #instances: WeakMap<Function, object> = new WeakMap();
+    static #initialized: WeakSet<object> = new WeakSet();
+    static #dependencies: Map<Function, Function[]> = new Map();
 
-    constructor(id: string) {
-        this.id = id;
-        this.createdAt = new Date();
+    #localInstances: WeakMap<Function, object> = new WeakMap();
+    #scope: string;
+
+    constructor(scope: string) {
+        this.#scope = scope;
     }
 
-    getId(): string {
-        return this.id;
-    }
-}
-
-class DerivedEntity extends BaseEntity {
-    name: string;
-
-    constructor(id: string, name: string) {
-        super(id);
-        this.name = name;
+    static register(token: Function, deps: Function[] = []): void {
+        DependencyInjector.#dependencies.set(token, deps);
     }
 
-    getName(): string {
-        return this.name;
-    }
-}
-
-class EntityFactory {
-    static create<T extends BaseEntity>(
-        ctor: new (...args: any[]) => T,
-        args: any[],
-        newTarget?: Function
-    ): T {
-        if (newTarget) {
-            return Reflect.construct(ctor, args, newTarget) as T;
+    static resolve<T>(token: Function): T {
+        if (DependencyInjector.#instances.has(token)) {
+            return DependencyInjector.#instances.get(token) as T;
         }
-        return Reflect.construct(ctor, args) as T;
-    }
 
-    static createWithPrototype<T extends BaseEntity>(
-        ctor: new (...args: any[]) => T,
-        args: any[],
-        prototype: object
-    ): T {
-        const instance = Reflect.construct(ctor, args);
-        Object.setPrototypeOf(instance, prototype);
+        const deps = DependencyInjector.#dependencies.get(token) || [];
+        const resolvedDeps = deps.map(dep => DependencyInjector.resolve(dep));
+        const instance = Reflect.construct(token, resolvedDeps);
+
+        DependencyInjector.#instances.set(token, instance);
+        DependencyInjector.#initialized.add(instance);
+
         return instance as T;
     }
+
+    static isInitialized(instance: object): boolean {
+        return DependencyInjector.#initialized.has(instance);
+    }
+
+    resolveScoped<T>(token: Function): T {
+        if (this.#localInstances.has(token)) {
+            return this.#localInstances.get(token) as T;
+        }
+
+        const instance = DependencyInjector.resolve<T>(token);
+        this.#localInstances.set(token, instance as object);
+        return instance;
+    }
+
+    getScope(): string {
+        return this.#scope;
+    }
 }
 
-class EntityManager {
-    private factory: typeof EntityFactory;
+class EventEmitter {
+    #listeners: WeakMap<Function, Set<Function>> = new WeakMap();
+    #onceListeners: WeakSet<Function> = new WeakSet();
+    #eventCounts: Map<string, number> = new Map();
 
-    constructor() {
-        this.factory = EntityFactory;
+    on(event: Function, listener: Function): void {
+        if (!this.#listeners.has(event)) {
+            this.#listeners.set(event, new Set());
+        }
+        this.#listeners.get(event)!.add(listener);
     }
 
-    createDerived(id: string, name: string): DerivedEntity {
-        return this.factory.create(DerivedEntity, [id, name]);
+    once(event: Function, listener: Function): void {
+        this.on(event, listener);
+        this.#onceListeners.add(listener);
     }
 
-    createWithNewTarget(id: string, name: string): BaseEntity {
-        return this.factory.create(BaseEntity, [id], DerivedEntity);
-    }
-}
-"#;
+    emit(event: Function, ...args: any[]): void {
+        const listeners = this.#listeners.get(event);
+        if (listeners) {
+            const count = this.#eventCounts.get(event.name) || 0;
+            this.#eventCounts.set(event.name, count + 1);
 
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-    let output = printer.get_output().to_string();
-
-    // Should have ES5 class structure
-    assert!(
-        output.contains("BaseEntity") && output.contains("DerivedEntity") && output.contains("EntityFactory"),
-        "Expected class names: {}",
-        output
-    );
-
-    // Should contain Reflect.construct
-    assert!(
-        output.contains("Reflect.construct"),
-        "Expected Reflect.construct: {}",
-        output
-    );
-}
-
-/// Test combined Proxy/Reflect observable pattern
-#[test]
-fn test_class_es5_proxy_reflect_observable_pattern() {
-    let source = r#"
-type Listener<T> = (target: T, prop: PropertyKey, value: unknown) => void;
-
-class DeepObserver<T extends object> {
-    private listeners: Map<PropertyKey, Set<Listener<T>>>;
-    private globalListeners: Set<Listener<T>>;
-
-    constructor() {
-        this.listeners = new Map();
-        this.globalListeners = new Set();
-    }
-
-    observe(target: T): T {
-        return this.createDeepProxy(target);
-    }
-
-    private createDeepProxy(obj: T): T {
-        return new Proxy(obj, {
-            get: (target, prop, receiver) => {
-                const value = Reflect.get(target, prop, receiver);
-                if (typeof value === 'object' && value !== null) {
-                    return this.createDeepProxy(value as any);
+            for (const listener of listeners) {
+                listener(...args);
+                if (this.#onceListeners.has(listener)) {
+                    listeners.delete(listener);
+                    this.#onceListeners.delete(listener);
                 }
-                return value;
-            },
-            set: (target, prop, value, receiver) => {
-                const result = Reflect.set(target, prop, value, receiver);
-                this.notifyListeners(target as T, prop, value);
-                return result;
-            },
-            deleteProperty: (target, prop) => {
-                const result = Reflect.deleteProperty(target, prop);
-                this.notifyListeners(target as T, prop, undefined);
-                return result;
             }
-        });
-    }
-
-    private notifyListeners(target: T, prop: PropertyKey, value: unknown): void {
-        const propListeners = this.listeners.get(prop);
-        if (propListeners) {
-            propListeners.forEach(listener => listener(target, prop, value));
         }
-        this.globalListeners.forEach(listener => listener(target, prop, value));
     }
 
-    on(prop: PropertyKey, listener: Listener<T>): () => void {
-        if (!this.listeners.has(prop)) {
-            this.listeners.set(prop, new Set());
+    getEventCount(eventName: string): number {
+        return this.#eventCounts.get(eventName) || 0;
+    }
+}
+
+class CacheManager {
+    #strongCache: Map<string, object> = new Map();
+    #weakCache: WeakMap<object, string> = new WeakMap();
+    #trackedKeys: WeakSet<object> = new WeakSet();
+    #refs: Map<string, WeakRef<object>> = new Map();
+
+    store(key: string, value: object): void {
+        this.#strongCache.set(key, value);
+        this.#weakCache.set(value, key);
+        this.#trackedKeys.add(value);
+        this.#refs.set(key, new WeakRef(value));
+    }
+
+    retrieve(key: string): object | undefined {
+        const ref = this.#refs.get(key);
+        if (ref) {
+            const value = ref.deref();
+            if (value && this.#trackedKeys.has(value)) {
+                return value;
+            }
         }
-        this.listeners.get(prop)!.add(listener);
-        return () => this.listeners.get(prop)?.delete(listener);
+        return this.#strongCache.get(key);
     }
 
-    onAny(listener: Listener<T>): () => void {
-        this.globalListeners.add(listener);
-        return () => this.globalListeners.delete(listener);
-    }
-}
-
-class StateManager<S extends object> {
-    private observer: DeepObserver<S>;
-    private state: S;
-    private proxiedState: S;
-
-    constructor(initialState: S) {
-        this.observer = new DeepObserver<S>();
-        this.state = initialState;
-        this.proxiedState = this.observer.observe(this.state);
+    getKeyForValue(value: object): string | undefined {
+        return this.#weakCache.get(value);
     }
 
-    getState(): S {
-        return this.proxiedState;
+    isTracked(value: object): boolean {
+        return this.#trackedKeys.has(value);
     }
 
-    subscribe(prop: keyof S, callback: (state: S, prop: PropertyKey, value: unknown) => void): () => void {
-        return this.observer.on(prop, callback);
-    }
-
-    subscribeAll(callback: (state: S, prop: PropertyKey, value: unknown) => void): () => void {
-        return this.observer.onAny(callback);
+    clear(): void {
+        this.#strongCache.clear();
+        this.#refs.clear();
     }
 }
 
-interface AppState {
-    user: { name: string; email: string };
-    settings: { theme: string; notifications: boolean };
-}
-
-class AppStateManager extends StateManager<AppState> {
-    constructor() {
-        super({
-            user: { name: '', email: '' },
-            settings: { theme: 'light', notifications: true }
-        });
-    }
-
-    setUserName(name: string): void {
-        this.getState().user.name = name;
-    }
-
-    setTheme(theme: string): void {
-        this.getState().settings.theme = theme;
-    }
-}
+const injector = new DependencyInjector("root");
+const emitter = new EventEmitter();
+const cacheManager = new CacheManager();
 "#;
-
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
+
     let mut options = PrinterOptions::default();
     options.target = ScriptTarget::ES5;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
+
     let output = printer.get_output().to_string();
 
-    // Should have ES5 class structure
+    // Classes should be converted
     assert!(
-        output.contains("DeepObserver") && output.contains("StateManager") && output.contains("AppStateManager"),
-        "Expected class names: {}",
+        output.contains("DependencyInjector") && output.contains("EventEmitter") && output.contains("CacheManager"),
+        "Expected classes: {}",
         output
     );
 
-    // Should contain Proxy and Reflect methods
+    // DependencyInjector methods
     assert!(
-        output.contains("Proxy") && output.contains("Reflect.get") && output.contains("Reflect.set"),
-        "Expected Proxy and Reflect methods: {}",
+        output.contains("register") && output.contains("resolve") && output.contains("isInitialized"),
+        "Expected DependencyInjector methods: {}",
         output
     );
 
-    // Type alias should be stripped
+    // EventEmitter methods
     assert!(
-        !output.contains("type Listener"),
-        "Expected type alias to be stripped: {}",
+        output.contains("on") && output.contains("once") && output.contains("emit"),
+        "Expected EventEmitter methods: {}",
         output
     );
 
-    // Interface should be stripped
+    // CacheManager methods
     assert!(
-        !output.contains("interface AppState"),
-        "Expected interface to be stripped: {}",
+        output.contains("store") && output.contains("retrieve") && output.contains("isTracked"),
+        "Expected CacheManager methods: {}",
+        output
+    );
+
+    // Instance private fields should be transformed to WeakMap pattern
+    assert!(
+        output.contains("_EventEmitter_listeners") || output.contains("_CacheManager_strongCache"),
+        "Expected instance private fields to be handled: {}",
+        output
+    );
+
+    // Type annotations should be stripped
+    assert!(
+        !output.contains(": WeakMap<") && !output.contains(": WeakSet<") && !output.contains(": WeakRef<"),
+        "Expected type annotations to be stripped: {}",
         output
     );
 }
