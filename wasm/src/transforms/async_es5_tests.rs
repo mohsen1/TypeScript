@@ -11753,3 +11753,104 @@ fn test_async_queue_ops_ignores_nested_async() {
     );
     assert!(!result, "Should not detect await inside nested async in queue function");
 }
+
+// ============================================================================
+// ASYNC TIMEOUT PATTERN TESTS
+// Tests for timeout patterns: timeout, deadline, cancel
+// ============================================================================
+
+#[test]
+fn test_async_timeout_basic() {
+    let result = async_error_propagation_contains_await(
+        "async function withTimeout() { return await timeout(operation, 5000); }",
+    );
+    assert!(result, "Should detect await in basic timeout");
+}
+
+#[test]
+fn test_async_timeout_deadline() {
+    let result = async_error_propagation_contains_await(
+        "async function withDeadline() { return await deadline(operation, Date.now() + 5000); }",
+    );
+    assert!(result, "Should detect await in deadline pattern");
+}
+
+#[test]
+fn test_async_timeout_cancel() {
+    let result = async_error_propagation_contains_await(
+        "async function cancelTimeout() { await timeoutHandle.cancel(); }",
+    );
+    assert!(result, "Should detect await in cancel timeout");
+}
+
+#[test]
+fn test_async_timeout_race() {
+    let result = async_error_propagation_contains_await(
+        "async function raceTimeout() { return await Promise.race([operation(), timeoutPromise]); }",
+    );
+    assert!(result, "Should detect await in race against timeout");
+}
+
+#[test]
+fn test_async_timeout_abort() {
+    let result = async_error_propagation_contains_await(
+        "async function abortOnTimeout() { return await abortableOperation(signal); }",
+    );
+    assert!(result, "Should detect await in abort on timeout");
+}
+
+#[test]
+fn test_async_timeout_extend() {
+    let result = async_error_propagation_contains_await(
+        "async function extendTimeout() { await timer.extend(1000); }",
+    );
+    assert!(result, "Should detect await in extend timeout");
+}
+
+#[test]
+fn test_async_timeout_remaining() {
+    let result = async_error_propagation_contains_await(
+        "async function getRemaining() { return await timer.remaining(); }",
+    );
+    assert!(result, "Should detect await in get remaining time");
+}
+
+#[test]
+fn test_async_timeout_expired() {
+    let result = async_error_propagation_contains_await(
+        "async function checkExpired() { return await timer.isExpired(); }",
+    );
+    assert!(result, "Should detect await in check if expired");
+}
+
+#[test]
+fn test_async_timeout_reset() {
+    let result = async_error_propagation_contains_await(
+        "async function resetTimeout() { await timer.reset(); }",
+    );
+    assert!(result, "Should detect await in reset timeout");
+}
+
+#[test]
+fn test_async_timeout_clear() {
+    let result = async_error_propagation_contains_await(
+        "async function clearTimeout() { await timer.clear(); }",
+    );
+    assert!(result, "Should detect await in clear timeout");
+}
+
+#[test]
+fn test_async_timeout_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function syncTimeout() { return timer.getDuration(); }",
+    );
+    assert!(!result, "Should not detect await when timeout access is sync");
+}
+
+#[test]
+fn test_async_timeout_ignores_nested_async() {
+    let result = async_error_propagation_contains_await(
+        "async function outer() { const handler = async () => await timeout(op, 1000); }",
+    );
+    assert!(!result, "Should not detect await inside nested async in timeout function");
+}
