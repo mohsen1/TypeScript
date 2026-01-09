@@ -7,12 +7,13 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- [ ] Add async ES5 tests for async decorator patterns: async method decorators, async class decorators, async property decorators, decorator composition with async. Tests: `./wasm/test.sh async_es5_tests`
+None - awaiting next task
 
 ## Task Queue
 - [ ] Add async ES5 tests for async module patterns: dynamic import with await, top-level await simulation
 
 ## Completed
+- [x] Added 12 async decorator pattern tests (method basic, method multiple, method with params, static method, class with async method, property initializer, accessor simulation, composition, factory, validation, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (616 tests PASS).
 - [x] Added 12 async class pattern tests (constructor simulation, static init, factory method, singleton, dependency injection, lifecycle init, lifecycle destroy, builder, repository, service layer, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (604 tests PASS).
 - [x] Added 12 async iteration pattern tests (for-of await body, await expression, async generator, break, continue, nested, destructure, array destructure, try/catch, return, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (592 tests PASS).
 - [x] Added 12 async error handling pattern tests (try/catch basic, try/finally basic, try/catch/finally, await in catch, await in finally, nested try, rethrow, rethrow wrapped, finally with return, promise reject, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (580 tests PASS).
