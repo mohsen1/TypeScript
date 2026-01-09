@@ -116,6 +116,9 @@ pub struct CheckerContext<'a> {
     /// Cached types for symbols.
     pub symbol_types: FxHashMap<SymbolId, TypeId>,
 
+    /// Cached types for variable declarations (used for TS2403 checks).
+    pub var_decl_types: FxHashMap<SymbolId, TypeId>,
+
     /// Cached types for nodes.
     pub node_types: FxHashMap<u32, TypeId>,
 
@@ -208,6 +211,7 @@ impl<'a> CheckerContext<'a> {
             file_name,
             no_implicit_any: true,
             symbol_types: FxHashMap::default(),
+            var_decl_types: FxHashMap::default(),
             node_types: FxHashMap::default(),
             type_parameter_names: FxHashMap::default(),
             relation_cache: RefCell::new(FxHashMap::default()),
@@ -247,6 +251,7 @@ impl<'a> CheckerContext<'a> {
             file_name,
             no_implicit_any: true,
             symbol_types: cache.symbol_types,
+            var_decl_types: FxHashMap::default(),
             node_types: cache.node_types,
             type_parameter_names: cache.type_parameter_names,
             relation_cache: RefCell::new(cache.relation_cache),

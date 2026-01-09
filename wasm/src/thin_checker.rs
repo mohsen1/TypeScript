@@ -7516,13 +7516,17 @@ impl<'a> ThinCheckerState<'a> {
             // Check for variable redeclaration in the current scope (TS2403).
             // Note: This applies specifically to 'var' merging where types must match.
             // let/const duplicates are caught earlier by the binder (TS2451).
-            if let Some(prev_type) = self.ctx.symbol_types.get(&sym_id).copied() {
+            if let Some(prev_type) = self.ctx.var_decl_types.get(&sym_id).copied() {
                 if let Some(ref name) = var_name {
                     if !self.are_types_identical(final_type, prev_type) {
                         self.error_subsequent_variable_declaration(name, prev_type, final_type, decl_idx);
                     }
                 }
             } else {
+                self.ctx.var_decl_types.insert(sym_id, final_type);
+            }
+
+            if !self.ctx.symbol_types.contains_key(&sym_id) {
                 self.cache_symbol_type(sym_id, final_type);
             }
         } else {
