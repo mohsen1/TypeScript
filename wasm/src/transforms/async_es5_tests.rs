@@ -13765,3 +13765,53 @@ fn test_async_methchain_combined() {
     );
     assert!(result, "Should detect await in combined async chain patterns");
 }
+
+// ASYNC DISPOSABLE PATTERN TESTS
+
+#[test]
+fn test_async_disposepat_basic() {
+    let result = async_error_propagation_contains_await(
+        "async function cleanup() { return await resource.dispose(); }",
+    );
+    assert!(result, "Should detect await in basic async dispose");
+}
+
+#[test]
+fn test_async_disposepat_using() {
+    let result = async_error_propagation_contains_await(
+        "async function use() { return await getResource(); }",
+    );
+    assert!(result, "Should detect await in async using declaration");
+}
+
+#[test]
+fn test_async_disposepat_stack() {
+    let result = async_error_propagation_contains_await(
+        "async function manage() { await stack.use(r1); await stack.use(r2); return await stack.dispose(); }",
+    );
+    assert!(result, "Should detect await in async disposable stack");
+}
+
+#[test]
+fn test_async_disposepat_error() {
+    let result = async_error_propagation_contains_await(
+        "async function cleanup() { try { return await resource.dispose(); } catch (e) { console.error(e); } }",
+    );
+    assert!(result, "Should detect await in async disposal with error");
+}
+
+#[test]
+fn test_async_disposepat_symbol() {
+    let result = async_error_propagation_contains_await(
+        "async function dispose() { return await obj[Symbol.asyncDispose](); }",
+    );
+    assert!(result, "Should detect await in async Symbol.asyncDispose");
+}
+
+#[test]
+fn test_async_disposepat_combined() {
+    let result = async_error_propagation_contains_await(
+        "async function manage() { try { await init(); return await cleanup(); } finally { await dispose(); } }",
+    );
+    assert!(result, "Should detect await in combined async disposable patterns");
+}
