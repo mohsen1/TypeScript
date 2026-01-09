@@ -9382,3 +9382,427 @@ class Config<T> {
         output
     );
 }
+
+#[test]
+fn test_parity_es5_spread_method_call() {
+    let source = r#"
+class Logger {
+    log(...args: any[]): void {
+        console.log(...args);
+    }
+}
+
+const logger = new Logger();
+const messages: string[] = ["hello", "world"];
+logger.log(...messages);
+
+class Math {
+    static max(...nums: number[]): number {
+        return Math.max(...nums);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the class
+    assert!(
+        output.contains("Logger"),
+        "Output should contain Logger class: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": any[]") && !output.contains(": void") && !output.contains(": string[]"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_spread_typed_array() {
+    let source = r#"
+function sumNumbers(...nums: number[]): number {
+    return nums.reduce((a, b) => a + b, 0);
+}
+
+const numbers: number[] = [1, 2, 3];
+const moreNumbers: number[] = [4, 5, 6];
+const allNumbers: number[] = [...numbers, ...moreNumbers];
+
+function concat<T>(...arrays: T[][]): T[] {
+    return ([] as T[]).concat(...arrays);
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the functions
+    assert!(
+        output.contains("sumNumbers") && output.contains("concat"),
+        "Output should contain functions: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number[]") && !output.contains(": number") && !output.contains("<T>"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_spread_constructor() {
+    let source = r#"
+class Point {
+    constructor(public x: number, public y: number) {}
+}
+
+class Rectangle {
+    constructor(public width: number, public height: number, public label: string = "") {}
+}
+
+const coords: [number, number] = [10, 20];
+const point = new Point(...coords);
+
+const dimensions: [number, number, string] = [100, 200, "rect"];
+const rect = new Rectangle(...dimensions);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the classes
+    assert!(
+        output.contains("Point") && output.contains("Rectangle"),
+        "Output should contain classes: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number") && !output.contains(": string"),
+        "Type annotations should be erased: {}",
+        output
+    );
+    // Tuple types should be erased
+    assert!(
+        !output.contains(": [number, number]"),
+        "Tuple types should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_spread_nested() {
+    let source = r#"
+function outer(callback: (...args: any[]) => void): void {
+    const inner = (...innerArgs: any[]) => {
+        callback(...innerArgs);
+    };
+    inner(1, 2, 3);
+}
+
+class EventEmitter {
+    emit(event: string, ...args: any[]): void {
+        this.listeners.forEach(listener => listener(...args));
+    }
+    listeners: ((...args: any[]) => void)[] = [];
+}
+
+const spread = (arr: number[]) => [...arr, ...[...arr]];
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the functions and class
+    assert!(
+        output.contains("outer") && output.contains("EventEmitter"),
+        "Output should contain outer function and EventEmitter class: {}",
+        output
+    );
+    // Arrow syntax should be transformed
+    assert!(
+        !output.contains("=>"),
+        "Arrow syntax should be transformed: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": any[]") && !output.contains(": void") && !output.contains(": number[]"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_destructuring_computed() {
+    let source = r#"
+const key = "name";
+const obj: { name: string; age: number } = { name: "Alice", age: 30 };
+const { [key]: value } = obj;
+
+const propName = "id";
+interface User { id: number; name: string }
+const user: User = { id: 1, name: "Bob" };
+const { [propName]: userId, name: userName } = user;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the variables
+    assert!(
+        output.contains("key") && output.contains("obj") && output.contains("user"),
+        "Output should contain variables: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": { name:") && !output.contains(": User") && !output.contains("interface User"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_destructuring_return() {
+    let source = r#"
+function getCoords(): { x: number; y: number } {
+    return { x: 10, y: 20 };
+}
+
+const { x, y } = getCoords();
+
+function getPair(): [string, number] {
+    return ["hello", 42];
+}
+
+const [first, second] = getPair();
+
+class DataProvider {
+    getData(): { items: string[]; count: number } {
+        return { items: [], count: 0 };
+    }
+}
+
+const provider = new DataProvider();
+const { items, count } = provider.getData();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the functions
+    assert!(
+        output.contains("getCoords") && output.contains("getPair") && output.contains("DataProvider"),
+        "Output should contain functions: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": { x:") && !output.contains(": [string, number]") && !output.contains(": number"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_destructuring_rename() {
+    let source = r#"
+interface Person { firstName: string; lastName: string; age: number }
+const person: Person = { firstName: "John", lastName: "Doe", age: 25 };
+const { firstName: fName, lastName: lName, age: years } = person;
+
+const response: { data: string[]; error: Error | null } = { data: [], error: null };
+const { data: items, error: err } = response;
+
+function process({ input: src, output: dest }: { input: string; output: string }): void {
+    console.log(src, dest);
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the variables
+    assert!(
+        output.contains("person") && output.contains("response"),
+        "Output should contain variables: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": Person") && !output.contains("interface Person") && !output.contains(": { data:"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_destructuring_loop() {
+    let source = r#"
+interface Entry { key: string; value: number }
+const entries: Entry[] = [{ key: "a", value: 1 }, { key: "b", value: 2 }];
+
+for (const { key, value } of entries) {
+    console.log(key, value);
+}
+
+const pairs: [string, number][] = [["x", 1], ["y", 2]];
+for (const [name, num] of pairs) {
+    console.log(name, num);
+}
+
+const map: Map<string, number> = new Map();
+for (const [k, v] of map.entries()) {
+    console.log(k, v);
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the arrays
+    assert!(
+        output.contains("entries") && output.contains("pairs"),
+        "Output should contain arrays: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": Entry[]") && !output.contains("interface Entry") && !output.contains(": [string, number][]"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
