@@ -27,6 +27,7 @@ Steps:
 (empty - will receive new tasks from EM after completing current assignment)
 
 ## Completed
+- [x] Added ES5 tests for class expression patterns (6 tests): anonymous multi, named fluent, extends component, factory return, static members, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 494 pass).
 - [x] Added ES5 tests for static block initialization (6 tests): basic init, private field access, multiple blocks ordering, super reference, computed properties, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 488 pass).
 - [x] Added ES5 tests for super() ordering edge cases (6 tests): field initializers before/after, parameter properties, private fields, try/catch ordering, conditional fields, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 476 pass).
 - [x] Added ES5 tests for triple-slash directive patterns (6 tests): reference path, reference types, amd-module, reference lib, multiple directives, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 473 pass).
