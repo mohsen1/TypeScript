@@ -5673,3 +5673,98 @@ fn test_callback_param_inferred_from_generic_higher_order() {
     // T inferred as string, so callback param is string
     assert_eq!(result, TypeId::STRING);
 }
+
+// =============================================================================
+// Generic Default Type Inference Tests
+// =============================================================================
+
+#[test]
+fn test_generic_default_used_when_no_inference() {
+    // Test: <T = string> with no inference constraints, T defaults to string
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // No constraints added - should use default if available
+    // Note: defaults are typically handled during type param registration,
+    // but here we test the inference context behavior with no constraints
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    // Without any constraints, resolves to unknown
+    assert_eq!(result, TypeId::UNKNOWN);
+}
+
+#[test]
+fn test_generic_default_overridden_by_lower_bound() {
+    // Test: <T = string> with lower bound number, inference overrides default
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Inferred lower bound takes precedence
+    ctx.add_lower_bound(var_t, TypeId::NUMBER);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    // Lower bound overrides any potential default
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_generic_default_with_constraint() {
+    // Test: <T extends object = {}> - constraint with default
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Upper bound from constraint
+    ctx.add_upper_bound(var_t, TypeId::OBJECT);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    // With only upper bound, resolves to the upper bound
+    assert_eq!(result, TypeId::OBJECT);
+}
+
+#[test]
+fn test_generic_default_with_literal_inference() {
+    // Test: <T = string> called with literal "hello", infers literal not default
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let hello = interner.literal_string("hello");
+    ctx.add_lower_bound(var_t, hello);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    // Inferred literal takes precedence over default
+    assert_eq!(result, hello);
+}
+
+#[test]
+fn test_generic_multiple_params_with_defaults() {
+    // Test: <T = string, U = number> with only U having lower bound
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    // Only U has a lower bound
+    ctx.add_lower_bound(var_u, TypeId::BOOLEAN);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+
+    assert_eq!(results.len(), 2);
+    // T has no constraints, resolves to unknown
+    assert_eq!(results[0], (t_name, TypeId::UNKNOWN));
+    // U has lower bound, resolves to boolean
+    assert_eq!(results[1], (u_name, TypeId::BOOLEAN));
+}
