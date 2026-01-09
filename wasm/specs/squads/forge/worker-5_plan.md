@@ -6,12 +6,24 @@ Execute tasks assigned by EM-Forge for the Forge squad (type system).
 Status: Active
 Priority: 5
 
-## Current Assignment (TS2300 - Duplicate Identifier)
+## Current Assignment (TS7008 - Member Implicit Any)
+- [x] Implement member implicit any checking (TS7008) in `thin_checker.rs`
+- [x] Add `MEMBER_IMPLICIT_ANY` diagnostic message and `IMPLICIT_ANY_MEMBER` code (7008)
+- [x] Check class properties without type annotation and no initializer
+- [x] Check interface/type literal property signatures without type annotation
+
+### Implementation Details
+- Added TS7008 check in `check_property_declaration()` for class properties
+- Added TS7008 check in `check_type_member_for_parameter_properties()` for interface/type literal properties
+- Class properties: emit error when no type annotation AND no initializer (can't infer type)
+- Interface properties: emit error when no type annotation (interfaces can't have initializers)
+
+## Previous Assignment (TS2300 - Duplicate Identifier) - COMPLETED
 - [x] Implement duplicate identifier checking (TS2300) in `thin_checker.rs`
 - [x] Add `check_duplicate_identifiers()` function to detect conflicting declarations
 - [x] Handle block-scoped variables (let/const), type aliases, classes, functions
 
-### Implementation Details
+### TS2300 Implementation Details
 - Added `check_duplicate_identifiers()` in `thin_checker.rs` called from `check_source_file()`
 - Detects duplicate declarations that cannot merge:
   - Block-scoped variables (let/const) with any other declaration
@@ -20,10 +32,6 @@ Priority: 5
   - Class with function or variable
 - Uses symbol flags from binder to identify block-scoped variables
 - Reports error on all declarations after the first
-
-### Test Status
-- Library compiles with pre-existing errors (unrelated to TS2300)
-- Pre-existing infrastructure issues: Docker path, TypeId dereference errors
 
 ## Previous Assignment (TS7010/TS7006) - COMPLETED
 - [x] Implement return-path analysis for missing return diagnostics (TS2366) in `thin_checker.rs`
