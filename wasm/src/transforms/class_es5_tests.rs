@@ -15263,3 +15263,340 @@ class SimpleMap<K, V> {
         output
     );
 }
+
+// ============================================================================
+// Symbol.toStringTag Tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_symbol_to_string_tag_basic() {
+    // Basic Symbol.toStringTag getter for custom class name
+    let source = r#"
+class CustomCollection {
+    private items: unknown[] = [];
+
+    get [Symbol.toStringTag](): string {
+        return "CustomCollection";
+    }
+
+    add(item: unknown): void {
+        this.items.push(item);
+    }
+
+    get length(): number {
+        return this.items.length;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function CustomCollection"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Symbol.toStringTag or defineProperty should be present
+    assert!(
+        output.contains("toStringTag") || output.contains("defineProperty") || output.contains("Symbol"),
+        "Expected Symbol.toStringTag handling: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("add"),
+        "Expected add method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_to_string_tag_dynamic() {
+    // Symbol.toStringTag with dynamic value based on state
+    let source = r#"
+class StatefulObject {
+    private state: "idle" | "running" | "stopped" = "idle";
+
+    get [Symbol.toStringTag](): string {
+        return "StatefulObject<" + this.state + ">";
+    }
+
+    start(): void {
+        this.state = "running";
+    }
+
+    stop(): void {
+        this.state = "stopped";
+    }
+
+    reset(): void {
+        this.state = "idle";
+    }
+
+    get currentState(): string {
+        return this.state;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function StatefulObject"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // State methods should be present
+    assert!(
+        output.contains("start") && output.contains("stop") && output.contains("reset"),
+        "Expected state methods: {}",
+        output
+    );
+
+    // currentState getter should be present
+    assert!(
+        output.contains("currentState"),
+        "Expected currentState getter: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_to_string_tag_with_inheritance() {
+    // Symbol.toStringTag with class inheritance
+    let source = r#"
+class BaseType {
+    get [Symbol.toStringTag](): string {
+        return "BaseType";
+    }
+
+    getTypeName(): string {
+        return Object.prototype.toString.call(this);
+    }
+}
+
+class DerivedType extends BaseType {
+    get [Symbol.toStringTag](): string {
+        return "DerivedType";
+    }
+
+    getParentTypeName(): string {
+        return "BaseType";
+    }
+}
+
+class AnotherDerived extends BaseType {
+    private customName: string;
+
+    constructor(name: string) {
+        super();
+        this.customName = name;
+    }
+
+    get [Symbol.toStringTag](): string {
+        return this.customName;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // All classes should be converted
+    assert!(
+        output.contains("function BaseType"),
+        "Expected BaseType function: {}",
+        output
+    );
+    assert!(
+        output.contains("function DerivedType"),
+        "Expected DerivedType function: {}",
+        output
+    );
+    assert!(
+        output.contains("function AnotherDerived"),
+        "Expected AnotherDerived function: {}",
+        output
+    );
+
+    // Inheritance should be set up
+    assert!(
+        output.contains("__extends") || output.contains("extends"),
+        "Expected inheritance: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_to_string_tag_static() {
+    // Static Symbol.toStringTag (less common but valid)
+    let source = r#"
+class TypeRegistry {
+    private static types: Map<string, unknown> = new Map();
+
+    static get [Symbol.toStringTag](): string {
+        return "TypeRegistry";
+    }
+
+    static register(name: string, type: unknown): void {
+        this.types.set(name, type);
+    }
+
+    static get(name: string): unknown {
+        return this.types.get(name);
+    }
+
+    static has(name: string): boolean {
+        return this.types.has(name);
+    }
+
+    static get count(): number {
+        return this.types.size;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function TypeRegistry"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("register") && output.contains("has"),
+        "Expected static methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_to_string_tag_with_iterator() {
+    // Symbol.toStringTag combined with Symbol.iterator
+    let source = r#"
+class AdvancedCollection<T> {
+    private items: T[] = [];
+
+    get [Symbol.toStringTag](): string {
+        return "AdvancedCollection";
+    }
+
+    *[Symbol.iterator](): Generator<T> {
+        for (const item of this.items) {
+            yield item;
+        }
+    }
+
+    add(item: T): void {
+        this.items.push(item);
+    }
+
+    remove(item: T): boolean {
+        const idx = this.items.indexOf(item);
+        if (idx !== -1) {
+            this.items.splice(idx, 1);
+            return true;
+        }
+        return false;
+    }
+
+    get length(): number {
+        return this.items.length;
+    }
+
+    toString(): string {
+        return "[object " + this[Symbol.toStringTag] + "]";
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function AdvancedCollection"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("add") && output.contains("remove") && output.contains("toString"),
+        "Expected methods: {}",
+        output
+    );
+
+    // length getter should be present
+    assert!(
+        output.contains("length"),
+        "Expected length getter: {}",
+        output
+    );
+}
