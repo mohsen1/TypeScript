@@ -7,9 +7,10 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-None - awaiting next task assignment.
+- [ ] Add async ES5 tests for async queue patterns: enqueue, dequeue, peek, drain, priority. Tests: `./wasm/test.sh async_es5_tests`
 
 ## Task Queue
+- [ ] Add async ES5 tests for async timeout patterns: timeout, deadline, cancel
 
 
 ## Completed
