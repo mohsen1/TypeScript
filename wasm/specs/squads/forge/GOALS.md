@@ -5,31 +5,25 @@ Updated: 2026-01-09
 Priority: 1
 
 ---
-## 📢 EM-FORGE: READ THIS - DIRECTIVE FROM DIRECTOR
+## 📢 EM-FORGE: DIRECTIVE UPDATE
 
-**Operation Crucible is NOW IN EFFECT.** Your squad has ONE mission:
+**Director is handling Redux blocker personally.** Forge workers reassigned to:
 
-1. **ALL 5 WORKERS** swarm the Redux/Lodash Generics blocker
-2. **ROOT CAUSE**: Eager evaluation of conditionals when InferenceVars aren't bound
-3. **THE FIX**: Introduce `Deferred` state in `solver/evaluate.rs`
-4. **Nothing else matters** until `test_check_redux_lodash_style_generics` passes
+### Failing Tests to Fix (Priority Order):
+1. `solver::evaluate::tests::test_conditional_infer_function_optional_param_distributive`
+2. `solver::evaluate::tests::test_conditional_infer_function_optional_param_non_distributive_union_input`
+3. `cli::driver_tests::compile_class_with_generic_constructor`
 
-Please acknowledge by updating Squad Status below.
+### Other High-Value Solver Work:
+- Template literal type inference edge cases
+- Generic constraint satisfaction edge cases
+- Mapped type key remapping
 
 ---
 
-## 🚨 OPERATION CRUCIBLE - SWARM THE BLOCKER
+## Forge Focus: Solver Test Fixes + Hardening
 
-**Redux/Lodash Generics blocker must pass. All 5 workers on this.**
-
-### Root Cause Identified
-The bug is **eager evaluation of conditional types when `InferenceVar`s are not yet bound**.
-
-### The Fix
-Refactor `solver/evaluate.rs` to introduce a **`Deferred` state** for `ConditionalResult`:
-- When `check_type` contains an unbound `InferenceVar`, do NOT return `Any` or `Never`
-- Return a `TypeKey::Conditional` that preserves the constraint
-- Only evaluate when inference context is finalized
+**Redux blocker is being handled by Director. Focus on other failing tests.**
 
 ## Current Milestone
 Phase 8 - Conformance, Convergence, and Hardening: Type-system correctness in the integrated pipeline, driven by conformance tests.
@@ -46,22 +40,23 @@ Phase 8 - Conformance, Convergence, and Hardening: Type-system correctness in th
 
 ## Objectives (Ranked)
 
-1. **🚨 BLOCKER: Redux/Lodash Generics**
-   - Context: This test combines mapped types, conditional inference, AND cross-file resolution
-   - Root Cause: Eager evaluation of conditionals when InferenceVars aren't bound
-   - Fix: Introduce `Deferred` state in `solver/evaluate.rs`
-   - Key Files: `solver/evaluate.rs`, `solver/infer.rs`
-   - **SWARM THIS UNTIL GREEN**
+1. **Fix Failing Solver Tests**
+   - `test_conditional_infer_function_optional_param_distributive` - FAILING
+   - `test_conditional_infer_function_optional_param_non_distributive_union_input` - FAILING
+   - Key Files: `solver/evaluate.rs`, `solver/evaluate_tests.rs`
 
-2. **Generic Inference Hardening**
+2. **Fix CLI Generic Constructor Test**
+   - `compile_class_with_generic_constructor` - FAILING
+   - Key Files: `cli/driver_tests.rs`, `solver/infer.rs`
+
+3. **Generic Inference Hardening**
    - Context: Solver is the correctness bottleneck per Project Direction
    - Success Criteria: Inference from usage and context-sensitive typing match `tsc`
    - Key Files: `solver/infer.rs`, `solver/infer_tests.rs`
 
-3. **Conditional Type Evaluation**
-   - Context: Distributive conditional types over unions must match TypeScript
-   - Success Criteria: `solver/evaluate.rs` handles distributive conditionals correctly
-   - Key Files: `solver/evaluate.rs`, `solver/evaluate_tests.rs`
+4. **Template Literal Types**
+   - Context: Template literal inference and pattern matching
+   - Key Files: `solver/evaluate.rs`
 
 ## Anti-Priorities
 - New LSP features
@@ -74,30 +69,23 @@ Phase 8 - Conformance, Convergence, and Hardening: Type-system correctness in th
 - These tests will help triangulate correct behavior for Forge workers
 
 ## Notes to EM
-- **All 5 workers on Redux blocker**
-- Focus on `solver/evaluate.rs` Deferred state implementation
+- **Director is handling Redux blocker** - do NOT assign workers to it
+- Focus on fixing the 3 failing tests listed above
 - Read `wasm/specs/SOLVER.md` for solver architecture
 - Use Docker for tests: `./wasm/test.sh`
 
 ## Management Strategy
 Per Project Direction: **Autocratic Scheduling + Bisect-on-Merge**
 - PRs that regress ANY existing baseline are auto-rejected
-- Zero-Idle: All workers swarm the blocker
 
 ## Squad Status
-- Last EM Report: 2026-01-09 - Operation Crucible in progress
-- Workers Active: 1/5 (pane 4 actively debugging type param substitution)
-- Current Focus: 🚨 Redux/Lodash Generics blocker - type parameter registration
-- Direction: SWARM THE BLOCKER
-- Blockers: `test_check_redux_lodash_style_generics` (4 diagnostics vs 0)
-- Progress: 6 → 4 diagnostics (33% reduction)
-- Issues:
-  - Worker 2's changes cause REGRESSION (removes Ref handling in evaluate.rs)
-  - Type params not being registered in TypeEnvironment for cross-file symbols
-  - Symbols resolving to TypeId(4) (any) instead of actual types
+- Last EM Report: 2026-01-09 - Reassigned from Redux blocker
+- Workers Active: 5/5
+- Current Focus: Fix 3 failing solver/CLI tests
+- Direction: Test fixes + solver hardening
 - Worker Assignments:
-  - W1: (idle)
-  - W2: BLOCKED - changes remove Ref/TypeQuery handling in evaluate.rs (regression)
-  - W3: (merged docs update)
-  - W4: (merged namespace fix)
-  - W5: BLOCKED - commit calls unimplemented `with_type_param_bindings` method
+  - W1: Fix `test_conditional_infer_function_optional_param_distributive`
+  - W2: Fix `test_conditional_infer_function_optional_param_non_distributive_union_input`
+  - W3: Fix `compile_class_with_generic_constructor`
+  - W4: Template literal type edge cases
+  - W5: Generic constraint satisfaction edge cases
