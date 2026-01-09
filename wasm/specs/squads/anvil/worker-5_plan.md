@@ -7,10 +7,10 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-None - awaiting next task
+- [ ] Add async ES5 tests for async context patterns: AsyncLocalStorage simulation, context propagation, zone-like patterns. Tests: `./wasm/test.sh async_es5_tests`
 
 ## Task Queue
-- [ ] Add async ES5 tests for async context patterns: AsyncLocalStorage simulation, context propagation
+- [ ] Add async ES5 tests for async stream patterns: readable stream, writable stream, transform stream
 
 ## Completed
 - [x] Added 12 async resource management pattern tests (dispose basic, try-finally cleanup, acquire-release, connection close, file handle, transaction, pool return, stream close, multiple cleanup, conditional cleanup, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (640 tests PASS).
