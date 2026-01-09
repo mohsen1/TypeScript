@@ -7,9 +7,22 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-(none - awaiting new task from EM-Anvil)
+Add ES5 generator function source map tests
 
-ES5 class expression source map tests were already completed in a previous session. 10 class expression ES5 tests exist (anonymous, named, in_return, with_extends, with_static, in_variable, in_array, in_object, with_methods, comprehensive) and all 905 source map tests pass.
+Per GOALS.md Objective 2: Source Map Validation
+
+Steps:
+1. Add 6 ES5 generator function source map tests to `wasm/src/source_map_tests.rs`:
+   - Basic generator yield
+   - Generator yield*
+   - Generator with return
+   - Async generator
+   - Generator in class method
+   - Combined generator patterns
+2. Run `./wasm/test.sh source_map` to verify all tests pass
+3. Commit with message: `[wasm] source_map: add generator function source map tests`
+4. Push to `origin/worker/anvil-3`
+5. Update this plan file and push
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
