@@ -8699,3 +8699,225 @@ function logWithLevel(level: string = "debug", timestamp: boolean = true, ...mes
         output
     );
 }
+
+#[test]
+fn test_parity_es5_rest_params_generator() {
+    let source = r#"
+function* yieldAll(...values: number[]): Generator<number> {
+    for (const value of values) {
+        yield value;
+    }
+}
+
+function* logAndYield(prefix: string, ...items: string[]): Generator<string> {
+    for (const item of items) {
+        console.log(prefix, item);
+        yield item;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the functions
+    assert!(
+        output.contains("yieldAll") && output.contains("logAndYield"),
+        "Output should contain generator functions: {}",
+        output
+    );
+    // Rest syntax should be transformed (uses arguments)
+    assert!(
+        output.contains("arguments"),
+        "Rest syntax should use arguments: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": Generator") && !output.contains(": number[]"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_rest_params_async() {
+    let source = r#"
+async function fetchAll(...urls: string[]): Promise<Response[]> {
+    return Promise.all(urls.map(url => fetch(url)));
+}
+
+async function logAsync(level: string, ...messages: string[]): Promise<void> {
+    await new Promise(r => setTimeout(r, 100));
+    console.log(level, messages);
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the functions
+    assert!(
+        output.contains("fetchAll") && output.contains("logAsync"),
+        "Output should contain async functions: {}",
+        output
+    );
+    // Async syntax should be transformed (uses __awaiter helper)
+    assert!(
+        output.contains("__awaiter") || !output.contains("async function"),
+        "Async syntax should be transformed: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": Promise") && !output.contains(": string[]"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_rest_params_destructuring() {
+    let source = r#"
+function processItems(...items: { id: number; name: string }[]): void {
+    items.forEach(item => console.log(item.id, item.name));
+}
+
+function mergeConfigs(...configs: { [key: string]: any }[]): object {
+    return Object.assign({}, ...configs);
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the functions
+    assert!(
+        output.contains("processItems") && output.contains("mergeConfigs"),
+        "Output should contain functions: {}",
+        output
+    );
+    // Rest syntax should be transformed
+    assert!(
+        !output.contains("...items") && !output.contains("...configs"),
+        "Rest syntax in params should be transformed: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": { id:") && !output.contains(": object"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_rest_params_constructor() {
+    let source = r#"
+class Collection<T> {
+    private items: T[];
+
+    constructor(...initialItems: T[]) {
+        this.items = initialItems;
+    }
+
+    add(...newItems: T[]): void {
+        this.items.push(...newItems);
+    }
+}
+
+class EventEmitter {
+    constructor(private name: string, ...handlers: Function[]) {
+        handlers.forEach(h => this.register(h));
+    }
+
+    register(handler: Function): void {}
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the classes
+    assert!(
+        output.contains("Collection") && output.contains("EventEmitter"),
+        "Output should contain classes: {}",
+        output
+    );
+    // Should use arguments in constructor for rest params
+    assert!(
+        output.contains("arguments"),
+        "Output should use arguments for rest params: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains("<T>") && !output.contains(": T[]") && !output.contains(": Function"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
