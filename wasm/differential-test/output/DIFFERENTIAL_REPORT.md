@@ -23,8 +23,41 @@ const p2: Bar = { x: 1, y: 2 };
 
 The error message reveals the bug: the interface `{ x: number; y: number }` is being interpreted as `{ number: any; x: number }`. The parser treats the `y: number;` line's type keyword `number` as a property name instead of a type annotation.
 
-### Root Cause Location
-The bug appears to be in how the `NodeList` of members is iterated in `collect_interface_members` at `wasm/src/solver/lower.rs:902`. The issue is likely in how the `SignatureData` structure's fields are being read or how properties are being accumulated.
+### Investigation Findings
+
+**Parsing is CORRECT:**
+```
+Interface 'Point' found at node 9
+  members list: [NodeIndex(4), NodeIndex(8)]
+  Member 0 (idx 4): kind=172
+    name_idx: NodeIndex(1)
+    type_annotation_idx: NodeIndex(3)
+    name_text: 'x'
+    type_node kind: 184
+  Member 1 (idx 8): kind=172
+    name_idx: NodeIndex(5)
+    type_annotation_idx: NodeIndex(7)
+    name_text: 'y'
+    type_node kind: 184
+```
+
+Both properties are parsed correctly with the right names and type annotations.
+
+**Bug Location:**
+The bug is in TYPE LOWERING, not parsing. When `collect_interface_members` processes the second property signature, it appears to be retrieving the wrong SignatureData from the `signatures` vector.
+
+Specifically:
+- Each ThinNode has a `data_index` field that indexes into type-specific data vectors
+- For PROPERTY_SIGNATURE nodes, `data_index` indexes into `arena.signatures`
+- The `get_signature(node)` method uses `signatures.get(node.data_index as usize)`
+
+**Suspected Root Cause:**
+When lowering the second property, `sig.name` returns NodeIndex(3) instead of NodeIndex(5), which is the TYPE_REFERENCE node for the first property's type annotation instead of the identifier node for `y`.
+
+This could be caused by:
+1. Wrong `data_index` stored in the second property's ThinNode
+2. Data corruption in the `signatures` vector
+3. Off-by-one error in how signatures are indexed
 
 ### Impact
 This bug affects ALL interfaces with more than one property, which is the vast majority of real-world TypeScript code.
