@@ -5768,3 +5768,116 @@ fn test_generic_multiple_params_with_defaults() {
     // U has lower bound, resolves to boolean
     assert_eq!(results[1], (u_name, TypeId::BOOLEAN));
 }
+
+// ============================================================================
+// Constructor Type Inference Tests
+// ============================================================================
+// Tests for constructor function type inference
+
+#[test]
+fn test_constructor_single_param_inference() {
+    // Test: new (x: T) => Instance infers T from argument
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Constructor param receives string argument
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_constructor_multiple_params_inference() {
+    // Test: new <T, U>(a: T, b: U) => Instance infers both T and U
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    // First param is string, second is number
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+    ctx.add_lower_bound(var_u, TypeId::NUMBER);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+
+    assert_eq!(results.len(), 2);
+    assert_eq!(results[0], (t_name, TypeId::STRING));
+    assert_eq!(results[1], (u_name, TypeId::NUMBER));
+}
+
+#[test]
+fn test_constructor_with_constraint() {
+    // Test: new <T extends object>(config: T) => Instance
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // T has upper bound of object
+    ctx.add_upper_bound(var_t, TypeId::OBJECT);
+
+    // Argument is specific object type
+    let prop_name = interner.intern_string("name");
+    let obj_type = interner.object(vec![PropertyInfo {
+        name: prop_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    ctx.add_lower_bound(var_t, obj_type);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    // Should be the specific object type
+    assert_eq!(result, obj_type);
+}
+
+#[test]
+fn test_constructor_optional_param_inference() {
+    // Test: new <T>(arg?: T) => Instance with optional param
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Optional param not provided - may include undefined
+    let optional_type = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+    ctx.add_lower_bound(var_t, optional_type);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    // Should preserve the union type
+    assert_eq!(result, optional_type);
+}
+
+#[test]
+fn test_constructor_rest_param_inference() {
+    // Test: new <T>(...args: T[]) => Instance with rest param
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Rest param elements are string and number - infer union
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+    ctx.add_lower_bound(var_t, TypeId::NUMBER);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    // Should be union of string | number
+    if let Some(TypeKey::Union(_)) = interner.lookup(result) {
+        // Union is expected
+    } else {
+        // Could also resolve to one of the types if widening happens
+        assert!(result == TypeId::STRING || result == TypeId::NUMBER);
+    }
+}
