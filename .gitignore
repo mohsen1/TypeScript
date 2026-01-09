@@ -73,3 +73,5 @@ yek.toml
 .env.local
 .claude/settings.local.json
 .role/
+
+.notify/*.notify
