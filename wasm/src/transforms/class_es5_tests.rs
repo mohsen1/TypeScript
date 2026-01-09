@@ -26320,3 +26320,533 @@ class BoundMethods {
         output
     );
 }
+
+// ============================================================================
+// PRIVATE METHOD PATTERN TESTS
+// ============================================================================
+
+/// Test ES5 class with static private methods
+#[test]
+fn test_class_es5_private_method_static() {
+    let source = r#"
+// Static private methods
+class Singleton {
+    static #instance: Singleton | null = null;
+    static #initialized = false;
+
+    private constructor() {}
+
+    static #createInstance(): Singleton {
+        if (!Singleton.#instance) {
+            Singleton.#instance = new Singleton();
+            Singleton.#initialize();
+        }
+        return Singleton.#instance;
+    }
+
+    static #initialize(): void {
+        Singleton.#initialized = true;
+        console.log("Singleton initialized");
+    }
+
+    static getInstance(): Singleton {
+        return Singleton.#createInstance();
+    }
+
+    static isInitialized(): boolean {
+        return Singleton.#initialized;
+    }
+}
+
+class IdGenerator {
+    static #counter = 0;
+    static #prefix = "id_";
+
+    static #formatId(num: number): string {
+        return `${IdGenerator.#prefix}${num.toString().padStart(6, "0")}`;
+    }
+
+    static #incrementCounter(): number {
+        return ++IdGenerator.#counter;
+    }
+
+    static generate(): string {
+        const num = IdGenerator.#incrementCounter();
+        return IdGenerator.#formatId(num);
+    }
+
+    static reset(): void {
+        IdGenerator.#counter = 0;
+    }
+}
+
+class ConfigLoader {
+    static #cache: Map<string, any> = new Map();
+    static #defaultConfig = { debug: false, version: "1.0" };
+
+    static #loadFromCache(key: string): any | undefined {
+        return ConfigLoader.#cache.get(key);
+    }
+
+    static #saveToCache(key: string, value: any): void {
+        ConfigLoader.#cache.set(key, value);
+    }
+
+    static #mergeWithDefaults(config: any): any {
+        return { ...ConfigLoader.#defaultConfig, ...config };
+    }
+
+    static load(key: string, config: any): any {
+        const cached = ConfigLoader.#loadFromCache(key);
+        if (cached) return cached;
+
+        const merged = ConfigLoader.#mergeWithDefaults(config);
+        ConfigLoader.#saveToCache(key, merged);
+        return merged;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Singleton") && output.contains("IdGenerator") && output.contains("ConfigLoader"),
+        "Expected static private method classes: {}",
+        output
+    );
+
+    // Private method names should be transformed (WeakMap pattern or mangled)
+    assert!(
+        output.contains("getInstance") && output.contains("generate") && output.contains("load"),
+        "Expected public methods to be preserved: {}",
+        output
+    );
+}
+
+/// Test ES5 class with async private methods
+#[test]
+fn test_class_es5_private_method_async() {
+    let source = r#"
+// Async private methods
+class DataFetcher {
+    #baseUrl: string;
+    #cache: Map<string, any> = new Map();
+
+    constructor(baseUrl: string) {
+        this.#baseUrl = baseUrl;
+    }
+
+    async #fetchFromNetwork(endpoint: string): Promise<any> {
+        const response = await fetch(`${this.#baseUrl}${endpoint}`);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        return response.json();
+    }
+
+    async #processResponse(data: any): Promise<any> {
+        await new Promise(r => setTimeout(r, 10)); // simulate processing
+        return { ...data, processed: true };
+    }
+
+    async #cacheResult(key: string, data: any): Promise<void> {
+        this.#cache.set(key, data);
+    }
+
+    async fetch(endpoint: string): Promise<any> {
+        const cached = this.#cache.get(endpoint);
+        if (cached) return cached;
+
+        const raw = await this.#fetchFromNetwork(endpoint);
+        const processed = await this.#processResponse(raw);
+        await this.#cacheResult(endpoint, processed);
+        return processed;
+    }
+}
+
+class AsyncValidator {
+    async #validateEmail(email: string): Promise<boolean> {
+        await new Promise(r => setTimeout(r, 50));
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    }
+
+    async #validateUsername(username: string): Promise<boolean> {
+        await new Promise(r => setTimeout(r, 50));
+        return /^[a-zA-Z0-9_]{3,20}$/.test(username);
+    }
+
+    async #checkAvailability(username: string): Promise<boolean> {
+        await new Promise(r => setTimeout(r, 100));
+        return true; // simulate API call
+    }
+
+    async validate(data: { email: string; username: string }): Promise<{ valid: boolean; errors: string[] }> {
+        const errors: string[] = [];
+
+        if (!await this.#validateEmail(data.email)) {
+            errors.push("Invalid email");
+        }
+
+        if (!await this.#validateUsername(data.username)) {
+            errors.push("Invalid username");
+        } else if (!await this.#checkAvailability(data.username)) {
+            errors.push("Username not available");
+        }
+
+        return { valid: errors.length === 0, errors };
+    }
+}
+
+class RetryHandler {
+    #maxRetries = 3;
+    #delay = 1000;
+
+    async #wait(ms: number): Promise<void> {
+        await new Promise(r => setTimeout(r, ms));
+    }
+
+    async #attempt<T>(fn: () => Promise<T>, attempt: number): Promise<T> {
+        try {
+            return await fn();
+        } catch (error) {
+            if (attempt >= this.#maxRetries) throw error;
+            await this.#wait(this.#delay * attempt);
+            return this.#attempt(fn, attempt + 1);
+        }
+    }
+
+    async execute<T>(fn: () => Promise<T>): Promise<T> {
+        return this.#attempt(fn, 1);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("DataFetcher") && output.contains("AsyncValidator") && output.contains("RetryHandler"),
+        "Expected async private method classes: {}",
+        output
+    );
+
+    // Public async methods should be preserved
+    assert!(
+        output.contains("fetch") && output.contains("validate") && output.contains("execute"),
+        "Expected public methods to be preserved: {}",
+        output
+    );
+
+    // Async/await should be transformed for ES5
+    assert!(
+        output.contains("__awaiter") || output.contains("return") || output.contains("Promise"),
+        "Expected async transformation pattern: {}",
+        output
+    );
+}
+
+/// Test ES5 class with generator private methods
+#[test]
+fn test_class_es5_private_method_generator() {
+    let source = r#"
+// Generator private methods
+class RangeGenerator {
+    #start: number;
+    #end: number;
+    #step: number;
+
+    constructor(start: number, end: number, step: number = 1) {
+        this.#start = start;
+        this.#end = end;
+        this.#step = step;
+    }
+
+    *#generateRange(): Generator<number> {
+        for (let i = this.#start; i <= this.#end; i += this.#step) {
+            yield i;
+        }
+    }
+
+    *#generateReverse(): Generator<number> {
+        for (let i = this.#end; i >= this.#start; i -= this.#step) {
+            yield i;
+        }
+    }
+
+    *values(): Generator<number> {
+        yield* this.#generateRange();
+    }
+
+    *reversed(): Generator<number> {
+        yield* this.#generateReverse();
+    }
+
+    toArray(): number[] {
+        return [...this.#generateRange()];
+    }
+}
+
+class TreeNode<T> {
+    value: T;
+    children: TreeNode<T>[] = [];
+
+    constructor(value: T) {
+        this.value = value;
+    }
+
+    *#preOrder(): Generator<T> {
+        yield this.value;
+        for (const child of this.children) {
+            yield* child.#preOrder();
+        }
+    }
+
+    *#postOrder(): Generator<T> {
+        for (const child of this.children) {
+            yield* child.#postOrder();
+        }
+        yield this.value;
+    }
+
+    *#breadthFirst(): Generator<T> {
+        const queue: TreeNode<T>[] = [this];
+        while (queue.length > 0) {
+            const node = queue.shift()!;
+            yield node.value;
+            queue.push(...node.children);
+        }
+    }
+
+    *traverse(order: "pre" | "post" | "bfs" = "pre"): Generator<T> {
+        switch (order) {
+            case "pre": yield* this.#preOrder(); break;
+            case "post": yield* this.#postOrder(); break;
+            case "bfs": yield* this.#breadthFirst(); break;
+        }
+    }
+}
+
+class Paginator<T> {
+    #items: T[];
+    #pageSize: number;
+
+    constructor(items: T[], pageSize: number) {
+        this.#items = items;
+        this.#pageSize = pageSize;
+    }
+
+    *#getPages(): Generator<T[]> {
+        for (let i = 0; i < this.#items.length; i += this.#pageSize) {
+            yield this.#items.slice(i, i + this.#pageSize);
+        }
+    }
+
+    *pages(): Generator<T[]> {
+        yield* this.#getPages();
+    }
+
+    getPage(index: number): T[] | undefined {
+        let i = 0;
+        for (const page of this.#getPages()) {
+            if (i === index) return page;
+            i++;
+        }
+        return undefined;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("RangeGenerator") && output.contains("TreeNode") && output.contains("Paginator"),
+        "Expected generator private method classes: {}",
+        output
+    );
+
+    // Public methods should be preserved
+    assert!(
+        output.contains("values") && output.contains("traverse") && output.contains("pages"),
+        "Expected public methods to be preserved: {}",
+        output
+    );
+}
+
+/// Test ES5 class with private accessors
+#[test]
+fn test_class_es5_private_method_accessors() {
+    let source = r#"
+// Private accessors
+class SecureStorage {
+    #data: Map<string, string> = new Map();
+    #encryptionKey: string;
+
+    constructor(key: string) {
+        this.#encryptionKey = key;
+    }
+
+    get #secretKey(): string {
+        return this.#encryptionKey.split("").reverse().join("");
+    }
+
+    set #secretKey(value: string) {
+        this.#encryptionKey = value;
+    }
+
+    #encrypt(value: string): string {
+        return btoa(value + this.#secretKey);
+    }
+
+    #decrypt(value: string): string {
+        const decrypted = atob(value);
+        return decrypted.slice(0, -this.#secretKey.length);
+    }
+
+    set(key: string, value: string): void {
+        this.#data.set(key, this.#encrypt(value));
+    }
+
+    get(key: string): string | undefined {
+        const encrypted = this.#data.get(key);
+        return encrypted ? this.#decrypt(encrypted) : undefined;
+    }
+}
+
+class ObservableValue<T> {
+    #value: T;
+    #listeners: Set<(value: T) => void> = new Set();
+
+    constructor(initial: T) {
+        this.#value = initial;
+    }
+
+    get #currentValue(): T {
+        return this.#value;
+    }
+
+    set #currentValue(value: T) {
+        this.#value = value;
+        this.#notifyListeners();
+    }
+
+    #notifyListeners(): void {
+        for (const listener of this.#listeners) {
+            listener(this.#value);
+        }
+    }
+
+    get value(): T {
+        return this.#currentValue;
+    }
+
+    set value(newValue: T) {
+        this.#currentValue = newValue;
+    }
+
+    subscribe(listener: (value: T) => void): () => void {
+        this.#listeners.add(listener);
+        return () => this.#listeners.delete(listener);
+    }
+}
+
+class LazyProperty {
+    #computed: number | null = null;
+    #baseValue: number;
+
+    constructor(base: number) {
+        this.#baseValue = base;
+    }
+
+    get #expensiveComputation(): number {
+        if (this.#computed === null) {
+            // Expensive calculation
+            let result = this.#baseValue;
+            for (let i = 0; i < 1000; i++) {
+                result = Math.sqrt(result * result + i);
+            }
+            this.#computed = result;
+        }
+        return this.#computed;
+    }
+
+    get value(): number {
+        return this.#expensiveComputation;
+    }
+
+    invalidate(): void {
+        this.#computed = null;
+    }
+
+    update(base: number): void {
+        this.#baseValue = base;
+        this.invalidate();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("SecureStorage") && output.contains("ObservableValue") && output.contains("LazyProperty"),
+        "Expected private accessor classes: {}",
+        output
+    );
+
+    // Public methods should be preserved
+    assert!(
+        output.contains("set") && output.contains("get") && output.contains("subscribe"),
+        "Expected public methods to be preserved: {}",
+        output
+    );
+}
