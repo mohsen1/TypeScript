@@ -1,140 +1,84 @@
-# Anvil Worker 4 - Parser Edge Cases (TS1005/TS1068)
+# Anvil Worker 4 - Mapped Type Recursion Guard
 
 ## Operation Conformance Assignment
 
-**Mission**: Fix false positive parser errors TS1005 and TS1068 for valid TypeScript syntax.
+**Mission**: Fix stack overflow in `types/mapped/recursiveMappedTypes.ts`.
 
-**Target Errors**:
-- TS1005 "';' expected" - ~35 false positives
-- TS1068 "Unexpected token" - ~25 false positives
-**Root Cause**: Parser doesn't handle all valid TypeScript syntax edge cases
+**Status**: COMPLETED
 
-## Problem Analysis
+## Task Checklist
 
-The WASM parser incorrectly reports errors for valid code:
+- [x] Reproduce stack overflow via conformance runner
+- [x] Trace mapped type recursion in solver/thin_checker
+- [x] Add recursion guard + memoization
+- [x] Add regression test
+- [x] Run conformance before/after and capture metrics
 
-```typescript
-// TS1005 false positive - arrow function in object
-const obj = {
-  handler: () => { }  // Parser expects ';' incorrectly
-};
+## Conformance Metrics (types/mapped)
 
-// TS1068 false positive - type assertions
-const x = <string>value;  // Old-style type assertion
-```
+| Metric | Before | After |
+| --- | --- | --- |
+| Files Found | 25 | 25 |
+| Tests Run | 25 | 25 |
+| Exact Match | 4 (16.0%) | 4 (16.0%) |
+| Same Error Count | 4 (16.0%) | 5 (20.0%) |
+| WASM Crashed | 1 | 0 |
+| Tests with missing errors | 10 (40.0%) | 10 (40.0%) |
+| Tests with extra errors | 18 (72.0%) | 19 (76.0%) |
 
-## Implementation Tasks
+**Before** (types/mapped, --max=200):
+- Crashed: `types/mapped/recursiveMappedTypes.ts` (Maximum call stack size exceeded)
 
-### Task 1: Audit Parser Error Sites
-**File**: `wasm/src/parser/mod.rs`
+**After** (types/mapped, --max=200):
+- No crashes
 
-1. Search for where TS1005 is emitted
-2. Search for where TS1068 is emitted
-3. Identify patterns that incorrectly trigger these
+## Files Modified
 
-### Task 2: Fix Arrow Function Parsing in Objects
-**File**: `wasm/src/parser/mod.rs`
-
-Arrow functions in object literals need special handling:
-```rust
-fn parse_object_literal_element(&mut self) -> Result<Node, Error> {
-    // Handle shorthand, method, getter/setter, spread
-    // CRITICAL: Arrow function property values
-    if self.is_arrow_function_expression() {
-        return self.parse_property_assignment_with_arrow();
-    }
-    // ...
-}
-```
-
-### Task 3: Fix Type Assertion Parsing
-**File**: `wasm/src/parser/mod.rs`
-
-Handle angle-bracket type assertions:
-```rust
-fn parse_unary_expression(&mut self) -> Result<Node, Error> {
-    // Check for <Type> assertion (not JSX in .ts files)
-    if self.token() == Token::LessThan && !self.is_jsx_context() {
-        return self.parse_type_assertion();
-    }
-    // ...
-}
-```
-
-### Task 4: Fix Other Common Edge Cases
-
-1. **Generic arrow functions in JSX context**:
-   ```typescript
-   const f = <T,>(x: T) => x; // Trailing comma disambiguates from JSX
-   ```
-
-2. **Computed property names with expressions**:
-   ```typescript
-   const obj = {
-     [Symbol.iterator]() { }
-   };
-   ```
-
-3. **Optional chaining with method calls**:
-   ```typescript
-   obj?.method();
-   ```
-
-### Task 5: Write Regression Tests
-**File**: `wasm/src/parser/tests.rs`
-
-```typescript
-// Test 1: Arrow in object
-const x = { f: () => 1 };
-
-// Test 2: Type assertion
-const y = <number>someValue;
-
-// Test 3: Generic arrow
-const id = <T,>(x: T): T => x;
-
-// Test 4: Computed property
-const obj = { [key]: value };
-
-// Test 5: Optional chain
-result?.method?.();
-
-// Test 6: Nullish coalescing
-const val = a ?? b;
-```
-
-## Success Criteria
-
-- [ ] Arrow functions in objects parse correctly
-- [ ] Type assertions parse correctly
-- [ ] Generic arrow functions parse correctly
-- [ ] TS1005/TS1068 false positives drop by 40+ occurrences
-
-## Files to Modify
-
-1. `wasm/src/parser/mod.rs` - Main parser fixes
-2. `wasm/src/parser/scanner.rs` - If token handling needs updates
-3. `wasm/src/parser/expressions.rs` - Expression parsing
-4. Test files as needed
-
-## Verification
-
-Run after changes:
-```bash
-node wasm/differential-test/conformance-runner.mjs --max=200 -v 2>&1 | grep -E "TS1005|TS1068"
-```
-
-Target: Reduce TS1005+TS1068 false positives from 60 to <20.
-
-## Progress
-- Updated `wasm/src/thin_parser.rs` to allow `var` as a class member name and to broaden angle-bracket type assertion detection.
-- Added parser regression tests in `wasm/src/thin_parser_tests.rs` for arrow functions in object literals, angle-bracket type assertions (including literal types), TSX generic arrows with trailing commas, and class members named `var`.
-- Pending: run conformance runner; push to origin blocked by SSH permission (git@github.com: Permission denied).
-
-## Status
-Active (changes committed; push blocked)
+- `wasm/src/solver/evaluate.rs`
+- `wasm/src/thin_checker.rs`
+- `wasm/src/checker/context.rs`
+- `wasm/src/thin_checker_tests.rs`
 
 ## Notes
+
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/anvil-4`
-- **NEVER edit**: `STRUCTURE.md`, `GOALS.md`, other workers' plan files, or anything in `orchestrator/`
+- Ready for Merge: Yes
+
+## Follow-up (2025-01-09) - Recursive Mapped Types
+
+**Mission**: Add mapped type resolution guard/memoization and deepen regression coverage.
+
+**Status**: COMPLETED
+
+### Checklist
+
+- [x] Re-ran conformance: `node wasm/differential-test/conformance-runner.mjs types/mapped --max=200 -v` (no crash; `recursiveMappedTypes.ts` still missing errors)
+- [x] Re-ran conformance (post-change): `node wasm/differential-test/conformance-runner.mjs types/mapped --max=200` (no crashes; metrics unchanged)
+- [x] Added mapped eval cache + guard in `thin_checker` mapped resolution
+- [x] Added regression test: `test_recursive_mapped_type_list_widget_guard`
+- [x] Tests: `./wasm/test.sh test_recursive_mapped_type_list_widget_guard` (PASS)
+
+## Resume Notes
+
+- Branch: `worker/anvil-4`
+- Last work: mapped type resolution guard + memoization (thin checker), regression test for ListWidget recursion.
+- Latest conformance: `node wasm/differential-test/conformance-runner.mjs types/mapped --max=200` (0 crashes; metrics unchanged).
+- Regression test: `./wasm/test.sh test_recursive_mapped_type_list_widget_guard` (PASS).
+
+### Files Touched
+
+- `wasm/src/thin_checker.rs` (mapped type resolution guard + cache)
+- `wasm/src/checker/context.rs` (mapped eval cache/set fields)
+- `wasm/src/thin_checker_tests.rs` (ListWidget recursion test)
+
+### Known Gaps (recursiveMappedTypes.ts)
+
+- Missing diagnostics in conformance: TS2456, TS2313, TS2589, TS2502, TS2615.
+- Likely areas: type alias circularity, circular type parameter constraints, deep instantiation limits, mapped type self-reference.
+
+### Next Steps (if continuing)
+
+1. Trace why `type Recurse = { [K in keyof Recurse]: Recurse[K] }` does not emit TS2456/TS2313.
+2. Add diagnostics for circular constraints/type aliases in `ThinCheckerState` (look at symbol resolution guards and alias type computation).
+3. Ensure depth/excessive instantiation errors (TS2589) surface for recursive mapped types.
