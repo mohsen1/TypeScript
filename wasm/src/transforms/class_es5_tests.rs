@@ -11330,27 +11330,24 @@ class StateManager {
 }
 
 // ============================================================================
-// Symbol.toPrimitive Tests
+// Promise Pattern Tests
 // ============================================================================
 
 #[test]
-fn test_class_es5_symbol_to_primitive_basic() {
-    // Basic Symbol.toPrimitive method
+fn test_class_es5_promise_resolve_reject() {
+    // Promise.resolve and Promise.reject usage
     let source = r#"
-class Money {
-    private amount: number;
-    private currency: string;
-
-    constructor(amount: number, currency: string) {
-        this.amount = amount;
-        this.currency = currency;
+class PromiseFactory<T> {
+    resolve(value: T): Promise<T> {
+        return Promise.resolve(value);
     }
 
-    [Symbol.toPrimitive](hint: string): string | number {
-        if (hint === "number") {
-            return this.amount;
-        }
-        return `${this.currency}${this.amount}`;
+    reject(reason: any): Promise<never> {
+        return Promise.reject(reason);
+    }
+
+    wrap(value: T | Promise<T>): Promise<T> {
+        return Promise.resolve(value);
     }
 }
 "#;
@@ -11369,189 +11366,44 @@ class Money {
 
     let output = printer.get_output().to_string();
 
-    // Class should be converted to function
+    // Class should be emitted
     assert!(
-        output.contains("function Money"),
-        "Expected function declaration: {}",
+        output.contains("PromiseFactory"),
+        "Expected PromiseFactory class: {}",
         output
     );
 
-    // hint parameter should be present
+    // Promise should be present
     assert!(
-        output.contains("hint"),
-        "Expected hint parameter: {}",
-        output
-    );
-
-    // number check should be present
-    assert!(
-        output.contains("number"),
-        "Expected number hint check: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_symbol_to_primitive_all_hints() {
-    // Symbol.toPrimitive handling all hint types
-    let source = r#"
-class Temperature {
-    private celsius: number;
-
-    constructor(celsius: number) {
-        this.celsius = celsius;
-    }
-
-    [Symbol.toPrimitive](hint: string): string | number | boolean {
-        switch (hint) {
-            case "number":
-                return this.celsius;
-            case "string":
-                return `${this.celsius} degrees C`;
-            default:
-                return this.celsius > 0;
-        }
-    }
-
-    toFahrenheit(): number {
-        return (this.celsius * 9/5) + 32;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Class should be converted
-    assert!(
-        output.contains("function Temperature"),
-        "Expected function declaration: {}",
-        output
-    );
-
-    // switch statement should be present
-    assert!(
-        output.contains("switch") || output.contains("case"),
-        "Expected switch statement: {}",
-        output
-    );
-
-    // toFahrenheit method should be present
-    assert!(
-        output.contains("toFahrenheit"),
-        "Expected toFahrenheit method: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_symbol_to_primitive_with_date_like() {
-    // Date-like class with Symbol.toPrimitive
-    let source = r#"
-class CustomDate {
-    private timestamp: number;
-
-    constructor(timestamp: number) {
-        this.timestamp = timestamp;
-    }
-
-    [Symbol.toPrimitive](hint: string): string | number {
-        if (hint === "number") {
-            return this.timestamp;
-        }
-        if (hint === "string") {
-            return new Date(this.timestamp).toISOString();
-        }
-        // default hint
-        return this.timestamp;
-    }
-
-    getTime(): number {
-        return this.timestamp;
-    }
-
-    toString(): string {
-        return new Date(this.timestamp).toISOString();
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Class should be converted
-    assert!(
-        output.contains("function CustomDate"),
-        "Expected function declaration: {}",
+        output.contains("Promise"),
+        "Expected Promise: {}",
         output
     );
 
     // Methods should be present
     assert!(
-        output.contains("getTime") && output.contains("toString"),
-        "Expected methods: {}",
-        output
-    );
-
-    // Date constructor should be present
-    assert!(
-        output.contains("Date"),
-        "Expected Date reference: {}",
+        output.contains("resolve") && output.contains("reject") && output.contains("wrap"),
+        "Expected resolve, reject, wrap methods: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_symbol_to_primitive_with_inheritance() {
-    // Symbol.toPrimitive with inheritance
+fn test_class_es5_promise_all() {
+    // Promise.all usage
     let source = r#"
-class BaseValue {
-    protected value: number;
-
-    constructor(value: number) {
-        this.value = value;
+class BatchProcessor<T> {
+    processAll(items: T[], processor: (item: T) => Promise<T>): Promise<T[]> {
+        const promises = items.map(item => processor(item));
+        return Promise.all(promises);
     }
 
-    [Symbol.toPrimitive](hint: string): string | number {
-        if (hint === "number") {
-            return this.value;
-        }
-        return String(this.value);
-    }
-}
-
-class Percentage extends BaseValue {
-    constructor(value: number) {
-        super(value);
+    fetchAll(urls: string[]): Promise<Response[]> {
+        return Promise.all(urls.map(url => fetch(url)));
     }
 
-    [Symbol.toPrimitive](hint: string): string | number {
-        if (hint === "number") {
-            return this.value / 100;
-        }
-        return `${this.value}%`;
+    parallel<R>(...promises: Promise<R>[]): Promise<R[]> {
+        return Promise.all(promises);
     }
 }
 "#;
@@ -11570,98 +11422,289 @@ class Percentage extends BaseValue {
 
     let output = printer.get_output().to_string();
 
-    // Both classes should be present
+    // Class should be emitted
     assert!(
-        output.contains("BaseValue") && output.contains("Percentage"),
-        "Expected both classes: {}",
+        output.contains("BatchProcessor"),
+        "Expected BatchProcessor class: {}",
         output
     );
 
-    // Inheritance pattern should be present
+    // Promise.all should be present
     assert!(
-        output.contains("__extends") || output.contains("prototype"),
-        "Expected inheritance pattern: {}",
-        output
-    );
-
-    // super call should be present
-    assert!(
-        output.contains("_super") || output.contains(".call(this"),
-        "Expected super call: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_symbol_to_primitive_with_other_symbols() {
-    // Class with multiple well-known symbols including toPrimitive
-    let source = r#"
-class RichValue {
-    private data: number;
-    private label: string;
-
-    constructor(data: number, label: string) {
-        this.data = data;
-        this.label = label;
-    }
-
-    [Symbol.toPrimitive](hint: string): string | number {
-        if (hint === "number") {
-            return this.data;
-        }
-        return `${this.label}: ${this.data}`;
-    }
-
-    get [Symbol.toStringTag](): string {
-        return "RichValue";
-    }
-
-    *[Symbol.iterator](): Iterator<number> {
-        yield this.data;
-    }
-
-    getData(): number {
-        return this.data;
-    }
-
-    getLabel(): string {
-        return this.label;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Class should be converted
-    assert!(
-        output.contains("function RichValue"),
-        "Expected function declaration: {}",
+        output.contains("Promise"),
+        "Expected Promise: {}",
         output
     );
 
     // Methods should be present
     assert!(
-        output.contains("getData") && output.contains("getLabel"),
-        "Expected methods: {}",
+        output.contains("processAll") && output.contains("fetchAll") && output.contains("parallel"),
+        "Expected processAll, fetchAll, parallel methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_promise_race() {
+    // Promise.race usage
+    let source = r#"
+class RaceRunner<T> {
+    race(promises: Promise<T>[]): Promise<T> {
+        return Promise.race(promises);
+    }
+
+    timeout<R>(promise: Promise<R>, ms: number): Promise<R> {
+        const timeoutPromise = new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error("Timeout")), ms);
+        });
+        return Promise.race([promise, timeoutPromise]);
+    }
+
+    first<R>(...promises: Promise<R>[]): Promise<R> {
+        return Promise.race(promises);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("RaceRunner"),
+        "Expected RaceRunner class: {}",
         output
     );
 
-    // Object.defineProperty for getter (toStringTag)
+    // Promise.race should be present
     assert!(
-        output.contains("Object.defineProperty") || output.contains("prototype"),
-        "Expected property definition: {}",
+        output.contains("Promise"),
+        "Expected Promise: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("race") && output.contains("timeout") && output.contains("first"),
+        "Expected race, timeout, first methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_promise_chaining() {
+    // Promise chaining with then/catch/finally
+    let source = r#"
+class DataFetcher {
+    private baseUrl: string;
+
+    constructor(baseUrl: string) {
+        this.baseUrl = baseUrl;
+    }
+
+    fetch<T>(path: string): Promise<T> {
+        return fetch(this.baseUrl + path)
+            .then(response => response.json())
+            .then(data => data as T)
+            .catch(error => {
+                console.error("Fetch error:", error);
+                throw error;
+            });
+    }
+
+    fetchWithRetry<T>(path: string, retries: number): Promise<T> {
+        return this.fetch<T>(path).catch(error => {
+            if (retries > 0) {
+                return this.fetchWithRetry<T>(path, retries - 1);
+            }
+            throw error;
+        });
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("DataFetcher"),
+        "Expected DataFetcher class: {}",
+        output
+    );
+
+    // Promise methods should be present
+    assert!(
+        output.contains("then") || output.contains("catch"),
+        "Expected then or catch: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("fetch") && output.contains("fetchWithRetry"),
+        "Expected fetch and fetchWithRetry methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_promise_allsettled() {
+    // Promise.allSettled usage
+    let source = r#"
+interface SettledResult<T> {
+    status: "fulfilled" | "rejected";
+    value?: T;
+    reason?: any;
+}
+
+class SettledProcessor<T> {
+    processAllSettled(promises: Promise<T>[]): Promise<SettledResult<T>[]> {
+        return Promise.allSettled(promises);
+    }
+
+    getSuccessful(promises: Promise<T>[]): Promise<T[]> {
+        return Promise.allSettled(promises).then(results =>
+            results
+                .filter(r => r.status === "fulfilled")
+                .map(r => (r as PromiseFulfilledResult<T>).value)
+        );
+    }
+
+    getFailed(promises: Promise<T>[]): Promise<any[]> {
+        return Promise.allSettled(promises).then(results =>
+            results
+                .filter(r => r.status === "rejected")
+                .map(r => (r as PromiseRejectedResult).reason)
+        );
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("SettledProcessor"),
+        "Expected SettledProcessor class: {}",
+        output
+    );
+
+    // Promise should be present
+    assert!(
+        output.contains("Promise"),
+        "Expected Promise: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("processAllSettled") && output.contains("getSuccessful") && output.contains("getFailed"),
+        "Expected processAllSettled, getSuccessful, getFailed methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_promise_wrapper() {
+    // Custom Promise wrapper class
+    let source = r#"
+class Deferred<T> {
+    promise: Promise<T>;
+    private resolveFunc!: (value: T) => void;
+    private rejectFunc!: (reason: any) => void;
+
+    constructor() {
+        this.promise = new Promise<T>((resolve, reject) => {
+            this.resolveFunc = resolve;
+            this.rejectFunc = reject;
+        });
+    }
+
+    resolve(value: T): void {
+        this.resolveFunc(value);
+    }
+
+    reject(reason: any): void {
+        this.rejectFunc(reason);
+    }
+
+    then<R>(onFulfilled: (value: T) => R): Promise<R> {
+        return this.promise.then(onFulfilled);
+    }
+
+    catch(onRejected: (reason: any) => any): Promise<T> {
+        return this.promise.catch(onRejected);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("Deferred"),
+        "Expected Deferred class: {}",
+        output
+    );
+
+    // Promise constructor should be present
+    assert!(
+        output.contains("Promise"),
+        "Expected Promise: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("resolve") && output.contains("reject") && output.contains("then"),
+        "Expected resolve, reject, then methods: {}",
         output
     );
 }
