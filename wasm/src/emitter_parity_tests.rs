@@ -14708,6 +14708,269 @@ class EventHandler {
     );
 }
 
+/// Parity test for ES5 private async method with complex await.
+/// Private async method with multiple awaits and error handling.
+#[test]
+fn test_parity_es5_private_async_method_complex() {
+    let source = r#"
+interface ApiResponse<T> { data: T; status: number }
+class DataService {
+    private baseUrl: string = "https://api.example.com";
+
+    async #fetchWithRetry<T>(url: string, retries: number): Promise<ApiResponse<T>> {
+        for (let i = 0; i < retries; i++) {
+            try {
+                const response = await fetch(this.baseUrl + url);
+                const data = await response.json();
+                return { data, status: response.status };
+            } catch (error) {
+                if (i === retries - 1) throw error;
+                await this.#delay(1000 * (i + 1));
+            }
+        }
+        throw new Error("Max retries exceeded");
+    }
+
+    async #delay(ms: number): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    async getData<T>(endpoint: string): Promise<T> {
+        const response = await this.#fetchWithRetry<T>(endpoint, 3);
+        return response.data;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the class
+    assert!(
+        output.contains("DataService"),
+        "Output should contain DataService class: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface"),
+        "ES5 output should erase interface: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": number") && !output.contains("Promise<"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+    // Generic type parameters should be erased
+    assert!(
+        !output.contains("<T>"),
+        "ES5 output should erase generic type parameters: {}",
+        output
+    );
+    // No async method syntax
+    assert!(
+        !output.contains("async #"),
+        "ES5 output should not contain async private method syntax: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 private generator method.
+/// Private generator method in a class.
+#[test]
+fn test_parity_es5_private_generator_method() {
+    let source = r#"
+interface TreeNode<T> { value: T; children: TreeNode<T>[] }
+class TreeIterator<T> {
+    private root: TreeNode<T>;
+
+    constructor(root: TreeNode<T>) {
+        this.root = root;
+    }
+
+    *#traverseDepthFirst(node: TreeNode<T>): Generator<T> {
+        yield node.value;
+        for (const child of node.children) {
+            yield* this.#traverseDepthFirst(child);
+        }
+    }
+
+    *#traverseBreadthFirst(): Generator<T> {
+        const queue: TreeNode<T>[] = [this.root];
+        while (queue.length > 0) {
+            const node = queue.shift()!;
+            yield node.value;
+            queue.push(...node.children);
+        }
+    }
+
+    *values(): Generator<T> {
+        yield* this.#traverseDepthFirst(this.root);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the class
+    assert!(
+        output.contains("TreeIterator"),
+        "Output should contain TreeIterator class: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface"),
+        "ES5 output should erase interface: {}",
+        output
+    );
+    // Generic type parameters should be erased
+    assert!(
+        !output.contains("<T>"),
+        "ES5 output should erase generic type parameters: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": TreeNode") && !output.contains("Generator<T>"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+    // No private generator method syntax
+    assert!(
+        !output.contains("*#"),
+        "ES5 output should not contain private generator method syntax: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 private accessor with complex types.
+/// Private getter/setter with complex type annotations.
+#[test]
+fn test_parity_es5_private_accessor_complex() {
+    let source = r#"
+interface ValidationResult { valid: boolean; errors: string[] }
+class FormField<T> {
+    #value: T;
+    #validators: ((value: T) => ValidationResult)[] = [];
+
+    constructor(initialValue: T) {
+        this.#value = initialValue;
+    }
+
+    get #currentValue(): T {
+        return this.#value;
+    }
+
+    set #currentValue(newValue: T) {
+        this.#value = newValue;
+    }
+
+    get #validationState(): ValidationResult {
+        const allErrors: string[] = [];
+        for (const validator of this.#validators) {
+            const result = validator(this.#currentValue);
+            if (!result.valid) {
+                allErrors.push(...result.errors);
+            }
+        }
+        return { valid: allErrors.length === 0, errors: allErrors };
+    }
+
+    getValue(): T {
+        return this.#currentValue;
+    }
+
+    setValue(value: T): ValidationResult {
+        this.#currentValue = value;
+        return this.#validationState;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the class
+    assert!(
+        output.contains("FormField"),
+        "Output should contain FormField class: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface"),
+        "ES5 output should erase interface: {}",
+        output
+    );
+    // Generic type parameters should be erased
+    assert!(
+        !output.contains("<T>"),
+        "ES5 output should erase generic type parameters: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": ValidationResult") && !output.contains(": T"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+    // No private accessor syntax
+    assert!(
+        !output.contains("get #") && !output.contains("set #"),
+        "ES5 output should not contain private accessor syntax: {}",
+        output
+    );
+}
+
 #[test]
 fn test_parity_es5_static_field_computed() {
     let source = r#"
