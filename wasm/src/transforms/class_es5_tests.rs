@@ -9473,3 +9473,309 @@ class BoundedValue {
         output
     );
 }
+
+// =============================================================================
+// Static Initialization Order Tests
+// =============================================================================
+
+#[test]
+fn test_class_es5_static_init_order_basic() {
+    // Static fields should be initialized in declaration order
+    let source = r#"
+class Config {
+    static first: string = "first";
+    static second: string = Config.first + "_second";
+    static third: string = Config.second + "_third";
+
+    static getAll(): string {
+        return Config.third;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be present
+    assert!(
+        output.contains("Config"),
+        "Expected Config class: {}",
+        output
+    );
+
+    // Static fields should be present
+    assert!(
+        output.contains("first") && output.contains("second") && output.contains("third"),
+        "Expected static fields: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("getAll"),
+        "Expected getAll method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_static_init_order_with_methods() {
+    // Static fields can call static methods during initialization
+    let source = r#"
+class Initializer {
+    static value: number = Initializer.compute();
+    static doubled: number = Initializer.value * 2;
+
+    static compute(): number {
+        return 42;
+    }
+
+    static getDoubled(): number {
+        return Initializer.doubled;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be present
+    assert!(
+        output.contains("Initializer"),
+        "Expected Initializer class: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("compute") && output.contains("getDoubled"),
+        "Expected compute and getDoubled methods: {}",
+        output
+    );
+
+    // Static fields should be present
+    assert!(
+        output.contains("value") && output.contains("doubled"),
+        "Expected value and doubled fields: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_static_init_order_static_block() {
+    // Static blocks execute in order with static fields
+    let source = r#"
+class Database {
+    static connections: string[] = [];
+    static initialized: boolean = false;
+
+    static {
+        Database.connections.push("default");
+        Database.initialized = true;
+    }
+
+    static primaryConnection: string = Database.connections[0];
+
+    static {
+        Database.connections.push("replica");
+    }
+
+    static getConnections(): string[] {
+        return Database.connections;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be present
+    assert!(
+        output.contains("Database"),
+        "Expected Database class: {}",
+        output
+    );
+
+    // Static fields should be present
+    assert!(
+        output.contains("connections") && output.contains("initialized"),
+        "Expected static fields: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("getConnections"),
+        "Expected getConnections method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_static_init_order_inheritance() {
+    // Static initialization order with inheritance
+    let source = r#"
+class BaseLogger {
+    static prefix: string = "[Base]";
+    static level: number = 1;
+
+    static log(msg: string): void {
+        console.log(BaseLogger.prefix, msg);
+    }
+}
+
+class ChildLogger extends BaseLogger {
+    static prefix: string = "[Child]";
+    static childLevel: number = BaseLogger.level + 1;
+
+    static logChild(msg: string): void {
+        console.log(ChildLogger.prefix, msg);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be present
+    assert!(
+        output.contains("BaseLogger") && output.contains("ChildLogger"),
+        "Expected BaseLogger and ChildLogger classes: {}",
+        output
+    );
+
+    // Inheritance should be present
+    assert!(
+        output.contains("__extends") || output.contains("prototype"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("log") && output.contains("logChild"),
+        "Expected log and logChild methods: {}",
+        output
+    );
+
+    // Static fields should be present
+    assert!(
+        output.contains("prefix") && output.contains("level"),
+        "Expected prefix and level fields: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_static_init_order_complex() {
+    // Complex static initialization with multiple dependencies
+    let source = r#"
+class AppConfig {
+    static env: string = "production";
+    static debug: boolean = AppConfig.env !== "production";
+    static apiUrl: string = AppConfig.debug ? "http://localhost:3000" : "https://api.example.com";
+    static timeout: number = AppConfig.debug ? 30000 : 5000;
+
+    static settings = {
+        env: AppConfig.env,
+        debug: AppConfig.debug,
+        apiUrl: AppConfig.apiUrl,
+        timeout: AppConfig.timeout
+    };
+
+    static getSettings(): any {
+        return AppConfig.settings;
+    }
+
+    static isDebug(): boolean {
+        return AppConfig.debug;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be present
+    assert!(
+        output.contains("AppConfig"),
+        "Expected AppConfig class: {}",
+        output
+    );
+
+    // Static fields should be present
+    assert!(
+        output.contains("env") && output.contains("debug") && output.contains("apiUrl"),
+        "Expected static fields: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("getSettings") && output.contains("isDebug"),
+        "Expected getSettings and isDebug methods: {}",
+        output
+    );
+
+    // Settings object should be present
+    assert!(
+        output.contains("settings"),
+        "Expected settings field: {}",
+        output
+    );
+}
