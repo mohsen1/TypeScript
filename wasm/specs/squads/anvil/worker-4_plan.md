@@ -7,12 +7,13 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [ ] Add ES5 class tests for Symbol.iterator patterns in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
+- [ ] (none)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Add ES5 class tests for Symbol.iterator patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for Symbol.for/Symbol.keyFor patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for Symbol.unscopables patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for Symbol.split patterns. Tests: `./wasm/test.sh class_es5_tests`

@@ -14874,3 +14874,392 @@ class PluginRegistry {
         output
     );
 }
+
+// ============================================================================
+// Symbol.iterator Pattern Tests (Full Pipeline)
+// ============================================================================
+
+#[test]
+fn test_class_es5_symbol_iterator_range() {
+    // Custom range iterator implementation
+    let source = r#"
+class Range {
+    private start: number;
+    private end: number;
+    private step: number;
+
+    constructor(start: number, end: number, step: number = 1) {
+        this.start = start;
+        this.end = end;
+        this.step = step;
+    }
+
+    *[Symbol.iterator](): Generator<number> {
+        for (let i = this.start; i <= this.end; i += this.step) {
+            yield i;
+        }
+    }
+
+    toArray(): number[] {
+        return [...this];
+    }
+
+    get length(): number {
+        return Math.ceil((this.end - this.start + 1) / this.step);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function Range"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Symbol.iterator should be present
+    assert!(
+        output.contains("Symbol.iterator") || output.contains("iterator"),
+        "Expected Symbol.iterator reference: {}",
+        output
+    );
+
+    // Helper methods should be present
+    assert!(
+        output.contains("toArray"),
+        "Expected toArray method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_iterator_linked_list() {
+    // Linked list with iterator implementation
+    let source = r#"
+class LinkedListNode<T> {
+    value: T;
+    next: LinkedListNode<T> | null = null;
+
+    constructor(value: T) {
+        this.value = value;
+    }
+}
+
+class LinkedList<T> {
+    private head: LinkedListNode<T> | null = null;
+    private tail: LinkedListNode<T> | null = null;
+    private size: number = 0;
+
+    append(value: T): void {
+        const node = new LinkedListNode(value);
+        if (!this.tail) {
+            this.head = this.tail = node;
+        } else {
+            this.tail.next = node;
+            this.tail = node;
+        }
+        this.size++;
+    }
+
+    *[Symbol.iterator](): Generator<T> {
+        let current = this.head;
+        while (current) {
+            yield current.value;
+            current = current.next;
+        }
+    }
+
+    get length(): number {
+        return this.size;
+    }
+
+    isEmpty(): boolean {
+        return this.size === 0;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Both classes should be converted
+    assert!(
+        output.contains("function LinkedListNode"),
+        "Expected LinkedListNode function: {}",
+        output
+    );
+    assert!(
+        output.contains("function LinkedList"),
+        "Expected LinkedList function: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("append") && output.contains("isEmpty"),
+        "Expected append and isEmpty methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_iterator_with_return_value() {
+    // Iterator with return value and done state
+    let source = r#"
+class CountdownIterator {
+    private count: number;
+
+    constructor(start: number) {
+        this.count = start;
+    }
+
+    [Symbol.iterator](): Iterator<number, string> {
+        let current = this.count;
+        return {
+            next(): IteratorResult<number, string> {
+                if (current > 0) {
+                    return { value: current--, done: false };
+                }
+                return { value: "Liftoff!", done: true };
+            }
+        };
+    }
+
+    reset(value: number): void {
+        this.count = value;
+    }
+
+    get remaining(): number {
+        return this.count;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function CountdownIterator"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("reset"),
+        "Expected reset method: {}",
+        output
+    );
+
+    // remaining getter should be present
+    assert!(
+        output.contains("remaining"),
+        "Expected remaining getter: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_iterator_with_inheritance() {
+    // Iterator with class inheritance
+    let source = r#"
+abstract class IterableCollection<T> {
+    protected items: T[] = [];
+
+    abstract [Symbol.iterator](): Iterator<T>;
+
+    add(item: T): void {
+        this.items.push(item);
+    }
+
+    get size(): number {
+        return this.items.length;
+    }
+}
+
+class ForwardIterable<T> extends IterableCollection<T> {
+    *[Symbol.iterator](): Generator<T> {
+        for (const item of this.items) {
+            yield item;
+        }
+    }
+}
+
+class ReverseIterable<T> extends IterableCollection<T> {
+    *[Symbol.iterator](): Generator<T> {
+        for (let i = this.items.length - 1; i >= 0; i--) {
+            yield this.items[i];
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // All three classes should be converted
+    assert!(
+        output.contains("function IterableCollection"),
+        "Expected IterableCollection function: {}",
+        output
+    );
+    assert!(
+        output.contains("function ForwardIterable"),
+        "Expected ForwardIterable function: {}",
+        output
+    );
+    assert!(
+        output.contains("function ReverseIterable"),
+        "Expected ReverseIterable function: {}",
+        output
+    );
+
+    // Inheritance should be set up
+    assert!(
+        output.contains("__extends") || output.contains("extends"),
+        "Expected inheritance: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_iterator_map_entries() {
+    // Custom map with iterator returning entries
+    let source = r#"
+class SimpleMap<K, V> {
+    private keys: K[] = [];
+    private values: V[] = [];
+
+    set(key: K, value: V): void {
+        const idx = this.keys.indexOf(key);
+        if (idx === -1) {
+            this.keys.push(key);
+            this.values.push(value);
+        } else {
+            this.values[idx] = value;
+        }
+    }
+
+    get(key: K): V | undefined {
+        const idx = this.keys.indexOf(key);
+        return idx !== -1 ? this.values[idx] : undefined;
+    }
+
+    *[Symbol.iterator](): Generator<[K, V]> {
+        for (let i = 0; i < this.keys.length; i++) {
+            yield [this.keys[i], this.values[i]];
+        }
+    }
+
+    *entries(): Generator<[K, V]> {
+        yield* this;
+    }
+
+    *keysIter(): Generator<K> {
+        for (const key of this.keys) {
+            yield key;
+        }
+    }
+
+    *valuesIter(): Generator<V> {
+        for (const value of this.values) {
+            yield value;
+        }
+    }
+
+    get size(): number {
+        return this.keys.length;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function SimpleMap"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Map methods should be present
+    assert!(
+        output.contains("set") && output.contains("get"),
+        "Expected set and get methods: {}",
+        output
+    );
+
+    // Iterator methods should be present
+    assert!(
+        output.contains("entries") && output.contains("keysIter") && output.contains("valuesIter"),
+        "Expected iterator methods: {}",
+        output
+    );
+
+    // size getter should be present
+    assert!(
+        output.contains("size"),
+        "Expected size getter: {}",
+        output
+    );
+}
