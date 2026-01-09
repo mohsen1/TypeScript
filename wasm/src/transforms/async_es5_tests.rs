@@ -12359,3 +12359,104 @@ fn test_async_cache_ignores_nested_async() {
     );
     assert!(!result, "Should not detect await inside nested async cache loader");
 }
+
+// ============================================================================
+// ASYNC BATCHING PATTERN TESTS
+// Tests for batching patterns: batch, debounce, throttle, coalesce
+// ============================================================================
+
+#[test]
+fn test_async_batch_collect() {
+    let result = async_error_propagation_contains_await(
+        "async function batch(items) { return await processBatch(items); }",
+    );
+    assert!(result, "Should detect await in batch collection");
+}
+
+#[test]
+fn test_async_batch_flush() {
+    let result = async_error_propagation_contains_await(
+        "async function flush() { await sendBatch(buffer); buffer.length = 0; }",
+    );
+    assert!(result, "Should detect await in batch flush");
+}
+
+#[test]
+fn test_async_batch_debounce() {
+    let result = async_error_propagation_contains_await(
+        "async function debounced() { clearTimeout(timer); await delay(wait); await action(); }",
+    );
+    assert!(result, "Should detect await in debounce pattern");
+}
+
+#[test]
+fn test_async_batch_throttle() {
+    let result = async_error_propagation_contains_await(
+        "async function throttled() { if (ready) { ready = false; await action(); ready = true; } }",
+    );
+    assert!(result, "Should detect await in throttle pattern");
+}
+
+#[test]
+fn test_async_batch_coalesce() {
+    let result = async_error_propagation_contains_await(
+        "async function coalesce(key) { pending.set(key, value); await flush(); }",
+    );
+    assert!(result, "Should detect await in coalesce pattern");
+}
+
+#[test]
+fn test_async_batch_queue() {
+    let result = async_error_propagation_contains_await(
+        "async function enqueue(item) { queue.push(item); if (queue.length >= size) await flush(); }",
+    );
+    assert!(result, "Should detect await in batch queue");
+}
+
+#[test]
+fn test_async_batch_window() {
+    let result = async_error_propagation_contains_await(
+        "async function window() { await delay(interval); return await processBatch(collected); }",
+    );
+    assert!(result, "Should detect await in batch window");
+}
+
+#[test]
+fn test_async_batch_merge() {
+    let result = async_error_propagation_contains_await(
+        "async function merge(requests) { return await sendMerged(requests); }",
+    );
+    assert!(result, "Should detect await in batch merge");
+}
+
+#[test]
+fn test_async_batch_split() {
+    let result = async_error_propagation_contains_await(
+        "async function split(items) { for (const chunk of chunks(items)) { await process(chunk); } }",
+    );
+    assert!(result, "Should detect await in batch split");
+}
+
+#[test]
+fn test_async_batch_rate_limit() {
+    let result = async_error_propagation_contains_await(
+        "async function rateLimit() { await limiter.acquire(); await action(); }",
+    );
+    assert!(result, "Should detect await in rate limiting");
+}
+
+#[test]
+fn test_async_batch_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function syncBatch(items) { buffer.push(...items); return buffer.length; }",
+    );
+    assert!(!result, "Should not detect await when batching is sync");
+}
+
+#[test]
+fn test_async_batch_ignores_nested_async() {
+    let result = async_error_propagation_contains_await(
+        "async function outer() { const processor = async (batch) => await handle(batch); }",
+    );
+    assert!(!result, "Should not detect await inside nested async batch handler");
+}
