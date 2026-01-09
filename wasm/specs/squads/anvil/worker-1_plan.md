@@ -6,7 +6,14 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-(awaiting next task from EM-Anvil)
+Fix TS2322 false positives ("Type 'X' is not assignable to type 'Y'") from `wasm/specs/squads/anvil/GOALS.md`.
+
+Focus:
+1. Gather 5-10 TS2322 failing samples from conformance run output.
+2. Audit assignability checks in `wasm/src/thin_checker.rs` and `wasm/src/solver/subtype.rs` for the failing patterns.
+3. Implement minimal fixes that reduce TS2322 without adding new false positives.
+4. Add targeted regression tests (prefer `wasm/src/thin_checker_tests.rs`).
+5. Run conformance before/after and record exact match + extra errors in this plan.
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)

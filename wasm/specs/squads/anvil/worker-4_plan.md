@@ -1,4 +1,16 @@
-# Anvil Worker 4 - Parser Edge Cases (TS1005/TS1068)
+# Anvil Worker 4 Plan
+
+## Current Assignment
+Fix crash in `types/mapped/recursiveMappedTypes.ts` (stack overflow) from `wasm/specs/squads/anvil/GOALS.md`.
+
+Focus:
+1. Reproduce the crash via conformance run (or targeted runner) and capture the stack.
+2. Trace mapped type recursion in `wasm/src/solver/` and `wasm/src/thin_checker.rs`.
+3. Add a recursion guard or memoization to prevent infinite recursion.
+4. Add a regression test for the mapped type recursion case.
+5. Run conformance before/after and record exact match + crash count here.
+
+## Completed: TS1005/TS1068 Parser Edge Cases
 
 ## Operation Conformance Assignment
 
