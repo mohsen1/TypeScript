@@ -30931,3 +30931,702 @@ class DynamicAccessor<T extends object> {
         output
     );
 }
+
+/// Test: template string interpolation types
+/// Verifies that classes using template string interpolation transform correctly to ES5
+#[test]
+fn test_class_es5_template_string_interpolation() {
+    let source = r#"
+type Greeting<T extends string> = `Hello, ${T}!`;
+type Farewell<T extends string> = `Goodbye, ${T}!`;
+
+class MessageBuilder {
+    private name: string;
+
+    constructor(name: string) {
+        this.name = name;
+    }
+
+    greet(): string {
+        return "Hello, " + this.name + "!";
+    }
+
+    farewell(): string {
+        return "Goodbye, " + this.name + "!";
+    }
+
+    custom(prefix: string, suffix: string): string {
+        return prefix + this.name + suffix;
+    }
+
+    getName(): string {
+        return this.name;
+    }
+}
+
+type EventName<T extends string> = `on${Capitalize<T>}`;
+
+class EventEmitter {
+    private handlers: { [key: string]: Function[] };
+
+    constructor() {
+        this.handlers = {};
+    }
+
+    on(event: string, handler: Function): void {
+        if (!this.handlers[event]) {
+            this.handlers[event] = [];
+        }
+        this.handlers[event].push(handler);
+    }
+
+    emit(event: string, data: any): void {
+        var handlers = this.handlers[event];
+        if (handlers) {
+            for (var i = 0; i < handlers.length; i++) {
+                handlers[i](data);
+            }
+        }
+    }
+
+    off(event: string, handler: Function): void {
+        var handlers = this.handlers[event];
+        if (handlers) {
+            var index = handlers.indexOf(handler);
+            if (index !== -1) {
+                handlers.splice(index, 1);
+            }
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function MessageBuilder"),
+        "Expected MessageBuilder function: {}",
+        output
+    );
+    assert!(
+        output.contains("MessageBuilder.prototype.greet") && output.contains("MessageBuilder.prototype.farewell"),
+        "Expected greet and farewell methods: {}",
+        output
+    );
+    assert!(
+        output.contains("MessageBuilder.prototype.custom") && output.contains("MessageBuilder.prototype.getName"),
+        "Expected custom and getName methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function EventEmitter"),
+        "Expected EventEmitter function: {}",
+        output
+    );
+    assert!(
+        output.contains("EventEmitter.prototype.on") && output.contains("EventEmitter.prototype.emit"),
+        "Expected on and emit methods: {}",
+        output
+    );
+}
+
+/// Test: template string pattern matching
+/// Verifies that classes using template string pattern matching transform correctly to ES5
+#[test]
+fn test_class_es5_template_pattern_matching() {
+    let source = r#"
+type PathSegment = `/${string}`;
+type QueryParam = `${string}=${string}`;
+
+class UrlParser {
+    private url: string;
+
+    constructor(url: string) {
+        this.url = url;
+    }
+
+    getPath(): string {
+        var questionIndex = this.url.indexOf("?");
+        if (questionIndex === -1) {
+            return this.url;
+        }
+        return this.url.substring(0, questionIndex);
+    }
+
+    getQuery(): string {
+        var questionIndex = this.url.indexOf("?");
+        if (questionIndex === -1) {
+            return "";
+        }
+        return this.url.substring(questionIndex + 1);
+    }
+
+    getSegments(): string[] {
+        var path = this.getPath();
+        return path.split("/").filter(function(s) { return s.length > 0; });
+    }
+
+    getUrl(): string {
+        return this.url;
+    }
+}
+
+type CssUnit = `${number}px` | `${number}em` | `${number}rem`;
+
+class StyleBuilder {
+    private styles: { [key: string]: string };
+
+    constructor() {
+        this.styles = {};
+    }
+
+    set(property: string, value: string): this {
+        this.styles[property] = value;
+        return this;
+    }
+
+    setPx(property: string, value: number): this {
+        this.styles[property] = value + "px";
+        return this;
+    }
+
+    setEm(property: string, value: number): this {
+        this.styles[property] = value + "em";
+        return this;
+    }
+
+    build(): string {
+        var result = [];
+        for (var key in this.styles) {
+            result.push(key + ": " + this.styles[key]);
+        }
+        return result.join("; ");
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function UrlParser"),
+        "Expected UrlParser function: {}",
+        output
+    );
+    assert!(
+        output.contains("UrlParser.prototype.getPath") && output.contains("UrlParser.prototype.getQuery"),
+        "Expected getPath and getQuery methods: {}",
+        output
+    );
+    assert!(
+        output.contains("UrlParser.prototype.getSegments") && output.contains("UrlParser.prototype.getUrl"),
+        "Expected getSegments and getUrl methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function StyleBuilder"),
+        "Expected StyleBuilder function: {}",
+        output
+    );
+    assert!(
+        output.contains("StyleBuilder.prototype.set") && output.contains("StyleBuilder.prototype.setPx"),
+        "Expected set and setPx methods: {}",
+        output
+    );
+    assert!(
+        output.contains("StyleBuilder.prototype.build"),
+        "Expected build method: {}",
+        output
+    );
+}
+
+/// Test: template literal key types
+/// Verifies that classes using template literal key types transform correctly to ES5
+#[test]
+fn test_class_es5_template_literal_keys() {
+    let source = r#"
+type Getters<T> = {
+    [K in keyof T as `get${Capitalize<string & K>}`]: () => T[K];
+};
+
+type Setters<T> = {
+    [K in keyof T as `set${Capitalize<string & K>}`]: (value: T[K]) => void;
+};
+
+class PropertyManager<T extends object> {
+    private data: T;
+
+    constructor(data: T) {
+        this.data = data;
+    }
+
+    get<K extends keyof T>(key: K): T[K] {
+        return this.data[key];
+    }
+
+    set<K extends keyof T>(key: K, value: T[K]): void {
+        this.data[key] = value;
+    }
+
+    getData(): T {
+        return this.data;
+    }
+
+    getKeys(): Array<keyof T> {
+        return Object.keys(this.data) as Array<keyof T>;
+    }
+}
+
+type PrefixedKeys<T, P extends string> = {
+    [K in keyof T as `${P}${string & K}`]: T[K];
+};
+
+class KeyTransformer {
+    prefix<T extends object>(obj: T, prefix: string): object {
+        var result = {} as any;
+        for (var key in obj) {
+            result[prefix + key] = (obj as any)[key];
+        }
+        return result;
+    }
+
+    suffix<T extends object>(obj: T, suffix: string): object {
+        var result = {} as any;
+        for (var key in obj) {
+            result[key + suffix] = (obj as any)[key];
+        }
+        return result;
+    }
+
+    transform<T extends object>(obj: T, fn: (key: string) => string): object {
+        var result = {} as any;
+        for (var key in obj) {
+            result[fn(key)] = (obj as any)[key];
+        }
+        return result;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function PropertyManager"),
+        "Expected PropertyManager function: {}",
+        output
+    );
+    assert!(
+        output.contains("PropertyManager.prototype.get") && output.contains("PropertyManager.prototype.set"),
+        "Expected get and set methods: {}",
+        output
+    );
+    assert!(
+        output.contains("PropertyManager.prototype.getData") && output.contains("PropertyManager.prototype.getKeys"),
+        "Expected getData and getKeys methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function KeyTransformer"),
+        "Expected KeyTransformer function: {}",
+        output
+    );
+    assert!(
+        output.contains("KeyTransformer.prototype.prefix") && output.contains("KeyTransformer.prototype.suffix"),
+        "Expected prefix and suffix methods: {}",
+        output
+    );
+    assert!(
+        output.contains("KeyTransformer.prototype.transform"),
+        "Expected transform method: {}",
+        output
+    );
+}
+
+/// Test: tagged template literal types
+/// Verifies that classes using tagged template literals transform correctly to ES5
+#[test]
+fn test_class_es5_tagged_template_types() {
+    let source = r#"
+class SqlBuilder {
+    private query: string;
+    private params: any[];
+
+    constructor() {
+        this.query = "";
+        this.params = [];
+    }
+
+    select(columns: string[]): this {
+        this.query = "SELECT " + columns.join(", ");
+        return this;
+    }
+
+    from(table: string): this {
+        this.query = this.query + " FROM " + table;
+        return this;
+    }
+
+    where(condition: string, value: any): this {
+        this.query = this.query + " WHERE " + condition;
+        this.params.push(value);
+        return this;
+    }
+
+    getQuery(): string {
+        return this.query;
+    }
+
+    getParams(): any[] {
+        return this.params;
+    }
+}
+
+class HtmlBuilder {
+    private content: string;
+
+    constructor() {
+        this.content = "";
+    }
+
+    tag(name: string, text: string): this {
+        this.content = this.content + "<" + name + ">" + text + "</" + name + ">";
+        return this;
+    }
+
+    div(text: string): this {
+        return this.tag("div", text);
+    }
+
+    span(text: string): this {
+        return this.tag("span", text);
+    }
+
+    p(text: string): this {
+        return this.tag("p", text);
+    }
+
+    build(): string {
+        return this.content;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function SqlBuilder"),
+        "Expected SqlBuilder function: {}",
+        output
+    );
+    assert!(
+        output.contains("SqlBuilder.prototype.select") && output.contains("SqlBuilder.prototype.from"),
+        "Expected select and from methods: {}",
+        output
+    );
+    assert!(
+        output.contains("SqlBuilder.prototype.where") && output.contains("SqlBuilder.prototype.getQuery"),
+        "Expected where and getQuery methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function HtmlBuilder"),
+        "Expected HtmlBuilder function: {}",
+        output
+    );
+    assert!(
+        output.contains("HtmlBuilder.prototype.tag") && output.contains("HtmlBuilder.prototype.div"),
+        "Expected tag and div methods: {}",
+        output
+    );
+    assert!(
+        output.contains("HtmlBuilder.prototype.build"),
+        "Expected build method: {}",
+        output
+    );
+}
+
+/// Test: string manipulation utility types
+/// Verifies that classes using string manipulation utility types transform correctly to ES5
+#[test]
+fn test_class_es5_string_manipulation_types() {
+    let source = r#"
+type Upper<T extends string> = Uppercase<T>;
+type Lower<T extends string> = Lowercase<T>;
+type Cap<T extends string> = Capitalize<T>;
+type Uncap<T extends string> = Uncapitalize<T>;
+
+class StringTransformer {
+    toUpperCase(str: string): string {
+        return str.toUpperCase();
+    }
+
+    toLowerCase(str: string): string {
+        return str.toLowerCase();
+    }
+
+    capitalize(str: string): string {
+        if (str.length === 0) return str;
+        return str.charAt(0).toUpperCase() + str.slice(1);
+    }
+
+    uncapitalize(str: string): string {
+        if (str.length === 0) return str;
+        return str.charAt(0).toLowerCase() + str.slice(1);
+    }
+
+    toCamelCase(str: string): string {
+        return str.replace(/-([a-z])/g, function(match, letter) {
+            return letter.toUpperCase();
+        });
+    }
+
+    toKebabCase(str: string): string {
+        return str.replace(/([A-Z])/g, function(match) {
+            return "-" + match.toLowerCase();
+        });
+    }
+}
+
+class NameFormatter {
+    private firstName: string;
+    private lastName: string;
+
+    constructor(firstName: string, lastName: string) {
+        this.firstName = firstName;
+        this.lastName = lastName;
+    }
+
+    getFullName(): string {
+        return this.firstName + " " + this.lastName;
+    }
+
+    getInitials(): string {
+        return this.firstName.charAt(0).toUpperCase() + this.lastName.charAt(0).toUpperCase();
+    }
+
+    getReversed(): string {
+        return this.lastName + ", " + this.firstName;
+    }
+
+    getUpperCase(): string {
+        return this.getFullName().toUpperCase();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function StringTransformer"),
+        "Expected StringTransformer function: {}",
+        output
+    );
+    assert!(
+        output.contains("StringTransformer.prototype.toUpperCase") && output.contains("StringTransformer.prototype.toLowerCase"),
+        "Expected toUpperCase and toLowerCase methods: {}",
+        output
+    );
+    assert!(
+        output.contains("StringTransformer.prototype.capitalize") && output.contains("StringTransformer.prototype.toCamelCase"),
+        "Expected capitalize and toCamelCase methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function NameFormatter"),
+        "Expected NameFormatter function: {}",
+        output
+    );
+    assert!(
+        output.contains("NameFormatter.prototype.getFullName") && output.contains("NameFormatter.prototype.getInitials"),
+        "Expected getFullName and getInitials methods: {}",
+        output
+    );
+}
+
+/// Test: combined template string patterns
+/// Verifies that classes using combined template string patterns transform correctly to ES5
+#[test]
+fn test_class_es5_combined_template_patterns() {
+    let source = r#"
+type ApiRoute<T extends string> = `/api/${T}`;
+type HttpMethod = "GET" | "POST" | "PUT" | "DELETE";
+type Endpoint<M extends HttpMethod, R extends string> = `${M} ${R}`;
+
+class RouteBuilder {
+    private basePath: string;
+    private routes: string[];
+
+    constructor(basePath: string) {
+        this.basePath = basePath;
+        this.routes = [];
+    }
+
+    get(path: string): this {
+        this.routes.push("GET " + this.basePath + path);
+        return this;
+    }
+
+    post(path: string): this {
+        this.routes.push("POST " + this.basePath + path);
+        return this;
+    }
+
+    put(path: string): this {
+        this.routes.push("PUT " + this.basePath + path);
+        return this;
+    }
+
+    delete(path: string): this {
+        this.routes.push("DELETE " + this.basePath + path);
+        return this;
+    }
+
+    getRoutes(): string[] {
+        return this.routes;
+    }
+}
+
+type I18nKey<N extends string, K extends string> = `${N}.${K}`;
+
+class I18nManager {
+    private translations: { [key: string]: string };
+    private namespace: string;
+
+    constructor(namespace: string) {
+        this.namespace = namespace;
+        this.translations = {};
+    }
+
+    set(key: string, value: string): void {
+        this.translations[this.namespace + "." + key] = value;
+    }
+
+    get(key: string): string {
+        var fullKey = this.namespace + "." + key;
+        return this.translations[fullKey] || fullKey;
+    }
+
+    has(key: string): boolean {
+        var fullKey = this.namespace + "." + key;
+        return fullKey in this.translations;
+    }
+
+    getNamespace(): string {
+        return this.namespace;
+    }
+
+    getAllKeys(): string[] {
+        return Object.keys(this.translations);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function RouteBuilder"),
+        "Expected RouteBuilder function: {}",
+        output
+    );
+    assert!(
+        output.contains("RouteBuilder.prototype.get") && output.contains("RouteBuilder.prototype.post"),
+        "Expected get and post methods: {}",
+        output
+    );
+    assert!(
+        output.contains("RouteBuilder.prototype.put") && output.contains("RouteBuilder.prototype.delete"),
+        "Expected put and delete methods: {}",
+        output
+    );
+    assert!(
+        output.contains("RouteBuilder.prototype.getRoutes"),
+        "Expected getRoutes method: {}",
+        output
+    );
+    assert!(
+        output.contains("function I18nManager"),
+        "Expected I18nManager function: {}",
+        output
+    );
+    assert!(
+        output.contains("I18nManager.prototype.set") && output.contains("I18nManager.prototype.get"),
+        "Expected set and get methods: {}",
+        output
+    );
+    assert!(
+        output.contains("I18nManager.prototype.has") && output.contains("I18nManager.prototype.getNamespace"),
+        "Expected has and getNamespace methods: {}",
+        output
+    );
+}
