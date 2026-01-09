@@ -7,12 +7,26 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] Add ES5 accessor decorator parity tests in `wasm/src/emitter_parity_tests.rs`. Run `./wasm/test.sh emitter_parity`.
+- [ ] (none)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 rest parameter parity tests (class-method, typed-array, arrow, with-defaults) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (180 tests).
+- [x] Added ES5 computed property parity tests (symbol, class-method, expression, accessor) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (176 tests).
+- [x] Added ES5 class static block parity tests (try-catch, loop-init, conditional, derived-class) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (172 tests).
+- [x] Added ES5 private field accessor parity tests (getter, setter, pair, static) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (168 tests).
+- [x] Added ES5 async super call parity tests (basic, with-args, static, with-await) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (164 tests).
+- [x] Added ES5 static initialization order parity tests (properties, blocks, interleaved, derived) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (160 tests).
+- [x] Added ES5 generator function parity tests (return-value, multiple-yields, try-catch, expression) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (156 tests).
+- [x] Added ES5 class expression parity tests (anonymous, named, static, accessor) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (152 tests).
+- [x] Added ES5 import/export parity tests (alias, default-function, interface, type-alias) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (148 tests).
+- [x] Added ES5 enum parity tests (explicit-values, const, computed, heterogeneous) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (144 tests).
+- [x] Added ES5 namespace parity tests (nested, with-class, with-interface, with-enum) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (140 tests).
+- [x] Added ES5 async generator parity tests (try-catch, static, multi-yield, yield-star) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (136 tests).
+- [x] Added ES5 parameter decorator parity tests (multiple, method, factory, multi-params) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (132 tests).
+- [x] Added ES5 accessor decorator parity tests (getter, setter, multiple, static) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (128 tests).
 - [x] Added ES5 property decorator parity tests (multiple, factory, static, initializer) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (124 tests).
 - [x] Added ES5 method decorator parity tests (multiple, factory, static, async) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (120 tests).
 - [x] Added ES5 class decorator parity tests (multiple, factory, generic, extends) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (116 tests).

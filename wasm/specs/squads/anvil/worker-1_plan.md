@@ -8,12 +8,27 @@ Priority: 1
 Blocked: Awaiting next EM-Anvil assignment.
 
 ## Current Assignment
-- [ ] Add ES5 class tests for async methods with generators in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
+- [ ] Add ES5 class tests for Object.keys/Object.create patterns in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 tests for Array.isArray/Array.of patterns (6 tests): isarray basic, array.of basic, isarray guard, static methods, in constructor, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 242 pass).
+- [x] Added ES5 tests for Object.freeze/Object.seal patterns (6 tests): freeze basic, seal basic, deep freeze, state checks, immutable record, frozen singleton. Ran `./wasm/test.sh class_es5_tests` (all 237 pass).
+- [x] Added ES5 tests for Object.getOwnPropertyDescriptor patterns (6 tests): basic, with defineProperty, getOwnPropertyDescriptors, static methods, in constructor, mixin pattern. Ran `./wasm/test.sh class_es5_tests` (all 232 pass).
+- [x] Added ES5 tests for Object.entries/Object.values patterns (6 tests): entries basic, values basic, entries with type, static methods, in constructor, combined. Ran `./wasm/test.sh class_es5_tests` (all 233 pass).
+- [x] Added ES5 tests for String.raw template patterns (6 tests): basic, with expressions, escape sequences, static property, in constructor, multiline. Ran `./wasm/test.sh class_es5_tests` (all 222 pass).
+- [x] Added ES5 tests for Map/Set collection patterns (6 tests): Map basic, Map iteration, Set basic, WeakMap usage, WeakSet usage, combined Graph class. Ran `./wasm/test.sh class_es5_tests` (all 216 pass).
+- [x] Added ES5 tests for Array.from patterns (6 tests): basic, map function, array-like, collections, generator, length. Ran `./wasm/test.sh class_es5_tests` (all 210 pass).
+- [x] Added ES5 tests for Promise patterns (6 tests): resolve/reject, all, race, chaining, allSettled, wrapper. Ran `./wasm/test.sh class_es5_tests` (all 204 pass).
+- [x] Added ES5 tests for Object.assign patterns (6 tests): basic merge, defaults, clone, mixin, constructor, immutable update. Ran `./wasm/test.sh class_es5_tests` (all 198 pass).
+- [x] Added ES5 tests for Reflect API patterns (6 tests): get/set, has/delete, construct, apply, ownKeys, defineProperty. Ran `./wasm/test.sh class_es5_tests` (all 192 pass).
+- [x] Added ES5 tests for WeakRef and FinalizationRegistry (6 tests): basic WeakRef, with deref, FinalizationRegistry basic, with unregister, cache pattern, combined. Ran `./wasm/test.sh class_es5_tests` (all 186 pass).
+- [x] Added ES5 tests for Proxy patterns (6 tests): basic proxy, handler traps, apply trap, factory, with Reflect, revocable. Ran `./wasm/test.sh class_es5_tests` (all 180 pass).
+- [x] Added ES5 tests for new.target (6 tests): basic new.target, derived class, abstract pattern, with static, inheritance chain, undefined check. Ran `./wasm/test.sh class_es5_tests` (all 174 pass).
+- [x] Added ES5 tests for Symbol.species (6 tests): basic Symbol.species, derived class, with methods, returning base, with static members, returning null. Ran `./wasm/test.sh class_es5_tests` (all 163 pass).
+- [x] Added ES5 tests for async generator methods (6 tests): basic async generator, with await, static, with try/catch, in derived class, with yield delegation. Ran `./wasm/test.sh class_es5_tests` (all 164 pass).
 - [x] Added ES5 tests for const assertions (6 tests): object field, array field, static field, in method, in constructor, in derived class. Ran `./wasm/test.sh class_es5_tests` (all 153 pass).
 - [x] Added ES5 tests for satisfies expressions (6 tests): field initializer, in method, static field, in constructor, array literal, in derived class. Ran `./wasm/test.sh class_es5_tests` (all 147 pass).
 - [x] Added ES5 tests for override keyword (6 tests): basic override, accessor, multiple methods, multi-level inheritance, with super call, abstract method. Ran `./wasm/test.sh class_es5_tests` (all 141 pass).

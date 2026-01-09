@@ -7,12 +7,25 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] Add class expression source map tests in `wasm/src/source_map_tests.rs`. Run `./wasm/test.sh source_map`.
+- [ ] Add break/continue statement ES5 source map tests in `wasm/src/source_map_tests.rs`. Run `./wasm/test.sh source_map`.
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added return statement ES5 source map tests (basic, void, expression, conditional, object, array, class method, arrow function, async, combined); `./wasm/test.sh source_map` passes.
+- [x] Added empty statement ES5 source map tests (basic, multiple, in function, in loop, in conditional, in class, in switch, after declaration, in try-catch, combined); `./wasm/test.sh source_map` passes.
+- [x] Added debugger statement ES5 source map tests (basic, in function, conditional, loop, class method, try-catch, arrow function, async, switch, combined); `./wasm/test.sh source_map` passes.
+- [x] Added throw statement ES5 source map tests (basic, string, custom error, expression, in function, conditional, class method, async, rethrow, combined); `./wasm/test.sh source_map` passes.
+- [x] Added with statement ES5 source map tests (basic, property access, method call, nested, function, loop, conditional, assignment, try-catch, combined); `./wasm/test.sh source_map` passes.
+- [x] Added labeled statement ES5 source map tests (basic, for break, while continue, nested, block, switch, in function, do-while, class method, combined); `./wasm/test.sh source_map` passes.
+- [x] Added switch-case ES5 source map tests (basic, default, fall-through, break, return, nested, in function, expression cases, class method, combined); `./wasm/test.sh source_map` passes.
+- [x] Added try-catch-finally ES5 source map tests (basic, try-catch-finally, try-finally, nested, typed catch, rethrow, async, expression, class method, combined); `./wasm/test.sh source_map` passes.
+- [x] Added for-await-of ES5 source map tests (basic, destructuring, nested, try-catch, break/continue, class method, with await, labels, return, combined); `./wasm/test.sh source_map` passes.
+- [x] Added async generator ES5 source map tests (basic, with await, yield* and await, try-catch, class method, for-await-of, return value, expression, nested, combined); `./wasm/test.sh source_map` passes.
+- [x] Added arrow function source map tests (no params, single param, default params, rest params, destructuring params, class property, IIFE, object return, higher-order, combined); `./wasm/test.sh source_map` passes.
+- [x] Added import/export source map tests (named imports, default imports, namespace imports, named exports, default exports, export from, import with alias, type-only imports, side-effect imports, combined); `./wasm/test.sh source_map` passes.
+- [x] Added class expression source map tests (named, with extends, static methods, accessors, in function, with constructor, computed props, in array, in IIFE, combined); `./wasm/test.sh source_map` passes.
 - [x] Added enum transform source map tests (const enums, with initializers, member references, in namespaces, merged enums, reverse mappings, heterogeneous enums, in classes, in switch statements, combined); `./wasm/test.sh source_map` passes.
 - [x] Added decorator source map tests (with arguments, with expression, composition, static method, static property, getter, setter, metadata, inheritance, combined advanced); `./wasm/test.sh source_map` passes.
 - [x] Added private fields source map tests (basic, initialized, constructor, private method, access, assignment, static field, static method, inheritance, combined); `./wasm/test.sh source_map` passes.
