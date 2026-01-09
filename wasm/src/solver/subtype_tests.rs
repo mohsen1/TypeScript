@@ -11035,14 +11035,24 @@ fn test_index_signature_string_basic() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
 
-    let indexed_number = interner.intern(TypeKey::Object {
-        props: vec![],
-        index_signature: Some((TypeId::STRING, TypeId::NUMBER)),
+    let indexed_number = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
     });
 
-    let indexed_string = interner.intern(TypeKey::Object {
-        props: vec![],
-        index_signature: Some((TypeId::STRING, TypeId::STRING)),
+    let indexed_string = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+        number_index: None,
     });
 
     // Different value types - not subtypes
@@ -11058,14 +11068,24 @@ fn test_index_signature_covariant_value() {
 
     let hello = interner.literal_string("hello");
 
-    let indexed_literal = interner.intern(TypeKey::Object {
-        props: vec![],
-        index_signature: Some((TypeId::STRING, hello)),
+    let indexed_literal = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: hello,
+            readonly: false,
+        }),
+        number_index: None,
     });
 
-    let indexed_string = interner.intern(TypeKey::Object {
-        props: vec![],
-        index_signature: Some((TypeId::STRING, TypeId::STRING)),
+    let indexed_string = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+        number_index: None,
     });
 
     // Literal value type is subtype of wider value type
@@ -11080,8 +11100,8 @@ fn test_index_signature_with_known_property() {
 
     let a_name = interner.intern_string("a");
 
-    let indexed_with_prop = interner.intern(TypeKey::Object {
-        props: vec![PropertyInfo {
+    let indexed_with_prop = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
             name: a_name,
             type_id: TypeId::STRING,
             write_type: TypeId::STRING,
@@ -11089,12 +11109,22 @@ fn test_index_signature_with_known_property() {
             readonly: false,
             is_method: false,
         }],
-        index_signature: Some((TypeId::STRING, TypeId::STRING)),
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+        number_index: None,
     });
 
-    let indexed_only = interner.intern(TypeKey::Object {
-        props: vec![],
-        index_signature: Some((TypeId::STRING, TypeId::STRING)),
+    let indexed_only = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+        number_index: None,
     });
 
     // Object with known property and index signature is subtype
@@ -11107,14 +11137,24 @@ fn test_index_signature_number_index() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
 
-    let number_indexed = interner.intern(TypeKey::Object {
-        props: vec![],
-        index_signature: Some((TypeId::NUMBER, TypeId::STRING)),
+    let number_indexed = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
     });
 
-    let string_indexed = interner.intern(TypeKey::Object {
-        props: vec![],
-        index_signature: Some((TypeId::STRING, TypeId::STRING)),
+    let string_indexed = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+        number_index: None,
     });
 
     // Number index and string index are different
@@ -11130,14 +11170,24 @@ fn test_index_signature_union_value() {
 
     let union_value = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
 
-    let indexed_union = interner.intern(TypeKey::Object {
-        props: vec![],
-        index_signature: Some((TypeId::STRING, union_value)),
+    let indexed_union = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: union_value,
+            readonly: false,
+        }),
+        number_index: None,
     });
 
-    let indexed_string = interner.intern(TypeKey::Object {
-        props: vec![],
-        index_signature: Some((TypeId::STRING, TypeId::STRING)),
+    let indexed_string = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+        number_index: None,
     });
 
     // string is subtype of string | number
@@ -11173,9 +11223,14 @@ fn test_index_signature_object_to_indexed() {
         },
     ]);
 
-    let indexed = interner.intern(TypeKey::Object {
-        props: vec![],
-        index_signature: Some((TypeId::STRING, TypeId::STRING)),
+    let indexed = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+        number_index: None,
     });
 
     // Object with matching property types is subtype of index signature
