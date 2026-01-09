@@ -6,12 +6,13 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-- [ ] Add ES5 class tests for infer keyword patterns: array element, function return, promise unwrap
+(awaiting assignment)
 
 ## Task Queue
 (empty)
 
 ## Completed
+- [x] Added ES5 tests for infer keyword patterns (6 tests): array element, function return, promise unwrap, constructor params, tuple elements, combined infer patterns. Ran `./wasm/test.sh class_es5_tests` (all 407 pass).
 - [x] Added ES5 tests for mapped type patterns (6 tests): Partial, Required, Readonly, Pick, Omit, Record. Ran `./wasm/test.sh class_es5_tests` (all 401 pass).
 - [x] Added ES5 tests for union type patterns (6 tests): discriminated unions, type narrowing, string literal unions, number literal unions, nullable unions, combined union patterns. Ran `./wasm/test.sh class_es5_tests` (all 395 pass).
 - [x] Added ES5 tests for intersection type patterns (6 tests): object intersection, interface merging, conditional intersection, generic intersection, mixin intersection patterns, combined intersection patterns. Ran `./wasm/test.sh class_es5_tests` (all 389 pass).
