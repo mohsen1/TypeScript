@@ -76,6 +76,10 @@ Improve assignability diagnostics and reduce false positives/negatives for TS232
 - [x] Fixed BindResult import issue in lib.rs
 - [x] Cleaned up duplicate check_property_accessibility code from rebase conflict
 - [x] Fixed let...else syntax error in protected access check (converted to match expression)
+- [x] Merged with origin/rust, fixed s_sym scope bug in solver/subtype.rs
+- [x] Added get_type_of_assignment_target function for binary expression checking
+- [x] Added check_parameter_initializers function for TS2322 on default parameter values
+- [x] Applied check_parameter_initializers to constructors, methods, accessors, functions
 
 ## Ready for Merge
 No
@@ -89,8 +93,9 @@ No
 - **NEVER edit**: `STRUCTURE.md`, `GOALS.md`, other workers' plan files, or anything in `orchestrator/`
 
 ## Resume
-- Branch/state: `worker/forge-4`, local changes in `package-lock.json`, `wasm/src/binder.rs`, `wasm/src/thin_binder.rs`, `wasm/src/parser/thin_node.rs`, `wasm/src/checker/context.rs`, `wasm/src/thin_checker.rs`, and this plan file.
-- Added: constructor-access tracking in `wasm/src/checker/context.rs` (protected/private sets) and related checks in `wasm/src/thin_checker.rs` (assignment/var-decl fallback for `typeof` class).
-- Added: `type_contains_error` to suppress TS2322 cascades; `check_property_accessibility` now returns bool and `get_type_of_property_access`/`get_type_of_element_access` return `TypeId::ERROR` on access violations.
-- Repro: `node scripts/test-rust-compiler.mjs tests/cases/conformance/classes/constructorDeclarations/classConstructorAccessibility3.ts` now matches TS2322 baseline; `classPropertyAsPrivate` matches 8x TS2341 but still emits extra TS7006/7010.
-- TS2322 scan: `/tmp/ts2322-scan.js 6000` => Missing: `constructorImplementationWithDefaultValues2`, `constructorWithAssignableReturnExpression`, `typeOfThisInstanceMemberNarrowedWithLoopAntecedent`; Extra: `derivedClassWithoutExplicitConstructor3`, `instancePropertiesInheritedIntoClassType`, `instancePropertyInClassType`, `derivedClassOverridesProtectedMembers3` (plus many crashes due to missing libs).
+- Branch/state: `worker/forge-4`, synced with origin/rust, all changes committed and pushed.
+- Session work: Fixed s_sym bug in subtype.rs, added get_type_of_assignment_target, added check_parameter_initializers for TS2322 on default param values.
+- Test results: constructorImplementationWithDefaultValues2 now produces all 4 expected TS2322 errors (plus some extra 2304/7006 from overload handling).
+- typeOfThisInstanceMemberNarrowedWithLoopAntecedent: now passes (error codes match).
+- constructorWithAssignableReturnExpression: different issue (needs constructor return type checking, error 2409).
+- Unit tests: 4842 passed, 71 failed, 1 skipped (same as origin/rust baseline).
