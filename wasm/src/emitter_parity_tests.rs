@@ -6102,3 +6102,202 @@ class AppConfig {
         output
     );
 }
+
+/// Parity test for ES5 multiple parameter decorators.
+/// Multiple decorators on a single parameter should be lowered properly.
+#[test]
+fn test_parity_es5_parameter_decorator_multiple() {
+    let source = r#"function required(target: any, key: string, index: number) {}
+function validate(target: any, key: string, index: number) {}
+
+class UserService {
+    createUser(@required @validate name: string): void {}
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify class exists
+    assert!(
+        output.contains("UserService"),
+        "Output should define UserService class: {}",
+        output
+    );
+    // No decorator syntax in ES5
+    assert!(
+        !output.contains("@required") && !output.contains("@validate"),
+        "ES5 output should not contain decorator syntax: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": void"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 parameter decorator on method.
+/// Parameter decorator on regular method should be lowered properly.
+#[test]
+fn test_parity_es5_parameter_decorator_method() {
+    let source = r#"function log(target: any, key: string, index: number) {}
+
+class Logger {
+    write(@log message: string): void {
+        console.log(message);
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify class exists
+    assert!(
+        output.contains("Logger"),
+        "Output should define Logger class: {}",
+        output
+    );
+    // No decorator syntax in ES5
+    assert!(
+        !output.contains("@log"),
+        "ES5 output should not contain @log decorator syntax: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": void"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 parameter decorator factory.
+/// Parameter decorator factories with arguments should be lowered properly.
+#[test]
+fn test_parity_es5_parameter_decorator_factory() {
+    let source = r#"function maxLength(max: number) {
+    return function(target: any, key: string, index: number) {};
+}
+
+class FormValidator {
+    validate(@maxLength(100) input: string): boolean {
+        return true;
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify class exists
+    assert!(
+        output.contains("FormValidator"),
+        "Output should define FormValidator class: {}",
+        output
+    );
+    // No decorator syntax in ES5
+    assert!(
+        !output.contains("@maxLength"),
+        "ES5 output should not contain @maxLength decorator syntax: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": boolean"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 multiple parameters with decorators.
+/// Multiple parameters each with decorators should be lowered properly.
+#[test]
+fn test_parity_es5_parameter_decorator_multi_params() {
+    let source = r#"function inject(target: any, key: string, index: number) {}
+
+class Container {
+    resolve(@inject a: string, @inject b: number, @inject c: boolean): void {}
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify class exists
+    assert!(
+        output.contains("Container"),
+        "Output should define Container class: {}",
+        output
+    );
+    // No decorator syntax in ES5
+    assert!(
+        !output.contains("@inject"),
+        "ES5 output should not contain @inject decorator syntax: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": boolean") && !output.contains(": void"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
