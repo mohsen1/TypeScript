@@ -17,12 +17,30 @@ Priority: 2
 - [x] Discriminated union tests (type narrowing, exhaustiveness)
 - [x] Never type tests (impossible values, exhaustiveness)
 - [x] Any type tests (type erasure, type assertions)
+- [x] Tuple type tests (labeled elements, rest, optional, spreads)
 
 ## Task Queue
 - [ ] Implement TypeResolver for TypeEvaluator to resolve Refs inside Mapped/Conditional types
 - [ ] This would enable full evaluation of complex patterns like `{ [K in keyof R]: ExtractAction<R[K]> }[keyof R]`
 
 ## Completed
+- [x] Added 29 tuple type tests including:
+  - Basic fixed-length tuples
+  - Labeled elements [name: string, age: number]
+  - Optional elements [string, number?, boolean?]
+  - Rest element at end/start/middle
+  - Labeled with optional, labeled rest
+  - Empty tuple, single element tuple
+  - Nested tuples, tuple spreads
+  - Union/object/function/literal elements
+  - Multiple optional at end, optional before rest
+  - Never/any/unknown elements
+  - Readonly array spread
+  - Tuple parameter inference
+  - Promise elements
+  - Tuple vs array distinction
+  - Long tuples (10 elements)
+  - Mixed labels
 - [x] Added 29 any type tests including:
   - Basic any identity and type key lookup
   - Any in union (absorption) and intersection
@@ -182,6 +200,7 @@ Worker 2 branch now contains:
 - 22 discriminated union tests (type narrowing, exhaustiveness)
 - 30 never type tests (impossible values, exhaustiveness)
 - 29 any type tests (type erasure, type assertions)
+- 29 tuple type tests (labeled elements, rest, optional, spreads)
 - No modifications to evaluate.rs or other core files
 - Pure test additions that can be safely merged
 
