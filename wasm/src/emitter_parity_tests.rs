@@ -8074,3 +8074,220 @@ class Registry {
         output
     );
 }
+
+// ============================================================================
+// ES5 CLASS STATIC BLOCK PARITY TESTS (ADDITIONAL)
+// ============================================================================
+
+#[test]
+fn test_parity_es5_static_block_try_catch() {
+    let source = r#"
+class SafeInit {
+    static config: Record<string, string> = {};
+
+    static {
+        try {
+            SafeInit.config["key"] = "value";
+        } catch (e: unknown) {
+            SafeInit.config["error"] = "failed";
+        }
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the class
+    assert!(
+        output.contains("SafeInit"),
+        "Output should contain SafeInit class: {}",
+        output
+    );
+    // Should contain try-catch structure
+    assert!(
+        output.contains("try") && output.contains("catch"),
+        "Output should contain try-catch: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": unknown"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_static_block_loop_init() {
+    let source = r#"
+class LookupTable {
+    static table: number[] = [];
+
+    static {
+        for (let i = 0; i < 10; i++) {
+            LookupTable.table.push(i * i);
+        }
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the class
+    assert!(
+        output.contains("LookupTable"),
+        "Output should contain LookupTable class: {}",
+        output
+    );
+    // Should contain loop structure
+    assert!(
+        output.contains("for"),
+        "Output should contain for loop: {}",
+        output
+    );
+    // let should be transformed to var
+    assert!(
+        !output.contains("let i"),
+        "let should be transformed to var: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_static_block_conditional() {
+    let source = r#"
+class Environment {
+    static isDev: boolean = false;
+    static apiUrl: string;
+
+    static {
+        if (Environment.isDev) {
+            Environment.apiUrl = "http://localhost:3000";
+        } else {
+            Environment.apiUrl = "https://api.example.com";
+        }
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the class
+    assert!(
+        output.contains("Environment"),
+        "Output should contain Environment class: {}",
+        output
+    );
+    // Should contain conditional structure
+    assert!(
+        output.contains("if") && output.contains("else"),
+        "Output should contain if-else: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": boolean") && !output.contains(": string"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_static_block_derived_class() {
+    let source = r#"
+class Parent {
+    static parentValue: number = 10;
+}
+
+class Child extends Parent {
+    static childValue: number;
+
+    static {
+        Child.childValue = Parent.parentValue * 2;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain both classes
+    assert!(
+        output.contains("Parent") && output.contains("Child"),
+        "Output should contain Parent and Child classes: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
