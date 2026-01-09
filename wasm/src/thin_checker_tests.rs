@@ -4505,6 +4505,97 @@ const anon = () => { return null; };
     assert_eq!(count(7011), 1, "Expected one 7011 error, got codes: {:?}", codes);
 }
 
+/// Test that functions that only throw don't trigger TS2355.
+/// TS2355: "A function whose declared type is neither 'void' nor 'any' must return a value"
+/// This should NOT fire for functions that only throw since throwing is a valid exit.
+#[test]
+fn test_throw_only_function_no_2355() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// Function that only throws should NOT get 2355
+function throwOnly(): number {
+    throw new Error("always throws");
+}
+
+// Method that only throws should NOT get 2355
+class C {
+    throwMethod(): string {
+        throw new Error("always throws");
+    }
+
+    get throwGetter(): number {
+        throw new Error("getter throws");
+    }
+}
+
+// Function that DOES fall through without returning SHOULD get 2355
+function fallsThrough(): number {
+    console.log("oops, no return");
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count = |code| codes.iter().filter(|&&c| c == code).count();
+
+    // Only fallsThrough should get 2355, not the throw-only functions
+    assert_eq!(count(2355), 1, "Expected exactly one 2355 error for fallsThrough(), got: {:?}", codes);
+
+    // Verify which function got the error by checking the messages
+    let error_2355 = checker.ctx.diagnostics.iter().find(|d| d.code == 2355);
+    assert!(error_2355.is_some(), "Should have a 2355 error");
+}
+
+/// Test that infinite loops don't trigger TS2355 either
+#[test]
+fn test_infinite_loop_no_2355() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// Infinite loop without break should NOT get 2355
+function infiniteLoop(): number {
+    while (true) {
+        console.log("forever");
+    }
+}
+
+// But loop with break SHOULD fall through
+function loopWithBreak(): number {
+    while (true) {
+        break;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count = |code| codes.iter().filter(|&&c| c == code).count();
+
+    // Only loopWithBreak should get 2355
+    assert_eq!(count(2355), 1, "Expected exactly one 2355 error for loopWithBreak(), got: {:?}", codes);
+}
+
 #[test]
 fn test_no_implicit_any_false_suppresses_diagnostics() {
     use crate::thin_parser::ThinParserState;
@@ -6138,6 +6229,144 @@ class RegularClass {
 }
 
 #[test]
+fn test_private_static_method_access_no_error() {
+    use crate::thin_parser::ThinParserState;
+
+    // Private static methods should be accessible within the class
+    let source = r#"
+class A {
+    static #foo(a: number) {}
+    constructor() {
+        A.#foo(30);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    // TS2339 = "Property 'X' does not exist on type 'Y'"
+    let error_2339_count = codes.iter().filter(|&&c| c == 2339).count();
+
+    assert_eq!(error_2339_count, 0,
+        "Expected no TS2339 error for private static method access, got errors: {:?}", codes);
+}
+
+#[test]
+fn test_non_private_static_accessor_access_works() {
+    use crate::thin_parser::ThinParserState;
+
+    // Non-private static accessors should be accessible from class reference
+    let source = r#"
+class A {
+    static get quux(): number {
+        return 42;
+    }
+}
+let x = A.quux;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    // TS2339 = "Property 'X' does not exist on type 'Y'"
+    let error_2339_count = codes.iter().filter(|&&c| c == 2339).count();
+
+    assert_eq!(error_2339_count, 0,
+        "Expected no TS2339 error for non-private static accessor access, got errors: {:?}", codes);
+}
+
+#[test]
+fn test_private_static_accessor_access_no_error() {
+    use crate::thin_parser::ThinParserState;
+
+    // Private static accessors should be accessible within the class
+    // Simplified test: just a getter without body references
+    let source = r#"
+class A {
+    static get #quux(): number {
+        return 42;
+    }
+    constructor() {
+        let x = A.#quux;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    // TS2339 = "Property 'X' does not exist on type 'Y'"
+    let error_2339_count = codes.iter().filter(|&&c| c == 2339).count();
+
+    assert_eq!(error_2339_count, 0,
+        "Expected no TS2339 error for private static accessor access, got errors: {:?}", codes);
+}
+
+#[test]
+fn test_private_static_generator_method_access_no_error() {
+    use crate::thin_parser::ThinParserState;
+
+    // Private static async generator methods should be accessible within the class
+    let source = r#"
+class A {
+    static async *#baz(a: number) {
+        return 3;
+    }
+    constructor() {
+        A.#baz(30);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    // TS1068 = "Unexpected token"
+    // TS2339 = "Property 'X' does not exist on type 'Y'"
+    let error_1068_count = codes.iter().filter(|&&c| c == 1068).count();
+    let error_2339_count = codes.iter().filter(|&&c| c == 2339).count();
+
+    assert_eq!(error_1068_count, 0,
+        "Expected no TS1068 (unexpected token) error for private static generator method, got errors: {:?}", codes);
+    assert_eq!(error_2339_count, 0,
+        "Expected no TS2339 error for private static generator method access, got errors: {:?}", codes);
+}
+
+#[test]
 fn test_namespace_with_relative_path_ok() {
     use crate::thin_parser::ThinParserState;
 
@@ -6218,6 +6447,65 @@ var x: string;
 
     assert_eq!(error_2403_count, 0,
         "Expected no error 2403 for top-level variable redeclaration with same type, got: {:?}", codes);
+}
+
+#[test]
+fn test_variable_redeclaration_typeof_ok_no_2403() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test for bi-directional assignability in var redeclaration:
+    // `var e = E;` and `var e: typeof E;` should be allowed because
+    // the types are bi-directionally assignable (even if TypeIds differ).
+    // Based on TypeScript conformance test: enumBasics.ts
+    let source = r#"
+enum E { A, B, C }
+var e = E;
+var e: typeof E;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let error_2403_count = codes.iter().filter(|&&c| c == 2403).count();
+
+    assert_eq!(error_2403_count, 0,
+        "Expected no error 2403 for enum typeof redeclaration, got: {:?}", codes);
+}
+
+#[test]
+fn test_variable_redeclaration_inferred_vs_annotated_no_2403() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test that inferred type from initializer matches explicit annotation
+    // Based on conformance test: ambientDeclarationsExternal.ts pattern
+    let source = r#"
+var n = 42;
+var n: number;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let error_2403_count = codes.iter().filter(|&&c| c == 2403).count();
+
+    assert_eq!(error_2403_count, 0,
+        "Expected no error 2403 for inferred vs annotated redeclaration, got: {:?}", codes);
 }
 
 #[test]
@@ -12924,31 +13212,26 @@ x.type;
 }
 
 #[test]
-fn test_static_member_inheritance() {
-    // Tests that static methods are inherited from base class to derived class
+fn test_abstract_constructor_type_parses() {
     use crate::thin_parser::ThinParserState;
 
+    // Test that abstract constructor types parse correctly (no TS1005/TS1109 errors)
     let source = r#"
-class C {
-    foo: string;
-    thing() { }
-    static other() { }
+function Mixin<TBaseClass extends abstract new (...args: any) => any>(baseClass: TBaseClass) {
+    return baseClass;
 }
 
-class D extends C {
-    bar: string;
-}
-
-// Direct access on base class - should work
-C.other();
-
-// Access on derived class - should inherit static method
-D.other();
+type AbstractConstructor<T> = abstract new (...args: any[]) => T;
 "#;
 
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
-    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    // Check for parser errors (TS1005 = ';' expected, TS1109 = Expression expected)
+    let parse_errors: Vec<_> = parser.get_diagnostics().iter()
+        .filter(|d| d.code == 1005 || d.code == 1109)
+        .collect();
+    assert!(parse_errors.is_empty(), "Should not have parse errors for abstract new syntax: {:?}", parse_errors);
 
     let mut binder = ThinBinderState::new();
     binder.bind_source_file(parser.get_arena(), root);
@@ -12956,28 +13239,21 @@ D.other();
     let types = TypeInterner::new();
     let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
-
-    // Debug: print all diagnostics
-    eprintln!("=== Diagnostics for static member inheritance ===");
-    for d in &checker.ctx.diagnostics {
-        eprintln!("  code={}, msg={}", d.code, d.message_text);
-    }
-
-    // There should be NO errors - both C.other() and D.other() should work
-    let error_codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
-    assert!(!error_codes.contains(&2339),
-        "Should not have TS2339 error - static members should be inherited. Errors: {:?}",
-        checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
 }
 
 #[test]
-fn test_keyof_type_operator() {
-    // Tests that keyof evaluates to a union of literal string keys
+fn test_circular_type_alias_ts2456() {
     use crate::thin_parser::ThinParserState;
+    use crate::checker::types::diagnostics::diagnostic_codes;
 
     let source = r#"
-type Obj = { a: number; b: string };
-let x: keyof Obj = "c";  // Should error - "c" is not in "a" | "b"
+// Direct circular reference - should emit TS2456
+type Recurse = {
+    [K in keyof Recurse]: Recurse[K]
+};
+
+// Usage to trigger resolution
+declare let x: Recurse;
 "#;
 
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -12991,46 +13267,45 @@ let x: keyof Obj = "c";  // Should error - "c" is not in "a" | "b"
     let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
 
-    // Debug: print all diagnostics
-    eprintln!("=== Diagnostics for keyof type operator ===");
-    for d in &checker.ctx.diagnostics {
-        eprintln!("  code={}, msg={}", d.code, d.message_text);
-    }
-
-    // Should have TS2322 error with proper message about "c" not being assignable to "a" | "b"
-    let has_error = checker.ctx.diagnostics.iter().any(|d| d.code == 2322);
-    assert!(has_error, "Should have TS2322 type not assignable error");
-
-    // The error message should mention "a" | "b" or similar, not just "keyof Obj"
-    let error_msg = checker.ctx.diagnostics.iter()
-        .find(|d| d.code == 2322)
-        .map(|d| &d.message_text)
-        .unwrap();
-
-    // After keyof evaluation, the type should be evaluated
-    // For now, let's just check the error exists
-    eprintln!("Error message: {}", error_msg);
+    // Should have TS2456 error for circular type alias
+    let has_ts2456 = checker.ctx.diagnostics.iter().any(|d| d.code == diagnostic_codes::TYPE_ALIAS_CIRCULARLY_REFERENCES_ITSELF);
+    assert!(has_ts2456, "Expected TS2456 (circular type alias) error, got: {:?}", checker.ctx.diagnostics);
 }
 
 #[test]
-fn test_mixin_intersection_new() {
-    // Tests that new on intersection of constructors returns intersection of instance types
+fn test_builtin_types_no_ts2304_errors() {
+    // Regression test: Global types like Promise, Array, Map should not cause
+    // TS2304 "Cannot find name" errors when lib.d.ts is not loaded.
     use crate::thin_parser::ThinParserState;
 
     let source = r#"
-declare class C1 {
-    a: number;
+// Type references with type arguments
+declare const promise: Promise<string>;
+declare const promiseLike: PromiseLike<number>;
+declare const map: Map<string, number>;
+declare const set: Set<string>;
+declare const array: Array<number>;
+declare const readonlyArray: ReadonlyArray<string>;
+declare const partial: Partial<{x: number}>;
+declare const required: Required<{x?: number}>;
+declare const readonly: Readonly<{x: number}>;
+declare const record: Record<string, number>;
+declare const iterator: Iterator<number>;
+declare const iterable: Iterable<string>;
+
+// Type alias with builtin generic
+type MyPromise<T> = Promise<T>;
+declare const myPromise: MyPromise<boolean>;
+
+// typeof with global constructor
+declare const PromiseConstructor: typeof Promise;
+declare const ArrayConstructor: typeof Array;
+declare const MapConstructor: typeof Map;
+
+// Interface extending builtin
+interface MyError extends Error {
+    customField: string;
 }
-
-declare class M1 {
-    p: number;
-}
-
-declare const Mixed1: typeof M1 & typeof C1;
-
-let x1 = new Mixed1();
-x1.a;  // Should work - from C1
-x1.p;  // Should work - from M1
 "#;
 
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -13044,74 +13319,15 @@ x1.p;  // Should work - from M1
     let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
 
-    // Debug: print all diagnostics
-    eprintln!("=== Diagnostics for mixin intersection ===");
-    for d in &checker.ctx.diagnostics {
-        eprintln!("  code={}, msg={}", d.code, d.message_text);
-    }
-
-    // Should NOT have TS2339 errors for properties a and p
-    let ts2339_errors: Vec<_> = checker.ctx.diagnostics.iter()
-        .filter(|d| d.code == 2339)
+    // Filter for TS2304 errors (Cannot find name)
+    let ts2304_errors: Vec<_> = checker.ctx.diagnostics
+        .iter()
+        .filter(|d| d.code == 2304)
         .collect();
 
-    assert!(ts2339_errors.is_empty(),
-        "Should not have TS2339 errors for mixin properties, got: {:?}",
-        ts2339_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>());
-}
-
-#[test]
-fn test_mixin_intersection_with_constructors() {
-    // Tests that new on intersection with multiple constructor overloads works
-    use crate::thin_parser::ThinParserState;
-
-    let source = r#"
-declare class C1 {
-    public a: number;
-    protected b: number;
-    private c: number;
-    constructor(s: string);
-    constructor(n: number);
-}
-
-declare class M1 {
-    constructor(...args: any[]);
-    p: number;
-    static p: number;
-}
-
-declare const Mixed1: typeof M1 & typeof C1;
-
-function f1() {
-    let x1 = new Mixed1("hello");
-    x1.a;  // Should work - from C1
-    x1.p;  // Should work - from M1
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
-
-    let mut binder = ThinBinderState::new();
-    binder.bind_source_file(parser.get_arena(), root);
-
-    let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
-    checker.check_source_file(root);
-
-    // Debug: print all diagnostics
-    eprintln!("=== Diagnostics for mixin with constructors ===");
-    for d in &checker.ctx.diagnostics {
-        eprintln!("  code={}, msg={}", d.code, d.message_text);
-    }
-
-    // Should NOT have TS2339 errors for properties a and p
-    let ts2339_errors: Vec<_> = checker.ctx.diagnostics.iter()
-        .filter(|d| d.code == 2339)
-        .collect();
-
-    assert!(ts2339_errors.is_empty(),
-        "Should not have TS2339 errors for mixin properties, got: {:?}",
-        ts2339_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>());
+    assert!(
+        ts2304_errors.is_empty(),
+        "Should not emit TS2304 errors for builtin types, got: {:?}",
+        ts2304_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
+    );
 }

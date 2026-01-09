@@ -82,3 +82,37 @@
 1. Trace why `type Recurse = { [K in keyof Recurse]: Recurse[K] }` does not emit TS2456/TS2313.
 2. Add diagnostics for circular constraints/type aliases in `ThinCheckerState` (look at symbol resolution guards and alias type computation).
 3. Ensure depth/excessive instantiation errors (TS2589) surface for recursive mapped types.
+
+## Follow-up (2026-01-09) - Circular Type Alias TS2456 Detection
+
+**Mission**: Add TS2456 (circular type alias) diagnostic emission for self-referential type aliases.
+
+**Status**: IN PROGRESS
+
+### Checklist
+
+- [x] Investigated how circular type alias detection should work
+- [x] Traced type alias resolution in `thin_checker.rs` (`get_type_of_symbol` → `symbol_resolution_set`)
+- [x] Added TS2456 emission in circular reference detection (`get_type_of_symbol`)
+- [x] Added regression test: `test_circular_type_alias_ts2456` (PASS)
+- [x] Fixed unrelated bug in `solver/subtype.rs` (dead code referencing undefined variable)
+- [ ] Conformance test for `recursiveMappedTypes.ts` - TS2456 still not firing for all cases
+
+### Files Modified
+
+- `wasm/src/thin_checker.rs` (TS2456 emission in circular symbol resolution)
+- `wasm/src/solver/subtype.rs` (fixed dead code bug)
+- `wasm/src/thin_checker_tests.rs` (circular type alias test)
+
+### Notes
+
+- The basic circular type alias detection works for simple cases (`type Recurse = { [K in keyof Recurse]: Recurse[K] }` in unit test).
+- Conformance tests show TS2456 is still marked as "missing" for `recursiveMappedTypes.ts`. This may be due to:
+  1. Complex mapped type resolution paths that bypass symbol resolution
+  2. Different error reporting locations (TSC may report multiple TS2456 while we only report once)
+  3. Additional circular patterns not yet covered by our detection
+- Pre-existing issues (not caused by this work):
+  - Driver test `compile_class_with_generic_constructor` fails with TS2322 errors
+  - Conformance tests `mappedTypes2.ts` and `recursiveMappedTypes.ts` crash with "unreachable" (from upstream merge)
+
+Ready for Merge: No (partial TS2456 implementation; needs investigation of pre-existing crashes)
