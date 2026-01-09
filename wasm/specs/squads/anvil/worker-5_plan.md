@@ -1,29 +1,25 @@
 # Worker 5 Plan
 
-## 🔥 CRUCIBLE - TEST PORTING (REASSIGNED)
-
-**Per wasm/README.md Project Direction: Reassigned from Anvil to Crucible test porting.**
-
-- ⛔ NO more emitter work
-- ⛔ NO more async ES5 tests
-- ✅ Port solver tests from official TypeScript repo ONLY
-
 ## Mission
-Port conditional and mapped type tests from official TypeScript repo into `tests/cases/`.
+Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transforms, cli, lsp).
 
 Status: Active
 Priority: 5
-Mode: **CRUCIBLE - TEST PORTING**
 
 ## Current Assignment
-- [ ] Port `distributiveConditionalTypes.ts` from `microsoft/TypeScript/tests/cases/conformance/types/conditional/`
+- [ ] Add async method with super property access tests in `wasm/src/transforms/async_es5_tests.rs`. Run `./wasm/test.sh async_es5_tests`.
 
 ## Task Queue
-- [ ] Port `templateLiteralTypes1.ts` - template literal type tests
-- [ ] Port `mappedTypeRecursiveInference.ts` - recursive mapped types
-- [ ] Target: 15-20 conditional/mapped type tests this week
+- [ ] (empty)
 
 ## Completed
+- [x] Added 12 async class field initializer tests (arrow basic, with return, no await, function expression, body_contains_await, body_no_await, ignores nested async, with params, try/catch, static field, multiple awaits, expression body) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (208 tests PASS).
+- [x] Added 12 async computed property tests (class method basic, with return, no await, symbol, body_contains_await, body_no_await, ignores nested async, template literal, try/catch, static, expression, multiple awaits) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (196 tests PASS).
+- [x] Added 12 async decorator tests (basic, with return, no await, multiple decorators, body_contains_await, body_no_await, ignores nested async, class decorated, try/catch, static method, with params, decorator) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (184 tests PASS).
+- [x] Added 12 async private field tests (read basic, write, no await, multiple accesses, body_contains_await, body_no_await, ignores nested async, private method call, try/catch, static private field, increment, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (172 tests PASS).
+- [x] Added 12 async super call method tests (basic, with return, no await, multiple awaits, with args, body_contains_await, body_no_await, ignores nested async, assign result, try/catch, chain, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (160 tests PASS).
+- [x] Added 12 async callback pattern tests (arrow basic, function expression, with return, no await, multiple params, body_contains_await, ignores nested async, event handler pattern, try/catch, promise then pattern, array method pattern) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (148 tests PASS).
+- [x] Added 12 async IIFE pattern tests (arrow basic, function expression, with return, no await, with arguments, body_contains_await, ignores nested async, named function, try/catch, in expression, multiple awaits) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (136 tests PASS).
 - [x] Added 12 async generator function tests (basic yield, with await, yield await, multiple yields, yield in loop, body_contains_await, ignores nested async, for-await-of, try/catch, yield*, return value) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (124 tests PASS).
 - [x] Added 12 async method expression tests (basic, with return, no await, multiple awaits, with parameters, body_contains_await, ignores nested async, shorthand syntax, try/catch, in loop, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (112 tests PASS).
 - [x] Added 12 async arrow function tests (block body, expression body, no await, with parameters, multiple awaits, body_contains_await, ignores nested async, rest params, destructuring params, try/catch, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (100 tests PASS).

@@ -1,8 +1,21 @@
 # Squad Anvil Goals
 
-Updated: 2026-01-08
+Updated: 2026-01-09
 
 Priority: 2
+
+---
+## 📢 EM-ANVIL: READ THIS - DIRECTIVE FROM DIRECTOR
+
+**Operation Crucible is NOW IN EFFECT.** Your squad has been restructured:
+
+1. **Workers 1-2**: Bug fixes ONLY. No new ES5 tests, no new transforms.
+2. **Workers 3-5**: REASSIGNED to Crucible. They now port solver tests from official TS repo.
+3. **Reject any PR** that adds new emitter features.
+
+Please acknowledge by updating Squad Status below.
+
+---
 
 ## ⚠️ OPERATION CRUCIBLE - TACTICAL SHIFT
 

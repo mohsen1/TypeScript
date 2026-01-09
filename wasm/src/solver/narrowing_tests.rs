@@ -813,3 +813,241 @@ fn test_narrow_single_member_union() {
     let narrowed = ctx.narrow_excluding_type(union, TypeId::STRING);
     assert_eq!(narrowed, TypeId::NUMBER);
 }
+
+// =============================================================================
+// Type Predicate Structure Tests
+// =============================================================================
+// These tests verify TypePredicate structures are correctly created.
+// Actual narrowing with type predicates happens at the checker level.
+
+#[test]
+fn test_type_predicate_basic_structure() {
+    use super::TypePredicate;
+    use super::TypePredicateTarget;
+
+    let interner = TypeInterner::new();
+    let x_name = interner.intern_string("x");
+
+    // x is string
+    let predicate = TypePredicate {
+        asserts: false,
+        target: TypePredicateTarget::Identifier(x_name),
+        type_id: Some(TypeId::STRING),
+    };
+
+    assert!(!predicate.asserts);
+    assert_eq!(predicate.target, TypePredicateTarget::Identifier(x_name));
+    assert_eq!(predicate.type_id, Some(TypeId::STRING));
+}
+
+#[test]
+fn test_type_predicate_asserts_structure() {
+    use super::TypePredicate;
+    use super::TypePredicateTarget;
+
+    let interner = TypeInterner::new();
+    let x_name = interner.intern_string("x");
+
+    // asserts x is string
+    let predicate = TypePredicate {
+        asserts: true,
+        target: TypePredicateTarget::Identifier(x_name),
+        type_id: Some(TypeId::STRING),
+    };
+
+    assert!(predicate.asserts);
+    assert_eq!(predicate.target, TypePredicateTarget::Identifier(x_name));
+    assert_eq!(predicate.type_id, Some(TypeId::STRING));
+}
+
+#[test]
+fn test_type_predicate_this_target() {
+    use super::TypePredicate;
+    use super::TypePredicateTarget;
+
+    let interner = TypeInterner::new();
+
+    // Create an object type for the predicate
+    let foo_name = interner.intern_string("foo");
+    let foo_type = interner.object(vec![
+        PropertyInfo {
+            name: foo_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // this is Foo
+    let predicate = TypePredicate {
+        asserts: false,
+        target: TypePredicateTarget::This,
+        type_id: Some(foo_type),
+    };
+
+    assert!(!predicate.asserts);
+    assert_eq!(predicate.target, TypePredicateTarget::This);
+    assert_eq!(predicate.type_id, Some(foo_type));
+}
+
+#[test]
+fn test_type_predicate_asserts_without_type() {
+    use super::TypePredicate;
+    use super::TypePredicateTarget;
+
+    let interner = TypeInterner::new();
+    let x_name = interner.intern_string("x");
+
+    // asserts x (no type - just assertion that x is truthy)
+    let predicate = TypePredicate {
+        asserts: true,
+        target: TypePredicateTarget::Identifier(x_name),
+        type_id: None,
+    };
+
+    assert!(predicate.asserts);
+    assert_eq!(predicate.target, TypePredicateTarget::Identifier(x_name));
+    assert_eq!(predicate.type_id, None);
+}
+
+#[test]
+fn test_function_shape_with_type_predicate() {
+    use super::{FunctionShape, ParamInfo, TypePredicate, TypePredicateTarget};
+
+    let interner = TypeInterner::new();
+    let x_name = interner.intern_string("x");
+
+    // function isString(x: any): x is string
+    let shape = FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(x_name),
+            type_id: TypeId::ANY,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::BOOLEAN,
+        type_predicate: Some(TypePredicate {
+            asserts: false,
+            target: TypePredicateTarget::Identifier(x_name),
+            type_id: Some(TypeId::STRING),
+        }),
+        is_constructor: false,
+    };
+
+    assert!(shape.type_predicate.is_some());
+    let pred = shape.type_predicate.unwrap();
+    assert!(!pred.asserts);
+    assert_eq!(pred.type_id, Some(TypeId::STRING));
+}
+
+#[test]
+fn test_call_signature_with_type_predicate() {
+    use super::{CallSignature, ParamInfo, TypePredicate, TypePredicateTarget};
+
+    let interner = TypeInterner::new();
+    let x_name = interner.intern_string("x");
+
+    // Overload: (x: any): x is number
+    let sig = CallSignature {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(x_name),
+            type_id: TypeId::ANY,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::BOOLEAN,
+        type_predicate: Some(TypePredicate {
+            asserts: false,
+            target: TypePredicateTarget::Identifier(x_name),
+            type_id: Some(TypeId::NUMBER),
+        }),
+    };
+
+    assert!(sig.type_predicate.is_some());
+    let pred = sig.type_predicate.unwrap();
+    assert_eq!(pred.type_id, Some(TypeId::NUMBER));
+}
+
+#[test]
+fn test_narrow_to_type_simulates_type_predicate_narrowing() {
+    let interner = TypeInterner::new();
+    let ctx = NarrowingContext::new(&interner);
+
+    // Simulating what happens after a type predicate check:
+    // if (isString(x)) { /* x is narrowed to string here */ }
+
+    // Start with x: string | number
+    let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    // After type predicate `x is string` returns true:
+    // Narrow to string (the predicate type)
+    let narrowed = ctx.narrow_to_type(union, TypeId::STRING);
+
+    // Should be narrowed to string
+    assert_eq!(narrowed, TypeId::STRING);
+}
+
+#[test]
+fn test_narrow_excluding_type_simulates_type_predicate_false_branch() {
+    let interner = TypeInterner::new();
+    let ctx = NarrowingContext::new(&interner);
+
+    // Simulating the else branch after a type predicate check:
+    // if (isString(x)) { ... } else { /* x is NOT string here */ }
+
+    // Start with x: string | number
+    let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    // After type predicate `x is string` returns false:
+    // Narrow by excluding string
+    let narrowed = ctx.narrow_excluding_type(union, TypeId::STRING);
+
+    // Should be narrowed to number
+    assert_eq!(narrowed, TypeId::NUMBER);
+}
+
+#[test]
+fn test_narrow_to_interface_type() {
+    let interner = TypeInterner::new();
+    let ctx = NarrowingContext::new(&interner);
+
+    // Simulating interface narrowing:
+    // interface Cat { meow(): void }
+    // interface Dog { bark(): void }
+    // function isCat(x: Cat | Dog): x is Cat
+
+    let meow_name = interner.intern_string("meow");
+    let bark_name = interner.intern_string("bark");
+
+    let cat_type = interner.object(vec![PropertyInfo {
+        name: meow_name,
+        type_id: TypeId::VOID,
+        write_type: TypeId::VOID,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let dog_type = interner.object(vec![PropertyInfo {
+        name: bark_name,
+        type_id: TypeId::VOID,
+        write_type: TypeId::VOID,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let union = interner.union(vec![cat_type, dog_type]);
+
+    // After type predicate `x is Cat` returns true:
+    let narrowed = ctx.narrow_to_type(union, cat_type);
+
+    // Should be narrowed to Cat
+    assert_eq!(narrowed, cat_type);
+}

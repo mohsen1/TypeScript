@@ -173,6 +173,41 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
 
     /// Evaluate a type, resolving any meta-types if possible.
     /// Returns the evaluated type (may be the same if no evaluation needed).
+    ///
+    /// # TODO: Application Type Expansion (Worker 2 - Redux test fix)
+    ///
+    /// **Problem**: `Application(Ref(sym), args)` types (like `Reducer<S, A>`) are not
+    /// being expanded to their instantiated form. This causes diagnostics to show
+    /// `Ref(5)<error>` instead of the actual type.
+    ///
+    /// **Current Behavior**: Application types pass through unchanged at line ~202.
+    /// This means when comparing a function type against `Reducer<S, A>`, the
+    /// Application type is not expanded to its underlying function type.
+    ///
+    /// **Observed Diagnostics in redux test**:
+    /// - `Type '(state: undefined | Ref(5)<error>, action: Ref(6)<error>) => any'
+    ///    is not assignable to type 'Ref(1)<Ref(5)<error>, Ref(6)<error>>'`
+    /// - `Ref(5)`, `Ref(6)`, `Ref(7)` etc. should be expanded to actual types
+    ///
+    /// **Fix Approach**: Add a case for `TypeKey::Application(app_id)`:
+    /// 1. Get the base type from the Application
+    /// 2. If base is a `Ref(sym)`, resolve it using `self.resolver.resolve_ref(sym, ...)`
+    /// 3. Get the type parameters from the resolved type (type alias or interface)
+    /// 4. Create a substitution map: type_params[i] -> args[i]
+    /// 5. Instantiate the resolved type body with the substitution
+    /// 6. Return the instantiated type
+    ///
+    /// **Example**:
+    /// ```text
+    /// // Given: type Reducer<S, A> = (state: S | undefined, action: A) => S
+    /// // And: Application(Ref(Reducer), [number, AnyAction])
+    /// // Should expand to: (state: number | undefined, action: AnyAction) => number
+    /// ```
+    ///
+    /// **Related Files**:
+    /// - `instantiate.rs` - Has substitution logic for type parameters
+    /// - `thin_checker.rs:2900-2918` - Type alias resolution with type params
+    /// - `lower.rs:856-868` - `lower_type_alias_declaration` with params
     pub fn evaluate(&self, type_id: TypeId) -> TypeId {
         // Fast path for intrinsics
         if type_id.is_intrinsic() {
@@ -247,12 +282,17 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             if let Some(type_params) = type_params {
                 // Resolve the base type to get the body
                 if let Some(resolved) = resolved {
+                    // Pre-expand type arguments that are TypeQuery or Application
+                    let expanded_args: Vec<TypeId> = app.args.iter().map(|&arg| {
+                        self.try_expand_type_arg(arg)
+                    }).collect();
+
                     // Instantiate the resolved type with the type arguments
                     let instantiated = instantiate_generic(
                         self.interner,
                         resolved,
                         &type_params,
-                        &app.args,
+                        &expanded_args,
                     );
                     // Recursively evaluate the result
                     return self.evaluate(instantiated);
@@ -261,11 +301,16 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 // Fallback: try to extract type params from the resolved type's properties
                 let extracted_params = self.extract_type_params_from_type(resolved);
                 if !extracted_params.is_empty() && extracted_params.len() == app.args.len() {
+                    // Pre-expand type arguments
+                    let expanded_args: Vec<TypeId> = app.args.iter().map(|&arg| {
+                        self.try_expand_type_arg(arg)
+                    }).collect();
+
                     let instantiated = instantiate_generic(
                         self.interner,
                         resolved,
                         &extracted_params,
-                        &app.args,
+                        &expanded_args,
                     );
                     return self.evaluate(instantiated);
                 }
@@ -360,6 +405,26 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         }
     }
 
+    /// Try to expand a type argument that may be a TypeQuery or Application.
+    /// Returns the expanded type, or the original if it can't be expanded.
+    /// This ensures type arguments are resolved before instantiation.
+    fn try_expand_type_arg(&self, arg: TypeId) -> TypeId {
+        let Some(key) = self.interner.lookup(arg) else {
+            return arg;
+        };
+        match key {
+            TypeKey::TypeQuery(sym_ref) => {
+                // Resolve the TypeQuery to get the actual type
+                self.resolver.resolve_ref(sym_ref, self.interner).unwrap_or(arg)
+            }
+            TypeKey::Application(app_id) => {
+                // Recursively evaluate the nested Application
+                self.evaluate_application(app_id)
+            }
+            _ => arg,
+        }
+    }
+
     /// Evaluate a conditional type: T extends U ? X : Y
     ///
     /// Algorithm:
@@ -377,7 +442,11 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         }
 
         if check_type == TypeId::ANY {
-            return TypeId::ANY;
+            // For `any extends X ? T : F`, return union of both branches
+            // This allows error poisoning to work correctly
+            let true_eval = self.evaluate(cond.true_type);
+            let false_eval = self.evaluate(cond.false_type);
+            return self.interner.union2(true_eval, false_eval);
         }
 
         // Step 1: Check for distributivity

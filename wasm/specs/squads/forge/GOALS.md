@@ -1,55 +1,71 @@
 # Squad Forge Goals
 
-Updated: 2026-01-08
+Updated: 2026-01-09
 
 Priority: 1
 
-## 🚨 OPERATION CRUCIBLE - SWARM THE BLOCKER
+---
+## 📢 EM-FORGE: DIRECTIVE UPDATE
 
-**Redux/Lodash Generics blocker must pass. All 5 workers on this.**
+**Redux/Lodash blocker is handled by senior staff. DO NOT work on it.**
 
-### Root Cause Identified
-The bug is **eager evaluation of conditional types when `InferenceVar`s are not yet bound**.
+Focus on these per Project Direction:
 
-### The Fix
-Refactor `solver/evaluate.rs` to introduce a **`Deferred` state** for `ConditionalResult`:
-- When `check_type` contains an unbound `InferenceVar`, do NOT return `Any` or `Never`
-- Return a `TypeKey::Conditional` that preserves the constraint
-- Only evaluate when inference context is finalized
+### 1. Generic Inference (`solver/infer.rs`)
+- Inference from usage
+- Context-sensitive typing
+- Circular constraints in `extends` clauses
+
+### 2. Conditional Types Stress Testing (`solver/evaluate.rs`)
+- Distributive conditional types over unions
+- This is where most "toy" compilers fail
+
+### 3. Fix Failing Tests
+- `test_conditional_infer_function_optional_param_distributive`
+- `test_conditional_infer_function_optional_param_non_distributive_union_input`
+- `compile_class_with_generic_constructor`
+
+---
+
+## Forge Focus: Generic Inference + Conditional Types
+
+**Solver is 55% complete. Focus on inference and conditional type evaluation.**
 
 ## Current Milestone
 Phase 8 - Conformance, Convergence, and Hardening: Type-system correctness in the integrated pipeline, driven by conformance tests.
 
 ## Project Direction Alignment
 - Solver is the correctness bottleneck (estimated 55% complete)
-- 🚨 BLOCKER: `test_check_redux_lodash_style_generics` must pass
-- All workers swarm until it's green
+- Redux blocker handled separately by senior staff
+- Focus on Generic Inference and Conditional Types
 
 ## Focus Areas
-- `wasm/src/solver/evaluate.rs` - **PRIMARY: Deferred state for conditionals**
-- `wasm/src/solver/infer.rs` - Inference context finalization
+- `wasm/src/solver/infer.rs` - **PRIMARY: Generic inference from usage**
+- `wasm/src/solver/evaluate.rs` - Distributive conditional types over unions
 - `wasm/src/solver/` - Type inference, constraint solving
 
 ## Objectives (Ranked)
 
-1. **🚨 BLOCKER: Redux/Lodash Generics**
-   - Context: This test combines mapped types, conditional inference, AND cross-file resolution
-   - Root Cause: Eager evaluation of conditionals when InferenceVars aren't bound
-   - Fix: Introduce `Deferred` state in `solver/evaluate.rs`
-   - Key Files: `solver/evaluate.rs`, `solver/infer.rs`
-   - **SWARM THIS UNTIL GREEN**
-
-2. **Generic Inference Hardening**
-   - Context: Solver is the correctness bottleneck per Project Direction
-   - Success Criteria: Inference from usage and context-sensitive typing match `tsc`
+1. **Generic Inference Hardening**
+   - Inference from usage and context-sensitive typing
+   - Circular constraints in `extends` clauses
    - Key Files: `solver/infer.rs`, `solver/infer_tests.rs`
 
-3. **Conditional Type Evaluation**
-   - Context: Distributive conditional types over unions must match TypeScript
-   - Success Criteria: `solver/evaluate.rs` handles distributive conditionals correctly
+2. **Conditional Types Stress Testing**
+   - Distributive conditional types over unions
    - Key Files: `solver/evaluate.rs`, `solver/evaluate_tests.rs`
 
+3. **Fix Failing Tests**
+   - `test_conditional_infer_function_optional_param_distributive` - FAILING
+   - `test_conditional_infer_function_optional_param_non_distributive_union_input` - FAILING
+   - `compile_class_with_generic_constructor` - FAILING
+
+4. **Template Literal Types**
+   - Context: Template literal inference and pattern matching
+   - Key Files: `solver/evaluate.rs`
+
 ## Anti-Priorities
+- ⛔ Redux/Lodash blocker (handled by senior staff)
 - New LSP features
 - CLI argument parsing or UX changes
 - Performance micro-optimizations
@@ -60,30 +76,23 @@ Phase 8 - Conformance, Convergence, and Hardening: Type-system correctness in th
 - These tests will help triangulate correct behavior for Forge workers
 
 ## Notes to EM
-- **All 5 workers on Redux blocker**
-- Focus on `solver/evaluate.rs` Deferred state implementation
+- **⛔ DO NOT assign workers to Redux blocker** - senior staff handling it
+- Focus on Generic Inference and Conditional Types stress testing
 - Read `wasm/specs/SOLVER.md` for solver architecture
 - Use Docker for tests: `./wasm/test.sh`
 
 ## Management Strategy
 Per Project Direction: **Autocratic Scheduling + Bisect-on-Merge**
 - PRs that regress ANY existing baseline are auto-rejected
-- Zero-Idle: All workers swarm the blocker
 
 ## Squad Status
-- Last EM Report: 2026-01-09 - Operation Crucible in progress
-- Workers Active: 1/5 (pane 4 actively debugging type param substitution)
-- Current Focus: 🚨 Redux/Lodash Generics blocker - type parameter registration
-- Direction: SWARM THE BLOCKER
-- Blockers: `test_check_redux_lodash_style_generics` (4 diagnostics vs 0)
-- Progress: 6 → 4 diagnostics (33% reduction)
-- Issues:
-  - Worker 2's changes cause REGRESSION (removes Ref handling in evaluate.rs)
-  - Type params not being registered in TypeEnvironment for cross-file symbols
-  - Symbols resolving to TypeId(4) (any) instead of actual types
+- Last EM Report: 2026-01-09 - Reassigned from Redux blocker
+- Workers Active: 5/5
+- Current Focus: Generic Inference + Conditional Types
+- Direction: Solver hardening (NOT Redux)
 - Worker Assignments:
-  - W1: (idle)
-  - W2: BLOCKED - must restore Ref/TypeQuery handling in evaluate.rs
-  - W3: (merged docs update)
-  - W4: (merged namespace fix) - now investigating type param registration
-  - W5: (idle)
+  - W1: Generic inference from usage (`solver/infer.rs`)
+  - W2: Context-sensitive typing edge cases
+  - W3: Circular constraints in `extends` clauses
+  - W4: Distributive conditional types over unions
+  - W5: Fix failing conditional infer tests

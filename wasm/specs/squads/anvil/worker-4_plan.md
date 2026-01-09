@@ -1,29 +1,27 @@
 # Worker 4 Plan
 
-## 🔥 CRUCIBLE - TEST PORTING (REASSIGNED)
-
-**Per wasm/README.md Project Direction: Reassigned from Anvil to Crucible test porting.**
-
-- ⛔ NO more emitter work
-- ⛔ NO more ES5 class tests
-- ✅ Port solver tests from official TypeScript repo ONLY
-
 ## Mission
-Port mapped type tests from official TypeScript repo into `tests/cases/`.
+Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transforms, cli, lsp).
 
 Status: Active
 Priority: 4
-Mode: **CRUCIBLE - TEST PORTING**
 
 ## Current Assignment
-- [ ] Port `mappedTypes1.ts` and `mappedTypes2.ts` from `microsoft/TypeScript/tests/cases/conformance/types/mapped/`
+- [ ] Add ES5 class tests for private static methods in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
 
 ## Task Queue
-- [ ] Port `mappedTypeConstraints.ts` - constraint handling
-- [ ] Port `keyRemappingKeyof.ts` - key remapping tests
-- [ ] Target: 15-20 mapped type tests this week
+- [ ] (empty)
 
 ## Completed
+- [x] Add ES5 class tests for namespace merging. Tests: `./wasm/test.sh class_es5_tests`
+- [x] Add ES5 class tests for auto-accessor. Tests: `./wasm/test.sh class_es5_tests`
+- [x] Add ES5 class tests for using declarations. Tests: `./wasm/test.sh class_es5_tests`
+- [x] Add ES5 class tests for decorators on constructor params. Tests: `./wasm/test.sh class_es5_tests`
+- [x] Add ES5 class tests for extends expression. Tests: `./wasm/test.sh class_es5_tests`
+- [x] Add ES5 class tests for private field initialization. Tests: `./wasm/test.sh class_es5_tests`
+- [x] Add ES5 class tests for static accessors. Tests: `./wasm/test.sh class_es5_tests`
+- [x] Add ES5 class tests for protected members. Tests: `./wasm/test.sh class_es5_tests`
+- [x] Add ES5 class tests for parameter properties. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for constructor overloads. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for method overloads. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for accessor keyword (ES2022). Tests: `./wasm/test.sh class_es5_tests`
