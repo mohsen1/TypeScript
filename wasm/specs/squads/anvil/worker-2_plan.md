@@ -7,7 +7,7 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] (awaiting assignment)
+- [ ] Add ES5 shorthand method parity tests (method definitions, computed methods, async shorthand, generator shorthand) in `wasm/src/emitter_parity_tests.rs`. Run `./wasm/test.sh emitter_parity`.
 
 ## Task Queue
 - [ ] (empty)

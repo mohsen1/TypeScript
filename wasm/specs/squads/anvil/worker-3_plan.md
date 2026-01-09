@@ -7,7 +7,7 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- (awaiting assignment)
+- [ ] Add class field ES5 source map tests (public fields, private fields, static fields, computed fields, field initializers) in `wasm/src/source_map_tests.rs`. Run `./wasm/test.sh source_map`.
 
 ## Task Queue
 - [ ] (empty)
