@@ -6,12 +6,13 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-- [ ] Add ES5 class tests for utility type patterns: Awaited, NonNullable, ReturnType. Tests: `./wasm/test.sh class_es5_tests`
+(none)
 
 ## Task Queue
 - [ ] Add ES5 class tests for function overload patterns: multiple signatures, implementation
 
 ## Completed
+- [x] Added ES5 tests for utility type patterns (6 tests): Awaited, NonNullable, ReturnType, Parameters, InstanceType, combined utility patterns. Ran `./wasm/test.sh class_es5_tests` (all 440 pass).
 - [x] Added ES5 tests for nominal type patterns (6 tests): basic branded, opaque types, branded type guards, branded numeric, branded string, combined nominal patterns. Ran `./wasm/test.sh class_es5_tests` (all 437 pass).
 - [x] Added ES5 tests for assertion function patterns (6 tests): basic asserts, type predicates, generic signatures, class methods, inheritance, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 431 pass).
 - [x] Added ES5 tests for template string type patterns (6 tests): string interpolation, pattern matching, literal keys, tagged template types, string manipulation types, combined template patterns. Ran `./wasm/test.sh class_es5_tests` (all 422 pass).
