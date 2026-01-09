@@ -7,27 +7,13 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-Add ES5 tuple type patterns parity tests
-
-Per GOALS.md Objective 1: ES5 downleveling correctness
-
-Steps:
-1. Add 6 ES5 tuple type parity tests to `wasm/src/thin_emitter/emitter_parity_tests.rs`:
-   - Basic tuple type
-   - Tuple with optional elements
-   - Tuple with rest elements
-   - Named tuple elements
-   - Variadic tuple types
-   - Combined tuple patterns
-2. Run `./wasm/test.sh emitter_parity` to verify all tests pass
-3. Commit with message: `[wasm] emitter: add tuple type parity tests`
-4. Push to `origin/worker/anvil-2`
-5. Update this plan file and push
+Awaiting new assignment from EM-Anvil.
 
 ## Task Queue
 (empty)
 
 ## Completed
+- [x] Added ES5 tuple type patterns parity tests (basic, optional, rest, named, variadic, combined) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (425 tests).
 - [x] Added ES5 generic class patterns parity tests (single-param, multi-params, constraints, extends-generic, default-params, combined) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (419 tests).
 - [x] Added ES5 mixin patterns parity tests (basic-function, generics, composition, static-members, private-fields, combined-patterns) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (413 tests).
 - [x] Added ES5 abstract class patterns parity tests (abstract-methods, implemented-methods, static-members, inheritance-chain, generics, combined-patterns) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (407 tests).
