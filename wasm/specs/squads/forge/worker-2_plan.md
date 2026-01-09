@@ -36,6 +36,18 @@ Reduce false positives for property access errors by aligning TS2339 behavior wi
 - TS2339 missing errors reduced
 - Extra errors do not increase (no regressions)
 
+## Resume Notes
+- Branch: `worker/forge-2` (ahead of `origin/rust` by 7 commits).
+- Latest commit: `[wasm] checker: improve TS2339 property access diagnostics`
+- Recent changes: class/interface declaration merging, computed class member name checking with `this` typing, Object prototype members, static inheritance + namespace merge for constructors, additional TS2339 tests.
+- Last tests: `./wasm/test.sh test_ts2339_` (passes).
+- Known remaining TS2339 diffs from last conformance scan (max 500):
+  - Extra: `Symbols/ES5SymbolProperty2.ts`, `Symbols/ES5SymbolProperty6.ts`, `additionalChecks/noPropertyAccessFromIndexSignature1.ts`, `ambient/ambientDeclarations.ts`, `ambient/ambientDeclarationsExternal.ts`, `classes/classDeclarations/classAbstractKeyword/classAbstractCrashedOnce.ts`, `classes/classDeclarations/mergedClassInterface.ts`, `classes/classDeclarations/mergedInheritedClassInterface.ts`, `classes/members/accessibility/privateStaticNotAccessibleInClodule.ts`, `classes/members/accessibility/privateStaticNotAccessibleInClodule2.ts`, `classes/members/accessibility/protectedStaticNotAccessibleInClodule.ts`, `classes/members/privateNames/privateNameHashCharName.ts`.
+  - Missing: `async/es6/asyncWithVarShadowing_es6.ts`, `classes/members/classTypes/staticPropertyNotInClassType.ts`, `classes/members/instanceAndStaticMembers/typeOfThisInStaticMembers12.ts`, `classes/members/instanceAndStaticMembers/typeOfThisInStaticMembers13.ts`, `classes/members/privateNames/privateNameAndIndexSignature.ts`, `classes/members/privateNames/privateNameBadAssignment.ts`, `classes/members/privateNames/privateNameBadDeclaration.ts`, `classes/members/privateNames/privateNameInInExpression.ts`.
+- Conformance scan command (docker + custom script):
+  - `docker run --rm --memory="8g" --cpus="4" -e NODE_PATH=/usr/local/lib/node_modules -e MAX_TESTS=500 -v "$(pwd)/wasm/pkg:/app/pkg:ro" -v "$(pwd)/tests:/tests:ro" -v "/tmp/ts2339-scan.mjs:/app/ts2339-scan.mjs:ro" ts-conformance-runner node /app/ts2339-scan.mjs`
+- Remember: do not touch `.role/AGENTS.md`.
+
 ## Task Queue
 - Re-run TS2339 conformance scan and log deltas.
 - Investigate remaining TS2339 diffs (Symbol.iterator, index-signature property access, private names).
