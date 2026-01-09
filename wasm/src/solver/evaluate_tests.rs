@@ -15921,3 +15921,132 @@ fn test_template_literal_extract_index_from_array_key() {
     ]);
     assert_eq!(result, expected);
 }
+
+#[test]
+fn test_template_literal_extract_port_number() {
+    let interner = TypeInterner::new();
+
+    // Pattern: T extends `localhost:${infer Port}` ? Port : never
+    // Input: "localhost:3000" => Port = "3000"
+    // Common pattern for extracting port numbers from host strings
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("Port");
+    let infer_port = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends `localhost:${infer Port}` ? Port : never
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("localhost:")),
+        TemplateSpan::Type(infer_port),
+    ]);
+
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_template,
+        true_type: infer_port,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, interner.literal_string("localhost:3000"));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    let expected = interner.literal_string("3000");
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_template_literal_extract_coordinates() {
+    let interner = TypeInterner::new();
+
+    // Pattern: T extends `(${infer X},${infer Y})` ? [X, Y] : never
+    // Input: "(10,20)" => [X, Y] = ["10", "20"]
+    // Common pattern for parsing coordinate pairs
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_x = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("X"),
+        constraint: None,
+        default: None,
+    }));
+    let infer_y = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("Y"),
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends `(${infer X},${infer Y})` ? [X, Y] : never
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("(")),
+        TemplateSpan::Type(infer_x),
+        TemplateSpan::Text(interner.intern_string(",")),
+        TemplateSpan::Type(infer_y),
+        TemplateSpan::Text(interner.intern_string(")")),
+    ]);
+
+    let true_type = interner.tuple(vec![
+        TupleElement {
+            type_id: infer_x,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: infer_y,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_template,
+        true_type,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, interner.literal_string("(10,20)"));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    let expected = interner.tuple(vec![
+        TupleElement {
+            type_id: interner.literal_string("10"),
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: interner.literal_string("20"),
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+    assert_eq!(result, expected);
+}
