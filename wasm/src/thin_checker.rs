@@ -3743,6 +3743,41 @@ impl<'a> ThinCheckerState<'a> {
     }
 
     /// Get type of a symbol.
+    ///
+    /// # Circular Reference Issue with Type Predicates (Worker 1 - see worker-5_plan.md)
+    ///
+    /// **Problem**: When computing the type of a function/type alias with a type predicate,
+    /// circular reference detection can trigger if the predicate's type resolves back to
+    /// the symbol being computed.
+    ///
+    /// **Call Chain Causing Circular Detection**:
+    /// 1. `get_type_of_symbol(SymbolId(N))` - e.g., computing type of a function or type alias
+    /// 2. `compute_type_of_symbol` → `call_signature_from_function` (line ~2838)
+    /// 3. `call_signature_from_function` → `return_type_and_predicate` (line ~2159)
+    /// 4. `return_type_and_predicate` → `get_type_from_type_node(data.type_node)` for predicate type
+    /// 5. `get_type_from_type_node` → `get_type_from_type_reference` (line ~4888)
+    /// 6. `get_type_from_type_reference` → `resolve_named_type_reference` (line ~586)
+    /// 7. `resolve_named_type_reference` → `get_type_of_symbol(sym_id)` (line ~602) **IMMEDIATE**
+    /// 8. If `sym_id == SymbolId(N)`, circular detection triggers → returns `TypeId::ANY`
+    ///
+    /// **Why Interfaces Work But Functions Don't**:
+    /// - **Interfaces**: Use `TypeLowering.lower_interface_declarations` which creates
+    ///   `TypeKey::Ref(SymbolRef)` - a **deferred** reference that doesn't immediately
+    ///   call `get_type_of_symbol`. See `lower.rs:1951`.
+    /// - **Functions**: Use `return_type_and_predicate` which calls `get_type_from_type_node`
+    ///   → `get_type_of_symbol` **immediately**, triggering circular detection.
+    ///
+    /// **Fix Approach**:
+    /// Option A: Make `return_type_and_predicate` use deferred type references for predicate
+    ///           types, similar to how TypeLowering handles them. This would involve creating
+    ///           `TypeKey::Ref(SymbolRef)` instead of calling `get_type_of_symbol` immediately.
+    ///
+    /// Option B: Use TypeLowering's `lower_type_predicate_return` (line ~2065) instead of
+    ///           ThinChecker's `return_type_and_predicate` when processing function signatures.
+    ///
+    /// **Test Cases**: See `thin_checker_tests.rs`:
+    /// - `test_type_predicate_self_referential_guard` - documents the issue
+    /// - `test_type_predicate_interface_self_reference` - shows working case with interfaces
     pub fn get_type_of_symbol(&mut self, sym_id: SymbolId) -> TypeId {
         use crate::solver::SymbolRef;
 
