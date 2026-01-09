@@ -10104,7 +10104,7 @@ fn test_constraint_upper_bound_function() {
     let specific_fn = interner.function(FunctionShape {
         type_params: Vec::new(),
         params: vec![ParamInfo {
-            name: interner.intern_string("x"),
+            name: Some(interner.intern_string("x")),
             type_id: TypeId::STRING,
             optional: false,
             rest: false,
