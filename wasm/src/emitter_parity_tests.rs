@@ -8291,3 +8291,205 @@ class Child extends Parent {
         output
     );
 }
+
+// ============================================================================
+// ES5 COMPUTED PROPERTY PARITY TESTS (ADDITIONAL)
+// ============================================================================
+
+#[test]
+fn test_parity_es5_computed_property_symbol() {
+    let source = r#"
+const sym = Symbol("key");
+
+const obj = {
+    [sym]: "symbol value",
+    [Symbol.iterator]: function* () {
+        yield 1;
+    }
+};
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain Symbol references
+    assert!(
+        output.contains("Symbol"),
+        "Output should contain Symbol: {}",
+        output
+    );
+    // Should contain the object
+    assert!(
+        output.contains("obj"),
+        "Output should contain obj: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_computed_property_class_method() {
+    let source = r#"
+const methodName = "dynamicMethod";
+
+class DynamicClass {
+    [methodName](x: number): number {
+        return x * 2;
+    }
+
+    static ["staticMethod"](y: string): string {
+        return y.toUpperCase();
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the class
+    assert!(
+        output.contains("DynamicClass"),
+        "Output should contain DynamicClass: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number") && !output.contains(": string"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_computed_property_expression() {
+    let source = r#"
+const prefix = "prop";
+const index = 1;
+
+const obj: Record<string, number> = {
+    [prefix + index]: 100,
+    [prefix + (index + 1)]: 200,
+    [`${prefix}${index + 2}`]: 300
+};
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the object
+    assert!(
+        output.contains("obj"),
+        "Output should contain obj: {}",
+        output
+    );
+    // Type annotation should be erased
+    assert!(
+        !output.contains("Record<"),
+        "Type annotation should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_computed_property_accessor() {
+    let source = r#"
+const propName = "value";
+
+class ComputedAccessor {
+    private _data: number = 0;
+
+    get [propName](): number {
+        return this._data;
+    }
+
+    set [propName](val: number) {
+        this._data = val;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the class
+    assert!(
+        output.contains("ComputedAccessor"),
+        "Output should contain ComputedAccessor: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number"),
+        "Type annotations should be erased: {}",
+        output
+    );
+    // private keyword should be erased
+    assert!(
+        !output.contains("private"),
+        "private keyword should be erased: {}",
+        output
+    );
+}
