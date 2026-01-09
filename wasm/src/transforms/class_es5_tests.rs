@@ -32733,3 +32733,341 @@ class HashMap<K, V> implements KeyValueStore<K, V> {
         output
     );
 }
+
+// ============================================================================
+// CONSTRUCTOR SIGNATURE PATTERN TESTS
+// ============================================================================
+
+/// Test ES5 class downleveling with constructor optional parameter patterns
+#[test]
+fn test_class_es5_constructor_signature_optional_params() {
+    let source = r#"
+class HttpClient {
+    private baseUrl: string;
+    private timeout: number;
+    private headers: Record<string, string>;
+    private retries: number;
+
+    constructor(
+        baseUrl: string,
+        timeout?: number,
+        headers?: Record<string, string>,
+        retries?: number
+    ) {
+        this.baseUrl = baseUrl;
+        this.timeout = timeout ?? 5000;
+        this.headers = headers ?? {};
+        this.retries = retries ?? 3;
+    }
+
+    get(path: string): Promise<any> {
+        return fetch(this.baseUrl + path, {
+            headers: this.headers
+        }).then(r => r.json());
+    }
+}
+
+class Logger {
+    private level: string;
+    private prefix: string;
+    private timestamps: boolean;
+
+    constructor(
+        level: string = "info",
+        prefix: string = "",
+        timestamps: boolean = true
+    ) {
+        this.level = level;
+        this.prefix = prefix;
+        this.timestamps = timestamps;
+    }
+
+    log(message: string): void {
+        const ts = this.timestamps ? new Date().toISOString() + " " : "";
+        console.log(ts + this.prefix + message);
+    }
+}
+
+class EventBus {
+    private name: string;
+    private maxListeners: number;
+    private debug: boolean;
+
+    constructor(name?: string, maxListeners?: number, debug?: boolean) {
+        this.name = name || "default";
+        this.maxListeners = maxListeners || 10;
+        this.debug = debug || false;
+    }
+
+    emit(event: string, data?: any): void {
+        if (this.debug) {
+            console.log("[" + this.name + "] Emitting:", event);
+        }
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("HttpClient") && output.contains("Logger") && output.contains("EventBus"),
+        "Expected constructor optional param classes: {}",
+        output
+    );
+
+    // Methods should be preserved
+    assert!(
+        output.contains("get") && output.contains("log") && output.contains("emit"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Properties should be referenced
+    assert!(
+        output.contains("baseUrl") && output.contains("timeout") && output.contains("headers"),
+        "Expected HttpClient properties: {}",
+        output
+    );
+}
+
+/// Test ES5 class downleveling with constructor rest parameter patterns
+#[test]
+fn test_class_es5_constructor_signature_rest_params() {
+    let source = r#"
+class Command {
+    private name: string;
+    private args: string[];
+
+    constructor(name: string, ...args: string[]) {
+        this.name = name;
+        this.args = args;
+    }
+
+    execute(): string {
+        return this.name + " " + this.args.join(" ");
+    }
+
+    getArgs(): string[] {
+        return [...this.args];
+    }
+}
+
+class Pipeline {
+    private stages: Function[];
+
+    constructor(...stages: Function[]) {
+        this.stages = stages;
+    }
+
+    run(input: any): any {
+        return this.stages.reduce((acc, stage) => stage(acc), input);
+    }
+
+    addStage(stage: Function): void {
+        this.stages.push(stage);
+    }
+}
+
+class CompositeValidator {
+    private validators: ((value: any) => boolean)[];
+    private mode: string;
+
+    constructor(mode: string, ...validators: ((value: any) => boolean)[]) {
+        this.mode = mode;
+        this.validators = validators;
+    }
+
+    validate(value: any): boolean {
+        if (this.mode === "all") {
+            return this.validators.every(v => v(value));
+        } else {
+            return this.validators.some(v => v(value));
+        }
+    }
+
+    addValidator(validator: (value: any) => boolean): void {
+        this.validators.push(validator);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Command") && output.contains("Pipeline") && output.contains("CompositeValidator"),
+        "Expected constructor rest param classes: {}",
+        output
+    );
+
+    // Methods should be preserved
+    assert!(
+        output.contains("execute") && output.contains("run") && output.contains("validate"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Additional methods
+    assert!(
+        output.contains("getArgs") && output.contains("addStage") && output.contains("addValidator"),
+        "Expected additional methods: {}",
+        output
+    );
+}
+
+/// Test ES5 class downleveling with constructor overload signature patterns
+#[test]
+fn test_class_es5_constructor_signature_overloads() {
+    let source = r#"
+class Point {
+    x: number;
+    y: number;
+
+    constructor();
+    constructor(x: number);
+    constructor(x: number, y: number);
+    constructor(x?: number, y?: number) {
+        this.x = x ?? 0;
+        this.y = y ?? x ?? 0;
+    }
+
+    distanceTo(other: Point): number {
+        const dx = this.x - other.x;
+        const dy = this.y - other.y;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    static fromArray(arr: [number, number]): Point {
+        return new Point(arr[0], arr[1]);
+    }
+}
+
+class Rectangle {
+    width: number;
+    height: number;
+    x: number;
+    y: number;
+
+    constructor(width: number, height: number);
+    constructor(width: number, height: number, x: number, y: number);
+    constructor(width: number, height: number, x?: number, y?: number) {
+        this.width = width;
+        this.height = height;
+        this.x = x ?? 0;
+        this.y = y ?? 0;
+    }
+
+    area(): number {
+        return this.width * this.height;
+    }
+
+    contains(point: Point): boolean {
+        return point.x >= this.x && point.x <= this.x + this.width &&
+               point.y >= this.y && point.y <= this.y + this.height;
+    }
+}
+
+class Color {
+    r: number;
+    g: number;
+    b: number;
+    a: number;
+
+    constructor(hex: string);
+    constructor(r: number, g: number, b: number);
+    constructor(r: number, g: number, b: number, a: number);
+    constructor(rOrHex: number | string, g?: number, b?: number, a?: number) {
+        if (typeof rOrHex === "string") {
+            // Parse hex
+            this.r = 0;
+            this.g = 0;
+            this.b = 0;
+            this.a = 1;
+        } else {
+            this.r = rOrHex;
+            this.g = g ?? 0;
+            this.b = b ?? 0;
+            this.a = a ?? 1;
+        }
+    }
+
+    toHex(): string {
+        return this.r.toString(16) + this.g.toString(16) + this.b.toString(16);
+    }
+
+    withAlpha(alpha: number): Color {
+        return new Color(this.r, this.g, this.b, alpha);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Point") && output.contains("Rectangle") && output.contains("Color"),
+        "Expected constructor overload classes: {}",
+        output
+    );
+
+    // Point methods
+    assert!(
+        output.contains("distanceTo") && output.contains("fromArray"),
+        "Expected Point methods: {}",
+        output
+    );
+
+    // Rectangle methods
+    assert!(
+        output.contains("area") && output.contains("contains"),
+        "Expected Rectangle methods: {}",
+        output
+    );
+
+    // Color methods
+    assert!(
+        output.contains("toHex") && output.contains("withAlpha"),
+        "Expected Color methods: {}",
+        output
+    );
+}
