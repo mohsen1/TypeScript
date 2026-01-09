@@ -7,7 +7,27 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-None - awaiting new task
+Add async ES5 tests for computed super property access patterns
+
+Per GOALS.md Objective 1: "Match tsc for computed super[...] cases"
+
+Steps:
+1. Add 12 async computed super tests to `wasm/src/transforms/async_es5_tests.rs`:
+   - async method with super[key] access
+   - async method with super[computed()] call
+   - async arrow with super property
+   - async static with super access
+   - async generator with super[key]
+   - super[key] in try/catch async
+   - super[Symbol.iterator] async pattern
+   - super["method"]() async call
+   - body_contains_await tests for super patterns
+   - ignores nested async patterns
+   - Combined computed super patterns
+2. Run `./wasm/test.sh async_es5_tests` to verify all tests pass
+3. Commit with message: `[wasm] async_es5: add computed super property access tests`
+4. Push to `origin/worker/anvil-5`
+5. Update this plan file and push
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
