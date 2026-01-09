@@ -21154,3 +21154,851 @@ fn test_keyof_symbol_keyed_object() {
     // Should include the symbol key
     assert!(keyof_obj != TypeId::NEVER);
 }
+
+// =============================================================================
+// Constructor Type Tests
+// =============================================================================
+// Tests for new signatures, abstract constructors, and constructor types
+
+#[test]
+fn test_constructor_basic_new_signature() {
+    // new () => T
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let instance = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let constructor = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: instance,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    // Constructor type should be valid
+    assert!(constructor != TypeId::ERROR);
+    assert!(constructor != TypeId::NEVER);
+}
+
+#[test]
+fn test_constructor_with_parameters() {
+    // new (x: string, y: number) => T
+    let interner = TypeInterner::new();
+
+    let instance = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("x"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("y"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let constructor = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo {
+                name: Some(interner.intern_string("x")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("y")),
+                type_id: TypeId::NUMBER,
+                optional: false,
+                rest: false,
+            },
+        ],
+        this_type: None,
+        return_type: instance,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    assert!(constructor != TypeId::ERROR);
+}
+
+#[test]
+fn test_constructor_vs_regular_function() {
+    // Constructor and regular function are different types
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let instance = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let constructor = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: instance,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    let regular_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: instance,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Constructor and function with same signature are not assignable
+    assert!(!checker.is_subtype_of(constructor, regular_fn));
+    assert!(!checker.is_subtype_of(regular_fn, constructor));
+}
+
+#[test]
+fn test_constructor_callable_with_construct_signature() {
+    // interface C { new (): T }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let instance = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("value"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let callable_with_new = interner.callable(CallableShape {
+        call_signatures: vec![],
+        construct_signatures: vec![CallSignature {
+            type_params: vec![],
+            params: vec![],
+            this_type: None,
+            return_type: instance,
+            type_predicate: None,
+        }],
+        properties: vec![],
+    });
+
+    assert!(callable_with_new != TypeId::ERROR);
+}
+
+#[test]
+fn test_constructor_with_call_and_construct() {
+    // interface F { (): string; new (): T }
+    let interner = TypeInterner::new();
+
+    let instance = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let callable_both = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+            type_params: vec![],
+            params: vec![],
+            this_type: None,
+            return_type: TypeId::STRING,
+            type_predicate: None,
+        }],
+        construct_signatures: vec![CallSignature {
+            type_params: vec![],
+            params: vec![],
+            this_type: None,
+            return_type: instance,
+            type_predicate: None,
+        }],
+        properties: vec![],
+    });
+
+    assert!(callable_both != TypeId::ERROR);
+}
+
+#[test]
+fn test_constructor_subtype_by_return_type() {
+    // new () => Derived <: new () => Base
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let base = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let derived = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("x"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("y"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let ctor_base = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: base,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    let ctor_derived = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: derived,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    // Constructor returning derived is subtype of constructor returning base
+    assert!(checker.is_subtype_of(ctor_derived, ctor_base));
+    // Reverse is not true
+    assert!(!checker.is_subtype_of(ctor_base, ctor_derived));
+}
+
+#[test]
+fn test_constructor_contravariant_parameters() {
+    // new (x: Base) => T <: new (x: Derived) => T
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let instance = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("result"),
+        type_id: TypeId::BOOLEAN,
+        write_type: TypeId::BOOLEAN,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let string_or_number = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    let ctor_wide_param = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: string_or_number,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: instance,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    let ctor_narrow_param = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: instance,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    // Constructor with wider param type is subtype (contravariance)
+    assert!(checker.is_subtype_of(ctor_wide_param, ctor_narrow_param));
+}
+
+#[test]
+fn test_constructor_optional_parameter() {
+    // new (x?: string) => T
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let instance = interner.object(vec![]);
+
+    let ctor_optional = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: true,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: instance,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    let ctor_required = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: instance,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    // Optional param constructor is wider (accepts more call patterns)
+    assert!(checker.is_subtype_of(ctor_optional, ctor_required));
+}
+
+#[test]
+fn test_constructor_rest_parameter() {
+    // new (...args: string[]) => T
+    let interner = TypeInterner::new();
+
+    let instance = interner.object(vec![]);
+    let string_array = interner.array(TypeId::STRING);
+
+    let ctor_rest = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: string_array,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: instance,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    assert!(ctor_rest != TypeId::ERROR);
+}
+
+#[test]
+fn test_constructor_overload_signatures() {
+    // interface C { new (): A; new (x: string): B }
+    let interner = TypeInterner::new();
+
+    let instance_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let instance_b = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let overloaded_ctor = interner.callable(CallableShape {
+        call_signatures: vec![],
+        construct_signatures: vec![
+            CallSignature {
+                type_params: vec![],
+                params: vec![],
+                this_type: None,
+                return_type: instance_a,
+                type_predicate: None,
+            },
+            CallSignature {
+                type_params: vec![],
+                params: vec![ParamInfo {
+                    name: Some(interner.intern_string("x")),
+                    type_id: TypeId::STRING,
+                    optional: false,
+                    rest: false,
+                }],
+                this_type: None,
+                return_type: instance_b,
+                type_predicate: None,
+            },
+        ],
+        properties: vec![],
+    });
+
+    assert!(overloaded_ctor != TypeId::ERROR);
+}
+
+#[test]
+fn test_constructor_generic_type_param() {
+    // new <T>() => T
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let generic_ctor = interner.function(FunctionShape {
+        type_params: vec![t_param],
+        params: vec![],
+        this_type: None,
+        return_type: t_type,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    assert!(generic_ctor != TypeId::ERROR);
+}
+
+#[test]
+fn test_constructor_generic_with_constraint() {
+    // new <T extends object>() => T
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: Some(TypeId::OBJECT),
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let constrained_ctor = interner.function(FunctionShape {
+        type_params: vec![t_param],
+        params: vec![],
+        this_type: None,
+        return_type: t_type,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    assert!(constrained_ctor != TypeId::ERROR);
+}
+
+#[test]
+fn test_constructor_abstract_pattern() {
+    // abstract new () => T (abstract constructor)
+    // Represented as a construct signature that can't be directly called
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let instance = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Abstract constructor (conceptually - just a construct signature)
+    let abstract_ctor = interner.callable(CallableShape {
+        call_signatures: vec![],
+        construct_signatures: vec![CallSignature {
+            type_params: vec![],
+            params: vec![],
+            this_type: None,
+            return_type: instance,
+            type_predicate: None,
+        }],
+        properties: vec![],
+    });
+
+    // Concrete constructor
+    let concrete_ctor = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: instance,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    // Both should be valid
+    assert!(abstract_ctor != TypeId::ERROR);
+    assert!(concrete_ctor != TypeId::ERROR);
+}
+
+#[test]
+fn test_constructor_with_static_properties() {
+    // Constructor function with static members
+    let interner = TypeInterner::new();
+
+    let instance = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("value"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let ctor_with_static = interner.callable(CallableShape {
+        call_signatures: vec![],
+        construct_signatures: vec![CallSignature {
+            type_params: vec![],
+            params: vec![],
+            this_type: None,
+            return_type: instance,
+            type_predicate: None,
+        }],
+        properties: vec![PropertyInfo {
+            name: interner.intern_string("create"),
+            type_id: interner.function(FunctionShape {
+                type_params: vec![],
+                params: vec![],
+                this_type: None,
+                return_type: instance,
+                type_predicate: None,
+                is_constructor: false,
+            }),
+            write_type: TypeId::NEVER,
+            optional: false,
+            readonly: true,
+            is_method: true,
+        }],
+    });
+
+    assert!(ctor_with_static != TypeId::ERROR);
+}
+
+#[test]
+fn test_constructor_instance_type_extraction() {
+    // InstanceType<typeof C> pattern
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let instance = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("x"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("y"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let ctor = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: instance,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    // The return type of the constructor IS the instance type
+    // This simulates what InstanceType<> would extract
+    assert!(ctor != TypeId::ERROR);
+    assert!(checker.is_subtype_of(instance, instance));
+}
+
+#[test]
+fn test_constructor_parameters_extraction() {
+    // ConstructorParameters<typeof C> pattern
+    let interner = TypeInterner::new();
+
+    let instance = interner.object(vec![]);
+
+    let ctor = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo {
+                name: Some(interner.intern_string("name")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("age")),
+                type_id: TypeId::NUMBER,
+                optional: false,
+                rest: false,
+            },
+        ],
+        this_type: None,
+        return_type: instance,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    // Constructor parameters would be [string, number]
+    let params_tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: Some(interner.intern_string("name")),
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: Some(interner.intern_string("age")),
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    assert!(ctor != TypeId::ERROR);
+    assert!(params_tuple != TypeId::ERROR);
+}
+
+#[test]
+fn test_constructor_reflexive() {
+    // C <: C
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let instance = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let ctor = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: instance,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    assert!(checker.is_subtype_of(ctor, ctor));
+}
+
+#[test]
+fn test_constructor_never_return() {
+    // new () => never (throws)
+    let interner = TypeInterner::new();
+
+    let throwing_ctor = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::NEVER,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    assert!(throwing_ctor != TypeId::ERROR);
+}
+
+#[test]
+fn test_constructor_any_return() {
+    // new () => any
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let ctor_any = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::ANY,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    let instance = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let ctor_specific = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: instance,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    // any return is assignable to/from specific (any is bivariant)
+    assert!(checker.is_subtype_of(ctor_any, ctor_specific));
+}
+
+#[test]
+fn test_constructor_multiple_construct_signatures_subtype() {
+    // Subtyping between callables with construct signatures
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let instance = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let single_sig = interner.callable(CallableShape {
+        call_signatures: vec![],
+        construct_signatures: vec![CallSignature {
+            type_params: vec![],
+            params: vec![],
+            this_type: None,
+            return_type: instance,
+            type_predicate: None,
+        }],
+        properties: vec![],
+    });
+
+    let double_sig = interner.callable(CallableShape {
+        call_signatures: vec![],
+        construct_signatures: vec![
+            CallSignature {
+                type_params: vec![],
+                params: vec![],
+                this_type: None,
+                return_type: instance,
+                type_predicate: None,
+            },
+            CallSignature {
+                type_params: vec![],
+                params: vec![ParamInfo {
+                    name: Some(interner.intern_string("x")),
+                    type_id: TypeId::STRING,
+                    optional: false,
+                    rest: false,
+                }],
+                this_type: None,
+                return_type: instance,
+                type_predicate: None,
+            },
+        ],
+        properties: vec![],
+    });
+
+    // Double signature is more specific (has additional overload)
+    // The single signature should match one of the overloads
+    assert!(checker.is_subtype_of(single_sig, double_sig));
+}
+
+#[test]
+fn test_constructor_with_this_type() {
+    // new (this: Window) => T
+    let interner = TypeInterner::new();
+
+    let window_type = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("document"),
+        type_id: TypeId::OBJECT,
+        write_type: TypeId::OBJECT,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let instance = interner.object(vec![]);
+
+    let ctor_with_this = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: Some(window_type),
+        return_type: instance,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    assert!(ctor_with_this != TypeId::ERROR);
+}
+
+#[test]
+fn test_constructor_empty_vs_nonempty() {
+    // new () => {} vs new () => { x: number }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let empty_instance = interner.object(vec![]);
+    let nonempty_instance = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let ctor_empty = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: empty_instance,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    let ctor_nonempty = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: nonempty_instance,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    // nonempty is subtype of empty (structural typing)
+    assert!(checker.is_subtype_of(ctor_nonempty, ctor_empty));
+    // empty is NOT subtype of nonempty
+    assert!(!checker.is_subtype_of(ctor_empty, ctor_nonempty));
+}
