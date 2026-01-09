@@ -13,6 +13,7 @@ Priority: 5
 - [ ] (empty)
 
 ## Completed
+- [x] Added 12 async static method tests (with await, no await, factory, body_contains_await, body_no_await, ignores nested async, with params, try/catch, singleton, class access, multiple awaits, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (424 tests PASS).
 - [x] Added 12 async getter/setter tests (basic, with await, no await, both, body_contains_await, body_no_await, ignores nested async, static, try/catch, computed, private, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (412 tests PASS).
 - [x] Added 12 async class method tests (private, with this, multiple returns, body_contains_await, body_no_await, ignores nested async, with super, generic, with finally, static, while loop, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (400 tests PASS).
 - [x] Added 12 async method decorator tests (basic, with await, no await, chained, body_contains_await, body_no_await, ignores nested async, with params, try/catch, static, factory, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (388 tests PASS).
