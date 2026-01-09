@@ -17723,3 +17723,268 @@ class ReadOnlyConfig extends BaseConfig {
         output
     );
 }
+
+/// Parity test for ES5 private instance fields with methods.
+/// Private fields accessed and modified by instance methods.
+#[test]
+fn test_parity_es5_private_instance_field_methods() {
+    let source = r#"class BankAccount {
+    #balance: number = 0;
+    #transactions: string[] = [];
+
+    deposit(amount: number): void {
+        this.#balance += amount;
+        this.#transactions.push(`Deposit: ${amount}`);
+    }
+
+    withdraw(amount: number): boolean {
+        if (amount > this.#balance) {
+            return false;
+        }
+        this.#balance -= amount;
+        this.#transactions.push(`Withdraw: ${amount}`);
+        return true;
+    }
+
+    getBalance(): number {
+        return this.#balance;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Class and methods should be present
+    assert!(
+        output.contains("BankAccount") && output.contains("deposit") && output.contains("withdraw"),
+        "Output should contain class and methods: {}",
+        output
+    );
+    // Should use private field helpers or WeakMap
+    assert!(
+        output.contains("__classPrivateFieldGet") || output.contains("__classPrivateFieldSet") || output.contains("WeakMap"),
+        "ES5 output should use private field mechanism: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number") && !output.contains(": boolean") && !output.contains(": void"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 private static fields.
+/// Static private fields shared across all instances.
+#[test]
+fn test_parity_es5_private_static_field_complex() {
+    let source = r#"class Logger {
+    static #instance: Logger | null = null;
+    static #logLevel: number = 0;
+    #name: string;
+
+    private constructor(name: string) {
+        this.#name = name;
+    }
+
+    static getInstance(): Logger {
+        if (!Logger.#instance) {
+            Logger.#instance = new Logger('default');
+        }
+        return Logger.#instance;
+    }
+
+    static setLogLevel(level: number): void {
+        Logger.#logLevel = level;
+    }
+
+    log(message: string): void {
+        if (Logger.#logLevel > 0) {
+            console.log(`[${this.#name}] ${message}`);
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Class and methods should be present
+    assert!(
+        output.contains("Logger") && output.contains("getInstance") && output.contains("setLogLevel"),
+        "Output should contain class and methods: {}",
+        output
+    );
+    // Private modifier on constructor should be erased
+    assert!(
+        !output.contains("private constructor"),
+        "Private constructor modifier should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 private methods with this binding.
+/// Private methods that need proper this context.
+#[test]
+fn test_parity_es5_private_method_this_context() {
+    let source = r#"class EventEmitter {
+    #listeners: Map<string, Function[]> = new Map();
+
+    #getListeners(event: string): Function[] {
+        if (!this.#listeners.has(event)) {
+            this.#listeners.set(event, []);
+        }
+        return this.#listeners.get(event)!;
+    }
+
+    #notifyListeners(event: string, data: any): void {
+        const listeners = this.#getListeners(event);
+        listeners.forEach(listener => listener(data));
+    }
+
+    on(event: string, callback: Function): void {
+        this.#getListeners(event).push(callback);
+    }
+
+    emit(event: string, data: any): void {
+        this.#notifyListeners(event, data);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Class and public methods should be present
+    assert!(
+        output.contains("EventEmitter") && output.contains("on") && output.contains("emit"),
+        "Output should contain class and methods: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": Map<") && !output.contains(": Function") && !output.contains(": void"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 private accessors with validation.
+/// Private getters and setters with type checking logic.
+#[test]
+fn test_parity_es5_private_accessor_validation() {
+    let source = r#"class Temperature {
+    #celsius: number = 0;
+
+    get #fahrenheit(): number {
+        return (this.#celsius * 9/5) + 32;
+    }
+
+    set #fahrenheit(value: number) {
+        this.#celsius = (value - 32) * 5/9;
+    }
+
+    get celsius(): number {
+        return this.#celsius;
+    }
+
+    set celsius(value: number) {
+        if (value < -273.15) {
+            throw new Error('Below absolute zero');
+        }
+        this.#celsius = value;
+    }
+
+    get fahrenheit(): number {
+        return this.#fahrenheit;
+    }
+
+    set fahrenheit(value: number) {
+        this.#fahrenheit = value;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Class should be present
+    assert!(
+        output.contains("Temperature"),
+        "Output should contain class: {}",
+        output
+    );
+    // Public accessors should be present
+    assert!(
+        output.contains("celsius") && output.contains("fahrenheit"),
+        "Output should contain public accessors: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
