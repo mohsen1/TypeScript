@@ -6,12 +6,13 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-- [ ] Add ES5 class tests for type guard patterns: user-defined type guards, in operator, typeof guards, instanceof guards, discriminated unions, assertion functions. Tests: `./wasm/test.sh class_es5_tests`
+- [ ] Add ES5 class tests for mapped type class patterns: Partial class fields, Required class fields, Readonly class members. Tests: `./wasm/test.sh class_es5_tests`
 
 ## Task Queue
-- [ ] Add ES5 class tests for control flow analysis patterns: narrowing, exhaustiveness checks, never type
+- [ ] Add ES5 class tests for conditional type patterns: infer keyword in class context, distributive conditionals
 
 ## Completed
+- [x] Added ES5 tests for type guard patterns (6 tests): user-defined type guards, in operator guards, typeof guards, instanceof guards, discriminated unions, assertion functions. Ran `./wasm/test.sh class_es5_tests` (all 347 pass).
 - [x] Added ES5 tests for module pattern variations (6 tests): CommonJS class exports, ESM default class, ESM named exports, re-export patterns, barrel export pattern, mixed module patterns. Ran `./wasm/test.sh class_es5_tests` (all 341 pass).
 - [x] Added ES5 tests for namespace merging patterns (6 tests): class with namespace augmentation, namespace with interface, namespace with enum, namespace with function, nested namespaces, namespace exports. Ran `./wasm/test.sh class_es5_tests` (all 330 pass).
 - [x] Added ES5 tests for abstract class patterns (6 tests): abstract method inheritance, abstract with decorators, abstract static methods, abstract getters/setters, multi-level inheritance, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 324 pass).
