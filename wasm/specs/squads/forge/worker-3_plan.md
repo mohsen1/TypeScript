@@ -98,13 +98,26 @@ This requires control flow analysis to track variable state through branches.
 - Same Error Count: 104 (21.4%)
 - TS2454 false positives FIXED (no longer in top 10 extra errors)
 
+### Conformance Test Results (Full run, 4928 tests)
+- Command: `node wasm/differential-test/process-pool-conformance.mjs --max=999999 --workers=4`
+- Exact Match: 677 (13.7%) vs baseline 23.3% (1148/4928)
+- Same Error Count: 780 (15.8%)
+- Missing Errors: 1405 (28.5%)
+- Extra Errors: 1022 (20.7%)
+- WASM Crashed: 2498
+- Top missing errors: TS2564 (160), TS2322 (82), TS2300 (70), TS2304 (70), TS7010 (66)
+- Top extra errors: TS2304 (354), TS1005 (265), TS1109 (158), TS7010 (133), TS7011 (123)
+- TS2339: missing 53, extra 64
+
 ### TS2339 Work (NEW)
 - [x] Fixed property access on `any` type (returns `any` without error)
 - [x] Fixed property access on `error` type (suppresses cascading errors)
+- [x] Resolve application type arguments with type env to enable distributive conditional narrowing
+- [x] Substitute polymorphic `this` in call returns and merge interface/base intersections (fixes intersectionThisTypes extra TS2339)
 - TS2339 extra errors reduced from 35 to 14
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
 - Similar infrastructure to TS2564 (property init) - share patterns with Workers 1-2
@@ -113,3 +126,4 @@ Yes
 - Commit format: `[wasm] checker: implement TS2454 definite assignment analysis`
 - Push to: `origin/worker/forge-3`
 - **NEVER edit**: `STRUCTURE.md`, `GOALS.md`, other workers' plan files, or anything in `orchestrator/`
+- Conformance (types/intersection, 24 tests): Exact 7 (29.2%), Same count 7 (29.2%), extra TS2339 removed; missing TS2339 remains in intersectionWithIndexSignatures
