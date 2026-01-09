@@ -13,12 +13,21 @@ Priority: 2
 - [x] Function return type inference tests for conditional types
 - [x] Variadic tuple type tests
 - [x] Rest parameter inference tests
+- [x] Type guard tests (is, asserts, narrowing)
 
 ## Task Queue
 - [ ] Implement TypeResolver for TypeEvaluator to resolve Refs inside Mapped/Conditional types
 - [ ] This would enable full evaluation of complex patterns like `{ [K in keyof R]: ExtractAction<R[K]> }[keyof R]`
 
 ## Completed
+- [x] Added 26 type guard tests including:
+  - Basic 'x is T' and 'asserts x is T' predicates
+  - 'this is T' class method predicates
+  - Generic type guard and union narrowing
+  - instanceof, typeof, 'in' patterns
+  - Discriminated union and never narrowing
+  - Array filter/every with type guards
+  - Assertion functions and assertNever patterns
 - [x] Added 26 rest parameter inference tests including:
   - Basic array and generic inference
   - Mixed types union, leading fixed params
@@ -117,6 +126,7 @@ Worker 2 branch now contains:
 - 24 function return type inference tests for conditional types
 - 28 variadic tuple type tests
 - 26 rest parameter inference tests
+- 26 type guard tests (is, asserts, narrowing)
 - No modifications to evaluate.rs or other core files
 - Pure test additions that can be safely merged
 
