@@ -13582,3 +13582,1353 @@ fn test_private_member_method_brand() {
     // Foo is subtype of empty
     assert!(checker.is_subtype_of(class_foo, class_bar));
 }
+
+// =============================================================================
+// INTERFACE EXTENSION HIERARCHY TESTS
+// =============================================================================
+
+#[test]
+fn test_interface_extends_single() {
+    // interface A { a: string }
+    // interface B extends A { b: number }
+    // B <: A
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_prop = interner.intern_string("a");
+    let b_prop = interner.intern_string("b");
+
+    let interface_a = interner.object(vec![PropertyInfo {
+        name: a_prop,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let interface_b = interner.object(vec![
+        PropertyInfo {
+            name: a_prop,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b_prop,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // B extends A
+    assert!(checker.is_subtype_of(interface_b, interface_a));
+    assert!(!checker.is_subtype_of(interface_a, interface_b));
+}
+
+#[test]
+fn test_interface_extends_chain() {
+    // interface A { a: string }
+    // interface B extends A { b: number }
+    // interface C extends B { c: boolean }
+    // C <: B <: A (transitive)
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_prop = interner.intern_string("a");
+    let b_prop = interner.intern_string("b");
+    let c_prop = interner.intern_string("c");
+
+    let interface_a = interner.object(vec![PropertyInfo {
+        name: a_prop,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let interface_b = interner.object(vec![
+        PropertyInfo {
+            name: a_prop,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b_prop,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let interface_c = interner.object(vec![
+        PropertyInfo {
+            name: a_prop,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b_prop,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: c_prop,
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Transitive chain
+    assert!(checker.is_subtype_of(interface_c, interface_b));
+    assert!(checker.is_subtype_of(interface_b, interface_a));
+    assert!(checker.is_subtype_of(interface_c, interface_a));
+}
+
+#[test]
+fn test_interface_extends_with_method() {
+    // interface A { method(): void }
+    // interface B extends A { other(): string }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let method_name = interner.intern_string("method");
+    let other_name = interner.intern_string("other");
+
+    let void_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let string_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let interface_a = interner.object(vec![PropertyInfo {
+        name: method_name,
+        type_id: void_method,
+        write_type: void_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let interface_b = interner.object(vec![
+        PropertyInfo {
+            name: method_name,
+            type_id: void_method,
+            write_type: void_method,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: other_name,
+            type_id: string_method,
+            write_type: string_method,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+    ]);
+
+    assert!(checker.is_subtype_of(interface_b, interface_a));
+}
+
+#[test]
+fn test_interface_extends_override_method() {
+    // interface A { method(): string }
+    // interface B extends A { method(): "hello" } // narrower return
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let method_name = interner.intern_string("method");
+    let hello = interner.literal_string("hello");
+
+    let string_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let hello_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: hello,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let interface_a = interner.object(vec![PropertyInfo {
+        name: method_name,
+        type_id: string_method,
+        write_type: string_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let interface_b = interner.object(vec![PropertyInfo {
+        name: method_name,
+        type_id: hello_method,
+        write_type: hello_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    // B with narrower return is subtype of A
+    assert!(checker.is_subtype_of(interface_b, interface_a));
+}
+
+#[test]
+fn test_interface_extends_property_override() {
+    // interface A { value: string | number }
+    // interface B extends A { value: string } // narrower type
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let value = interner.intern_string("value");
+    let string_or_number = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    let interface_a = interner.object(vec![PropertyInfo {
+        name: value,
+        type_id: string_or_number,
+        write_type: string_or_number,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let interface_b = interner.object(vec![PropertyInfo {
+        name: value,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // B with narrower property type is subtype of A
+    assert!(checker.is_subtype_of(interface_b, interface_a));
+}
+
+#[test]
+fn test_interface_extends_optional_to_required() {
+    // interface A { value?: string }
+    // interface B extends A { value: string } // making it required
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let value = interner.intern_string("value");
+
+    let interface_a = interner.object(vec![PropertyInfo {
+        name: value,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let interface_b = interner.object(vec![PropertyInfo {
+        name: value,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Required is subtype of optional
+    assert!(checker.is_subtype_of(interface_b, interface_a));
+}
+
+#[test]
+fn test_interface_extends_readonly_property() {
+    // interface A { readonly value: string }
+    // interface B extends A { value: string } // can widen readonly
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let value = interner.intern_string("value");
+
+    let interface_a = interner.object(vec![PropertyInfo {
+        name: value,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let interface_b = interner.object(vec![PropertyInfo {
+        name: value,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Writable is subtype of readonly
+    assert!(checker.is_subtype_of(interface_b, interface_a));
+}
+
+// =============================================================================
+// MULTIPLE INTERFACE IMPLEMENTS TESTS
+// =============================================================================
+
+#[test]
+fn test_interface_extends_multiple() {
+    // interface A { a: string }
+    // interface B { b: number }
+    // interface C extends A, B { c: boolean }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_prop = interner.intern_string("a");
+    let b_prop = interner.intern_string("b");
+    let c_prop = interner.intern_string("c");
+
+    let interface_a = interner.object(vec![PropertyInfo {
+        name: a_prop,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let interface_b = interner.object(vec![PropertyInfo {
+        name: b_prop,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let interface_c = interner.object(vec![
+        PropertyInfo {
+            name: a_prop,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b_prop,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: c_prop,
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // C extends both A and B
+    assert!(checker.is_subtype_of(interface_c, interface_a));
+    assert!(checker.is_subtype_of(interface_c, interface_b));
+}
+
+#[test]
+fn test_interface_extends_multiple_with_overlap() {
+    // interface A { shared: string; a: number }
+    // interface B { shared: string; b: boolean }
+    // interface C extends A, B {} // shared property from both
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let shared = interner.intern_string("shared");
+    let a_prop = interner.intern_string("a");
+    let b_prop = interner.intern_string("b");
+
+    let interface_a = interner.object(vec![
+        PropertyInfo {
+            name: shared,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: a_prop,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let interface_b = interner.object(vec![
+        PropertyInfo {
+            name: shared,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b_prop,
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let interface_c = interner.object(vec![
+        PropertyInfo {
+            name: shared,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: a_prop,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b_prop,
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // C extends both
+    assert!(checker.is_subtype_of(interface_c, interface_a));
+    assert!(checker.is_subtype_of(interface_c, interface_b));
+}
+
+#[test]
+fn test_interface_extends_multiple_methods() {
+    // interface Readable { read(): string }
+    // interface Writable { write(s: string): void }
+    // interface ReadWritable extends Readable, Writable {}
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let read = interner.intern_string("read");
+    let write = interner.intern_string("write");
+
+    let read_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let write_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("s")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let readable = interner.object(vec![PropertyInfo {
+        name: read,
+        type_id: read_method,
+        write_type: read_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let writable = interner.object(vec![PropertyInfo {
+        name: write,
+        type_id: write_method,
+        write_type: write_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let read_writable = interner.object(vec![
+        PropertyInfo {
+            name: read,
+            type_id: read_method,
+            write_type: read_method,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: write,
+            type_id: write_method,
+            write_type: write_method,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+    ]);
+
+    assert!(checker.is_subtype_of(read_writable, readable));
+    assert!(checker.is_subtype_of(read_writable, writable));
+}
+
+#[test]
+fn test_interface_diamond_extends() {
+    // interface A { a: string }
+    // interface B extends A { b: number }
+    // interface C extends A { c: boolean }
+    // interface D extends B, C {} // diamond
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_prop = interner.intern_string("a");
+    let b_prop = interner.intern_string("b");
+    let c_prop = interner.intern_string("c");
+
+    let interface_a = interner.object(vec![PropertyInfo {
+        name: a_prop,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let interface_b = interner.object(vec![
+        PropertyInfo {
+            name: a_prop,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b_prop,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let interface_c = interner.object(vec![
+        PropertyInfo {
+            name: a_prop,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: c_prop,
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let interface_d = interner.object(vec![
+        PropertyInfo {
+            name: a_prop,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b_prop,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: c_prop,
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // D extends all in diamond
+    assert!(checker.is_subtype_of(interface_d, interface_a));
+    assert!(checker.is_subtype_of(interface_d, interface_b));
+    assert!(checker.is_subtype_of(interface_d, interface_c));
+}
+
+#[test]
+fn test_interface_implements_partial() {
+    // Object missing some properties from interface
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_prop = interner.intern_string("a");
+    let b_prop = interner.intern_string("b");
+
+    let interface_ab = interner.object(vec![
+        PropertyInfo {
+            name: a_prop,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b_prop,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let partial = interner.object(vec![PropertyInfo {
+        name: a_prop,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Partial does not implement full interface
+    assert!(!checker.is_subtype_of(partial, interface_ab));
+}
+
+#[test]
+fn test_interface_implements_extra_properties() {
+    // Object with extra properties still implements interface
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_prop = interner.intern_string("a");
+    let extra_prop = interner.intern_string("extra");
+
+    let interface_a = interner.object(vec![PropertyInfo {
+        name: a_prop,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let with_extra = interner.object(vec![
+        PropertyInfo {
+            name: a_prop,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: extra_prop,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Object with extra properties implements interface
+    assert!(checker.is_subtype_of(with_extra, interface_a));
+}
+
+#[test]
+fn test_interface_implements_wrong_type() {
+    // Object with wrong property type doesn't implement interface
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let value = interner.intern_string("value");
+
+    let interface_string = interner.object(vec![PropertyInfo {
+        name: value,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let has_number = interner.object(vec![PropertyInfo {
+        name: value,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Wrong property type
+    assert!(!checker.is_subtype_of(has_number, interface_string));
+}
+
+// =============================================================================
+// INTERFACE MERGE BEHAVIOR TESTS
+// =============================================================================
+
+#[test]
+fn test_interface_merge_same_properties() {
+    // interface A { a: string }
+    // interface A { b: number } // declaration merging
+    // Merged: { a: string; b: number }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_prop = interner.intern_string("a");
+    let b_prop = interner.intern_string("b");
+
+    // First declaration
+    let interface_a1 = interner.object(vec![PropertyInfo {
+        name: a_prop,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Merged interface (both declarations)
+    let interface_merged = interner.object(vec![
+        PropertyInfo {
+            name: a_prop,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b_prop,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Merged is subtype of first declaration
+    assert!(checker.is_subtype_of(interface_merged, interface_a1));
+    // But not the reverse
+    assert!(!checker.is_subtype_of(interface_a1, interface_merged));
+}
+
+#[test]
+fn test_interface_merge_method_overloads() {
+    // interface A { method(x: string): void }
+    // interface A { method(x: number): void }
+    // Merged should have both overloads
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let method_name = interner.intern_string("method");
+
+    let string_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let number_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let interface_string = interner.object(vec![PropertyInfo {
+        name: method_name,
+        type_id: string_method,
+        write_type: string_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let interface_number = interner.object(vec![PropertyInfo {
+        name: method_name,
+        type_id: number_method,
+        write_type: number_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    // Different signatures - not subtypes of each other
+    assert!(!checker.is_subtype_of(interface_string, interface_number));
+    assert!(!checker.is_subtype_of(interface_number, interface_string));
+}
+
+#[test]
+fn test_interface_merge_compatible_properties() {
+    // interface A { value: string | number }
+    // interface A { value: string } // narrower - compatible in merge context
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let value = interner.intern_string("value");
+    let string_or_number = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    let interface_wide = interner.object(vec![PropertyInfo {
+        name: value,
+        type_id: string_or_number,
+        write_type: string_or_number,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let interface_narrow = interner.object(vec![PropertyInfo {
+        name: value,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Narrow is subtype of wide
+    assert!(checker.is_subtype_of(interface_narrow, interface_wide));
+}
+
+#[test]
+fn test_interface_merge_global_augmentation() {
+    // Simulating global augmentation:
+    // interface Window { myProp: string }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let document = interner.intern_string("document");
+    let my_prop = interner.intern_string("myProp");
+
+    // Original Window
+    let window_original = interner.object(vec![PropertyInfo {
+        name: document,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Augmented Window
+    let window_augmented = interner.object(vec![
+        PropertyInfo {
+            name: document,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: my_prop,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Augmented is subtype of original
+    assert!(checker.is_subtype_of(window_augmented, window_original));
+}
+
+#[test]
+fn test_interface_merge_namespace_merge() {
+    // interface + namespace merge (modeled as object with call signature + properties)
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let prop = interner.intern_string("prop");
+
+    // Interface part
+    let interface_part = interner.object(vec![PropertyInfo {
+        name: prop,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Another object with same structure
+    let same_structure = interner.object(vec![PropertyInfo {
+        name: prop,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Same structure - mutual subtypes
+    assert!(checker.is_subtype_of(interface_part, same_structure));
+    assert!(checker.is_subtype_of(same_structure, interface_part));
+}
+
+#[test]
+fn test_interface_merge_multiple_files() {
+    // Simulating interface merged from multiple files
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let file1_prop = interner.intern_string("fromFile1");
+    let file2_prop = interner.intern_string("fromFile2");
+
+    // What file1 sees
+    let file1_view = interner.object(vec![PropertyInfo {
+        name: file1_prop,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Fully merged
+    let merged = interner.object(vec![
+        PropertyInfo {
+            name: file1_prop,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: file2_prop,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Merged is subtype of partial view
+    assert!(checker.is_subtype_of(merged, file1_view));
+}
+
+#[test]
+fn test_interface_merge_empty_interface() {
+    // interface A {}
+    // interface A { prop: string }
+    // Merged: { prop: string }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let prop = interner.intern_string("prop");
+
+    let empty = interner.object(vec![]);
+
+    let with_prop = interner.object(vec![PropertyInfo {
+        name: prop,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Both subtype of empty
+    assert!(checker.is_subtype_of(with_prop, empty));
+    assert!(checker.is_subtype_of(empty, empty));
+}
+
+// =============================================================================
+// INTERFACE VS TYPE ALIAS COMPATIBILITY TESTS
+// =============================================================================
+
+#[test]
+fn test_interface_vs_type_alias_same_structure() {
+    // interface I { a: string }
+    // type T = { a: string }
+    // Both should be compatible
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_prop = interner.intern_string("a");
+
+    // Interface
+    let interface_i = interner.object(vec![PropertyInfo {
+        name: a_prop,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Type alias (same structure)
+    let type_t = interner.object(vec![PropertyInfo {
+        name: a_prop,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Mutual subtypes
+    assert!(checker.is_subtype_of(interface_i, type_t));
+    assert!(checker.is_subtype_of(type_t, interface_i));
+}
+
+#[test]
+fn test_interface_vs_type_alias_with_methods() {
+    // interface I { method(): void }
+    // type T = { method(): void }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let method_name = interner.intern_string("method");
+
+    let void_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let interface_i = interner.object(vec![PropertyInfo {
+        name: method_name,
+        type_id: void_method,
+        write_type: void_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let type_t = interner.object(vec![PropertyInfo {
+        name: method_name,
+        type_id: void_method,
+        write_type: void_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    // Mutual subtypes
+    assert!(checker.is_subtype_of(interface_i, type_t));
+    assert!(checker.is_subtype_of(type_t, interface_i));
+}
+
+#[test]
+fn test_interface_vs_intersection_type() {
+    // interface I { a: string; b: number }
+    // type T = { a: string } & { b: number }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_prop = interner.intern_string("a");
+    let b_prop = interner.intern_string("b");
+
+    let interface_i = interner.object(vec![
+        PropertyInfo {
+            name: a_prop,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b_prop,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: a_prop,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: b_prop,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let type_intersection = interner.intersection(vec![obj_a, obj_b]);
+
+    // Interface should be subtype of intersection (has all properties)
+    assert!(checker.is_subtype_of(interface_i, type_intersection));
+}
+
+#[test]
+fn test_interface_vs_type_alias_optional() {
+    // interface I { value?: string }
+    // type T = { value?: string }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let value = interner.intern_string("value");
+
+    let interface_i = interner.object(vec![PropertyInfo {
+        name: value,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let type_t = interner.object(vec![PropertyInfo {
+        name: value,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Mutual subtypes
+    assert!(checker.is_subtype_of(interface_i, type_t));
+    assert!(checker.is_subtype_of(type_t, interface_i));
+}
+
+#[test]
+fn test_interface_vs_type_alias_readonly() {
+    // interface I { readonly value: string }
+    // type T = { readonly value: string }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let value = interner.intern_string("value");
+
+    let interface_i = interner.object(vec![PropertyInfo {
+        name: value,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let type_t = interner.object(vec![PropertyInfo {
+        name: value,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    // Mutual subtypes
+    assert!(checker.is_subtype_of(interface_i, type_t));
+    assert!(checker.is_subtype_of(type_t, interface_i));
+}
+
+#[test]
+fn test_interface_vs_type_alias_index_signature() {
+    // interface I { [key: string]: number }
+    // type T = { [key: string]: number }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let interface_i = interner.intern(TypeKey::ObjectWithIndex(
+        interner.object_shape_with_index(
+            vec![],
+            Some(crate::solver::types::IndexSignature {
+                key_type: TypeId::STRING,
+                value_type: TypeId::NUMBER,
+                readonly: false,
+            }),
+        ),
+    ));
+
+    let type_t = interner.intern(TypeKey::ObjectWithIndex(
+        interner.object_shape_with_index(
+            vec![],
+            Some(crate::solver::types::IndexSignature {
+                key_type: TypeId::STRING,
+                value_type: TypeId::NUMBER,
+                readonly: false,
+            }),
+        ),
+    ));
+
+    // Same structure
+    assert!(checker.is_subtype_of(interface_i, type_t));
+    assert!(checker.is_subtype_of(type_t, interface_i));
+}
+
+#[test]
+fn test_interface_extends_type_alias() {
+    // type Base = { a: string }
+    // interface Derived extends Base { b: number }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_prop = interner.intern_string("a");
+    let b_prop = interner.intern_string("b");
+
+    let type_base = interner.object(vec![PropertyInfo {
+        name: a_prop,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let interface_derived = interner.object(vec![
+        PropertyInfo {
+            name: a_prop,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b_prop,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Interface extends type alias
+    assert!(checker.is_subtype_of(interface_derived, type_base));
+}
+
+#[test]
+fn test_type_alias_intersection_with_interface() {
+    // interface I { a: string }
+    // type T = I & { b: number }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_prop = interner.intern_string("a");
+    let b_prop = interner.intern_string("b");
+
+    let interface_i = interner.object(vec![PropertyInfo {
+        name: a_prop,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let extra = interner.object(vec![PropertyInfo {
+        name: b_prop,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let type_t = interner.intersection(vec![interface_i, extra]);
+
+    // T is subtype of I (intersection contains interface)
+    assert!(checker.is_subtype_of(type_t, interface_i));
+}
