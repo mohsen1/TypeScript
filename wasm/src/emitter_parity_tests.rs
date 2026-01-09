@@ -11686,6 +11686,488 @@ for (const [k, v] of map.entries()) {
 }
 
 #[test]
+fn test_parity_es5_destructuring_object_typed() {
+    let source = r#"
+interface User {
+    id: number;
+    name: string;
+    email: string;
+    age?: number;
+}
+
+interface Address {
+    street: string;
+    city: string;
+    country: string;
+}
+
+interface UserWithAddress extends User {
+    address: Address;
+}
+
+function getUser(): User {
+    return { id: 1, name: "John", email: "john@example.com" };
+}
+
+const { id, name, email }: User = getUser();
+
+function processUser({ id, name, email }: User): string {
+    return name + email;
+}
+
+const user: UserWithAddress = {
+    id: 1,
+    name: "Jane",
+    email: "jane@example.com",
+    address: { street: "123 Main", city: "NYC", country: "USA" }
+};
+
+const { address: { city, country } }: UserWithAddress = user;
+
+type Config = { readonly host: string; port: number };
+const { host, port }: Config = { host: "localhost", port: 8080 };
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Variables should be defined
+    assert!(
+        output.contains("id") && output.contains("name") && output.contains("email"),
+        "Destructured variables should be defined: {}",
+        output
+    );
+    // Interfaces should be erased
+    assert!(
+        !output.contains("interface"),
+        "Interfaces should be erased: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": User") && !output.contains(": Address") && !output.contains(": Config"),
+        "Type annotations should be erased: {}",
+        output
+    );
+    // readonly should be erased
+    assert!(
+        !output.contains("readonly"),
+        "readonly should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_destructuring_array_tuple() {
+    let source = r#"
+type Point2D = [number, number];
+type Point3D = [number, number, number];
+type NamedPoint = [string, number, number];
+
+const point2d: Point2D = [10, 20];
+const [x, y]: Point2D = point2d;
+
+const point3d: Point3D = [1, 2, 3];
+const [a, b, c]: Point3D = point3d;
+
+function getNamedPoint(): NamedPoint {
+    return ["origin", 0, 0];
+}
+
+const [label, px, py]: NamedPoint = getNamedPoint();
+
+type Result<T, E> = [T, null] | [null, E];
+const success: Result<number, string> = [42, null];
+const [value, error]: Result<number, string> = success;
+
+function swap<T, U>(tuple: [T, U]): [U, T] {
+    const [first, second]: [T, U] = tuple;
+    return [second, first];
+}
+
+const [head, ...tail]: number[] = [1, 2, 3, 4, 5];
+
+interface Pair<T> {
+    values: [T, T];
+}
+
+const pair: Pair<string> = { values: ["a", "b"] };
+const [left, right]: [string, string] = pair.values;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Variables should be defined
+    assert!(
+        output.contains("point2d") && output.contains("point3d"),
+        "Arrays should be defined: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type Point2D") && !output.contains("type Point3D") && !output.contains("type Result"),
+        "Type aliases should be erased: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Generic types should be erased
+    assert!(
+        !output.contains("<T>") && !output.contains("<T, U>") && !output.contains("<T, E>"),
+        "Generic types should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_destructuring_nested_deep() {
+    let source = r#"
+interface Company {
+    name: string;
+    location: {
+        address: {
+            street: string;
+            city: string;
+        };
+        coordinates: {
+            lat: number;
+            lng: number;
+        };
+    };
+    employees: {
+        id: number;
+        details: {
+            name: string;
+            role: string;
+        };
+    }[];
+}
+
+const company: Company = {
+    name: "TechCorp",
+    location: {
+        address: { street: "123 Tech Lane", city: "San Francisco" },
+        coordinates: { lat: 37.7749, lng: -122.4194 }
+    },
+    employees: [{ id: 1, details: { name: "Alice", role: "Engineer" } }]
+};
+
+const {
+    name: companyName,
+    location: {
+        address: { street, city },
+        coordinates: { lat, lng }
+    }
+}: Company = company;
+
+function processCompany({
+    name,
+    location: { address: { city: cityName } }
+}: Company): string {
+    return name + " in " + cityName;
+}
+
+type NestedArray = [[number, number], [string, string]];
+const nested: NestedArray = [[1, 2], ["a", "b"]];
+const [[n1, n2], [s1, s2]]: NestedArray = nested;
+
+const { employees: [{ details: { name: firstName } }] }: Company = company;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Variable should be defined
+    assert!(
+        output.contains("company"),
+        "Company object should be defined: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Type alias should be erased
+    assert!(
+        !output.contains("type NestedArray"),
+        "Type alias should be erased: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": Company") && !output.contains(": NestedArray"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_destructuring_defaults_typed() {
+    let source = r#"
+interface Options {
+    timeout?: number;
+    retries?: number;
+    verbose?: boolean;
+}
+
+function configure({
+    timeout = 1000,
+    retries = 3,
+    verbose = false
+}: Options = {}): void {
+    console.log(timeout, retries, verbose);
+}
+
+const { timeout = 5000, retries = 1 }: Options = {};
+
+type StringOrNumber = string | number;
+const { value = "default" }: { value?: StringOrNumber } = {};
+
+interface ComponentProps {
+    title?: string;
+    count?: number;
+    items?: string[];
+}
+
+function Component({
+    title = "Untitled",
+    count = 0,
+    items = []
+}: ComponentProps): void {
+    console.log(title, count, items);
+}
+
+const [first = 0, second = 0]: [number?, number?] = [];
+
+function withCallback({
+    onSuccess = () => {},
+    onError = (e: Error) => console.error(e)
+}: {
+    onSuccess?: () => void;
+    onError?: (e: Error) => void;
+} = {}): void {
+    onSuccess();
+}
+
+type Config<T> = { value?: T; fallback: T };
+function getValue<T>({ value, fallback }: Config<T>): T {
+    return value ?? fallback;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions should be defined
+    assert!(
+        output.contains("configure") && output.contains("Component"),
+        "Functions should be defined: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Type alias should be erased
+    assert!(
+        !output.contains("type StringOrNumber") && !output.contains("type Config"),
+        "Type aliases should be erased: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": Options") && !output.contains(": ComponentProps"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_destructuring_rest_typed() {
+    let source = r#"
+interface FullUser {
+    id: number;
+    name: string;
+    email: string;
+    password: string;
+    createdAt: Date;
+}
+
+const fullUser: FullUser = {
+    id: 1,
+    name: "John",
+    email: "john@example.com",
+    password: "secret",
+    createdAt: new Date()
+};
+
+const { password, ...safeUser }: FullUser = fullUser;
+
+function omitFields<T extends object, K extends keyof T>(
+    obj: T,
+    ...keys: K[]
+): Omit<T, K> {
+    const result = { ...obj };
+    for (const key of keys) {
+        delete (result as any)[key];
+    }
+    return result as Omit<T, K>;
+}
+
+type NumberTuple = [number, number, number, number, number];
+const nums: NumberTuple = [1, 2, 3, 4, 5];
+const [first, second, ...remaining]: NumberTuple = nums;
+
+interface ApiResponse<T> {
+    data: T;
+    status: number;
+    headers: Record<string, string>;
+}
+
+function processResponse<T>({
+    data,
+    ...metadata
+}: ApiResponse<T>): { data: T; meta: Omit<ApiResponse<T>, 'data'> } {
+    return { data, meta: metadata };
+}
+
+const { name, ...rest }: { name: string; [key: string]: unknown } = {
+    name: "test",
+    extra: true,
+    count: 42
+};
+
+function collectRest<T>(...items: T[]): T[] {
+    const [head, ...tail] = items;
+    return tail;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Variables should be defined
+    assert!(
+        output.contains("fullUser") && output.contains("safeUser"),
+        "Variables should be defined: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Type alias should be erased
+    assert!(
+        !output.contains("type NumberTuple"),
+        "Type alias should be erased: {}",
+        output
+    );
+    // Generic constraints should be erased
+    assert!(
+        !output.contains("extends object") && !output.contains("extends keyof"),
+        "Generic constraints should be erased: {}",
+        output
+    );
+    // Omit utility type should be erased
+    assert!(
+        !output.contains("Omit<"),
+        "Utility types should be erased: {}",
+        output
+    );
+}
+
+#[test]
 fn test_parity_es5_for_of_iterables() {
     let source = r#"
 const set: Set<number> = new Set([1, 2, 3]);
