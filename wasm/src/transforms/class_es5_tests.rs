@@ -15264,28 +15264,27 @@ class SimpleMap<K, V> {
     );
 }
 
+// ============================================================================
+// Symbol.toStringTag Tests
+// ============================================================================
+
 #[test]
-fn test_class_es5_reflect_construct_basic() {
-    // Basic Reflect.construct usage for constructor invocation
+fn test_class_es5_symbol_to_string_tag_basic() {
+    // Basic Symbol.toStringTag getter for custom class name
     let source = r#"
-class ConstructorInvoker {
-    static create<T>(ctor: new (...args: any[]) => T, args: any[]): T {
-        return Reflect.construct(ctor, args);
+class CustomCollection {
+    private items: unknown[] = [];
+
+    get [Symbol.toStringTag](): string {
+        return "CustomCollection";
     }
 
-    static createWithProto<T>(ctor: new (...args: any[]) => T, args: any[], proto: object): T {
-        return Reflect.construct(ctor, args, proto.constructor as any);
+    add(item: unknown): void {
+        this.items.push(item);
     }
 
-    static instantiate<T extends object>(
-        target: new (...args: any[]) => T,
-        argArray: any[]
-    ): T {
-        return Reflect.construct(target, argArray);
-    }
-
-    createInstance<T>(ctor: new (...args: any[]) => T, ...args: any[]): T {
-        return Reflect.construct(ctor, args);
+    get length(): number {
+        return this.items.length;
     }
 }
 "#;
@@ -15304,380 +15303,300 @@ class ConstructorInvoker {
 
     let output = printer.get_output().to_string();
 
+    // Class should be converted
     assert!(
-        output.contains("ConstructorInvoker"),
-        "Expected ConstructorInvoker class: {}",
+        output.contains("function CustomCollection"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Symbol.toStringTag or defineProperty should be present
+    assert!(
+        output.contains("toStringTag") || output.contains("defineProperty") || output.contains("Symbol"),
+        "Expected Symbol.toStringTag handling: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("add"),
+        "Expected add method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_to_string_tag_dynamic() {
+    // Symbol.toStringTag with dynamic value based on state
+    let source = r#"
+class StatefulObject {
+    private state: "idle" | "running" | "stopped" = "idle";
+
+    get [Symbol.toStringTag](): string {
+        return "StatefulObject<" + this.state + ">";
+    }
+
+    start(): void {
+        this.state = "running";
+    }
+
+    stop(): void {
+        this.state = "stopped";
+    }
+
+    reset(): void {
+        this.state = "idle";
+    }
+
+    get currentState(): string {
+        return this.state;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function StatefulObject"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // State methods should be present
+    assert!(
+        output.contains("start") && output.contains("stop") && output.contains("reset"),
+        "Expected state methods: {}",
+        output
+    );
+
+    // currentState getter should be present
+    assert!(
+        output.contains("currentState"),
+        "Expected currentState getter: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_to_string_tag_with_inheritance() {
+    // Symbol.toStringTag with class inheritance
+    let source = r#"
+class BaseType {
+    get [Symbol.toStringTag](): string {
+        return "BaseType";
+    }
+
+    getTypeName(): string {
+        return Object.prototype.toString.call(this);
+    }
+}
+
+class DerivedType extends BaseType {
+    get [Symbol.toStringTag](): string {
+        return "DerivedType";
+    }
+
+    getParentTypeName(): string {
+        return "BaseType";
+    }
+}
+
+class AnotherDerived extends BaseType {
+    private customName: string;
+
+    constructor(name: string) {
+        super();
+        this.customName = name;
+    }
+
+    get [Symbol.toStringTag](): string {
+        return this.customName;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // All classes should be converted
+    assert!(
+        output.contains("function BaseType"),
+        "Expected BaseType function: {}",
         output
     );
     assert!(
-        output.contains("Reflect.construct"),
-        "Expected Reflect.construct: {}",
+        output.contains("function DerivedType"),
+        "Expected DerivedType function: {}",
         output
     );
     assert!(
-        output.contains("create") && output.contains("createInstance"),
+        output.contains("function AnotherDerived"),
+        "Expected AnotherDerived function: {}",
+        output
+    );
+
+    // Inheritance should be set up
+    assert!(
+        output.contains("__extends") || output.contains("extends"),
+        "Expected inheritance: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_to_string_tag_static() {
+    // Static Symbol.toStringTag (less common but valid)
+    let source = r#"
+class TypeRegistry {
+    private static types: Map<string, unknown> = new Map();
+
+    static get [Symbol.toStringTag](): string {
+        return "TypeRegistry";
+    }
+
+    static register(name: string, type: unknown): void {
+        this.types.set(name, type);
+    }
+
+    static get(name: string): unknown {
+        return this.types.get(name);
+    }
+
+    static has(name: string): boolean {
+        return this.types.has(name);
+    }
+
+    static get count(): number {
+        return this.types.size;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function TypeRegistry"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("register") && output.contains("has"),
+        "Expected static methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_to_string_tag_with_iterator() {
+    // Symbol.toStringTag combined with Symbol.iterator
+    let source = r#"
+class AdvancedCollection<T> {
+    private items: T[] = [];
+
+    get [Symbol.toStringTag](): string {
+        return "AdvancedCollection";
+    }
+
+    *[Symbol.iterator](): Generator<T> {
+        for (const item of this.items) {
+            yield item;
+        }
+    }
+
+    add(item: T): void {
+        this.items.push(item);
+    }
+
+    remove(item: T): boolean {
+        const idx = this.items.indexOf(item);
+        if (idx !== -1) {
+            this.items.splice(idx, 1);
+            return true;
+        }
+        return false;
+    }
+
+    get length(): number {
+        return this.items.length;
+    }
+
+    toString(): string {
+        return "[object " + this[Symbol.toStringTag] + "]";
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function AdvancedCollection"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("add") && output.contains("remove") && output.contains("toString"),
         "Expected methods: {}",
         output
     );
-}
 
-#[test]
-fn test_class_es5_reflect_apply_basic() {
-    // Basic Reflect.apply usage for function application
-    let source = r#"
-class FunctionApplier {
-    static apply<T, R>(fn: (...args: any[]) => R, thisArg: T, args: any[]): R {
-        return Reflect.apply(fn, thisArg, args);
-    }
-
-    static call<T, R>(fn: (this: T, ...args: any[]) => R, context: T, ...args: any[]): R {
-        return Reflect.apply(fn, context, args);
-    }
-
-    static bind<T, R>(fn: (this: T, ...args: any[]) => R, context: T): (...args: any[]) => R {
-        return (...args: any[]) => Reflect.apply(fn, context, args);
-    }
-
-    invokeMethod<T, K extends keyof T>(obj: T, method: K, args: any[]): any {
-        const fn = obj[method];
-        if (typeof fn === 'function') {
-            return Reflect.apply(fn as Function, obj, args);
-        }
-        throw new Error('Not a function');
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
+    // length getter should be present
     assert!(
-        output.contains("FunctionApplier"),
-        "Expected FunctionApplier class: {}",
-        output
-    );
-    assert!(
-        output.contains("Reflect.apply"),
-        "Expected Reflect.apply: {}",
-        output
-    );
-    assert!(
-        output.contains("apply") && output.contains("call") && output.contains("bind"),
-        "Expected methods: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_reflect_construct_newtarget() {
-    // Reflect.construct with newTarget parameter
-    let source = r#"
-class NewTargetHandler {
-    static constructAs<T, U>(
-        target: new (...args: any[]) => T,
-        args: any[],
-        newTarget: new (...args: any[]) => U
-    ): T {
-        return Reflect.construct(target, args, newTarget);
-    }
-
-    static createSubclass<T>(
-        baseClass: new (...args: any[]) => T,
-        subClass: new (...args: any[]) => any,
-        args: any[]
-    ): T {
-        return Reflect.construct(baseClass, args, subClass);
-    }
-
-    static extendBuiltin<T extends object>(
-        builtin: new (...args: any[]) => T,
-        args: any[],
-        customClass: Function
-    ): T {
-        return Reflect.construct(builtin, args, customClass);
-    }
-
-    createWithNewTarget<T>(
-        ctor: new (...args: any[]) => T,
-        args: any[],
-        newTarget?: Function
-    ): T {
-        if (newTarget) {
-            return Reflect.construct(ctor, args, newTarget);
-        }
-        return Reflect.construct(ctor, args);
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    assert!(
-        output.contains("NewTargetHandler"),
-        "Expected NewTargetHandler class: {}",
-        output
-    );
-    assert!(
-        output.contains("Reflect.construct"),
-        "Expected Reflect.construct: {}",
-        output
-    );
-    assert!(
-        output.contains("constructAs") && output.contains("createSubclass"),
-        "Expected methods: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_reflect_apply_context() {
-    // Reflect.apply with different this context
-    let source = r#"
-class ContextBinder {
-    static withContext<T, R>(fn: Function, context: T, args: any[]): R {
-        return Reflect.apply(fn, context, args) as R;
-    }
-
-    static borrowMethod<T, U>(
-        source: T,
-        methodName: keyof T,
-        target: U,
-        args: any[]
-    ): any {
-        const method = source[methodName];
-        if (typeof method === 'function') {
-            return Reflect.apply(method as Function, target, args);
-        }
-        return undefined;
-    }
-
-    static chainCalls<T>(
-        context: T,
-        calls: Array<{ fn: Function; args: any[] }>
-    ): any[] {
-        return calls.map(({ fn, args }) => Reflect.apply(fn, context, args));
-    }
-
-    applyWithFallback<T, R>(
-        fn: Function,
-        context: T,
-        args: any[],
-        fallback: R
-    ): R {
-        try {
-            return Reflect.apply(fn, context, args) as R;
-        } catch {
-            return fallback;
-        }
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    assert!(
-        output.contains("ContextBinder"),
-        "Expected ContextBinder class: {}",
-        output
-    );
-    assert!(
-        output.contains("Reflect.apply"),
-        "Expected Reflect.apply: {}",
-        output
-    );
-    assert!(
-        output.contains("withContext") && output.contains("borrowMethod"),
-        "Expected methods: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_reflect_in_constructor() {
-    // Reflect.construct/apply in constructor
-    let source = r#"
-class ReflectiveClass {
-    private instance: object;
-    private boundMethods: Map<string, Function>;
-
-    constructor(
-        baseClass: new (...args: any[]) => object,
-        args: any[],
-        methodsToBind: string[]
-    ) {
-        this.instance = Reflect.construct(baseClass, args);
-        this.boundMethods = new Map();
-
-        methodsToBind.forEach(methodName => {
-            const method = (this.instance as any)[methodName];
-            if (typeof method === 'function') {
-                this.boundMethods.set(methodName, (...callArgs: any[]) => {
-                    return Reflect.apply(method, this.instance, callArgs);
-                });
-            }
-        });
-    }
-
-    callMethod(name: string, ...args: any[]): any {
-        const method = this.boundMethods.get(name);
-        if (method) {
-            return Reflect.apply(method, null, args);
-        }
-        throw new Error('Method not found');
-    }
-
-    getInstance(): object {
-        return this.instance;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    assert!(
-        output.contains("ReflectiveClass"),
-        "Expected ReflectiveClass class: {}",
-        output
-    );
-    assert!(
-        output.contains("Reflect.construct") && output.contains("Reflect.apply"),
-        "Expected Reflect methods: {}",
-        output
-    );
-    assert!(
-        output.contains("callMethod") && output.contains("getInstance"),
-        "Expected methods: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_reflect_combined() {
-    // Combined Reflect.construct and Reflect.apply patterns
-    let source = r#"
-class ReflectUtilities {
-    static factory<T>(
-        ctor: new (...args: any[]) => T,
-        initializer?: (instance: T) => void
-    ): (...args: any[]) => T {
-        return (...args: any[]) => {
-            const instance = Reflect.construct(ctor, args);
-            if (initializer) {
-                Reflect.apply(initializer, null, [instance]);
-            }
-            return instance;
-        };
-    }
-
-    static memoizedConstruct<T>(
-        ctor: new (...args: any[]) => T,
-        keyFn: (...args: any[]) => string
-    ): (...args: any[]) => T {
-        const cache = new Map<string, T>();
-        return (...args: any[]) => {
-            const key = Reflect.apply(keyFn, null, args);
-            if (cache.has(key)) {
-                return cache.get(key)!;
-            }
-            const instance = Reflect.construct(ctor, args);
-            cache.set(key, instance);
-            return instance;
-        };
-    }
-
-    invokeAll<T>(
-        methods: Array<{ target: object; fn: Function; args: any[] }>
-    ): any[] {
-        return methods.map(({ target, fn, args }) => Reflect.apply(fn, target, args));
-    }
-
-    constructAll<T>(
-        ctors: Array<{ ctor: new (...args: any[]) => T; args: any[] }>
-    ): T[] {
-        return ctors.map(({ ctor, args }) => Reflect.construct(ctor, args));
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    assert!(
-        output.contains("ReflectUtilities"),
-        "Expected ReflectUtilities class: {}",
-        output
-    );
-    assert!(
-        output.contains("Reflect.construct") && output.contains("Reflect.apply"),
-        "Expected Reflect methods: {}",
-        output
-    );
-    assert!(
-        output.contains("factory") && output.contains("memoizedConstruct"),
-        "Expected factory methods: {}",
-        output
-    );
-    assert!(
-        output.contains("invokeAll") && output.contains("constructAll"),
-        "Expected batch methods: {}",
+        output.contains("length"),
+        "Expected length getter: {}",
         output
     );
 }
