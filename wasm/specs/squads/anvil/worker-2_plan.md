@@ -7,12 +7,13 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-Add ES5 BigInt patterns parity tests: literal, arithmetic, comparison, method calls. Tests: `./wasm/test.sh emitter_parity`
+(none)
 
 ## Task Queue
 - [ ] Add ES5 Symbol patterns parity tests: well-known symbols, Symbol.for, Symbol.keyFor
 
 ## Completed
+- [x] Added ES5 BigInt patterns parity tests (literal, arithmetic, comparison, method-calls) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (363 tests).
 - [x] Added ES5 nullish coalescing patterns parity tests (complex-expressions, class-context, function-calls, nested-defaults) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (359 tests).
 - [x] Added ES5 optional chaining patterns parity tests (deep-nested, class-methods, generics, mixed-access) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (355 tests).
 - [x] Added ES5 spread/rest patterns parity tests (object-literal-methods, async-error-handling, custom-iterables, generic-signatures) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (351 tests).
