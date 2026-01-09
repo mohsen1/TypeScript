@@ -6,7 +6,7 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-- Idle; last completed task: TS2322 false positives fix (committed/pushed; Ready for Merge: Yes).
+- Idle; last completed task: TS2304 false positives fix (committed/pushed; Ready for Merge: Yes).
 - Awaiting next task from EM-Anvil.
 
 ## Task Queue
@@ -163,6 +163,7 @@ Priority: 1
 - [x] Added assignment operators ES5 test; verifies +=, -=, *= compound assignment operators. Ran `./wasm/test.sh class_es5_tests` (all 60 pass).
 - [x] Added prefix/postfix operators ES5 test; verifies ++x, x++, --x, x-- increment/decrement. Ran `./wasm/test.sh class_es5_tests` (all 60 pass).
 - [x] Investigated TS2322 false positives: resolved `typeof` type queries to value types when possible, resolved TypeQuery in subtype checks, added regression test, ran conformance before/after (see Notes).
+- [x] Fixed TS2304 false positives (Cannot find name): Added builtin global type handling for Promise, PromiseLike, Map, Set, Iterator, Generator, and 30+ other global types. Fixed type alias type parameter scoping, heritage clause resolution, type queries. Added find-ts2304.mjs differential test script. Added regression test. Key files: thin_checker.rs.
 
 ## Ready for Merge
 Yes
