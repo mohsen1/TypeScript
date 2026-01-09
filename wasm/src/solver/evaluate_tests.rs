@@ -17487,3 +17487,457 @@ fn test_array_covariance_non_array() {
     // Should return never since string is not an array
     assert_eq!(result, TypeId::NEVER);
 }
+
+// =========================================================================
+// Template Literal Type Inference - Multiple Captures
+// =========================================================================
+// Tests for template literal patterns with multiple infer captures
+
+#[test]
+fn test_template_literal_multiple_captures_two_parts() {
+    let interner = TypeInterner::new();
+
+    // Pattern: T extends `${infer A}-${infer B}` ? [A, B] : never
+    // Input: "hello-world" => ["hello", "world"]
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_a = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("A"),
+        constraint: None,
+        default: None,
+    }));
+    let infer_b = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("B"),
+        constraint: None,
+        default: None,
+    }));
+
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Type(infer_a),
+        TemplateSpan::Text(interner.intern_string("-")),
+        TemplateSpan::Type(infer_b),
+    ]);
+
+    let true_type = interner.tuple(vec![
+        TupleElement { type_id: infer_a, name: None, optional: false, rest: false },
+        TupleElement { type_id: infer_b, name: None, optional: false, rest: false },
+    ]);
+
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_template,
+        true_type,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, interner.literal_string("hello-world"));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    let expected = interner.tuple(vec![
+        TupleElement { type_id: interner.literal_string("hello"), name: None, optional: false, rest: false },
+        TupleElement { type_id: interner.literal_string("world"), name: None, optional: false, rest: false },
+    ]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_template_literal_multiple_captures_three_parts() {
+    let interner = TypeInterner::new();
+
+    // Pattern: T extends `${infer A}:${infer B}:${infer C}` ? [A, B, C] : never
+    // Input: "a:b:c" => ["a", "b", "c"]
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_a = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("A"),
+        constraint: None,
+        default: None,
+    }));
+    let infer_b = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("B"),
+        constraint: None,
+        default: None,
+    }));
+    let infer_c = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("C"),
+        constraint: None,
+        default: None,
+    }));
+
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Type(infer_a),
+        TemplateSpan::Text(interner.intern_string(":")),
+        TemplateSpan::Type(infer_b),
+        TemplateSpan::Text(interner.intern_string(":")),
+        TemplateSpan::Type(infer_c),
+    ]);
+
+    let true_type = interner.tuple(vec![
+        TupleElement { type_id: infer_a, name: None, optional: false, rest: false },
+        TupleElement { type_id: infer_b, name: None, optional: false, rest: false },
+        TupleElement { type_id: infer_c, name: None, optional: false, rest: false },
+    ]);
+
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_template,
+        true_type,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, interner.literal_string("a:b:c"));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    let expected = interner.tuple(vec![
+        TupleElement { type_id: interner.literal_string("a"), name: None, optional: false, rest: false },
+        TupleElement { type_id: interner.literal_string("b"), name: None, optional: false, rest: false },
+        TupleElement { type_id: interner.literal_string("c"), name: None, optional: false, rest: false },
+    ]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_template_literal_multiple_captures_with_prefix_suffix() {
+    let interner = TypeInterner::new();
+
+    // Pattern: T extends `[${infer Key}=${infer Value}]` ? { key: Key, value: Value } : never
+    // Input: "[name=john]" => { key: "name", value: "john" }
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_key = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("Key"),
+        constraint: None,
+        default: None,
+    }));
+    let infer_value = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("Value"),
+        constraint: None,
+        default: None,
+    }));
+
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("[")),
+        TemplateSpan::Type(infer_key),
+        TemplateSpan::Text(interner.intern_string("=")),
+        TemplateSpan::Type(infer_value),
+        TemplateSpan::Text(interner.intern_string("]")),
+    ]);
+
+    // Return tuple [Key, Value] for simplicity
+    let true_type = interner.tuple(vec![
+        TupleElement { type_id: infer_key, name: None, optional: false, rest: false },
+        TupleElement { type_id: infer_value, name: None, optional: false, rest: false },
+    ]);
+
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_template,
+        true_type,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, interner.literal_string("[name=john]"));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    let expected = interner.tuple(vec![
+        TupleElement { type_id: interner.literal_string("name"), name: None, optional: false, rest: false },
+        TupleElement { type_id: interner.literal_string("john"), name: None, optional: false, rest: false },
+    ]);
+    assert_eq!(result, expected);
+}
+
+// =========================================================================
+// Template Literal Type Inference - Conditional Narrowing
+// =========================================================================
+// Tests for template literal patterns used in conditional type narrowing
+
+#[test]
+fn test_template_literal_conditional_narrowing_with_infer() {
+    let interner = TypeInterner::new();
+
+    // Pattern: T extends `get${infer R}` ? R : "no-match"
+    // Input: "getName" => "Name", "setName" => "no-match"
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("R"),
+        constraint: None,
+        default: None,
+    }));
+
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("get")),
+        TemplateSpan::Type(infer_r),
+    ]);
+
+    let no_match = interner.literal_string("no-match");
+
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_template,
+        true_type: infer_r,
+        false_type: no_match,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let get_name = interner.literal_string("getName");
+    let set_name = interner.literal_string("setName");
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, interner.union(vec![get_name, set_name]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    // "getName" => "Name", "setName" => "no-match"
+    let expected = interner.union(vec![
+        interner.literal_string("Name"),
+        no_match,
+    ]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_template_literal_conditional_narrowing_suffix_infer() {
+    let interner = TypeInterner::new();
+
+    // Pattern: T extends `${infer R}Handler` ? R : "no-match"
+    // Input: "clickHandler" => "click", "clickListener" => "no-match"
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("R"),
+        constraint: None,
+        default: None,
+    }));
+
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Type(infer_r),
+        TemplateSpan::Text(interner.intern_string("Handler")),
+    ]);
+
+    let no_match = interner.literal_string("no-match");
+
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_template,
+        true_type: infer_r,
+        false_type: no_match,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let click_handler = interner.literal_string("clickHandler");
+    let click_listener = interner.literal_string("clickListener");
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, interner.union(vec![click_handler, click_listener]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    // "clickHandler" => "click", "clickListener" => "no-match"
+    let expected = interner.union(vec![
+        interner.literal_string("click"),
+        no_match,
+    ]);
+    assert_eq!(result, expected);
+}
+
+// =========================================================================
+// Template Literal Type Inference - Union Distribution
+// =========================================================================
+// Tests for template literal patterns with union type distribution
+
+#[test]
+fn test_template_literal_union_distribution_prefix() {
+    let interner = TypeInterner::new();
+
+    // Pattern: T extends `on${infer E}` ? E : never (distributive)
+    // Input: "onClick" | "onLoad" | "other" => "Click" | "Load"
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_e = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("E"),
+        constraint: None,
+        default: None,
+    }));
+
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("on")),
+        TemplateSpan::Type(infer_e),
+    ]);
+
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_template,
+        true_type: infer_e,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let on_click = interner.literal_string("onClick");
+    let on_load = interner.literal_string("onLoad");
+    let other = interner.literal_string("other");
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, interner.union(vec![on_click, on_load, other]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    // "onClick" => "Click", "onLoad" => "Load", "other" => never
+    let expected = interner.union(vec![
+        interner.literal_string("Click"),
+        interner.literal_string("Load"),
+    ]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_template_literal_union_distribution_all_match() {
+    let interner = TypeInterner::new();
+
+    // Pattern: T extends `item_${infer N}` ? N : never (distributive)
+    // Input: "item_1" | "item_2" | "item_3" => "1" | "2" | "3"
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_n = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("N"),
+        constraint: None,
+        default: None,
+    }));
+
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("item_")),
+        TemplateSpan::Type(infer_n),
+    ]);
+
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_template,
+        true_type: infer_n,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let item_1 = interner.literal_string("item_1");
+    let item_2 = interner.literal_string("item_2");
+    let item_3 = interner.literal_string("item_3");
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, interner.union(vec![item_1, item_2, item_3]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    // All match: "1" | "2" | "3"
+    let expected = interner.union(vec![
+        interner.literal_string("1"),
+        interner.literal_string("2"),
+        interner.literal_string("3"),
+    ]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_template_literal_union_distribution_none_match() {
+    let interner = TypeInterner::new();
+
+    // Pattern: T extends `prefix_${infer X}` ? X : never (distributive)
+    // Input: "other_1" | "other_2" => never (none match)
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_x = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("X"),
+        constraint: None,
+        default: None,
+    }));
+
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("prefix_")),
+        TemplateSpan::Type(infer_x),
+    ]);
+
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_template,
+        true_type: infer_x,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let other_1 = interner.literal_string("other_1");
+    let other_2 = interner.literal_string("other_2");
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, interner.union(vec![other_1, other_2]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    // None match, both return never => never
+    assert_eq!(result, TypeId::NEVER);
+}
