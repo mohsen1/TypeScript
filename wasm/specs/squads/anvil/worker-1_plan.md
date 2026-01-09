@@ -8,12 +8,13 @@ Priority: 1
 Blocked: Awaiting next EM-Anvil assignment.
 
 ## Current Assignment
-- [ ] Add ES5 class tests for Object.defineProperty patterns in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
+- [ ] Add ES5 class tests for Object.getPrototypeOf/setPrototypeOf patterns in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 tests for Object.defineProperty patterns (6 tests): basic, accessor, defineProperties multiple, readonly, in constructor, combined. Ran `./wasm/test.sh class_es5_tests` (all 253 pass).
 - [x] Added ES5 tests for Object.keys/Object.create patterns (6 tests): keys basic, create basic, keys iteration, create with descriptors, in constructor, combined. Ran `./wasm/test.sh class_es5_tests` (all 247 pass).
 - [x] Added ES5 tests for Array.isArray/Array.of patterns (6 tests): isarray basic, array.of basic, isarray guard, static methods, in constructor, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 242 pass).
 - [x] Added ES5 tests for Object.freeze/Object.seal patterns (6 tests): freeze basic, seal basic, deep freeze, state checks, immutable record, frozen singleton. Ran `./wasm/test.sh class_es5_tests` (all 237 pass).

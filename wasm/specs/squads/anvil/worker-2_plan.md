@@ -7,12 +7,14 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] Add ES5 default parameter parity tests in `wasm/src/emitter_parity_tests.rs`. Run `./wasm/test.sh emitter_parity`.
+- [ ] (none)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 default parameter parity tests (class-method, arrow, expression, constructor) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (192 tests).
+- [x] Added ES5 rest parameter parity tests (nested, overload, tuple, callback) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (188 tests).
 - [x] Added ES5 rest parameter parity tests (generator, async, destructuring, constructor) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (184 tests).
 - [x] Added ES5 rest parameter parity tests (class-method, typed-array, arrow, with-defaults) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (180 tests).
 - [x] Added ES5 computed property parity tests (symbol, class-method, expression, accessor) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (176 tests).
