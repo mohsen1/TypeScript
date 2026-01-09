@@ -7,12 +7,13 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- [ ] Add async ES5 tests for async event emitter patterns: on, off, once, emit. Tests: `./wasm/test.sh async_es5_tests`
+None - awaiting next task assignment.
 
 ## Task Queue
 
 
 ## Completed
+- [x] Added 12 async event emitter pattern tests (on, off, once, emit, wait, remove all, listeners, prepend, error, pipe, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (796 tests PASS).
 - [x] Added 12 async scheduler pattern tests (priority, delay, throttle, debounce, schedule, cancel, interval, cron, immediate, next tick, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (784 tests PASS).
 - [x] Added 12 async pool pattern tests (worker pool, task pool, connection pool, release, resize, drain, shutdown, health check, evict, batch, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (772 tests PASS).
 - [x] Added 12 async barrier pattern tests (wait, wait all, count down, reset, timeout, arrive, parties, phase, broken, action, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (760 tests PASS).

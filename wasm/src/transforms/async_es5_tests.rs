@@ -11551,3 +11551,104 @@ fn test_async_scheduler_ignores_nested_async() {
     );
     assert!(!result, "Should not detect await inside nested async in scheduler function");
 }
+
+// ============================================================================
+// ASYNC EVENT EMITTER PATTERN TESTS
+// Tests for event emitter patterns: on, off, once, emit
+// ============================================================================
+
+#[test]
+fn test_async_event_emitter_on() {
+    let result = async_error_propagation_contains_await(
+        "async function addListener() { await emitter.on(event, handler); }",
+    );
+    assert!(result, "Should detect await in event emitter on");
+}
+
+#[test]
+fn test_async_event_emitter_off() {
+    let result = async_error_propagation_contains_await(
+        "async function removeListener() { await emitter.off(event, handler); }",
+    );
+    assert!(result, "Should detect await in event emitter off");
+}
+
+#[test]
+fn test_async_event_emitter_once() {
+    let result = async_error_propagation_contains_await(
+        "async function listenOnce() { return await emitter.once(event); }",
+    );
+    assert!(result, "Should detect await in event emitter once");
+}
+
+#[test]
+fn test_async_event_emitter_emit() {
+    let result = async_error_propagation_contains_await(
+        "async function emitEvent() { await emitter.emit(event, data); }",
+    );
+    assert!(result, "Should detect await in event emitter emit");
+}
+
+#[test]
+fn test_async_event_emitter_wait() {
+    let result = async_error_propagation_contains_await(
+        "async function waitEvent() { return await emitter.waitFor(event); }",
+    );
+    assert!(result, "Should detect await in event emitter wait");
+}
+
+#[test]
+fn test_async_event_emitter_remove_all() {
+    let result = async_error_propagation_contains_await(
+        "async function removeAll() { await emitter.removeAllListeners(); }",
+    );
+    assert!(result, "Should detect await in remove all listeners");
+}
+
+#[test]
+fn test_async_event_emitter_listeners() {
+    let result = async_error_propagation_contains_await(
+        "async function getListeners() { return await emitter.listeners(event); }",
+    );
+    assert!(result, "Should detect await in get listeners");
+}
+
+#[test]
+fn test_async_event_emitter_prepend() {
+    let result = async_error_propagation_contains_await(
+        "async function prependListener() { await emitter.prependListener(event, handler); }",
+    );
+    assert!(result, "Should detect await in prepend listener");
+}
+
+#[test]
+fn test_async_event_emitter_error() {
+    let result = async_error_propagation_contains_await(
+        "async function handleError() { await emitter.emitError(error); }",
+    );
+    assert!(result, "Should detect await in error event emit");
+}
+
+#[test]
+fn test_async_event_emitter_pipe() {
+    let result = async_error_propagation_contains_await(
+        "async function pipeEvents() { await source.pipe(destination); }",
+    );
+    assert!(result, "Should detect await in event pipe");
+}
+
+#[test]
+fn test_async_event_emitter_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function syncEmitter() { return emitter.listenerCount(event); }",
+    );
+    assert!(!result, "Should not detect await when emitter access is sync");
+}
+
+#[test]
+fn test_async_event_emitter_ignores_nested_async() {
+    let result = async_error_propagation_contains_await(
+        "async function outer() { const handler = async () => await emitter.emit(); }",
+    );
+    assert!(!result, "Should not detect await inside nested async in event emitter function");
+}
