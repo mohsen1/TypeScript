@@ -25,9 +25,10 @@ Priority: 4
 - [x] Fixed compilation error in subtype_tests.rs (object_shape_with_index -> object_with_index)
 - [x] Added 5 namespace type member access pattern tests
 - [x] Added 11 circular constraints in extends clauses tests (F-bounded polymorphism)
+- [x] Added 10 additional circular constraint edge cases (polymorphic this, promise, event emitter, fluent interface, recursive JSON, linked list, state machine, visitor, expression tree, repository patterns)
 
 ## Ready for Merge
-Yes - all tests passing, completed namespace and circular constraint tests
+Yes - 21+ circular constraint tests, namespace tests all passing
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize solver correctness
