@@ -6,10 +6,10 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-(none)
+- [ ] Add ES5 class tests for namespace merging patterns: class with namespace augmentation, namespace with interface, namespace with enum, namespace with function, nested namespaces, namespace exports. Tests: `./wasm/test.sh class_es5_tests`
 
 ## Task Queue
-(empty)
+- [ ] Add ES5 class tests for module pattern variations: CommonJS class exports, ESM default class, re-export patterns
 
 ## Completed
 - [x] Added ES5 tests for abstract class patterns (6 tests): abstract method inheritance, abstract with decorators, abstract static methods, abstract getters/setters, multi-level inheritance, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 324 pass).

@@ -7,10 +7,10 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] (awaiting assignment)
+- [ ] Add ES5 source map tests for Symbol-keyed member patterns: Symbol.iterator, Symbol.asyncIterator, computed Symbol methods, Symbol.toStringTag, Symbol.hasInstance, Symbol.species. Tests: `./wasm/test.sh source_map`
 
 ## Task Queue
-- [ ] Add ES5 source map tests for Symbol-keyed member patterns: Symbol.iterator, Symbol.asyncIterator, computed Symbol methods
+- [ ] Add ES5 source map tests for decorator metadata patterns: reflect-metadata, parameter decorators, property descriptors
 
 ## Completed
 - [x] Added private field ES5 source map tests (instance field access, static field access, private method calls, accessor patterns, derived class, WeakMap polyfill, in-check, static method, comprehensive); 652 tests pass.
