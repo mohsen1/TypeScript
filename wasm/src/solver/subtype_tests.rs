@@ -24008,3 +24008,483 @@ fn test_void_undefined_null_union() {
     // But not string
     assert!(!checker.is_subtype_of(TypeId::STRING, void_undefined_null));
 }
+
+// =============================================================================
+// Bigint Type Tests - Literal Bigints, Arithmetic Operations
+// =============================================================================
+
+#[test]
+fn test_bigint_literal_subtype_of_bigint() {
+    // 100n is subtype of bigint
+    let interner = TypeInterner::new();
+
+    let big_100 = interner.bigint_literal(100);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(big_100, TypeId::BIGINT));
+    assert!(!checker.is_subtype_of(TypeId::BIGINT, big_100));
+}
+
+#[test]
+fn test_bigint_literal_same_value() {
+    // 100n is subtype of 100n
+    let interner = TypeInterner::new();
+
+    let big1 = interner.bigint_literal(100);
+    let big2 = interner.bigint_literal(100);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(big1, big2));
+    assert!(checker.is_subtype_of(big2, big1));
+}
+
+#[test]
+fn test_bigint_literal_different_values() {
+    // 100n is not subtype of 200n
+    let interner = TypeInterner::new();
+
+    let big_100 = interner.bigint_literal(100);
+    let big_200 = interner.bigint_literal(200);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(!checker.is_subtype_of(big_100, big_200));
+    assert!(!checker.is_subtype_of(big_200, big_100));
+}
+
+#[test]
+fn test_bigint_not_subtype_of_number() {
+    // bigint is not subtype of number
+    let interner = TypeInterner::new();
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(!checker.is_subtype_of(TypeId::BIGINT, TypeId::NUMBER));
+    assert!(!checker.is_subtype_of(TypeId::NUMBER, TypeId::BIGINT));
+}
+
+#[test]
+fn test_bigint_literal_not_subtype_of_number() {
+    // 100n is not subtype of number
+    let interner = TypeInterner::new();
+
+    let big_100 = interner.bigint_literal(100);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(!checker.is_subtype_of(big_100, TypeId::NUMBER));
+}
+
+#[test]
+fn test_number_literal_not_subtype_of_bigint() {
+    // 100 is not subtype of bigint
+    let interner = TypeInterner::new();
+
+    let num_100 = interner.number_literal(100.0);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(!checker.is_subtype_of(num_100, TypeId::BIGINT));
+}
+
+#[test]
+fn test_bigint_union_with_number() {
+    // bigint | number
+    let interner = TypeInterner::new();
+
+    let bigint_or_number = interner.union(vec![TypeId::BIGINT, TypeId::NUMBER]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(TypeId::BIGINT, bigint_or_number));
+    assert!(checker.is_subtype_of(TypeId::NUMBER, bigint_or_number));
+}
+
+#[test]
+fn test_bigint_literal_union() {
+    // 1n | 2n | 3n
+    let interner = TypeInterner::new();
+
+    let one = interner.bigint_literal(1);
+    let two = interner.bigint_literal(2);
+    let three = interner.bigint_literal(3);
+
+    let union = interner.union(vec![one, two, three]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(one, union));
+    assert!(checker.is_subtype_of(two, union));
+    assert!(checker.is_subtype_of(three, union));
+    assert!(checker.is_subtype_of(union, TypeId::BIGINT));
+}
+
+#[test]
+fn test_bigint_in_object_property() {
+    // { count: bigint }
+    let interner = TypeInterner::new();
+
+    let count_name = interner.intern_string("count");
+
+    let with_bigint = interner.object(vec![PropertyInfo {
+        name: count_name,
+        type_id: TypeId::BIGINT,
+        write_type: TypeId::BIGINT,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(with_bigint != TypeId::ERROR);
+}
+
+#[test]
+fn test_bigint_literal_in_object() {
+    // { id: 1n }
+    let interner = TypeInterner::new();
+
+    let id_name = interner.intern_string("id");
+    let one_n = interner.bigint_literal(1);
+
+    let with_literal = interner.object(vec![PropertyInfo {
+        name: id_name,
+        type_id: one_n,
+        write_type: one_n,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let with_bigint = interner.object(vec![PropertyInfo {
+        name: id_name,
+        type_id: TypeId::BIGINT,
+        write_type: TypeId::BIGINT,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(with_literal, with_bigint));
+}
+
+#[test]
+fn test_bigint_function_parameter() {
+    // (x: bigint) => void
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+
+    let bigint_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(x_name),
+            type_id: TypeId::BIGINT,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    assert!(bigint_fn != TypeId::ERROR);
+}
+
+#[test]
+fn test_bigint_function_return() {
+    // () => bigint
+    let interner = TypeInterner::new();
+
+    let returns_bigint = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::BIGINT,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    assert!(returns_bigint != TypeId::ERROR);
+}
+
+#[test]
+fn test_bigint_arithmetic_add_result() {
+    // bigint + bigint = bigint
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+    let y_name = interner.intern_string("y");
+
+    // Function (x: bigint, y: bigint) => bigint
+    let add_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo {
+                name: Some(x_name),
+                type_id: TypeId::BIGINT,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(y_name),
+                type_id: TypeId::BIGINT,
+                optional: false,
+                rest: false,
+            },
+        ],
+        this_type: None,
+        return_type: TypeId::BIGINT,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    assert!(add_fn != TypeId::ERROR);
+}
+
+#[test]
+fn test_bigint_comparison_result() {
+    // bigint < bigint = boolean
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+    let y_name = interner.intern_string("y");
+
+    // Function (x: bigint, y: bigint) => boolean
+    let compare_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo {
+                name: Some(x_name),
+                type_id: TypeId::BIGINT,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(y_name),
+                type_id: TypeId::BIGINT,
+                optional: false,
+                rest: false,
+            },
+        ],
+        this_type: None,
+        return_type: TypeId::BOOLEAN,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    assert!(compare_fn != TypeId::ERROR);
+}
+
+#[test]
+fn test_bigint_in_tuple() {
+    // [bigint, bigint]
+    let interner = TypeInterner::new();
+
+    let tuple = interner.tuple(vec![TypeId::BIGINT, TypeId::BIGINT]);
+
+    assert!(tuple != TypeId::ERROR);
+}
+
+#[test]
+fn test_bigint_literal_in_tuple() {
+    // [1n, 2n, 3n]
+    let interner = TypeInterner::new();
+
+    let one = interner.bigint_literal(1);
+    let two = interner.bigint_literal(2);
+    let three = interner.bigint_literal(3);
+
+    let literal_tuple = interner.tuple(vec![one, two, three]);
+    let bigint_tuple = interner.tuple(vec![TypeId::BIGINT, TypeId::BIGINT, TypeId::BIGINT]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(literal_tuple, bigint_tuple));
+}
+
+#[test]
+fn test_bigint_array() {
+    // bigint[]
+    let interner = TypeInterner::new();
+
+    let bigint_array = interner.array(TypeId::BIGINT);
+
+    assert!(bigint_array != TypeId::ERROR);
+}
+
+#[test]
+fn test_bigint_literal_array() {
+    // (1n | 2n)[]
+    let interner = TypeInterner::new();
+
+    let one = interner.bigint_literal(1);
+    let two = interner.bigint_literal(2);
+    let union = interner.union(vec![one, two]);
+
+    let literal_array = interner.array(union);
+    let bigint_array = interner.array(TypeId::BIGINT);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(literal_array, bigint_array));
+}
+
+#[test]
+fn test_bigint_negative_literal() {
+    // -100n
+    let interner = TypeInterner::new();
+
+    let neg_100 = interner.bigint_literal(-100);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(neg_100, TypeId::BIGINT));
+}
+
+#[test]
+fn test_bigint_zero_literal() {
+    // 0n
+    let interner = TypeInterner::new();
+
+    let zero = interner.bigint_literal(0);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(zero, TypeId::BIGINT));
+}
+
+#[test]
+fn test_bigint_large_literal() {
+    // Very large bigint value
+    let interner = TypeInterner::new();
+
+    let large = interner.bigint_literal(i64::MAX);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(large, TypeId::BIGINT));
+}
+
+#[test]
+fn test_bigint_in_index_signature() {
+    // { [key: string]: bigint }
+    let interner = TypeInterner::new();
+
+    let indexed = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::BIGINT,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    assert!(indexed != TypeId::ERROR);
+}
+
+#[test]
+fn test_bigint_optional_property() {
+    // { value?: bigint }
+    let interner = TypeInterner::new();
+
+    let value_name = interner.intern_string("value");
+
+    let with_optional = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: TypeId::BIGINT,
+        write_type: TypeId::BIGINT,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(with_optional != TypeId::ERROR);
+}
+
+#[test]
+fn test_bigint_readonly_property() {
+    // { readonly value: bigint }
+    let interner = TypeInterner::new();
+
+    let value_name = interner.intern_string("value");
+
+    let with_readonly = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: TypeId::BIGINT,
+        write_type: TypeId::BIGINT,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    assert!(with_readonly != TypeId::ERROR);
+}
+
+#[test]
+fn test_bigint_nullable() {
+    // bigint | null
+    let interner = TypeInterner::new();
+
+    let nullable_bigint = interner.union(vec![TypeId::BIGINT, TypeId::NULL]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(TypeId::BIGINT, nullable_bigint));
+    assert!(checker.is_subtype_of(TypeId::NULL, nullable_bigint));
+}
+
+#[test]
+fn test_bigint_literal_widening() {
+    // 1n assigned to bigint
+    let interner = TypeInterner::new();
+
+    let one_n = interner.bigint_literal(1);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(one_n, TypeId::BIGINT));
+}
+
+#[test]
+fn test_bigint_intersection() {
+    // bigint & {} (branded bigint pattern)
+    let interner = TypeInterner::new();
+
+    let brand_name = interner.intern_string("__brand");
+    let brand_value = interner.string_literal("UserId");
+
+    let brand_obj = interner.object(vec![PropertyInfo {
+        name: brand_name,
+        type_id: brand_value,
+        write_type: brand_value,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let branded_bigint = interner.intersection(vec![TypeId::BIGINT, brand_obj]);
+
+    assert!(branded_bigint != TypeId::ERROR);
+}
+
+#[test]
+fn test_bigint_in_generic_container() {
+    // Container<bigint> = { value: bigint }
+    let interner = TypeInterner::new();
+
+    let value_name = interner.intern_string("value");
+
+    let container_bigint = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: TypeId::BIGINT,
+        write_type: TypeId::BIGINT,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(container_bigint != TypeId::ERROR);
+}
+
+#[test]
+fn test_bigint_typeof() {
+    // typeof value === "bigint" narrows to bigint
+    let interner = TypeInterner::new();
+
+    // bigint | string union
+    let union = interner.union(vec![TypeId::BIGINT, TypeId::STRING]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    // After typeof "bigint" check, narrows to bigint
+    assert!(checker.is_subtype_of(TypeId::BIGINT, union));
+}

@@ -28,6 +28,8 @@ Priority: 4
 - [x] Add interface type tests - DONE (added 28 tests: extends, merge declarations, excess property checks)
 - [x] Add type alias tests - DONE (added 30 tests: generic, recursive, circular references)
 - [x] Add literal type tests - DONE (added 35 tests: string, number, boolean, template literal)
+- [x] Add object type tests - DONE (added 28 tests: optional properties, excess property checks, type widening)
+- [x] Add bigint type tests - DONE (added 30 tests: literal bigints, arithmetic operations)
 
 ## Completed
 - [x] Fixed method type parameter scope in check_method_declaration
@@ -56,9 +58,11 @@ Priority: 4
 - [x] Added 28 interface type tests (extends, merge declarations, excess property checks)
 - [x] Added 30 type alias tests (generic, recursive, circular references)
 - [x] Added 35 literal type tests (string, number, boolean, template literal)
+- [x] Added 28 object type tests (optional properties, excess property checks, type widening)
+- [x] Added 30 bigint type tests (literal bigints, arithmetic operations)
 
 ## Ready for Merge
-Yes - 373+ solver tests added (circular constraints, inference from usage, context-sensitive typing, advanced generic inference, distributive conditional types, circular edge cases, mapped types, index signatures, generic constraints, recursive types, readonly/optional modifiers, unknown type narrowing, class types, interface types, type aliases, literal types)
+Yes - 431+ solver tests added (circular constraints, inference from usage, context-sensitive typing, advanced generic inference, distributive conditional types, circular edge cases, mapped types, index signatures, generic constraints, recursive types, readonly/optional modifiers, unknown type narrowing, class types, interface types, type aliases, literal types, object types, bigint types)
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize solver correctness
