@@ -9806,3 +9806,258 @@ for (const [k, v] of map.entries()) {
         output
     );
 }
+
+#[test]
+fn test_parity_es5_for_of_iterables() {
+    let source = r#"
+const set: Set<number> = new Set([1, 2, 3]);
+for (const num of set) {
+    console.log(num);
+}
+
+const map: Map<string, number> = new Map([["a", 1], ["b", 2]]);
+for (const [key, value] of map) {
+    console.log(key, value);
+}
+
+const str: string = "hello";
+for (const char of str) {
+    console.log(char);
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the iterables
+    assert!(
+        output.contains("set") && output.contains("map") && output.contains("str"),
+        "Output should contain iterables: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": Set<") && !output.contains(": Map<") && !output.contains(": string"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_for_of_control_flow() {
+    let source = r#"
+function findFirst(items: number[], target: number): number | undefined {
+    for (const item of items) {
+        if (item === target) {
+            return item;
+        }
+    }
+    return undefined;
+}
+
+function sumUntil(nums: number[], limit: number): number {
+    let sum: number = 0;
+    for (const n of nums) {
+        if (sum + n > limit) {
+            break;
+        }
+        sum += n;
+    }
+    return sum;
+}
+
+function skipNegative(values: number[]): number[] {
+    const result: number[] = [];
+    for (const v of values) {
+        if (v < 0) {
+            continue;
+        }
+        result.push(v);
+    }
+    return result;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the functions
+    assert!(
+        output.contains("findFirst") && output.contains("sumUntil") && output.contains("skipNegative"),
+        "Output should contain functions: {}",
+        output
+    );
+    // Should contain control flow
+    assert!(
+        output.contains("break") && output.contains("continue"),
+        "Output should contain break and continue: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number[]") && !output.contains(": number | undefined"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_for_of_generator() {
+    let source = r#"
+function* range(start: number, end: number): Generator<number> {
+    for (let i = start; i < end; i++) {
+        yield i;
+    }
+}
+
+for (const n of range(0, 5)) {
+    console.log(n);
+}
+
+function* pairs<T>(arr: T[]): Generator<[T, T]> {
+    for (let i = 0; i < arr.length - 1; i++) {
+        yield [arr[i], arr[i + 1]];
+    }
+}
+
+const items: number[] = [1, 2, 3, 4];
+for (const [a, b] of pairs(items)) {
+    console.log(a, b);
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the generator functions
+    assert!(
+        output.contains("range") && output.contains("pairs"),
+        "Output should contain generator functions: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": Generator") && !output.contains("<T>"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_for_of_class_method() {
+    let source = r#"
+class DataProcessor {
+    private items: number[];
+
+    constructor(items: number[]) {
+        this.items = items;
+    }
+
+    process(): number[] {
+        const result: number[] = [];
+        for (const item of this.items) {
+            result.push(item * 2);
+        }
+        return result;
+    }
+
+    static fromArray<T>(arr: T[]): T[] {
+        const copy: T[] = [];
+        for (const elem of arr) {
+            copy.push(elem);
+        }
+        return copy;
+    }
+}
+
+class StringCollector {
+    collect(strings: string[]): string {
+        let result: string = "";
+        for (const s of strings) {
+            result += s;
+        }
+        return result;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the classes
+    assert!(
+        output.contains("DataProcessor") && output.contains("StringCollector"),
+        "Output should contain classes: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number[]") && !output.contains(": string") && !output.contains("<T>"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
