@@ -7,12 +7,13 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] Add ES5 async iteration patterns parity tests: for-await-of with generators, async iterator protocol, Symbol.asyncIterator. Tests: `./wasm/test.sh emitter_parity`
+- [ ] Add ES5 module patterns parity tests: dynamic import, top-level await, import.meta. Tests: `./wasm/test.sh emitter_parity`
 
 ## Task Queue
-- [ ] Add ES5 module patterns parity tests: dynamic import, top-level await, import.meta
+(empty)
 
 ## Completed
+- [x] Added ES5 async iteration patterns parity tests (for-await-generator, async-iterator-protocol, symbol-asyncIterator) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (302 tests).
 - [x] Added ES5 decorator patterns parity tests (class-chaining, method-descriptor, parameter-injection) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (299 tests).
 - [x] Added ES5 class inheritance patterns parity tests (extends-clause, super-calls, method-overrides, abstract-class) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (296 tests).
 - [x] Added ES5 import/export patterns parity tests (reexport, barrel-file, type-only-imports) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (292 tests).
