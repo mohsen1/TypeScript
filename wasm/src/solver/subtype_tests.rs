@@ -14932,3 +14932,580 @@ fn test_type_alias_intersection_with_interface() {
     // T is subtype of I (intersection contains interface)
     assert!(checker.is_subtype_of(type_t, interface_i));
 }
+
+// =============================================================================
+// NUMERIC ENUM ASSIGNABILITY TESTS
+// =============================================================================
+
+#[test]
+fn test_numeric_enum_member_to_number() {
+    // enum E { A = 0, B = 1 }
+    // E.A (literal 0) is subtype of number
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let enum_a = interner.literal_number(0.0);
+    let enum_b = interner.literal_number(1.0);
+
+    // Numeric enum members are subtypes of number
+    assert!(checker.is_subtype_of(enum_a, TypeId::NUMBER));
+    assert!(checker.is_subtype_of(enum_b, TypeId::NUMBER));
+}
+
+#[test]
+fn test_numeric_enum_union() {
+    // enum E { A = 0, B = 1, C = 2 }
+    // E is union of 0 | 1 | 2
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let enum_a = interner.literal_number(0.0);
+    let enum_b = interner.literal_number(1.0);
+    let enum_c = interner.literal_number(2.0);
+
+    let enum_type = interner.union(vec![enum_a, enum_b, enum_c]);
+
+    // Enum type is subtype of number
+    assert!(checker.is_subtype_of(enum_type, TypeId::NUMBER));
+
+    // Individual members are subtypes of enum type
+    assert!(checker.is_subtype_of(enum_a, enum_type));
+    assert!(checker.is_subtype_of(enum_b, enum_type));
+    assert!(checker.is_subtype_of(enum_c, enum_type));
+}
+
+#[test]
+fn test_numeric_enum_same_values_equal() {
+    // enum E1 { A = 0 }
+    // enum E2 { A = 0 }
+    // Same literal values are equal structurally
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let e1_a = interner.literal_number(0.0);
+    let e2_a = interner.literal_number(0.0);
+
+    // Same literal values are equal
+    assert!(checker.is_subtype_of(e1_a, e2_a));
+    assert!(checker.is_subtype_of(e2_a, e1_a));
+}
+
+#[test]
+fn test_numeric_enum_computed_values() {
+    // enum E { A = 1, B = 2, C = A + B } // C = 3
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let enum_a = interner.literal_number(1.0);
+    let enum_b = interner.literal_number(2.0);
+    let enum_c = interner.literal_number(3.0);
+
+    let enum_type = interner.union(vec![enum_a, enum_b, enum_c]);
+
+    // All computed values are part of enum
+    assert!(checker.is_subtype_of(enum_c, enum_type));
+    assert!(checker.is_subtype_of(enum_type, TypeId::NUMBER));
+}
+
+#[test]
+fn test_numeric_enum_negative_values() {
+    // enum E { A = -1, B = 0, C = 1 }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let enum_a = interner.literal_number(-1.0);
+    let enum_b = interner.literal_number(0.0);
+    let enum_c = interner.literal_number(1.0);
+
+    let enum_type = interner.union(vec![enum_a, enum_b, enum_c]);
+
+    // Negative values work correctly
+    assert!(checker.is_subtype_of(enum_a, TypeId::NUMBER));
+    assert!(checker.is_subtype_of(enum_a, enum_type));
+}
+
+#[test]
+fn test_number_not_subtype_of_numeric_enum() {
+    // number is not subtype of enum (enum is more specific)
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let enum_a = interner.literal_number(0.0);
+    let enum_b = interner.literal_number(1.0);
+    let enum_type = interner.union(vec![enum_a, enum_b]);
+
+    // number is not subtype of specific enum union
+    assert!(!checker.is_subtype_of(TypeId::NUMBER, enum_type));
+}
+
+#[test]
+fn test_numeric_enum_single_member() {
+    // enum E { Only = 42 }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let only = interner.literal_number(42.0);
+
+    // Single member enum
+    assert!(checker.is_subtype_of(only, TypeId::NUMBER));
+
+    // Other number literals are not the enum value
+    let other = interner.literal_number(43.0);
+    assert!(!checker.is_subtype_of(other, only));
+}
+
+// =============================================================================
+// STRING ENUM ASSIGNABILITY TESTS
+// =============================================================================
+
+#[test]
+fn test_string_enum_member_to_string() {
+    // enum E { A = "a", B = "b" }
+    // E.A (literal "a") is subtype of string
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let enum_a = interner.literal_string("a");
+    let enum_b = interner.literal_string("b");
+
+    // String enum members are subtypes of string
+    assert!(checker.is_subtype_of(enum_a, TypeId::STRING));
+    assert!(checker.is_subtype_of(enum_b, TypeId::STRING));
+}
+
+#[test]
+fn test_string_enum_union() {
+    // enum Direction { Up = "UP", Down = "DOWN", Left = "LEFT", Right = "RIGHT" }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let up = interner.literal_string("UP");
+    let down = interner.literal_string("DOWN");
+    let left = interner.literal_string("LEFT");
+    let right = interner.literal_string("RIGHT");
+
+    let direction = interner.union(vec![up, down, left, right]);
+
+    // Enum type is subtype of string
+    assert!(checker.is_subtype_of(direction, TypeId::STRING));
+
+    // Individual members are subtypes of enum type
+    assert!(checker.is_subtype_of(up, direction));
+    assert!(checker.is_subtype_of(down, direction));
+}
+
+#[test]
+fn test_string_not_subtype_of_string_enum() {
+    // string is not subtype of string enum
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a = interner.literal_string("a");
+    let b = interner.literal_string("b");
+    let enum_type = interner.union(vec![a, b]);
+
+    // string is not subtype of specific string enum
+    assert!(!checker.is_subtype_of(TypeId::STRING, enum_type));
+}
+
+#[test]
+fn test_string_enum_non_member_literal() {
+    // Non-member string literal is not subtype of enum
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a = interner.literal_string("a");
+    let b = interner.literal_string("b");
+    let enum_type = interner.union(vec![a, b]);
+
+    let c = interner.literal_string("c");
+
+    // "c" is not a member of the enum
+    assert!(!checker.is_subtype_of(c, enum_type));
+}
+
+#[test]
+fn test_string_enum_case_sensitive() {
+    // String enums are case-sensitive
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let upper = interner.literal_string("UP");
+    let lower = interner.literal_string("up");
+
+    // Different cases are different values
+    assert!(!checker.is_subtype_of(upper, lower));
+    assert!(!checker.is_subtype_of(lower, upper));
+}
+
+#[test]
+fn test_string_enum_empty_string() {
+    // enum E { Empty = "" }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let empty = interner.literal_string("");
+
+    assert!(checker.is_subtype_of(empty, TypeId::STRING));
+}
+
+#[test]
+fn test_string_enum_with_special_chars() {
+    // enum E { Special = "hello-world_123" }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let special = interner.literal_string("hello-world_123");
+
+    assert!(checker.is_subtype_of(special, TypeId::STRING));
+}
+
+// =============================================================================
+// CONST ENUM HANDLING TESTS
+// =============================================================================
+
+#[test]
+fn test_const_enum_numeric_values() {
+    // const enum E { A = 0, B = 1, C = 2 }
+    // Const enums are inlined - same as regular numeric enum for type checking
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a = interner.literal_number(0.0);
+    let b = interner.literal_number(1.0);
+    let c = interner.literal_number(2.0);
+
+    let const_enum = interner.union(vec![a, b, c]);
+
+    // Same behavior as regular enum
+    assert!(checker.is_subtype_of(const_enum, TypeId::NUMBER));
+    assert!(checker.is_subtype_of(a, const_enum));
+}
+
+#[test]
+fn test_const_enum_string_values() {
+    // const enum E { A = "a", B = "b" }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a = interner.literal_string("a");
+    let b = interner.literal_string("b");
+
+    let const_enum = interner.union(vec![a, b]);
+
+    assert!(checker.is_subtype_of(const_enum, TypeId::STRING));
+    assert!(checker.is_subtype_of(a, const_enum));
+}
+
+#[test]
+fn test_const_enum_computed_member() {
+    // const enum E { A = 1 << 0, B = 1 << 1, C = 1 << 2 }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a = interner.literal_number(1.0);  // 1 << 0
+    let b = interner.literal_number(2.0);  // 1 << 1
+    let c = interner.literal_number(4.0);  // 1 << 2
+
+    let flags_enum = interner.union(vec![a, b, c]);
+
+    assert!(checker.is_subtype_of(flags_enum, TypeId::NUMBER));
+}
+
+#[test]
+fn test_const_enum_single_value() {
+    // const enum E { Only = 42 }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let only = interner.literal_number(42.0);
+
+    // Single value const enum
+    assert!(checker.is_subtype_of(only, TypeId::NUMBER));
+}
+
+#[test]
+fn test_const_enum_mixed_types() {
+    // Testing union behavior for hypothetical mixed enum
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let num = interner.literal_number(0.0);
+    let str = interner.literal_string("b");
+
+    let mixed = interner.union(vec![num, str]);
+
+    // Mixed enum is subtype of string | number
+    let string_or_number = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert!(checker.is_subtype_of(mixed, string_or_number));
+
+    // But not just string or just number
+    assert!(!checker.is_subtype_of(mixed, TypeId::STRING));
+    assert!(!checker.is_subtype_of(mixed, TypeId::NUMBER));
+}
+
+#[test]
+fn test_const_enum_preserves_literal_types() {
+    // Const enum values should preserve their literal types
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let val = interner.literal_number(42.0);
+    let other = interner.literal_number(42.0);
+
+    // Same literal values are equal
+    assert!(checker.is_subtype_of(val, other));
+    assert!(checker.is_subtype_of(other, val));
+}
+
+#[test]
+fn test_const_enum_bitwise_flags() {
+    // const enum Flags { None = 0, Read = 1, Write = 2, Execute = 4, All = 7 }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let none = interner.literal_number(0.0);
+    let read = interner.literal_number(1.0);
+    let write = interner.literal_number(2.0);
+    let execute = interner.literal_number(4.0);
+    let all = interner.literal_number(7.0);
+
+    let flags = interner.union(vec![none, read, write, execute, all]);
+
+    assert!(checker.is_subtype_of(flags, TypeId::NUMBER));
+    assert!(checker.is_subtype_of(all, flags));
+}
+
+// =============================================================================
+// ENUM MEMBER ACCESS TESTS
+// =============================================================================
+
+#[test]
+fn test_enum_member_access_numeric() {
+    // enum E { A = 0, B = 1 }
+    // typeof E.A is literal type 0
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let e_a = interner.literal_number(0.0);
+    let e_b = interner.literal_number(1.0);
+
+    // E.A is distinct from E.B
+    assert!(!checker.is_subtype_of(e_a, e_b));
+    assert!(!checker.is_subtype_of(e_b, e_a));
+
+    // But both are numbers
+    assert!(checker.is_subtype_of(e_a, TypeId::NUMBER));
+    assert!(checker.is_subtype_of(e_b, TypeId::NUMBER));
+}
+
+#[test]
+fn test_enum_member_access_string() {
+    // enum E { A = "a", B = "b" }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let e_a = interner.literal_string("a");
+    let e_b = interner.literal_string("b");
+
+    // E.A is distinct from E.B
+    assert!(!checker.is_subtype_of(e_a, e_b));
+
+    // Both are strings
+    assert!(checker.is_subtype_of(e_a, TypeId::STRING));
+    assert!(checker.is_subtype_of(e_b, TypeId::STRING));
+}
+
+#[test]
+fn test_enum_member_in_object_property() {
+    // interface I { status: Status.Active }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let status_prop = interner.intern_string("status");
+    let active = interner.literal_string("ACTIVE");
+    let inactive = interner.literal_string("INACTIVE");
+
+    let interface_active = interner.object(vec![PropertyInfo {
+        name: status_prop,
+        type_id: active,
+        write_type: active,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_active = interner.object(vec![PropertyInfo {
+        name: status_prop,
+        type_id: active,
+        write_type: active,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_inactive = interner.object(vec![PropertyInfo {
+        name: status_prop,
+        type_id: inactive,
+        write_type: inactive,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Object with matching status is subtype
+    assert!(checker.is_subtype_of(obj_active, interface_active));
+
+    // Object with different status is not
+    assert!(!checker.is_subtype_of(obj_inactive, interface_active));
+}
+
+#[test]
+fn test_enum_member_union_in_property() {
+    // interface I { status: Status.Active | Status.Pending }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let status_prop = interner.intern_string("status");
+    let active = interner.literal_string("ACTIVE");
+    let pending = interner.literal_string("PENDING");
+    let completed = interner.literal_string("COMPLETED");
+
+    let active_or_pending = interner.union(vec![active, pending]);
+
+    let interface_type = interner.object(vec![PropertyInfo {
+        name: status_prop,
+        type_id: active_or_pending,
+        write_type: active_or_pending,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_active = interner.object(vec![PropertyInfo {
+        name: status_prop,
+        type_id: active,
+        write_type: active,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_completed = interner.object(vec![PropertyInfo {
+        name: status_prop,
+        type_id: completed,
+        write_type: completed,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Active matches union
+    assert!(checker.is_subtype_of(obj_active, interface_type));
+
+    // Completed does not match union
+    assert!(!checker.is_subtype_of(obj_completed, interface_type));
+}
+
+#[test]
+fn test_enum_member_as_function_param() {
+    // function f(status: Status.Active): void
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let active = interner.literal_string("ACTIVE");
+    let inactive = interner.literal_string("INACTIVE");
+
+    let fn_active_param = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("status")),
+            type_id: active,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_inactive_param = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("status")),
+            type_id: inactive,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Functions with different enum member params are not subtypes
+    assert!(!checker.is_subtype_of(fn_active_param, fn_inactive_param));
+}
+
+#[test]
+fn test_enum_member_as_return_type() {
+    // function f(): Status.Active
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let active = interner.literal_string("ACTIVE");
+
+    let fn_returns_active = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: active,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_returns_string = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Function returning enum member is subtype of function returning string
+    assert!(checker.is_subtype_of(fn_returns_active, fn_returns_string));
+}
+
+#[test]
+fn test_enum_member_narrowing() {
+    // Testing narrowing: if status === Status.Active, type is Status.Active
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let active = interner.literal_string("ACTIVE");
+    let inactive = interner.literal_string("INACTIVE");
+    let pending = interner.literal_string("PENDING");
+
+    let status_enum = interner.union(vec![active, inactive, pending]);
+
+    // After narrowing, active is subtype of the full enum
+    assert!(checker.is_subtype_of(active, status_enum));
+
+    // And the narrowed type is more specific
+    assert!(!checker.is_subtype_of(status_enum, active));
+}
+
+#[test]
+fn test_enum_reverse_mapping_numeric() {
+    // Numeric enums have reverse mappings: E[0] === "A"
+    // This is runtime behavior, but the type would be the key type
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    // The reverse mapped value is a string (the enum key name)
+    let key_name = interner.literal_string("A");
+
+    assert!(checker.is_subtype_of(key_name, TypeId::STRING));
+}
