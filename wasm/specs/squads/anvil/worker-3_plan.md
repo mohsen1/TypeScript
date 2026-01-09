@@ -7,12 +7,13 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] Add for-await-of ES5 source map tests in `wasm/src/source_map_tests.rs`. Run `./wasm/test.sh source_map`.
+- [ ] Add try-catch-finally ES5 source map tests in `wasm/src/source_map_tests.rs`. Run `./wasm/test.sh source_map`.
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added for-await-of ES5 source map tests (basic, destructuring, nested, try-catch, break/continue, class method, with await, labels, return, combined); `./wasm/test.sh source_map` passes.
 - [x] Added async generator ES5 source map tests (basic, with await, yield* and await, try-catch, class method, for-await-of, return value, expression, nested, combined); `./wasm/test.sh source_map` passes.
 - [x] Added arrow function source map tests (no params, single param, default params, rest params, destructuring params, class property, IIFE, object return, higher-order, combined); `./wasm/test.sh source_map` passes.
 - [x] Added import/export source map tests (named imports, default imports, namespace imports, named exports, default exports, export from, import with alias, type-only imports, side-effect imports, combined); `./wasm/test.sh source_map` passes.
