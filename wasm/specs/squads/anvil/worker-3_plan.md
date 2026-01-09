@@ -7,12 +7,13 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] Add interface/type alias ES5 source map tests (type erasure, complex types, generic types) in `wasm/src/source_map_tests.rs`. Run `./wasm/test.sh source_map`.
+- (awaiting assignment)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added interface/type alias ES5 source map tests (basic interface, basic type alias, interface with methods, interface extends, union/intersection types, generic interface, generic type alias, mapped types, conditional types, combined); `./wasm/test.sh source_map` passes.
 - [x] Added class declaration ES5 source map tests (basic class, with methods, static members, getters/setters, inheritance, constructor parameter properties, class expressions, generic, abstract, combined); `./wasm/test.sh source_map` passes.
 - [x] Added function declaration ES5 source map tests (basic, with parameters, default parameters, rest parameters, nested, generator, async, destructuring params, generic, combined); `./wasm/test.sh source_map` passes.
 - [x] Added variable declaration ES5 source map tests (var basic, let/const, multiple declarators, with types, object destructuring, array destructuring, in function, in for loop, complex initializers, combined); `./wasm/test.sh source_map` passes.
