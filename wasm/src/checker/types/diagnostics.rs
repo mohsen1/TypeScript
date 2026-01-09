@@ -129,6 +129,8 @@ pub mod diagnostic_messages {
     // Switch exhaustiveness
     pub const NOT_EXHAUSTIVE: &str = "Not all code paths return a value.";
     pub const SWITCH_NOT_EXHAUSTIVE: &str = "Switch is not exhaustive. Did you forget to handle '{0}'?";
+    pub const FUNCTION_LACKS_ENDING_RETURN_STATEMENT: &str =
+        "Function lacks ending return statement and return type does not include 'undefined'.";
 
     // Generic/type parameter errors
     pub const TYPE_NOT_SATISFY_CONSTRAINT: &str = "Type '{0}' does not satisfy the constraint '{1}'.";
@@ -138,6 +140,13 @@ pub mod diagnostic_messages {
     // Module/ambient errors
     pub const AMBIENT_MODULE_DECLARATION_CANNOT_SPECIFY_RELATIVE_MODULE_NAME: &str = "Ambient module declaration cannot specify relative module name.";
     pub const MODULE_HAS_NO_EXPORTED_MEMBER: &str = "Module '{0}' has no exported member '{1}'.";
+
+    // Implicit any errors
+    pub const PARAMETER_IMPLICIT_ANY: &str = "Parameter '{0}' implicitly has an '{1}' type.";
+    pub const IMPLICIT_ANY_RETURN: &str =
+        "'{0}', which lacks return-type annotation, implicitly has an '{1}' return type.";
+    pub const IMPLICIT_ANY_RETURN_FUNCTION_EXPRESSION: &str =
+        "Function expression, which lacks return-type annotation, implicitly has an '{0}' return type.";
 
     // Scanner/parser errors
     pub const NUMERIC_SEPARATORS_NOT_ALLOWED_HERE: &str = "Numeric separators are not allowed here.";
@@ -334,6 +343,8 @@ pub mod diagnostic_codes {
     pub const UNUSED_PARAMETER: u32 = 6133;
     pub const UNUSED_IMPORT: u32 = 6133;
     pub const IMPLICIT_ANY: u32 = 7005;
+    pub const IMPLICIT_ANY_PARAMETER: u32 = 7006;
     pub const IMPLICIT_ANY_RETURN: u32 = 7010;
+    pub const IMPLICIT_ANY_RETURN_FUNCTION_EXPRESSION: u32 = 7011;
     pub const COULD_NOT_RESOLVE_TYPE: u32 = 7016;
 }

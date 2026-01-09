@@ -3436,6 +3436,61 @@ const f = (flag: boolean) => {
 }
 
 #[test]
+fn test_missing_return_and_implicit_any_diagnostics() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// @noImplicitAny: true
+function noReturn(): number {
+    console.log("oops");
+}
+
+function maybeReturn(flag: boolean): number {
+    if (flag) {
+        return 1;
+    }
+}
+
+function allReturn(flag: boolean): number {
+    if (flag) {
+        return 1;
+    }
+    return 2;
+}
+
+function voidReturn(): void {
+    console.log("ok");
+}
+
+function implicitAny(x) {
+    return x;
+}
+
+const anon = () => { return null; };
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count = |code| codes.iter().filter(|&&c| c == code).count();
+
+    assert_eq!(count(2355), 1, "Expected one 2355 error, got codes: {:?}", codes);
+    assert_eq!(count(2366), 1, "Expected one 2366 error, got codes: {:?}", codes);
+    assert_eq!(count(7006), 1, "Expected one 7006 error, got codes: {:?}", codes);
+    assert_eq!(count(7010), 1, "Expected one 7010 error, got codes: {:?}", codes);
+    assert_eq!(count(7011), 1, "Expected one 7011 error, got codes: {:?}", codes);
+}
+
+#[test]
 fn test_checker_lowers_element_access_array() {
     use crate::thin_parser::ThinParserState;
 
