@@ -10743,3 +10743,104 @@ fn test_async_retry_pattern_ignores_nested_async() {
     );
     assert!(!result, "Should not detect await inside nested async in retry function");
 }
+
+// ============================================================================
+// ASYNC STATE MACHINE PATTERN TESTS
+// Tests for state machine patterns: state transitions, event-driven updates
+// ============================================================================
+
+#[test]
+fn test_async_state_machine_transition() {
+    let result = async_error_propagation_contains_await(
+        "async function transition() { return await stateMachine.transition(nextState); }",
+    );
+    assert!(result, "Should detect await in state transition");
+}
+
+#[test]
+fn test_async_state_machine_enter() {
+    let result = async_error_propagation_contains_await(
+        "async function onEnter() { await state.enter(); }",
+    );
+    assert!(result, "Should detect await in state enter handler");
+}
+
+#[test]
+fn test_async_state_machine_exit() {
+    let result = async_error_propagation_contains_await(
+        "async function onExit() { await state.exit(); }",
+    );
+    assert!(result, "Should detect await in state exit handler");
+}
+
+#[test]
+fn test_async_state_machine_event() {
+    let result = async_error_propagation_contains_await(
+        "async function handleEvent() { return await machine.send(event); }",
+    );
+    assert!(result, "Should detect await in event handling");
+}
+
+#[test]
+fn test_async_state_machine_dispatch() {
+    let result = async_error_propagation_contains_await(
+        "async function dispatch() { await store.dispatch(action); }",
+    );
+    assert!(result, "Should detect await in action dispatch");
+}
+
+#[test]
+fn test_async_state_machine_guard() {
+    let result = async_error_propagation_contains_await(
+        "async function checkGuard() { return await guard.evaluate(context); }",
+    );
+    assert!(result, "Should detect await in guard condition check");
+}
+
+#[test]
+fn test_async_state_machine_action() {
+    let result = async_error_propagation_contains_await(
+        "async function executeAction() { await action.execute(context); }",
+    );
+    assert!(result, "Should detect await in action execution");
+}
+
+#[test]
+fn test_async_state_machine_effect() {
+    let result = async_error_propagation_contains_await(
+        "async function runEffect() { await effect.run(); }",
+    );
+    assert!(result, "Should detect await in side effect execution");
+}
+
+#[test]
+fn test_async_state_machine_context() {
+    let result = async_error_propagation_contains_await(
+        "async function updateContext() { return await machine.setContext(newContext); }",
+    );
+    assert!(result, "Should detect await in context update");
+}
+
+#[test]
+fn test_async_state_machine_subscribe() {
+    let result = async_error_propagation_contains_await(
+        "async function subscribe() { await store.subscribe(listener); }",
+    );
+    assert!(result, "Should detect await in state subscription");
+}
+
+#[test]
+fn test_async_state_machine_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function syncState() { return machine.getState(); }",
+    );
+    assert!(!result, "Should not detect await when state access is sync");
+}
+
+#[test]
+fn test_async_state_machine_ignores_nested_async() {
+    let result = async_error_propagation_contains_await(
+        "async function outer() { const handler = async () => await machine.transition(); }",
+    );
+    assert!(!result, "Should not detect await inside nested async in state machine function");
+}
