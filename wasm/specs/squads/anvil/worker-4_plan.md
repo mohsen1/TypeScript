@@ -7,12 +7,13 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [ ] Add ES5 tests for class method decorator patterns (method decorator factories, stacked decorators, async method decorators, static method decorators) in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
+- [ ] (none)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Add ES5 class tests for method decorator patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for class field decorators patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for class static initialization block patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for using declarations (resource management) patterns. Tests: `./wasm/test.sh class_es5_tests`
