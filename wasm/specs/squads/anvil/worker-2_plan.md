@@ -7,12 +7,13 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] Add ES5 computed property parity tests in `wasm/src/emitter_parity_tests.rs`. Run `./wasm/test.sh emitter_parity`.
+- [ ] (awaiting assignment)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 computed property parity tests (template, binary, nested, conditional) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (224 tests).
 - [x] Added ES5 static field parity tests (computed, methods, inheritance, generic) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (220 tests).
 - [x] Added ES5 private method parity tests (this-binding, generic, derived, callback) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (216 tests).
 - [x] Added ES5 class decorator parity tests (constructor, static-members, metadata, inheritance) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (212 tests).

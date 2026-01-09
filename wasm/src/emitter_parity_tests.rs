@@ -8494,6 +8494,256 @@ class ComputedAccessor {
     );
 }
 
+#[test]
+fn test_parity_es5_computed_property_template() {
+    let source = r#"
+const prefix = "user";
+const suffix = "Name";
+
+const obj: Record<string, string> = {
+    [`${prefix}_${suffix}`]: "John",
+    [`${prefix}_age`]: "30"
+};
+
+class TemplateComputed {
+    [`get${suffix}`](): string {
+        return "value";
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain TemplateComputed class
+    assert!(
+        output.contains("TemplateComputed"),
+        "Output should contain TemplateComputed: {}",
+        output
+    );
+    // Template literals should be downleveled to concatenation
+    assert!(
+        output.contains("prefix") && output.contains("suffix"),
+        "Output should use prefix and suffix variables: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains("Record<"),
+        "Type annotation should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_computed_property_binary() {
+    let source = r#"
+const base = 10;
+const index = 5;
+
+const lookup: { [key: number]: string } = {
+    [base + index]: "fifteen",
+    [base * 2]: "twenty",
+    [base - 5]: "five"
+};
+
+class BinaryComputed {
+    [1 + 1](): number {
+        return 2;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the class
+    assert!(
+        output.contains("BinaryComputed"),
+        "Output should contain BinaryComputed: {}",
+        output
+    );
+    // Should contain binary operations
+    assert!(
+        output.contains("base") && output.contains("index"),
+        "Output should contain base and index: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_computed_property_nested() {
+    let source = r#"
+const outerKey = "outer";
+const innerKey = "inner";
+
+interface NestedConfig {
+    [key: string]: {
+        [key: string]: number;
+    };
+}
+
+const config: NestedConfig = {
+    [outerKey]: {
+        [innerKey]: 42,
+        ["static"]: 100
+    }
+};
+
+function createNested<T>(key: string, value: T): { [k: string]: T } {
+    return { [key]: value };
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain variable declarations
+    assert!(
+        output.contains("outerKey") && output.contains("innerKey"),
+        "Output should contain outerKey and innerKey: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Generic type parameter should be erased
+    assert!(
+        !output.contains("<T>"),
+        "Generic type parameter should be erased: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": NestedConfig"),
+        "Type annotation should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_computed_property_conditional() {
+    let source = r#"
+const useAlternate = true;
+const primaryKey = "primary";
+const altKey = "alternate";
+
+const settings: { [key: string]: boolean } = {
+    [useAlternate ? altKey : primaryKey]: true,
+    [!useAlternate ? "disabled" : "enabled"]: false
+};
+
+class ConditionalComputed {
+    static readonly FLAG = true;
+
+    [ConditionalComputed.FLAG ? "active" : "inactive"](): void {
+        console.log("called");
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the class
+    assert!(
+        output.contains("ConditionalComputed"),
+        "Output should contain ConditionalComputed: {}",
+        output
+    );
+    // Should contain conditional expressions
+    assert!(
+        output.contains("useAlternate") || output.contains("?"),
+        "Output should contain conditional logic: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": boolean"),
+        "Type annotations should be erased: {}",
+        output
+    );
+    // readonly keyword should be erased
+    assert!(
+        !output.contains("readonly"),
+        "readonly keyword should be erased: {}",
+        output
+    );
+}
+
 // ============================================================================
 // ES5 REST PARAMETER PARITY TESTS (ADDITIONAL)
 // ============================================================================
