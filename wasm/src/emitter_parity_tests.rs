@@ -21572,3 +21572,374 @@ class NestedDefaultResolver {
         output
     );
 }
+
+// =============================================================================
+// ES5 BigInt patterns parity tests
+// =============================================================================
+
+/// Test BigInt literal syntax with type annotations
+#[test]
+fn test_parity_es5_bigint_literal() {
+    let source = r#"
+const small: bigint = 123n;
+const large: bigint = 9007199254740991n;
+const negative: bigint = -456n;
+const hex: bigint = 0xFFn;
+const binary: bigint = 0b1010n;
+const octal: bigint = 0o777n;
+
+function useBigInt(value: bigint): bigint {
+    return value;
+}
+
+class BigIntContainer {
+    private value: bigint;
+
+    constructor(initial: bigint) {
+        this.value = initial;
+    }
+
+    getValue(): bigint {
+        return this.value;
+    }
+}
+
+const container = new BigIntContainer(100n);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Variable declarations should be present (BigInt literals may be stripped)
+    assert!(
+        output.contains("var small") && output.contains("var large"),
+        "Output should contain variable declarations: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": bigint"),
+        "Type annotations should be erased: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("BigIntContainer"),
+        "Output should contain class: {}",
+        output
+    );
+    // Function should be present
+    assert!(
+        output.contains("useBigInt"),
+        "Output should contain function: {}",
+        output
+    );
+}
+
+/// Test BigInt arithmetic operations with type erasure
+#[test]
+fn test_parity_es5_bigint_arithmetic() {
+    let source = r#"
+function bigIntMath(a: bigint, b: bigint): bigint {
+    const sum: bigint = a + b;
+    const diff: bigint = a - b;
+    const product: bigint = a * b;
+    const quotient: bigint = a / b;
+    const remainder: bigint = a % b;
+    const power: bigint = a ** b;
+    return sum + diff + product + quotient + remainder + power;
+}
+
+class BigIntCalculator {
+    private accumulator: bigint = 0n;
+
+    add(value: bigint): this {
+        this.accumulator += value;
+        return this;
+    }
+
+    subtract(value: bigint): this {
+        this.accumulator -= value;
+        return this;
+    }
+
+    multiply(value: bigint): this {
+        this.accumulator *= value;
+        return this;
+    }
+
+    getResult(): bigint {
+        return this.accumulator;
+    }
+}
+
+const result: bigint = bigIntMath(10n, 3n);
+const calc = new BigIntCalculator();
+calc.add(100n).subtract(20n).multiply(2n);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Function should be present
+    assert!(
+        output.contains("bigIntMath"),
+        "Output should contain bigIntMath function: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("BigIntCalculator"),
+        "Output should contain BigIntCalculator class: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": bigint"),
+        "Type annotations should be erased: {}",
+        output
+    );
+    // Private modifier should be erased
+    assert!(
+        !output.contains("private accumulator"),
+        "Private modifier should be erased: {}",
+        output
+    );
+    // Method bodies should be present
+    assert!(
+        output.contains("this.accumulator +=") || output.contains("this.accumulator="),
+        "Method bodies should be present: {}",
+        output
+    );
+}
+
+/// Test BigInt comparison operations with generics
+#[test]
+fn test_parity_es5_bigint_comparison() {
+    let source = r#"
+interface Comparable<T> {
+    compare(other: T): number;
+}
+
+function compareBigInts(a: bigint, b: bigint): number {
+    if (a < b) return -1;
+    if (a > b) return 1;
+    if (a === b) return 0;
+    if (a <= b) return -1;
+    if (a >= b) return 1;
+    return 0;
+}
+
+class BigIntComparator implements Comparable<bigint> {
+    private value: bigint;
+
+    constructor(value: bigint) {
+        this.value = value;
+    }
+
+    compare(other: bigint): number {
+        return compareBigInts(this.value, other);
+    }
+
+    equals(other: bigint): boolean {
+        return this.value === other;
+    }
+
+    lessThan(other: bigint): boolean {
+        return this.value < other;
+    }
+}
+
+const comp1 = new BigIntComparator(100n);
+const isEqual: boolean = comp1.equals(100n);
+const isLess: boolean = comp1.lessThan(200n);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Interface should be erased
+    assert!(
+        !output.contains("interface Comparable"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Implements clause should be erased
+    assert!(
+        !output.contains("implements"),
+        "Implements clause should be erased: {}",
+        output
+    );
+    // Function should be present
+    assert!(
+        output.contains("compareBigInts"),
+        "Output should contain compareBigInts function: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("BigIntComparator"),
+        "Output should contain BigIntComparator class: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": bigint") && !output.contains(": boolean") && !output.contains(": number"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test BigInt method calls and conversions
+#[test]
+fn test_parity_es5_bigint_method_calls() {
+    let source = r#"
+type BigIntFormatter = (value: bigint) => string;
+
+function formatBigInt(value: bigint): string {
+    const str: string = value.toString();
+    const localeStr: string = value.toLocaleString();
+    const valueOf: bigint = value.valueOf();
+    return str;
+}
+
+class BigIntWrapper {
+    private readonly value: bigint;
+
+    constructor(value: bigint | number | string) {
+        this.value = BigInt(value);
+    }
+
+    toString(radix?: number): string {
+        return this.value.toString(radix);
+    }
+
+    toJSON(): string {
+        return this.value.toString();
+    }
+
+    static fromString(str: string): BigIntWrapper {
+        return new BigIntWrapper(BigInt(str));
+    }
+
+    static max(...values: bigint[]): bigint {
+        return values.reduce((a, b) => a > b ? a : b);
+    }
+}
+
+const wrapper = new BigIntWrapper(12345n);
+const strValue: string = wrapper.toString(16);
+const fromStr = BigIntWrapper.fromString("999");
+const maxVal: bigint = BigIntWrapper.max(1n, 2n, 3n, 100n);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Type alias should be erased
+    assert!(
+        !output.contains("type BigIntFormatter"),
+        "Type alias should be erased: {}",
+        output
+    );
+    // Function should be present
+    assert!(
+        output.contains("formatBigInt"),
+        "Output should contain formatBigInt function: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("BigIntWrapper"),
+        "Output should contain BigIntWrapper class: {}",
+        output
+    );
+    // Static methods should be present
+    assert!(
+        output.contains("fromString") && output.contains("max"),
+        "Static methods should be present: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": bigint") && !output.contains(": string"),
+        "Type annotations should be erased: {}",
+        output
+    );
+    // Readonly modifier should be erased
+    assert!(
+        !output.contains("readonly value"),
+        "Readonly modifier should be erased: {}",
+        output
+    );
+    // BigInt function calls should be preserved
+    assert!(
+        output.contains("BigInt("),
+        "BigInt constructor calls should be preserved: {}",
+        output
+    );
+}
