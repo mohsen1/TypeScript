@@ -7,12 +7,14 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] Add ES5 enum patterns parity tests: const enums, computed members, reverse mappings, string enums. Tests: `./wasm/test.sh emitter_parity`
+- [ ] Add ES5 import/export patterns parity tests: re-exports, barrel files, type-only imports. Tests: `./wasm/test.sh emitter_parity`
 
 ## Task Queue
-- [ ] Add ES5 import/export patterns parity tests: re-exports, barrel files, type-only imports
+(empty)
 
 ## Completed
+- [x] Added ES5 enum patterns parity tests (const-usage, reverse-mapping, string-values, computed-complex) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (289 tests).
+- [x] Added ES5 namespace patterns parity tests (merging, exports, deeply-nested) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (285 tests).
 - [x] Added ES5 computed property patterns parity tests (method-call, function-call, typed) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (282 tests).
 - [x] Added ES5 class expression patterns parity tests (return, argument, extends-computed, implements, array, iife) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (279 tests).
 - [x] Added ES5 private method patterns parity tests (async-method-complex, generator-method, accessor-complex) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (273 tests).

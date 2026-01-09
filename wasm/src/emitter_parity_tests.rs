@@ -16134,3 +16134,224 @@ class Pool<T> {
         output
     );
 }
+
+/// Parity test for ES5 const enum with usage sites.
+/// Const enum usage should be inlined with the literal values.
+#[test]
+fn test_parity_es5_enum_const_with_usage() {
+    let source = r#"const enum Direction {
+    Up = 1,
+    Down = 2,
+    Left = 3,
+    Right = 4
+}
+
+function move(dir: Direction): void {
+    console.log(dir);
+}
+
+move(Direction.Up);
+const d: Direction = Direction.Left;
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // No const enum keyword
+    assert!(
+        !output.contains("const enum"),
+        "ES5 output should not contain const enum keyword: {}",
+        output
+    );
+    // Function should be present
+    assert!(
+        output.contains("function move"),
+        "Output should contain move function: {}",
+        output
+    );
+    // Type annotation should be erased
+    assert!(
+        !output.contains(": Direction"),
+        "Type annotation should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 enum reverse mapping.
+/// Numeric enums should have bidirectional mapping (name -> value, value -> name).
+#[test]
+fn test_parity_es5_enum_reverse_mapping() {
+    let source = r#"enum Color {
+    Red,
+    Green,
+    Blue
+}
+
+const colorName = Color[0];
+const colorValue = Color.Red;
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Enum should be present
+    assert!(
+        output.contains("Color"),
+        "Output should define Color enum: {}",
+        output
+    );
+    // No enum keyword
+    assert!(
+        !output.contains("enum Color"),
+        "ES5 output should not contain enum keyword: {}",
+        output
+    );
+    // Should have variable declarations
+    assert!(
+        output.contains("colorName") && output.contains("colorValue"),
+        "Output should contain variable declarations: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 string enum.
+/// String enums should emit only forward mapping (no reverse mapping).
+#[test]
+fn test_parity_es5_enum_string_values() {
+    let source = r#"enum LogLevel {
+    Debug = "DEBUG",
+    Info = "INFO",
+    Warn = "WARN",
+    Error = "ERROR"
+}
+
+function log(level: LogLevel, message: string): void {
+    console.log(`[${level}] ${message}`);
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Enum should be present
+    assert!(
+        output.contains("LogLevel"),
+        "Output should define LogLevel enum: {}",
+        output
+    );
+    // Should have string values
+    assert!(
+        output.contains("DEBUG") && output.contains("ERROR"),
+        "Output should contain string values: {}",
+        output
+    );
+    // No enum keyword
+    assert!(
+        !output.contains("enum LogLevel"),
+        "ES5 output should not contain enum keyword: {}",
+        output
+    );
+    // Type annotation should be erased
+    assert!(
+        !output.contains(": LogLevel") && !output.contains(": string"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 enum with computed member expressions.
+/// Complex computed members with function calls and expressions.
+#[test]
+fn test_parity_es5_enum_computed_complex() {
+    let source = r#"function getValue(): number { return 10; }
+
+enum Computed {
+    A = getValue(),
+    B = A + 1,
+    C = B * 2,
+    D = Math.floor(C / 3)
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Function and enum should be present
+    assert!(
+        output.contains("getValue") && output.contains("Computed"),
+        "Output should contain function and enum: {}",
+        output
+    );
+    // No enum keyword
+    assert!(
+        !output.contains("enum Computed"),
+        "ES5 output should not contain enum keyword: {}",
+        output
+    );
+    // Should have IIFE pattern for enum
+    assert!(
+        output.contains("(function (Computed)"),
+        "Output should use IIFE pattern for enum: {}",
+        output
+    );
+}
