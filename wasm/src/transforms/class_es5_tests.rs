@@ -10584,3 +10584,366 @@ class SubscriptionManager<T extends object> {
         output
     );
 }
+
+// ============================================================================
+// Reflect API Pattern Tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_reflect_get_set() {
+    // Reflect.get and Reflect.set usage
+    let source = r#"
+class PropertyAccessor {
+    private data: Record<string, any> = {};
+
+    getValue(key: string): any {
+        return Reflect.get(this.data, key);
+    }
+
+    setValue(key: string, value: any): boolean {
+        return Reflect.set(this.data, key, value);
+    }
+
+    getWithReceiver(target: object, key: string): any {
+        return Reflect.get(target, key, this);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("PropertyAccessor"),
+        "Expected PropertyAccessor class: {}",
+        output
+    );
+
+    // Reflect should be present
+    assert!(
+        output.contains("Reflect"),
+        "Expected Reflect: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("getValue") && output.contains("setValue"),
+        "Expected getValue and setValue methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_reflect_has_delete() {
+    // Reflect.has and Reflect.deleteProperty
+    let source = r#"
+class ObjectManager {
+    private store: Record<string, any> = {};
+
+    hasProperty(key: string): boolean {
+        return Reflect.has(this.store, key);
+    }
+
+    deleteProperty(key: string): boolean {
+        return Reflect.deleteProperty(this.store, key);
+    }
+
+    checkAndDelete(key: string): boolean {
+        if (Reflect.has(this.store, key)) {
+            return Reflect.deleteProperty(this.store, key);
+        }
+        return false;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("ObjectManager"),
+        "Expected ObjectManager class: {}",
+        output
+    );
+
+    // Reflect should be present
+    assert!(
+        output.contains("Reflect"),
+        "Expected Reflect: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("hasProperty") && output.contains("deleteProperty") && output.contains("checkAndDelete"),
+        "Expected hasProperty, deleteProperty, checkAndDelete methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_reflect_construct() {
+    // Reflect.construct usage
+    let source = r#"
+class Factory<T> {
+    create(ctor: new (...args: any[]) => T, args: any[]): T {
+        return Reflect.construct(ctor, args);
+    }
+
+    createWithNewTarget(ctor: new (...args: any[]) => T, args: any[], newTarget: Function): T {
+        return Reflect.construct(ctor, args, newTarget);
+    }
+
+    createInstance<U>(ctor: new () => U): U {
+        return Reflect.construct(ctor, []);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("Factory"),
+        "Expected Factory class: {}",
+        output
+    );
+
+    // Reflect.construct should be present
+    assert!(
+        output.contains("Reflect"),
+        "Expected Reflect: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("create") && output.contains("createInstance"),
+        "Expected create and createInstance methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_reflect_apply() {
+    // Reflect.apply usage
+    let source = r#"
+class FunctionInvoker {
+    invoke<T>(fn: (...args: any[]) => T, thisArg: any, args: any[]): T {
+        return Reflect.apply(fn, thisArg, args);
+    }
+
+    invokeMethod<T>(obj: any, methodName: string, args: any[]): T {
+        const method = obj[methodName];
+        return Reflect.apply(method, obj, args);
+    }
+
+    bindAndCall<T>(fn: (...args: any[]) => T, context: any): (...args: any[]) => T {
+        return (...args: any[]) => Reflect.apply(fn, context, args);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("FunctionInvoker"),
+        "Expected FunctionInvoker class: {}",
+        output
+    );
+
+    // Reflect.apply should be present
+    assert!(
+        output.contains("Reflect"),
+        "Expected Reflect: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("invoke") && output.contains("invokeMethod") && output.contains("bindAndCall"),
+        "Expected invoke, invokeMethod, bindAndCall methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_reflect_ownkeys() {
+    // Reflect.ownKeys and Reflect.getOwnPropertyDescriptor
+    let source = r#"
+class ObjectInspector {
+    getKeys(obj: object): (string | symbol)[] {
+        return Reflect.ownKeys(obj);
+    }
+
+    getDescriptor(obj: object, key: PropertyKey): PropertyDescriptor | undefined {
+        return Reflect.getOwnPropertyDescriptor(obj, key);
+    }
+
+    getEnumerableKeys(obj: object): string[] {
+        return Reflect.ownKeys(obj).filter(key => {
+            const desc = Reflect.getOwnPropertyDescriptor(obj, key);
+            return desc && desc.enumerable;
+        }) as string[];
+    }
+
+    isWritable(obj: object, key: PropertyKey): boolean {
+        const desc = Reflect.getOwnPropertyDescriptor(obj, key);
+        return desc ? !!desc.writable : false;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("ObjectInspector"),
+        "Expected ObjectInspector class: {}",
+        output
+    );
+
+    // Reflect should be present
+    assert!(
+        output.contains("Reflect"),
+        "Expected Reflect: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("getKeys") && output.contains("getDescriptor") && output.contains("isWritable"),
+        "Expected getKeys, getDescriptor, isWritable methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_reflect_define_property() {
+    // Reflect.defineProperty and Reflect.getPrototypeOf
+    let source = r#"
+class PropertyDefiner {
+    defineReadonly(obj: object, key: PropertyKey, value: any): boolean {
+        return Reflect.defineProperty(obj, key, {
+            value,
+            writable: false,
+            enumerable: true,
+            configurable: false
+        });
+    }
+
+    defineGetter(obj: object, key: PropertyKey, getter: () => any): boolean {
+        return Reflect.defineProperty(obj, key, {
+            get: getter,
+            enumerable: true,
+            configurable: true
+        });
+    }
+
+    getPrototype(obj: object): object | null {
+        return Reflect.getPrototypeOf(obj);
+    }
+
+    setPrototype(obj: object, proto: object | null): boolean {
+        return Reflect.setPrototypeOf(obj, proto);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("PropertyDefiner"),
+        "Expected PropertyDefiner class: {}",
+        output
+    );
+
+    // Reflect should be present
+    assert!(
+        output.contains("Reflect"),
+        "Expected Reflect: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("defineReadonly") && output.contains("defineGetter") && output.contains("getPrototype"),
+        "Expected defineReadonly, defineGetter, getPrototype methods: {}",
+        output
+    );
+}
