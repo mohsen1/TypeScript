@@ -8773,3 +8773,305 @@ namespace ApiService {
         output
     );
 }
+
+// =============================================================================
+// Async Generator Method Tests
+// =============================================================================
+
+#[test]
+fn test_class_es5_async_generator_method_basic() {
+    // Basic async generator method
+    let source = r#"
+class DataStream {
+    async *fetchItems(): AsyncGenerator<number> {
+        yield 1;
+        yield 2;
+        yield 3;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function DataStream"),
+        "Expected DataStream class: {}",
+        output
+    );
+
+    // Method should be on prototype
+    assert!(
+        output.contains("fetchItems"),
+        "Expected fetchItems method: {}",
+        output
+    );
+
+    // Should use __awaiter or __asyncGenerator helper
+    assert!(
+        output.contains("__awaiter") || output.contains("__generator") || output.contains("__asyncGenerator") || output.contains("prototype"),
+        "Expected async/generator helpers or prototype: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_async_generator_with_await() {
+    // Async generator with await inside
+    let source = r#"
+class ApiIterator {
+    async *paginate(url: string): AsyncGenerator<any> {
+        let page = 1;
+        while (page <= 3) {
+            const data = await fetch(url + "?page=" + page);
+            yield data;
+            page++;
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function ApiIterator"),
+        "Expected ApiIterator class: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("paginate"),
+        "Expected paginate method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_async_generator_static() {
+    // Static async generator method
+    let source = r#"
+class NumberGenerator {
+    static async *range(start: number, end: number): AsyncGenerator<number> {
+        for (let i = start; i <= end; i++) {
+            yield i;
+        }
+    }
+
+    static async *fibonacci(count: number): AsyncGenerator<number> {
+        let a = 0, b = 1;
+        for (let i = 0; i < count; i++) {
+            yield a;
+            const temp = a;
+            a = b;
+            b = temp + b;
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function NumberGenerator") || output.contains("NumberGenerator"),
+        "Expected NumberGenerator class: {}",
+        output
+    );
+
+    // Static methods should be on constructor, not prototype
+    assert!(
+        output.contains("range") && output.contains("fibonacci"),
+        "Expected static methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_async_generator_with_try_catch() {
+    // Async generator with error handling
+    let source = r#"
+class SafeIterator {
+    async *safeIterate(items: string[]): AsyncGenerator<string> {
+        for (const item of items) {
+            try {
+                const result = await this.process(item);
+                yield result;
+            } catch (e) {
+                yield "error";
+            }
+        }
+    }
+
+    async process(item: string): Promise<string> {
+        return item.toUpperCase();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function SafeIterator"),
+        "Expected SafeIterator class: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("safeIterate") && output.contains("process"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_async_generator_in_derived_class() {
+    // Async generator in derived class
+    let source = r#"
+class BaseProducer {
+    name: string = "base";
+}
+
+class EventProducer extends BaseProducer {
+    async *produceEvents(): AsyncGenerator<string> {
+        yield "start";
+        yield "processing";
+        yield "complete";
+    }
+
+    async *produceWithDelay(): AsyncGenerator<number> {
+        for (let i = 0; i < 3; i++) {
+            await new Promise(r => setTimeout(r, 100));
+            yield i;
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Second statement is the EventProducer class
+    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function EventProducer"),
+        "Expected EventProducer class: {}",
+        output
+    );
+
+    // Should have inheritance
+    assert!(
+        output.contains("__extends") || output.contains("_super"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("produceEvents") && output.contains("produceWithDelay"),
+        "Expected async generator methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_async_generator_with_yield_delegate() {
+    // Async generator with yield* delegation
+    let source = r#"
+class CompositeIterator {
+    async *iterateAll(): AsyncGenerator<number> {
+        yield* this.firstBatch();
+        yield* this.secondBatch();
+    }
+
+    async *firstBatch(): AsyncGenerator<number> {
+        yield 1;
+        yield 2;
+    }
+
+    async *secondBatch(): AsyncGenerator<number> {
+        yield 3;
+        yield 4;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function CompositeIterator"),
+        "Expected CompositeIterator class: {}",
+        output
+    );
+
+    // All methods should be present
+    assert!(
+        output.contains("iterateAll") && output.contains("firstBatch") && output.contains("secondBatch"),
+        "Expected all async generator methods: {}",
+        output
+    );
+}
