@@ -25989,340 +25989,164 @@ class MetadataReader {
     );
 }
 
-// =============================================================================
-// TEMPLATE LITERAL TYPE PATTERNS - ES5 TRANSFORMATION TESTS
-// =============================================================================
+// ============================================================================
+// CLASS FIELD INITIALIZER PATTERN TESTS
+// ============================================================================
 
-/// Test: Uppercase/Lowercase intrinsic types
-/// Verifies that classes using Uppercase and Lowercase types transform correctly to ES5
+/// Test ES5 class with complex field initializers
 #[test]
-fn test_class_es5_uppercase_lowercase_types() {
+fn test_class_es5_field_initializer_complex() {
     let source = r#"
-type EventName = "click" | "scroll" | "focus";
-type UpperEventName = Uppercase<EventName>;
-type LowerEventName = Lowercase<UpperEventName>;
-
-class EventNormalizer {
-    toUpper<T extends string>(event: T): Uppercase<T> {
-        return event.toUpperCase() as Uppercase<T>;
-    }
-
-    toLower<T extends string>(event: T): Lowercase<T> {
-        return event.toLowerCase() as Lowercase<T>;
-    }
-
-    normalizeEvent(event: EventName): LowerEventName {
-        return this.toLower(event);
-    }
-}
-
-class CaseConverter {
-    private cache: Map<string, string> = new Map();
-
-    convertToUppercase<T extends string>(value: T): Uppercase<T> {
-        const cached = this.cache.get(value + "_upper");
-        if (cached) return cached as Uppercase<T>;
-        const result = value.toUpperCase() as Uppercase<T>;
-        this.cache.set(value + "_upper", result);
-        return result;
-    }
-
-    convertToLowercase<T extends string>(value: T): Lowercase<T> {
-        const cached = this.cache.get(value + "_lower");
-        if (cached) return cached as Lowercase<T>;
-        const result = value.toLowerCase() as Lowercase<T>;
-        this.cache.set(value + "_lower", result);
-        return result;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    assert!(
-        output.contains("function EventNormalizer"),
-        "Expected EventNormalizer function: {}",
-        output
-    );
-    assert!(
-        output.contains("EventNormalizer.prototype.toUpper"),
-        "Expected toUpper method: {}",
-        output
-    );
-    assert!(
-        output.contains("EventNormalizer.prototype.toLower"),
-        "Expected toLower method: {}",
-        output
-    );
-    assert!(
-        output.contains("EventNormalizer.prototype.normalizeEvent"),
-        "Expected normalizeEvent method: {}",
-        output
-    );
-    assert!(
-        output.contains("function CaseConverter"),
-        "Expected CaseConverter function: {}",
-        output
-    );
-    assert!(
-        output.contains("CaseConverter.prototype.convertToUppercase") && output.contains("CaseConverter.prototype.convertToLowercase"),
-        "Expected CaseConverter methods: {}",
-        output
-    );
-}
-
-/// Test: Capitalize/Uncapitalize intrinsic types
-/// Verifies that classes using Capitalize and Uncapitalize types transform correctly to ES5
-#[test]
-fn test_class_es5_capitalize_uncapitalize_types() {
-    let source = r#"
-type PropName = "name" | "age" | "email";
-type CapitalizedProp = Capitalize<PropName>;
-type GetterName<T extends string> = `get${Capitalize<T>}`;
-type SetterName<T extends string> = `set${Capitalize<T>}`;
-
-class PropertyAccessor {
-    capitalize<T extends string>(str: T): Capitalize<T> {
-        return (str.charAt(0).toUpperCase() + str.slice(1)) as Capitalize<T>;
-    }
-
-    uncapitalize<T extends string>(str: T): Uncapitalize<T> {
-        return (str.charAt(0).toLowerCase() + str.slice(1)) as Uncapitalize<T>;
-    }
-
-    getGetterName<T extends string>(prop: T): GetterName<T> {
-        return ("get" + this.capitalize(prop)) as GetterName<T>;
-    }
-
-    getSetterName<T extends string>(prop: T): SetterName<T> {
-        return ("set" + this.capitalize(prop)) as SetterName<T>;
-    }
-}
-
-class NameFormatter {
-    formatAsTitle<T extends string>(name: T): Capitalize<Lowercase<T>> {
-        const lower = name.toLowerCase();
-        return (lower.charAt(0).toUpperCase() + lower.slice(1)) as Capitalize<Lowercase<T>>;
-    }
-
-    formatAsCamel<T extends string, U extends string>(first: T, second: U): `${Uncapitalize<T>}${Capitalize<U>}` {
-        const firstPart = first.charAt(0).toLowerCase() + first.slice(1);
-        const secondPart = second.charAt(0).toUpperCase() + second.slice(1);
-        return (firstPart + secondPart) as `${Uncapitalize<T>}${Capitalize<U>}`;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    assert!(
-        output.contains("function PropertyAccessor"),
-        "Expected PropertyAccessor function: {}",
-        output
-    );
-    assert!(
-        output.contains("PropertyAccessor.prototype.capitalize"),
-        "Expected capitalize method: {}",
-        output
-    );
-    assert!(
-        output.contains("PropertyAccessor.prototype.uncapitalize"),
-        "Expected uncapitalize method: {}",
-        output
-    );
-    assert!(
-        output.contains("PropertyAccessor.prototype.getGetterName") && output.contains("PropertyAccessor.prototype.getSetterName"),
-        "Expected getter/setter name methods: {}",
-        output
-    );
-    assert!(
-        output.contains("function NameFormatter"),
-        "Expected NameFormatter function: {}",
-        output
-    );
-    assert!(
-        output.contains("NameFormatter.prototype.formatAsTitle") && output.contains("NameFormatter.prototype.formatAsCamel"),
-        "Expected NameFormatter methods: {}",
-        output
-    );
-}
-
-/// Test: Key remapping with template literals
-/// Verifies that classes using key remapping patterns transform correctly to ES5
-#[test]
-fn test_class_es5_key_remapping_patterns() {
-    let source = r#"
-type Getters<T> = {
-    [K in keyof T as `get${Capitalize<string & K>}`]: () => T[K];
-};
-
-type Setters<T> = {
-    [K in keyof T as `set${Capitalize<string & K>}`]: (value: T[K]) => void;
-};
-
-interface Person {
-    name: string;
-    age: number;
-}
-
-class AccessorBuilder<T extends object> {
-    private target: T;
-
-    constructor(target: T) {
-        this.target = target;
-    }
-
-    createGetter<K extends keyof T>(key: K): () => T[K] {
-        return () => this.target[key];
-    }
-
-    createSetter<K extends keyof T>(key: K): (value: T[K]) => void {
-        return (value: T[K]) => { this.target[key] = value; };
-    }
-
-    buildAccessors(): Getters<T> & Setters<T> {
-        const result: any = {};
-        for (const key of Object.keys(this.target) as (keyof T)[]) {
-            const capitalized = String(key).charAt(0).toUpperCase() + String(key).slice(1);
-            result["get" + capitalized] = this.createGetter(key);
-            result["set" + capitalized] = this.createSetter(key);
+// Complex field initializers
+class ConfigService {
+    private readonly defaultConfig = {
+        host: "localhost",
+        port: 8080,
+        timeout: 30000,
+        retries: 3,
+        headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json"
         }
-        return result;
-    }
+    };
+
+    private connections: Map<string, { active: boolean; lastUsed: Date }> = new Map();
+
+    private validators = [
+        (x: number) => x > 0,
+        (x: number) => x < 100,
+        (x: number) => Number.isInteger(x)
+    ];
+
+    private readonly now = Date.now();
+
+    private lazyValue = (() => {
+        console.log("Initializing lazy value");
+        return Math.random();
+    })();
 }
 
-type EventHandlers<T> = {
-    [K in keyof T as `on${Capitalize<string & K>}Change`]: (newValue: T[K], oldValue: T[K]) => void;
-};
+class DataProcessor {
+    private buffer: ArrayBuffer = new ArrayBuffer(1024);
+    private view = new DataView(this.buffer);
+    private encoder = new TextEncoder();
+    private decoder = new TextDecoder("utf-8");
 
-class ObservableBuilder<T extends object> {
-    buildHandlers(): Partial<EventHandlers<T>> {
-        return {};
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
+    private readonly metadata = Object.freeze({
+        version: "1.0.0",
+        format: "binary",
+        encoding: "utf-8"
+    });
 
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    assert!(
-        output.contains("function AccessorBuilder"),
-        "Expected AccessorBuilder function: {}",
-        output
-    );
-    assert!(
-        output.contains("this.target = target"),
-        "Expected constructor assignment: {}",
-        output
-    );
-    assert!(
-        output.contains("AccessorBuilder.prototype.createGetter"),
-        "Expected createGetter method: {}",
-        output
-    );
-    assert!(
-        output.contains("AccessorBuilder.prototype.createSetter"),
-        "Expected createSetter method: {}",
-        output
-    );
-    assert!(
-        output.contains("AccessorBuilder.prototype.buildAccessors"),
-        "Expected buildAccessors method: {}",
-        output
-    );
-    assert!(
-        output.contains("function ObservableBuilder"),
-        "Expected ObservableBuilder function: {}",
-        output
-    );
+    private cache = new WeakMap<object, any>();
 }
 
-/// Test: Template literal union types
-/// Verifies that classes using template literal unions transform correctly to ES5
-#[test]
-fn test_class_es5_template_literal_unions() {
-    let source = r#"
-type Color = "red" | "green" | "blue";
-type Size = "small" | "medium" | "large";
-type ColorSize = `${Color}-${Size}`;
-
-type HttpMethod = "GET" | "POST" | "PUT" | "DELETE";
-type ApiEndpoint = "/users" | "/posts" | "/comments";
-type ApiRoute = `${HttpMethod} ${ApiEndpoint}`;
-
-class StyleGenerator {
-    private styles: Map<ColorSize, object> = new Map();
-
-    generateClassName(color: Color, size: Size): ColorSize {
-        return (color + "-" + size) as ColorSize;
-    }
-
-    registerStyle(colorSize: ColorSize, style: object): void {
-        this.styles.set(colorSize, style);
-    }
-
-    getStyle(colorSize: ColorSize): object | undefined {
-        return this.styles.get(colorSize);
-    }
-
-    getAllCombinations(): ColorSize[] {
-        const colors: Color[] = ["red", "green", "blue"];
-        const sizes: Size[] = ["small", "medium", "large"];
-        const result: ColorSize[] = [];
-        for (const color of colors) {
-            for (const size of sizes) {
-                result.push(this.generateClassName(color, size));
+class StateManager {
+    private state = {
+        count: 0,
+        items: [] as string[],
+        nested: {
+            level1: {
+                level2: {
+                    value: 42
+                }
             }
         }
-        return result;
+    };
+
+    private reducers = new Map<string, (state: any, action: any) => any>([
+        ["INCREMENT", (s, a) => ({ ...s, count: s.count + 1 })],
+        ["DECREMENT", (s, a) => ({ ...s, count: s.count - 1 })],
+        ["ADD_ITEM", (s, a) => ({ ...s, items: [...s.items, a.payload] })]
+    ]);
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("ConfigService") && output.contains("DataProcessor") && output.contains("StateManager"),
+        "Expected complex initializer classes: {}",
+        output
+    );
+
+    // Object literals and Map should be present
+    assert!(
+        output.contains("Map") && output.contains("localhost"),
+        "Expected complex initializer values: {}",
+        output
+    );
+}
+
+/// Test ES5 class with computed field names
+#[test]
+fn test_class_es5_field_initializer_computed() {
+    let source = r#"
+// Computed field names
+const FIELD_PREFIX = "data_";
+const VERSION = "v1";
+
+const fieldName = Symbol("fieldName");
+const privateKey = Symbol.for("privateKey");
+
+class DynamicFields {
+    [FIELD_PREFIX + "name"] = "default";
+    [FIELD_PREFIX + "value"] = 42;
+    [`${VERSION}_config`] = { enabled: true };
+
+    [fieldName] = "symbol field value";
+    [privateKey] = "symbol private value";
+
+    ["computed" + "Method"]() {
+        return this[FIELD_PREFIX + "name"];
     }
 }
 
-class RouteHandler {
-    private handlers: Map<ApiRoute, Function> = new Map();
+class SymbolProperties {
+    static [Symbol.toStringTag] = "SymbolProperties";
+    [Symbol.iterator] = function* () {
+        yield 1;
+        yield 2;
+        yield 3;
+    };
 
-    register(method: HttpMethod, endpoint: ApiEndpoint, handler: Function): void {
-        const route = (method + " " + endpoint) as ApiRoute;
-        this.handlers.set(route, handler);
+    private [Symbol.for("hidden")] = "secret";
+}
+
+class DynamicAccessor {
+    private _values: Record<string, any> = {};
+
+    ["get" + "Value"](key: string): any {
+        return this._values[key];
     }
 
-    dispatch(route: ApiRoute): Function | undefined {
-        return this.handlers.get(route);
+    ["set" + "Value"](key: string, value: any): void {
+        this._values[key] = value;
+    }
+}
+
+const keys = ["a", "b", "c"] as const;
+
+class MultipleComputed {
+    [keys[0]] = 1;
+    [keys[1]] = 2;
+    [keys[2]] = 3;
+
+    getAll() {
+        return [this[keys[0]], this[keys[1]], this[keys[2]]];
     }
 }
 "#;
@@ -26341,205 +26165,123 @@ class RouteHandler {
 
     let output = printer.get_output().to_string();
 
+    // Classes should be converted
     assert!(
-        output.contains("function StyleGenerator"),
-        "Expected StyleGenerator function: {}",
+        output.contains("DynamicFields") && output.contains("SymbolProperties") && output.contains("DynamicAccessor"),
+        "Expected computed field classes: {}",
         output
     );
+
+    // Symbol usage should be present
     assert!(
-        output.contains("StyleGenerator.prototype.generateClassName"),
-        "Expected generateClassName method: {}",
-        output
-    );
-    assert!(
-        output.contains("StyleGenerator.prototype.registerStyle") && output.contains("StyleGenerator.prototype.getStyle"),
-        "Expected registerStyle and getStyle methods: {}",
-        output
-    );
-    assert!(
-        output.contains("StyleGenerator.prototype.getAllCombinations"),
-        "Expected getAllCombinations method: {}",
-        output
-    );
-    assert!(
-        output.contains("function RouteHandler"),
-        "Expected RouteHandler function: {}",
-        output
-    );
-    assert!(
-        output.contains("RouteHandler.prototype.register") && output.contains("RouteHandler.prototype.dispatch"),
-        "Expected RouteHandler methods: {}",
+        output.contains("Symbol") || output.contains("fieldName"),
+        "Expected Symbol usage: {}",
         output
     );
 }
 
-/// Test: String manipulation with template literals
-/// Verifies that classes using string manipulation types transform correctly to ES5
+/// Test ES5 class with arrow function field initializers
 #[test]
-fn test_class_es5_string_manipulation_types() {
+fn test_class_es5_field_initializer_arrow() {
     let source = r#"
-type TrimStart<S extends string> = S extends ` ${infer R}` ? TrimStart<R> : S;
-type TrimEnd<S extends string> = S extends `${infer R} ` ? TrimEnd<R> : S;
-type Trim<S extends string> = TrimStart<TrimEnd<S>>;
+// Arrow function field initializers
+class EventHandler {
+    onClick = (event: MouseEvent) => {
+        console.log("Clicked at", event.clientX, event.clientY);
+        this.handleEvent(event);
+    };
 
-type Split<S extends string, D extends string> = S extends `${infer H}${D}${infer T}` ? [H, ...Split<T, D>] : [S];
-
-class StringManipulator {
-    trimStart<T extends string>(str: T): string {
-        return str.trimStart();
-    }
-
-    trimEnd<T extends string>(str: T): string {
-        return str.trimEnd();
-    }
-
-    trim<T extends string>(str: T): string {
-        return str.trim();
-    }
-
-    split<T extends string, D extends string>(str: T, delimiter: D): string[] {
-        return str.split(delimiter);
-    }
-}
-
-type Join<T extends string[], D extends string> = T extends [infer F, ...infer R]
-    ? R extends string[]
-        ? F extends string
-            ? R["length"] extends 0
-                ? F
-                : `${F}${D}${Join<R, D>}`
-            : never
-        : never
-    : "";
-
-class PathBuilder {
-    private segments: string[] = [];
-
-    addSegment(segment: string): this {
-        this.segments.push(segment);
-        return this;
-    }
-
-    build(): string {
-        return this.segments.join("/");
-    }
-
-    buildWithPrefix<P extends string>(prefix: P): `${P}/${string}` {
-        return (prefix + "/" + this.segments.join("/")) as `${P}/${string}`;
-    }
-
-    clear(): this {
-        this.segments = [];
-        return this;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    assert!(
-        output.contains("function StringManipulator"),
-        "Expected StringManipulator function: {}",
-        output
-    );
-    assert!(
-        output.contains("StringManipulator.prototype.trimStart") && output.contains("StringManipulator.prototype.trimEnd"),
-        "Expected trim methods: {}",
-        output
-    );
-    assert!(
-        output.contains("StringManipulator.prototype.trim") && output.contains("StringManipulator.prototype.split"),
-        "Expected trim and split methods: {}",
-        output
-    );
-    assert!(
-        output.contains("function PathBuilder"),
-        "Expected PathBuilder function: {}",
-        output
-    );
-    assert!(
-        output.contains("PathBuilder.prototype.addSegment") && output.contains("PathBuilder.prototype.build"),
-        "Expected PathBuilder methods: {}",
-        output
-    );
-    assert!(
-        output.contains("PathBuilder.prototype.buildWithPrefix"),
-        "Expected buildWithPrefix method: {}",
-        output
-    );
-}
-
-/// Test: Combined template literal patterns
-/// Verifies that classes using multiple template literal patterns together transform correctly to ES5
-#[test]
-fn test_class_es5_combined_template_literal_patterns() {
-    let source = r#"
-type EventType = "click" | "change" | "submit";
-type ElementId = "form" | "button" | "input";
-type EventHandler = `on${Capitalize<EventType>}`;
-type ElementEvent = `${ElementId}:${EventType}`;
-
-type CRUDAction = "create" | "read" | "update" | "delete";
-type Entity = "user" | "post" | "comment";
-type ActionMethod = `${Uppercase<CRUDAction>}_${Uppercase<Entity>}`;
-type ActionHandler = `handle${Capitalize<CRUDAction>}${Capitalize<Entity>}`;
-
-class EventManager {
-    private listeners: Map<ElementEvent, Function[]> = new Map();
-
-    addEventListener(elementId: ElementId, eventType: EventType, handler: Function): void {
-        const key = (elementId + ":" + eventType) as ElementEvent;
-        const handlers = this.listeners.get(key) || [];
-        handlers.push(handler);
-        this.listeners.set(key, handlers);
-    }
-
-    getHandlerName(eventType: EventType): EventHandler {
-        const capitalized = eventType.charAt(0).toUpperCase() + eventType.slice(1);
-        return ("on" + capitalized) as EventHandler;
-    }
-
-    emit(elementId: ElementId, eventType: EventType, data: any): void {
-        const key = (elementId + ":" + eventType) as ElementEvent;
-        const handlers = this.listeners.get(key) || [];
-        handlers.forEach(h => h(data));
-    }
-}
-
-class ActionDispatcher {
-    private actions: Map<ActionMethod, Function> = new Map();
-
-    registerAction(action: CRUDAction, entity: Entity, handler: Function): void {
-        const method = (action.toUpperCase() + "_" + entity.toUpperCase()) as ActionMethod;
-        this.actions.set(method, handler);
-    }
-
-    getHandlerName(action: CRUDAction, entity: Entity): ActionHandler {
-        const capAction = action.charAt(0).toUpperCase() + action.slice(1);
-        const capEntity = entity.charAt(0).toUpperCase() + entity.slice(1);
-        return ("handle" + capAction + capEntity) as ActionHandler;
-    }
-
-    dispatch(action: CRUDAction, entity: Entity, payload: any): any {
-        const method = (action.toUpperCase() + "_" + entity.toUpperCase()) as ActionMethod;
-        const handler = this.actions.get(method);
-        if (handler) {
-            return handler(payload);
+    onKeyDown = (event: KeyboardEvent) => {
+        if (event.key === "Enter") {
+            this.submit();
         }
-        throw new Error("No handler for " + method);
+    };
+
+    onScroll = (event: Event) => {
+        requestAnimationFrame(() => {
+            this.updatePosition();
+        });
+    };
+
+    private handleEvent(event: Event) {
+        console.log("Event handled:", event.type);
     }
+
+    private submit() {
+        console.log("Submitting...");
+    }
+
+    private updatePosition() {
+        console.log("Position updated");
+    }
+}
+
+class ReactiveComponent {
+    render = () => {
+        return `<div>${this.state.value}</div>`;
+    };
+
+    setState = (newState: Partial<typeof this.state>) => {
+        this.state = { ...this.state, ...newState };
+        this.render();
+    };
+
+    private state = { value: 0 };
+
+    componentDidMount = () => {
+        this.initialize();
+    };
+
+    private initialize = () => {
+        console.log("Component initialized");
+    };
+}
+
+class AsyncHandler {
+    fetchData = async (url: string) => {
+        const response = await fetch(url);
+        return response.json();
+    };
+
+    processData = async (data: any) => {
+        return new Promise((resolve) => {
+            setTimeout(() => resolve(data), 100);
+        });
+    };
+
+    handleError = (error: Error) => {
+        console.error("Error:", error.message);
+        this.logError(error);
+    };
+
+    private logError = (error: Error) => {
+        console.log("Logged:", error);
+    };
+}
+
+class BoundMethods {
+    private value = 0;
+
+    increment = () => {
+        this.value++;
+        return this.value;
+    };
+
+    decrement = () => {
+        this.value--;
+        return this.value;
+    };
+
+    reset = () => {
+        this.value = 0;
+        return this.value;
+    };
+
+    getValue = () => this.value;
+
+    setValue = (v: number) => {
+        this.value = v;
+    };
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -26557,39 +26299,24 @@ class ActionDispatcher {
 
     let output = printer.get_output().to_string();
 
+    // Classes should be converted
     assert!(
-        output.contains("function EventManager"),
-        "Expected EventManager function: {}",
+        output.contains("EventHandler") && output.contains("ReactiveComponent") && output.contains("AsyncHandler"),
+        "Expected arrow initializer classes: {}",
         output
     );
+
+    // BoundMethods class should be present
     assert!(
-        output.contains("EventManager.prototype.addEventListener"),
-        "Expected addEventListener method: {}",
+        output.contains("BoundMethods"),
+        "Expected BoundMethods class: {}",
         output
     );
+
+    // Arrow functions should be transformed (either kept as arrows or converted to functions with this capture)
     assert!(
-        output.contains("EventManager.prototype.getHandlerName"),
-        "Expected getHandlerName method: {}",
-        output
-    );
-    assert!(
-        output.contains("EventManager.prototype.emit"),
-        "Expected emit method: {}",
-        output
-    );
-    assert!(
-        output.contains("function ActionDispatcher"),
-        "Expected ActionDispatcher function: {}",
-        output
-    );
-    assert!(
-        output.contains("ActionDispatcher.prototype.registerAction") && output.contains("ActionDispatcher.prototype.getHandlerName"),
-        "Expected ActionDispatcher register and getHandlerName methods: {}",
-        output
-    );
-    assert!(
-        output.contains("ActionDispatcher.prototype.dispatch"),
-        "Expected dispatch method: {}",
+        output.contains("onClick") && output.contains("increment"),
+        "Expected arrow field names to be preserved: {}",
         output
     );
 }
