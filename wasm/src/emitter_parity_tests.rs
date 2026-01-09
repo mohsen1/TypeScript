@@ -9423,6 +9423,370 @@ const gen = function* (limit: number): Generator<number> {
     );
 }
 
+/// Parity test for ES5 generator with typed yields.
+/// Generator function with complex typed yield expressions.
+#[test]
+fn test_parity_es5_generator_typed_yields() {
+    let source = r#"
+interface Item { id: number; name: string }
+function* itemGenerator(): Generator<Item, void, undefined> {
+    yield { id: 1, name: "first" };
+    yield { id: 2, name: "second" };
+    yield { id: 3, name: "third" };
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain function name
+    assert!(
+        output.contains("itemGenerator"),
+        "Output should contain itemGenerator function: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface"),
+        "ES5 output should erase interface: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains("Generator<Item") && !output.contains(": Item"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+    // Should have yield statements
+    assert!(
+        output.contains("yield"),
+        "ES5 output should contain yield statements: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 generator with delegation (yield*).
+/// Generator function that delegates to another generator.
+#[test]
+fn test_parity_es5_generator_delegation() {
+    let source = r#"
+function* innerGen(): Generator<number> {
+    yield 1;
+    yield 2;
+}
+function* outerGen(): Generator<number> {
+    yield 0;
+    yield* innerGen();
+    yield 3;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain both function names
+    assert!(
+        output.contains("innerGen") && output.contains("outerGen"),
+        "Output should contain innerGen and outerGen functions: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains("Generator<number>"),
+        "ES5 output should erase Generator type: {}",
+        output
+    );
+    // Should have yield statements
+    assert!(
+        output.contains("yield"),
+        "ES5 output should contain yield statements: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 async generator with await.
+/// Async generator function combining yield and await.
+#[test]
+fn test_parity_es5_generator_async_await() {
+    let source = r#"
+interface DataChunk { data: string; hasMore: boolean }
+async function* streamData(url: string): AsyncGenerator<DataChunk> {
+    let hasMore = true;
+    while (hasMore) {
+        const response = await fetch(url);
+        const chunk: DataChunk = await response.json();
+        yield chunk;
+        hasMore = chunk.hasMore;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain function name
+    assert!(
+        output.contains("streamData"),
+        "Output should contain streamData function: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface"),
+        "ES5 output should erase interface: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains("AsyncGenerator<") && !output.contains(": DataChunk") && !output.contains(": string"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+    // No async keyword in ES5
+    assert!(
+        !output.contains("async function"),
+        "ES5 output should not contain async keyword: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 generator in class methods.
+/// Generator method with this binding in a class.
+#[test]
+fn test_parity_es5_generator_class_method_this() {
+    let source = r#"
+class NumberSequence {
+    private start: number;
+    private end: number;
+
+    constructor(start: number, end: number) {
+        this.start = start;
+        this.end = end;
+    }
+
+    *values(): Generator<number> {
+        for (let i = this.start; i <= this.end; i++) {
+            yield i;
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain class name
+    assert!(
+        output.contains("NumberSequence"),
+        "Output should contain NumberSequence class: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number") && !output.contains("Generator<"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+    // Private modifier should be erased
+    assert!(
+        !output.contains("private"),
+        "ES5 output should erase private modifier: {}",
+        output
+    );
+    // Method should reference this
+    assert!(
+        output.contains("this.start") || output.contains("this.end"),
+        "ES5 output should preserve this references: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 generator with try/finally.
+/// Generator function with cleanup in finally block.
+#[test]
+fn test_parity_es5_generator_try_finally() {
+    let source = r#"
+interface Connection { close(): void }
+function* processWithCleanup(conn: Connection): Generator<string, void, undefined> {
+    try {
+        yield "processing";
+        yield "more processing";
+    } finally {
+        conn.close();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain function name
+    assert!(
+        output.contains("processWithCleanup"),
+        "Output should contain processWithCleanup function: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface"),
+        "ES5 output should erase interface: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": Connection") && !output.contains("Generator<string"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+    // try/finally structure should be preserved
+    assert!(
+        output.contains("try") && output.contains("finally"),
+        "ES5 output should preserve try/finally structure: {}",
+        output
+    );
+    // Cleanup call should be preserved
+    assert!(
+        output.contains("close"),
+        "ES5 output should preserve cleanup call: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 generator with complex return value.
+/// Generator function with typed return value after yields.
+#[test]
+fn test_parity_es5_generator_complex_return() {
+    let source = r#"
+interface Summary { count: number; total: number }
+function* accumulator(values: number[]): Generator<number, Summary, undefined> {
+    let total = 0;
+    for (const v of values) {
+        total += v;
+        yield v;
+    }
+    return { count: values.length, total };
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain function name
+    assert!(
+        output.contains("accumulator"),
+        "Output should contain accumulator function: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface"),
+        "ES5 output should erase interface: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number[]") && !output.contains("Generator<number, Summary"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+    // Return object structure should be preserved
+    assert!(
+        output.contains("count") && output.contains("total"),
+        "ES5 output should preserve return object: {}",
+        output
+    );
+}
+
 // ============================================================================
 // ES5 CLASS STATIC INITIALIZATION ORDER PARITY TESTS
 // ============================================================================
