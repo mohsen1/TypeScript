@@ -19768,3 +19768,340 @@ class Admin extends User {
         output
     );
 }
+
+// =============================================================================
+// ES5 Arrow Function Edge Case Parity Tests
+// =============================================================================
+
+/// Test: deeply nested arrows with this binding at multiple levels
+#[test]
+fn test_parity_es5_arrow_deeply_nested_this() {
+    let source = r#"
+class EventManager {
+    private listeners: Map<string, Function[]> = new Map();
+    name: string = "manager";
+
+    register(event: string): (callback: Function) => () => void {
+        return (callback: Function) => {
+            const list = this.listeners.get(event) || [];
+            list.push(callback);
+            this.listeners.set(event, list);
+
+            return () => {
+                const current = this.listeners.get(event) || [];
+                const filtered = current.filter((cb) => {
+                    return cb !== callback;
+                });
+                this.listeners.set(event, filtered);
+                console.log(this.name);
+            };
+        };
+    }
+
+    createHandler(): () => () => () => string {
+        return () => {
+            const outer = this.name;
+            return () => {
+                const middle = outer;
+                return () => {
+                    return `${this.name}:${middle}:${outer}`;
+                };
+            };
+        };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Class should be present
+    assert!(
+        output.contains("EventManager"),
+        "Output should contain class: {}",
+        output
+    );
+    // Methods should be present
+    assert!(
+        output.contains("register") && output.contains("createHandler"),
+        "Output should contain methods: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": Map<") && !output.contains(": Function"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test: arrows in class field initializers with this context
+#[test]
+fn test_parity_es5_arrow_class_field_context() {
+    let source = r#"
+class Component<T> {
+    state: T;
+
+    // Arrow in field initializer captures this
+    handleClick = (event: MouseEvent): void => {
+        console.log(this.state, event);
+    };
+
+    handleChange = (value: T): T => {
+        this.state = value;
+        return this.state;
+    };
+
+    // Nested arrow in field
+    processor = (items: T[]): ((item: T) => T) => {
+        return (item: T) => {
+            console.log(this.state);
+            return item;
+        };
+    };
+
+    // Arrow with async
+    fetchData = async (): Promise<T> => {
+        console.log(this.state);
+        return this.state;
+    };
+
+    constructor(initial: T) {
+        this.state = initial;
+    }
+}
+
+class DerivedComponent extends Component<string> {
+    label: string = "";
+
+    // Override with arrow
+    handleClick = (event: MouseEvent): void => {
+        console.log(this.label, this.state, event);
+    };
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes should be present
+    assert!(
+        output.contains("Component") && output.contains("DerivedComponent"),
+        "Output should contain classes: {}",
+        output
+    );
+    // Type parameters should be erased
+    assert!(
+        !output.contains("<T>") && !output.contains(": T"),
+        "Type parameters should be erased: {}",
+        output
+    );
+}
+
+/// Test: complex rest and spread patterns in arrows
+#[test]
+fn test_parity_es5_arrow_rest_spread_complex() {
+    let source = r#"
+type Callback<T> = (...args: T[]) => void;
+
+const variadicLogger = <T>(...items: T[]): void => {
+    items.forEach((item, i) => console.log(i, item));
+};
+
+const combiner = <T, U>(...arrays: T[][]): ((transform: (item: T) => U) => U[]) => {
+    const combined = arrays.flat();
+    return (transform: (item: T) => U) => combined.map(transform);
+};
+
+const partialApply = <T, R>(
+    fn: (...args: T[]) => R,
+    ...firstArgs: T[]
+): ((...remainingArgs: T[]) => R) => {
+    return (...remainingArgs: T[]) => fn(...firstArgs, ...remainingArgs);
+};
+
+class Aggregator<T> {
+    collect = (...items: T[]): T[] => {
+        return [...items];
+    };
+
+    merge = (...arrays: T[][]): T[] => {
+        return arrays.reduce((acc, arr) => [...acc, ...arr], []);
+    };
+
+    transform = <U>(mapper: (item: T) => U) => (...items: T[]): U[] => {
+        return items.map(mapper);
+    };
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions should be present
+    assert!(
+        output.contains("variadicLogger") && output.contains("combiner") && output.contains("partialApply"),
+        "Output should contain functions: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("Aggregator"),
+        "Output should contain class: {}",
+        output
+    );
+    // Type alias should be erased
+    assert!(
+        !output.contains("type Callback"),
+        "Type alias should be erased: {}",
+        output
+    );
+    // Type parameters should be erased
+    assert!(
+        !output.contains("<T>") && !output.contains("<T, U>"),
+        "Type parameters should be erased: {}",
+        output
+    );
+}
+
+/// Test: arrow functions in method chains and callbacks
+#[test]
+fn test_parity_es5_arrow_callback_chains() {
+    let source = r#"
+interface Item {
+    id: number;
+    value: string;
+    score: number;
+}
+
+function processItems(items: Item[]): string[] {
+    return items
+        .filter((item) => item.score > 0)
+        .map((item) => ({ ...item, value: item.value.toUpperCase() }))
+        .sort((a, b) => b.score - a.score)
+        .map((item) => item.value);
+}
+
+class DataProcessor<T> {
+    constructor(private items: T[]) {}
+
+    pipe<U>(fn: (items: T[]) => U): U {
+        return fn(this.items);
+    }
+
+    chain(): {
+        filter: (pred: (item: T) => boolean) => ReturnType<typeof this.chain>;
+        map: <U>(fn: (item: T) => U) => DataProcessor<U>;
+        result: () => T[];
+    } {
+        const self = this;
+        return {
+            filter: (pred: (item: T) => boolean) => {
+                self.items = self.items.filter(pred);
+                return self.chain();
+            },
+            map: <U>(fn: (item: T) => U) => {
+                return new DataProcessor(self.items.map(fn));
+            },
+            result: () => self.items
+        };
+    }
+}
+
+const createPipeline = <T>() => ({
+    from: (items: T[]) => ({
+        through: <U>(fn: (item: T) => U) => ({
+            collect: (): U[] => items.map(fn)
+        })
+    })
+});
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions should be present
+    assert!(
+        output.contains("processItems") && output.contains("createPipeline"),
+        "Output should contain functions: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("DataProcessor"),
+        "Output should contain class: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface Item"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Type parameters should be erased
+    assert!(
+        !output.contains("<T>") && !output.contains("<U>"),
+        "Type parameters should be erased: {}",
+        output
+    );
+}
