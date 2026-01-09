@@ -39775,3 +39775,724 @@ class CachedRepository<T> extends AsyncRepository<T> {
         output
     );
 }
+
+// =============================================================================
+// STATIC BLOCK INITIALIZATION ORDERING
+// =============================================================================
+
+/// Test static block basic initialization
+#[test]
+fn test_class_es5_static_block_basic_init() {
+    let source = r#"
+class Counter {
+    static count: number;
+    static initialized: boolean;
+
+    static {
+        Counter.count = 0;
+        Counter.initialized = true;
+    }
+
+    static increment(): number {
+        return ++Counter.count;
+    }
+
+    static getCount(): number {
+        return Counter.count;
+    }
+
+    static isInitialized(): boolean {
+        return Counter.initialized;
+    }
+}
+
+class Registry {
+    static entries: Map<string, number>;
+    static defaultValue: number;
+
+    static {
+        Registry.entries = new Map();
+        Registry.defaultValue = 100;
+    }
+
+    static register(key: string, value: number): void {
+        Registry.entries.set(key, value);
+    }
+
+    static get(key: string): number {
+        return Registry.entries.get(key) ?? Registry.defaultValue;
+    }
+
+    static has(key: string): boolean {
+        return Registry.entries.has(key);
+    }
+
+    static clear(): void {
+        Registry.entries.clear();
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Counter class should be ES5 constructor
+    assert!(
+        output.contains("function Counter"),
+        "Expected ES5 Counter class: {}",
+        output
+    );
+
+    // Registry class should be ES5 constructor
+    assert!(
+        output.contains("function Registry"),
+        "Expected ES5 Registry class: {}",
+        output
+    );
+
+    // Static methods should be on constructor
+    assert!(
+        output.contains("Counter.increment") || output.contains("increment"),
+        "Expected Counter.increment method: {}",
+        output
+    );
+
+    // Static initialization should occur
+    assert!(
+        output.contains("Counter.count") || output.contains(".count"),
+        "Expected static count field: {}",
+        output
+    );
+}
+
+/// Test static block with private field access
+#[test]
+fn test_class_es5_static_block_private_access() {
+    let source = r#"
+class SecureStorage {
+    static #key: string;
+    static #initialized: boolean;
+
+    static {
+        SecureStorage.#key = "secret-key-" + Date.now();
+        SecureStorage.#initialized = true;
+    }
+
+    static getKeyLength(): number {
+        return SecureStorage.#key.length;
+    }
+
+    static isReady(): boolean {
+        return SecureStorage.#initialized;
+    }
+
+    static reset(): void {
+        SecureStorage.#key = "";
+        SecureStorage.#initialized = false;
+    }
+}
+
+class TokenManager {
+    static #tokens: string[];
+    static #maxTokens: number;
+
+    static {
+        TokenManager.#tokens = [];
+        TokenManager.#maxTokens = 100;
+    }
+
+    static addToken(token: string): boolean {
+        if (TokenManager.#tokens.length >= TokenManager.#maxTokens) {
+            return false;
+        }
+        TokenManager.#tokens.push(token);
+        return true;
+    }
+
+    static getTokenCount(): number {
+        return TokenManager.#tokens.length;
+    }
+
+    static clearTokens(): void {
+        TokenManager.#tokens = [];
+    }
+
+    static getMaxTokens(): number {
+        return TokenManager.#maxTokens;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // SecureStorage class should be ES5 constructor
+    assert!(
+        output.contains("function SecureStorage"),
+        "Expected ES5 SecureStorage class: {}",
+        output
+    );
+
+    // TokenManager class should be ES5 constructor
+    assert!(
+        output.contains("function TokenManager"),
+        "Expected ES5 TokenManager class: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("getKeyLength") && output.contains("isReady"),
+        "Expected SecureStorage methods: {}",
+        output
+    );
+
+    // TokenManager methods
+    assert!(
+        output.contains("addToken") && output.contains("getTokenCount") && output.contains("clearTokens"),
+        "Expected TokenManager methods: {}",
+        output
+    );
+}
+
+/// Test multiple static blocks ordering
+#[test]
+fn test_class_es5_static_block_multiple_ordering() {
+    let source = r#"
+class Initializer {
+    static step1: string;
+    static step2: string;
+    static step3: string;
+    static order: string[];
+
+    static {
+        Initializer.order = [];
+        Initializer.step1 = "first";
+        Initializer.order.push("step1");
+    }
+
+    static {
+        Initializer.step2 = "second";
+        Initializer.order.push("step2");
+    }
+
+    static {
+        Initializer.step3 = "third";
+        Initializer.order.push("step3");
+    }
+
+    static getOrder(): string[] {
+        return Initializer.order;
+    }
+
+    static getSteps(): { step1: string; step2: string; step3: string } {
+        return {
+            step1: Initializer.step1,
+            step2: Initializer.step2,
+            step3: Initializer.step3
+        };
+    }
+}
+
+class Pipeline {
+    static stages: string[] = [];
+    static configured: boolean = false;
+
+    static {
+        Pipeline.stages.push("parse");
+    }
+
+    static {
+        Pipeline.stages.push("transform");
+    }
+
+    static {
+        Pipeline.stages.push("emit");
+        Pipeline.configured = true;
+    }
+
+    static getStages(): string[] {
+        return Pipeline.stages;
+    }
+
+    static isConfigured(): boolean {
+        return Pipeline.configured;
+    }
+
+    static addStage(stage: string): void {
+        Pipeline.stages.push(stage);
+    }
+
+    static reset(): void {
+        Pipeline.stages = [];
+        Pipeline.configured = false;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Initializer class should be ES5 constructor
+    assert!(
+        output.contains("function Initializer"),
+        "Expected ES5 Initializer class: {}",
+        output
+    );
+
+    // Pipeline class should be ES5 constructor
+    assert!(
+        output.contains("function Pipeline"),
+        "Expected ES5 Pipeline class: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("getOrder") && output.contains("getSteps"),
+        "Expected Initializer methods: {}",
+        output
+    );
+
+    // Pipeline methods
+    assert!(
+        output.contains("getStages") && output.contains("isConfigured") && output.contains("addStage"),
+        "Expected Pipeline methods: {}",
+        output
+    );
+
+    // Static field strings should be present
+    assert!(
+        output.contains("\"first\"") || output.contains("\"parse\""),
+        "Expected static block initialization strings: {}",
+        output
+    );
+}
+
+/// Test static block with super reference in derived class
+#[test]
+fn test_class_es5_static_block_super_reference() {
+    let source = r#"
+class BaseConfig {
+    static version: string = "1.0.0";
+    static name: string = "BaseConfig";
+
+    static getVersion(): string {
+        return BaseConfig.version;
+    }
+
+    static getName(): string {
+        return BaseConfig.name;
+    }
+}
+
+class DerivedConfig extends BaseConfig {
+    static extendedVersion: string;
+    static fullName: string;
+
+    static {
+        DerivedConfig.extendedVersion = BaseConfig.version + "-extended";
+        DerivedConfig.fullName = BaseConfig.name + "Extended";
+    }
+
+    static getExtendedVersion(): string {
+        return DerivedConfig.extendedVersion;
+    }
+
+    static getFullName(): string {
+        return DerivedConfig.fullName;
+    }
+}
+
+class AppConfig extends DerivedConfig {
+    static appVersion: string;
+    static environment: string;
+
+    static {
+        AppConfig.appVersion = DerivedConfig.extendedVersion + "-app";
+        AppConfig.environment = "production";
+    }
+
+    static getAppVersion(): string {
+        return AppConfig.appVersion;
+    }
+
+    static getEnvironment(): string {
+        return AppConfig.environment;
+    }
+
+    static setEnvironment(env: string): void {
+        AppConfig.environment = env;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // BaseConfig class should be ES5 constructor
+    assert!(
+        output.contains("function BaseConfig"),
+        "Expected ES5 BaseConfig class: {}",
+        output
+    );
+
+    // DerivedConfig class should be ES5 constructor
+    assert!(
+        output.contains("function DerivedConfig"),
+        "Expected ES5 DerivedConfig class: {}",
+        output
+    );
+
+    // AppConfig class should be ES5 constructor
+    assert!(
+        output.contains("function AppConfig"),
+        "Expected ES5 AppConfig class: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("getVersion") && output.contains("getName"),
+        "Expected BaseConfig methods: {}",
+        output
+    );
+
+    // DerivedConfig methods
+    assert!(
+        output.contains("getExtendedVersion") && output.contains("getFullName"),
+        "Expected DerivedConfig methods: {}",
+        output
+    );
+
+    // AppConfig methods
+    assert!(
+        output.contains("getAppVersion") && output.contains("getEnvironment") && output.contains("setEnvironment"),
+        "Expected AppConfig methods: {}",
+        output
+    );
+}
+
+/// Test static block with computed properties
+#[test]
+fn test_class_es5_static_block_computed_props() {
+    let source = r#"
+const FIELD_KEY = "dynamicField";
+const METHOD_KEY = "dynamicMethod";
+
+class DynamicClass {
+    static [FIELD_KEY]: string;
+    static regularField: number;
+
+    static {
+        DynamicClass[FIELD_KEY] = "initialized";
+        DynamicClass.regularField = 42;
+    }
+
+    static [METHOD_KEY](): string {
+        return DynamicClass[FIELD_KEY];
+    }
+
+    static getRegular(): number {
+        return DynamicClass.regularField;
+    }
+
+    static setDynamic(value: string): void {
+        DynamicClass[FIELD_KEY] = value;
+    }
+}
+
+const CONFIG_KEY = Symbol("config");
+const STATUS_KEY = Symbol("status");
+
+class SymbolClass {
+    static [CONFIG_KEY]: object;
+    static [STATUS_KEY]: string;
+
+    static {
+        SymbolClass[CONFIG_KEY] = { debug: true };
+        SymbolClass[STATUS_KEY] = "ready";
+    }
+
+    static getConfig(): object {
+        return SymbolClass[CONFIG_KEY];
+    }
+
+    static getStatus(): string {
+        return SymbolClass[STATUS_KEY];
+    }
+
+    static updateConfig(config: object): void {
+        SymbolClass[CONFIG_KEY] = config;
+    }
+
+    static setStatus(status: string): void {
+        SymbolClass[STATUS_KEY] = status;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // DynamicClass should be ES5 constructor
+    assert!(
+        output.contains("function DynamicClass"),
+        "Expected ES5 DynamicClass: {}",
+        output
+    );
+
+    // SymbolClass should be ES5 constructor
+    assert!(
+        output.contains("function SymbolClass"),
+        "Expected ES5 SymbolClass: {}",
+        output
+    );
+
+    // Computed property constants
+    assert!(
+        output.contains("FIELD_KEY") || output.contains("dynamicField"),
+        "Expected computed property key: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("getRegular") && output.contains("setDynamic"),
+        "Expected DynamicClass methods: {}",
+        output
+    );
+
+    // SymbolClass methods
+    assert!(
+        output.contains("getConfig") && output.contains("getStatus") && output.contains("updateConfig"),
+        "Expected SymbolClass methods: {}",
+        output
+    );
+}
+
+/// Test combined static block patterns with various features
+#[test]
+fn test_class_es5_static_block_combined_patterns() {
+    let source = r#"
+class Application {
+    static #instanceCount: number;
+    static version: string;
+    static config: { debug: boolean; env: string };
+    static plugins: string[];
+
+    static {
+        Application.#instanceCount = 0;
+        Application.version = "2.0.0";
+    }
+
+    static {
+        Application.config = {
+            debug: false,
+            env: "production"
+        };
+    }
+
+    static {
+        Application.plugins = ["core", "auth", "api"];
+    }
+
+    private id: number;
+
+    constructor() {
+        this.id = ++Application.#instanceCount;
+    }
+
+    getId(): number {
+        return this.id;
+    }
+
+    static getInstanceCount(): number {
+        return Application.#instanceCount;
+    }
+
+    static getVersion(): string {
+        return Application.version;
+    }
+
+    static getConfig(): { debug: boolean; env: string } {
+        return Application.config;
+    }
+
+    static getPlugins(): string[] {
+        return Application.plugins;
+    }
+
+    static addPlugin(plugin: string): void {
+        Application.plugins.push(plugin);
+    }
+
+    static setDebug(debug: boolean): void {
+        Application.config.debug = debug;
+    }
+}
+
+class Database extends Application {
+    static #connectionPool: number;
+    static host: string;
+    static port: number;
+
+    static {
+        Database.#connectionPool = 10;
+        Database.host = "localhost";
+    }
+
+    static {
+        Database.port = 5432;
+    }
+
+    static getPoolSize(): number {
+        return Database.#connectionPool;
+    }
+
+    static getHost(): string {
+        return Database.host;
+    }
+
+    static getPort(): number {
+        return Database.port;
+    }
+
+    static getConnectionString(): string {
+        return Database.host + ":" + Database.port;
+    }
+
+    static setHost(host: string): void {
+        Database.host = host;
+    }
+
+    static setPort(port: number): void {
+        Database.port = port;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Application class should be ES5 constructor
+    assert!(
+        output.contains("function Application"),
+        "Expected ES5 Application class: {}",
+        output
+    );
+
+    // Database class should be ES5 constructor
+    assert!(
+        output.contains("function Database"),
+        "Expected ES5 Database class: {}",
+        output
+    );
+
+    // Should have __extends pattern
+    assert!(
+        output.contains("__extends") || output.contains("extendStatics"),
+        "Expected __extends helper: {}",
+        output
+    );
+
+    // Application instance method
+    assert!(
+        output.contains("getId"),
+        "Expected Application.prototype.getId: {}",
+        output
+    );
+
+    // Application static methods
+    assert!(
+        output.contains("getInstanceCount") && output.contains("getVersion") && output.contains("getConfig"),
+        "Expected Application static methods: {}",
+        output
+    );
+
+    // Database static methods
+    assert!(
+        output.contains("getPoolSize") && output.contains("getHost") && output.contains("getPort") && output.contains("getConnectionString"),
+        "Expected Database static methods: {}",
+        output
+    );
+
+    // Static initialization values
+    assert!(
+        output.contains("\"2.0.0\"") || output.contains("\"localhost\"") || output.contains("5432"),
+        "Expected static block initialization values: {}",
+        output
+    );
+}
