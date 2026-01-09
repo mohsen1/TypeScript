@@ -7,10 +7,10 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-None - ready for next task.
+- [ ] Add ES5 class tests for interface implementation patterns: implements clause, multiple interfaces. Tests: `./wasm/test.sh class_es5_tests`
 
 ## Task Queue
-- [ ] Add ES5 class tests for interface implementation patterns: implements clause, multiple interfaces
+- [ ] Add ES5 class tests for constructor signature patterns: overloads, optional params
 
 ## Completed
 - [x] Add ES5 class tests for abstract class implementation patterns. Tests: `./wasm/test.sh class_es5_tests`

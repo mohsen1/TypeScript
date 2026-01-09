@@ -7,10 +7,10 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-(awaiting assignment)
+- [ ] Add ES5 destructuring patterns parity tests: array, object, nested, defaults. Tests: `./wasm/test.sh emitter_parity`
 
 ## Task Queue
-(empty)
+- [ ] Add ES5 spread/rest patterns parity tests: array spread, object spread, rest params
 
 ## Completed
 - [x] Added ES5 arrow function edge case parity tests (deeply-nested-this, class-field-context, rest-spread-complex, callback-chains) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (343 tests).
