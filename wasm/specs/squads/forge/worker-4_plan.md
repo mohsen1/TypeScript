@@ -21,6 +21,7 @@ Priority: 4
 - [x] Add mapped type edge case tests - DONE (added 16 tests: homomorphic modifiers, key remapping)
 - [x] Add index signature tests - DONE (added 22 tests: string/number keys, intersection, readonly, value types)
 - [x] Add generic constraint tests - DONE (added 25 tests: extends, keyof constraints)
+- [x] Add recursive type tests - DONE (added 20 tests: self-referential types)
 
 ## Completed
 - [x] Fixed method type parameter scope in check_method_declaration
@@ -42,9 +43,10 @@ Priority: 4
 - [x] Added 16 mapped type edge case tests (homomorphic modifiers, key remapping, Pick/Omit/Record patterns)
 - [x] Added 22 index signature tests (string/number keys, intersection, readonly, value types)
 - [x] Added 25 generic constraint tests (extends, keyof constraints)
+- [x] Added 20 recursive type tests (self-referential types)
 
 ## Ready for Merge
-Yes - 183+ solver tests added (circular constraints, inference from usage, context-sensitive typing, advanced generic inference, distributive conditional types, circular edge cases, mapped types, index signatures, generic constraints)
+Yes - 203+ solver tests added (circular constraints, inference from usage, context-sensitive typing, advanced generic inference, distributive conditional types, circular edge cases, mapped types, index signatures, generic constraints, recursive types)
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize solver correctness
