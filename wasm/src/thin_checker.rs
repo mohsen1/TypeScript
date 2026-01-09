@@ -9763,6 +9763,19 @@ impl<'a> ThinCheckerState<'a> {
                 self.check_type_for_parameter_properties(sig.type_annotation);
             }
         }
+        // Check property signatures for implicit any (error 7008)
+        else if node.kind == syntax_kind_ext::PROPERTY_SIGNATURE {
+            if let Some(sig) = self.ctx.arena.get_signature(node) {
+                // Property signature without type annotation implicitly has 'any' type
+                if sig.type_annotation.is_none() {
+                    if let Some(member_name) = self.get_property_name(sig.name) {
+                        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages, format_message};
+                        let message = format_message(diagnostic_messages::MEMBER_IMPLICIT_ANY, &[&member_name, "any"]);
+                        self.error_at_node(sig.name, &message, diagnostic_codes::IMPLICIT_ANY_MEMBER);
+                    }
+                }
+            }
+        }
         // Check accessors in type literals/interfaces - cannot have body (error 1183)
         else if node.kind == syntax_kind_ext::GET_ACCESSOR || node.kind == syntax_kind_ext::SET_ACCESSOR {
             if let Some(accessor) = self.ctx.arena.get_accessor(node) {
@@ -11477,6 +11490,17 @@ impl<'a> ThinCheckerState<'a> {
         if !prop.initializer.is_none() && !self.has_static_modifier(&prop.modifiers) {
             self.check_property_initialization_order(member_idx, prop.initializer);
         }
+
+        // Error 7008: Member implicitly has an 'any' type
+        // Report when property has no type annotation and no initializer (can't infer type)
+        if prop.type_annotation.is_none() && prop.initializer.is_none() {
+            // Get the property name for the error message
+            if let Some(member_name) = self.get_property_name(prop.name) {
+                use crate::checker::types::diagnostics::{diagnostic_messages, format_message};
+                let message = format_message(diagnostic_messages::MEMBER_IMPLICIT_ANY, &[&member_name, "any"]);
+                self.error_at_node(prop.name, &message, diagnostic_codes::IMPLICIT_ANY_MEMBER);
+            }
+        }
     }
 
     /// Check a method declaration.
@@ -11854,21 +11878,21 @@ impl<'a> ThinCheckerState<'a> {
         visited.push(type_id);
 
         match self.ctx.types.lookup(type_id) {
-            Some(TypeKey::Array(elem)) => self.type_contains_any_inner(*elem, visited),
+            Some(TypeKey::Array(elem)) => self.type_contains_any_inner(elem, visited),
             Some(TypeKey::Tuple(list_id)) => self
                 .ctx
                 .types
-                .tuple_list(*list_id)
+                .tuple_list(list_id)
                 .iter()
                 .any(|elem| self.type_contains_any_inner(elem.type_id, visited)),
             Some(TypeKey::Union(list_id)) | Some(TypeKey::Intersection(list_id)) => self
                 .ctx
                 .types
-                .type_list(*list_id)
+                .type_list(list_id)
                 .iter()
                 .any(|&member| self.type_contains_any_inner(member, visited)),
             Some(TypeKey::Object(shape_id)) | Some(TypeKey::ObjectWithIndex(shape_id)) => {
-                let shape = self.ctx.types.object_shape(*shape_id);
+                let shape = self.ctx.types.object_shape(shape_id);
                 if shape
                     .properties
                     .iter()
@@ -11889,11 +11913,11 @@ impl<'a> ThinCheckerState<'a> {
                 false
             }
             Some(TypeKey::Function(shape_id)) => {
-                let shape = self.ctx.types.function_shape(*shape_id);
+                let shape = self.ctx.types.function_shape(shape_id);
                 self.type_contains_any_inner(shape.return_type, visited)
             }
             Some(TypeKey::Callable(shape_id)) => {
-                let shape = self.ctx.types.callable_shape(*shape_id);
+                let shape = self.ctx.types.callable_shape(shape_id);
                 if shape
                     .call_signatures
                     .iter()
@@ -11914,7 +11938,7 @@ impl<'a> ThinCheckerState<'a> {
                     .any(|prop| self.type_contains_any_inner(prop.type_id, visited))
             }
             Some(TypeKey::Application(app_id)) => {
-                let app = self.ctx.types.type_application(*app_id);
+                let app = self.ctx.types.type_application(app_id);
                 if self.type_contains_any_inner(app.base, visited) {
                     return true;
                 }
@@ -11923,14 +11947,14 @@ impl<'a> ThinCheckerState<'a> {
                     .any(|&arg| self.type_contains_any_inner(arg, visited))
             }
             Some(TypeKey::Conditional(cond_id)) => {
-                let cond = self.ctx.types.conditional_type(*cond_id);
+                let cond = self.ctx.types.conditional_type(cond_id);
                 self.type_contains_any_inner(cond.check_type, visited)
                     || self.type_contains_any_inner(cond.extends_type, visited)
                     || self.type_contains_any_inner(cond.true_type, visited)
                     || self.type_contains_any_inner(cond.false_type, visited)
             }
             Some(TypeKey::Mapped(mapped_id)) => {
-                let mapped = self.ctx.types.mapped_type(*mapped_id);
+                let mapped = self.ctx.types.mapped_type(mapped_id);
                 if self.type_contains_any_inner(mapped.constraint, visited) {
                     return true;
                 }
@@ -11942,20 +11966,20 @@ impl<'a> ThinCheckerState<'a> {
                 self.type_contains_any_inner(mapped.template, visited)
             }
             Some(TypeKey::IndexAccess(base, index)) => {
-                self.type_contains_any_inner(*base, visited)
-                    || self.type_contains_any_inner(*index, visited)
+                self.type_contains_any_inner(base, visited)
+                    || self.type_contains_any_inner(index, visited)
             }
             Some(TypeKey::TemplateLiteral(template_id)) => self
                 .ctx
                 .types
-                .template_list(*template_id)
+                .template_list(template_id)
                 .iter()
                 .any(|span| match span {
                     TemplateSpan::Type(span_type) => self.type_contains_any_inner(*span_type, visited),
                     _ => false,
                 }),
             Some(TypeKey::KeyOf(inner)) | Some(TypeKey::ReadonlyType(inner)) => {
-                self.type_contains_any_inner(*inner, visited)
+                self.type_contains_any_inner(inner, visited)
             }
             Some(TypeKey::TypeParameter(info)) => {
                 if let Some(constraint) = info.constraint {
