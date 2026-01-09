@@ -19691,3 +19691,490 @@ class AsyncTaskRunner<T> {
         output
     );
 }
+
+// ============================================================================
+// Class expression pattern tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_anonymous_class_expression() {
+    // Anonymous class expression assigned to variable
+    let source = r#"
+const MyClass = class {
+    private value: number;
+
+    constructor(value: number) {
+        this.value = value;
+    }
+
+    getValue(): number {
+        return this.value;
+    }
+
+    setValue(value: number): void {
+        this.value = value;
+    }
+};
+
+const AnotherClass = class {
+    static staticMethod(): string {
+        return "static";
+    }
+
+    instanceMethod(): string {
+        return "instance";
+    }
+};
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("MyClass"),
+        "Expected MyClass variable: {}",
+        output
+    );
+    assert!(
+        output.contains("AnotherClass"),
+        "Expected AnotherClass variable: {}",
+        output
+    );
+    assert!(
+        output.contains("getValue") && output.contains("setValue"),
+        "Expected instance methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_named_class_expression() {
+    // Named class expression
+    let source = r#"
+const Logger = class LoggerImpl {
+    private prefix: string;
+
+    constructor(prefix: string) {
+        this.prefix = prefix;
+    }
+
+    log(message: string): void {
+        console.log(`${this.prefix}: ${message}`);
+    }
+
+    createChild(childPrefix: string): LoggerImpl {
+        return new LoggerImpl(`${this.prefix}.${childPrefix}`);
+    }
+};
+
+const Counter = class CounterImpl {
+    private count: number = 0;
+
+    increment(): number {
+        return ++this.count;
+    }
+
+    decrement(): number {
+        return --this.count;
+    }
+
+    clone(): CounterImpl {
+        const copy = new CounterImpl();
+        return copy;
+    }
+};
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("Logger"),
+        "Expected Logger variable: {}",
+        output
+    );
+    assert!(
+        output.contains("Counter"),
+        "Expected Counter variable: {}",
+        output
+    );
+    assert!(
+        output.contains("log") && output.contains("createChild"),
+        "Expected Logger methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_class_in_return_statement() {
+    // Class expression in return statement
+    let source = r#"
+function createClass<T>(defaultValue: T) {
+    return class {
+        private value: T = defaultValue;
+
+        getValue(): T {
+            return this.value;
+        }
+
+        setValue(value: T): void {
+            this.value = value;
+        }
+    };
+}
+
+function createNamedClass(name: string) {
+    return class NamedEntity {
+        readonly name: string = name;
+
+        getName(): string {
+            return this.name;
+        }
+
+        static getClassName(): string {
+            return "NamedEntity";
+        }
+    };
+}
+
+function createExtendedClass<T>(Base: new () => T) {
+    return class extends Base {
+        extended: boolean = true;
+
+        isExtended(): boolean {
+            return this.extended;
+        }
+    };
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("createClass"),
+        "Expected createClass function: {}",
+        output
+    );
+    assert!(
+        output.contains("createNamedClass"),
+        "Expected createNamedClass function: {}",
+        output
+    );
+    assert!(
+        output.contains("createExtendedClass"),
+        "Expected createExtendedClass function: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_class_in_array() {
+    // Class expressions in array
+    let source = r#"
+const shapes = [
+    class Circle {
+        constructor(public radius: number) {}
+
+        area(): number {
+            return Math.PI * this.radius * this.radius;
+        }
+    },
+    class Rectangle {
+        constructor(public width: number, public height: number) {}
+
+        area(): number {
+            return this.width * this.height;
+        }
+    },
+    class Triangle {
+        constructor(public base: number, public height: number) {}
+
+        area(): number {
+            return 0.5 * this.base * this.height;
+        }
+    }
+];
+
+const handlers = [
+    class ClickHandler {
+        handle(event: MouseEvent): void {
+            console.log("click", event);
+        }
+    },
+    class KeyHandler {
+        handle(event: KeyboardEvent): void {
+            console.log("key", event);
+        }
+    }
+];
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("shapes"),
+        "Expected shapes array: {}",
+        output
+    );
+    assert!(
+        output.contains("handlers"),
+        "Expected handlers array: {}",
+        output
+    );
+    assert!(
+        output.contains("area"),
+        "Expected area method: {}",
+        output
+    );
+    assert!(
+        output.contains("handle"),
+        "Expected handle method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_iife_class() {
+    // Class in IIFE (Immediately Invoked Function Expression)
+    let source = r#"
+const Singleton = (function() {
+    let instance: SingletonClass | null = null;
+
+    class SingletonClass {
+        private data: Map<string, any> = new Map();
+
+        private constructor() {}
+
+        static getInstance(): SingletonClass {
+            if (!instance) {
+                instance = new SingletonClass();
+            }
+            return instance;
+        }
+
+        set(key: string, value: any): void {
+            this.data.set(key, value);
+        }
+
+        get(key: string): any {
+            return this.data.get(key);
+        }
+    }
+
+    return SingletonClass;
+})();
+
+const Module = (function() {
+    class PrivateClass {
+        private secret: string = "hidden";
+
+        getSecret(): string {
+            return this.secret;
+        }
+    }
+
+    return class PublicClass {
+        private impl: PrivateClass = new PrivateClass();
+
+        reveal(): string {
+            return this.impl.getSecret();
+        }
+    };
+})();
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("Singleton"),
+        "Expected Singleton variable: {}",
+        output
+    );
+    assert!(
+        output.contains("Module"),
+        "Expected Module variable: {}",
+        output
+    );
+    assert!(
+        output.contains("getInstance"),
+        "Expected getInstance method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_class_expression_combined() {
+    // Combined class expression patterns
+    let source = r#"
+type Constructor<T = {}> = new (...args: any[]) => T;
+
+function Timestamped<TBase extends Constructor>(Base: TBase) {
+    return class extends Base {
+        timestamp = Date.now();
+
+        getTimestamp(): number {
+            return this.timestamp;
+        }
+    };
+}
+
+function Tagged<TBase extends Constructor>(Base: TBase) {
+    return class extends Base {
+        tags: string[] = [];
+
+        addTag(tag: string): void {
+            this.tags.push(tag);
+        }
+
+        getTags(): string[] {
+            return this.tags;
+        }
+    };
+}
+
+const BaseEntity = class {
+    id: string;
+
+    constructor(id: string) {
+        this.id = id;
+    }
+
+    getId(): string {
+        return this.id;
+    }
+};
+
+const TimestampedEntity = Timestamped(BaseEntity);
+const TaggedTimestampedEntity = Tagged(Timestamped(BaseEntity));
+
+const factories = {
+    createUser: () => new (class User {
+        name: string = "";
+        email: string = "";
+
+        setName(name: string): this {
+            this.name = name;
+            return this;
+        }
+
+        setEmail(email: string): this {
+            this.email = email;
+            return this;
+        }
+    })(),
+
+    createProduct: () => new (class Product {
+        title: string = "";
+        price: number = 0;
+
+        setTitle(title: string): this {
+            this.title = title;
+            return this;
+        }
+
+        setPrice(price: number): this {
+            this.price = price;
+            return this;
+        }
+    })()
+};
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("Timestamped"),
+        "Expected Timestamped function: {}",
+        output
+    );
+    assert!(
+        output.contains("Tagged"),
+        "Expected Tagged function: {}",
+        output
+    );
+    assert!(
+        output.contains("BaseEntity"),
+        "Expected BaseEntity class: {}",
+        output
+    );
+    assert!(
+        output.contains("factories"),
+        "Expected factories object: {}",
+        output
+    );
+    assert!(
+        output.contains("createUser") && output.contains("createProduct"),
+        "Expected factory methods: {}",
+        output
+    );
+}
