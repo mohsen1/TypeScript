@@ -223,6 +223,15 @@ impl<'a> TypeLowering<'a> {
         }
     }
 
+    /// Initialize with existing type parameter bindings.
+    /// These are added to a new scope that persists for the lifetime of the TypeLowering.
+    pub fn with_type_param_bindings(mut self, bindings: Vec<(Atom, TypeId)>) -> Self {
+        if !bindings.is_empty() {
+            self.type_param_scopes = RefCell::new(vec![bindings]);
+        }
+        self
+    }
+
     /// Resolve a node to a type symbol ID if a resolver is provided.
     fn resolve_type_symbol(&self, node_idx: NodeIndex) -> Option<u32> {
         self.type_resolver.and_then(|resolver| resolver(node_idx))

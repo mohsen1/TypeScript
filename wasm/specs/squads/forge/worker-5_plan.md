@@ -12,7 +12,67 @@ Priority: 5
 ## Task Queue
 - [x] Add tests for function `this`-parameter inference (contextual typing + call-site inference) in `wasm/src/solver/infer_tests.rs`.
 - [x] Convert TODOs in `wasm/src/solver/evaluate_tests.rs` for optional property inference (missing vs `undefined`) and optional tuple element inference (undefined inclusion).
+- [x] Add coverage for `StateFromReducers<R>` mapped type that uses `ExtractState` on each property.
+- [x] Add coverage for `ActionFromReducers<R>` that uses indexed access `[keyof R]` on a mapped type.
+- [x] Fix `test_redux_pattern_generic_function_with_conditional_return` - conditional type in function return.
+- [x] Add distributive conditional type stress tests (40 tests covering large unions, nested conditionals, utility patterns, edge cases).
+- [x] Fix cross-file type alias resolution in `test_check_redux_lodash_style_generics` (redux/lodash diagnostics).
 - [ ] [EM: Add queued tasks]
+
+### Cross-File Type Alias Resolution Issue (Resolved)
+- Resolution: use `binder.symbol_arenas` to read type parameters from the correct file arena, so `TypeEnvironment` carries generic params for Application expansion.
+
+### Test Results
+- Tests: `./wasm/test.sh test_check_redux_lodash_style_generics`
+- Result: PASS (1 test run, 4960 skipped).
+- Tests: `./wasm/test.sh`
+- Result: FAIL (Docker permission denied to `/Users/mohsenazimi/.orbstack/run/docker.sock`).
+
+### Distributive Conditional Type Stress Tests Added
+Added 40 comprehensive stress tests in `evaluate_tests.rs` covering:
+
+**Large Union Distribution:**
+- `test_distributive_large_union_basic` - 10-member union filtering
+- `test_distributive_large_union_all_match` - all members match condition
+- `test_distributive_large_union_none_match` - no members match condition
+- `test_distributive_very_large_union` - 50-member union distribution
+- `test_distributive_hundred_member_union` - 100-member union distribution
+
+**Nested Conditionals:**
+- `test_distributive_nested_conditional` - 3 levels of nesting
+- `test_distributive_triple_nested_conditional` - 4 levels of nesting
+- `test_distributive_deeply_nested_union` - nested unions with deep filtering
+
+**Utility Type Patterns:**
+- `test_distributive_exclude_utility` - Exclude<T, U> pattern
+- `test_distributive_extract_utility` - Extract<T, U> pattern
+- `test_distributive_non_nullable_utility` - NonNullable<T> pattern
+
+**Infer Patterns:**
+- `test_distributive_with_infer_in_true_branch` - array element inference
+- `test_distributive_with_infer_filter` - filtered infer binding
+- `test_distributive_with_constrained_infer` - constrained infer
+- `test_distributive_two_infers_different_positions` - multiple infer variables
+- `test_distributive_infer_return_type` - function return type infer (TODO)
+
+**Edge Cases:**
+- `test_distributive_with_never_input` - never input handling
+- `test_distributive_with_any_input` - any input propagation
+- `test_distributive_with_unknown` - unknown extends
+- `test_distributive_with_void` - void type handling
+- `test_distributive_all_to_same_result` - deduplication
+- `test_distributive_identity_preservation` - identity conditional
+- `test_distributive_no_false_branch_matches` - all result in never
+
+**Complex Types:**
+- `test_distributive_function_types` - function type filtering
+- `test_distributive_readonly_array` - readonly array matching
+- `test_distributive_preserves_tuple_structure` - tuple structure preservation
+- `test_distributive_multiple_arrays` - array type filtering
+- `test_distributive_partial_object_match` - object property matching
+- `test_distributive_empty_object_match` - empty object pattern
+- `test_distributive_literal_type_filter` - literal type filtering
+- `test_distributive_numeric_literal_filter` - numeric literal range filtering
 
 ## Completed
 - [x] **Redux/Lodash Generics Fix**: Cross-file type param resolution for Application expansion; allow mapped keys with `symbol` in unions; treat `any[K]` index access as `any` to satisfy ReducersMapObject constraints and unblock redux test.

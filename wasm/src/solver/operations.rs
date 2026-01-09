@@ -1712,6 +1712,21 @@ impl<'a> PropertyAccessEvaluator<'a> {
                 }
             }
 
+            // Mapped: evaluate the mapped type to get concrete properties
+            TypeKey::Mapped(_) => {
+                let evaluated = evaluate_type(self.interner, obj_type);
+                if evaluated != obj_type {
+                    // Successfully evaluated - resolve property on the concrete type
+                    self.resolve_property_access_inner(evaluated, prop_name, prop_atom)
+                } else {
+                    // Evaluation didn't change the type - property not found
+                    PropertyAccessResult::PropertyNotFound {
+                        type_id: obj_type,
+                        property_name: prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name)),
+                    }
+                }
+            }
+
             _ => PropertyAccessResult::PropertyNotFound {
                 type_id: obj_type,
                 property_name: prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name)),
