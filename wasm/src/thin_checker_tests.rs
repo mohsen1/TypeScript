@@ -4556,6 +4556,77 @@ function implicitAnyParam(x) {
 }
 
 #[test]
+fn test_no_implicit_returns_ts7030() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// @noImplicitReturns: true
+function maybeReturn(flag: boolean): number {
+    if (flag) {
+        return 1;
+    }
+    // Falls through without return - should trigger TS7030
+}
+
+function alwaysReturns(flag: boolean): number {
+    if (flag) {
+        return 1;
+    }
+    return 2;  // OK - all paths return
+}
+
+function noReturns(): void {
+    console.log("ok");  // OK - void function
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count_7030 = codes.iter().filter(|&&c| c == 7030).count();
+    assert_eq!(count_7030, 1, "Expected one TS7030 error for maybeReturn, got codes: {:?}", codes);
+}
+
+#[test]
+fn test_no_implicit_returns_disabled() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// @noImplicitReturns: false
+function maybeReturn(flag: boolean): number {
+    if (flag) {
+        return 1;
+    }
+    // Falls through without return - should NOT trigger TS7030 when disabled
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count_7030 = codes.iter().filter(|&&c| c == 7030).count();
+    assert_eq!(count_7030, 0, "Should not have TS7030 when noImplicitReturns is false, got codes: {:?}", codes);
+}
+
+#[test]
 fn test_implicit_any_parameters_in_type_signatures() {
     use crate::thin_parser::ThinParserState;
 
