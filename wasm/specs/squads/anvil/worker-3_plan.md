@@ -150,3 +150,5 @@ Active
 - Enabled class/interface declaration merging in `ThinBinderState`
 - Resolved `import = require('module')` against ambient module exports
 - Added default `tests/lib/lib.d.ts` loading in conformance harness scripts
+
+Ready for Merge: Yes
