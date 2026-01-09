@@ -12001,6 +12001,463 @@ fn test_mapped_type_remove_readonly_add_optional() {
     assert_eq!(result, expected);
 }
 
+// =============================================================================
+// MAPPED TYPE MODIFIER ADVANCED TESTS
+// =============================================================================
+
+/// Test mapped type -readonly removes readonly from source object properties.
+///
+/// Given keys with -readonly modifier, properties should have readonly: false.
+#[test]
+fn test_mapped_type_minus_readonly_on_readonly_source() {
+    let interner = TypeInterner::new();
+
+    let key_a = interner.literal_string("a");
+    let key_b = interner.literal_string("b");
+    let keys = interner.union(vec![key_a, key_b]);
+
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint: keys,
+        name_type: None,
+        template: TypeId::STRING,
+        readonly_modifier: Some(MappedModifier::Remove),  // -readonly
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Expected: { a: string; b: string } with readonly: false
+    let a_name = interner.intern_string("a");
+    let b_name = interner.intern_string("b");
+    let expected = interner.object(vec![
+        PropertyInfo {
+            name: a_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,  // removed
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    assert_eq!(result, expected);
+}
+
+/// Test mapped type +optional adds optional to all properties.
+///
+/// Given keys with +? modifier, properties should have optional: true.
+#[test]
+fn test_mapped_type_plus_optional_on_required_source() {
+    let interner = TypeInterner::new();
+
+    let key_x = interner.literal_string("x");
+    let key_y = interner.literal_string("y");
+    let keys = interner.union(vec![key_x, key_y]);
+
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint: keys,
+        name_type: None,
+        template: TypeId::NUMBER,
+        readonly_modifier: None,
+        optional_modifier: Some(MappedModifier::Add),  // +?
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Expected: { x?: number; y?: number }
+    let x_name = interner.intern_string("x");
+    let y_name = interner.intern_string("y");
+    let expected = interner.object(vec![
+        PropertyInfo {
+            name: x_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: true,  // added
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: y_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: true,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    assert_eq!(result, expected);
+}
+
+/// Test key remapping to uppercase using as clause.
+///
+/// { [K in "a" | "b" as Uppercase<K>]: string } should produce { A: string; B: string }.
+#[test]
+fn test_mapped_type_key_remap_uppercase() {
+    let interner = TypeInterner::new();
+
+    let key_a = interner.literal_string("a");
+    let key_b = interner.literal_string("b");
+    let keys = interner.union(vec![key_a, key_b]);
+
+    let key_upper_a = interner.literal_string("A");
+    let key_upper_b = interner.literal_string("B");
+
+    let key_param = TypeParamInfo {
+        name: interner.intern_string("K"),
+        constraint: Some(keys),
+        default: None,
+    };
+    let key_param_id = interner.intern(TypeKey::TypeParameter(key_param.clone()));
+
+    // Create a conditional that maps "a" -> "A", "b" -> "B"
+    let inner_cond = interner.conditional(ConditionalType {
+        check_type: key_param_id,
+        extends_type: key_b,
+        true_type: key_upper_b,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    });
+    let name_type = interner.conditional(ConditionalType {
+        check_type: key_param_id,
+        extends_type: key_a,
+        true_type: key_upper_a,
+        false_type: inner_cond,
+        is_distributive: false,
+    });
+
+    let mapped = MappedType {
+        type_param: key_param,
+        constraint: keys,
+        name_type: Some(name_type),
+        template: TypeId::STRING,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Expected: { A: string; B: string }
+    let a_upper_name = interner.intern_string("A");
+    let b_upper_name = interner.intern_string("B");
+    let expected = interner.object(vec![
+        PropertyInfo {
+            name: a_upper_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b_upper_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    assert_eq!(result, expected);
+}
+
+/// Test key remapping with prefix using as clause.
+///
+/// { [K in "name" | "age" as `get_${K}`]: string } should produce { get_name: string; get_age: string }.
+#[test]
+fn test_mapped_type_key_remap_with_prefix() {
+    let interner = TypeInterner::new();
+
+    let key_name = interner.literal_string("name");
+    let key_age = interner.literal_string("age");
+    let keys = interner.union(vec![key_name, key_age]);
+
+    let key_get_name = interner.literal_string("get_name");
+    let key_get_age = interner.literal_string("get_age");
+
+    let key_param = TypeParamInfo {
+        name: interner.intern_string("K"),
+        constraint: Some(keys),
+        default: None,
+    };
+    let key_param_id = interner.intern(TypeKey::TypeParameter(key_param.clone()));
+
+    // Create conditional: K extends "name" ? "get_name" : K extends "age" ? "get_age" : never
+    let inner_cond = interner.conditional(ConditionalType {
+        check_type: key_param_id,
+        extends_type: key_age,
+        true_type: key_get_age,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    });
+    let name_type = interner.conditional(ConditionalType {
+        check_type: key_param_id,
+        extends_type: key_name,
+        true_type: key_get_name,
+        false_type: inner_cond,
+        is_distributive: false,
+    });
+
+    let mapped = MappedType {
+        type_param: key_param,
+        constraint: keys,
+        name_type: Some(name_type),
+        template: TypeId::STRING,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Expected: { get_age: string; get_name: string }
+    let get_age_name = interner.intern_string("get_age");
+    let get_name_name = interner.intern_string("get_name");
+    let expected = interner.object(vec![
+        PropertyInfo {
+            name: get_age_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: get_name_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    assert_eq!(result, expected);
+}
+
+/// Test modifier combination: +readonly +optional.
+///
+/// { +readonly [K in keys]+?: T[K] } should add both modifiers.
+#[test]
+fn test_mapped_type_add_both_modifiers_on_source() {
+    let interner = TypeInterner::new();
+
+    let key_value = interner.literal_string("value");
+
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint: key_value,
+        name_type: None,
+        template: TypeId::STRING,
+        readonly_modifier: Some(MappedModifier::Add),  // +readonly
+        optional_modifier: Some(MappedModifier::Add),  // +?
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Expected: { readonly value?: string }
+    let value_name = interner.intern_string("value");
+    let expected = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: true,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    assert_eq!(result, expected);
+}
+
+/// Test modifier combination: -readonly -optional (Required<T> pattern).
+///
+/// { -readonly [K in keys]-?: T[K] } should remove both modifiers.
+#[test]
+fn test_mapped_type_remove_both_modifiers_required_pattern() {
+    let interner = TypeInterner::new();
+
+    let key_data = interner.literal_string("data");
+
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint: key_data,
+        name_type: None,
+        template: TypeId::STRING,
+        readonly_modifier: Some(MappedModifier::Remove),  // -readonly
+        optional_modifier: Some(MappedModifier::Remove),  // -?
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Expected: { data: string } with both modifiers removed
+    let data_name = interner.intern_string("data");
+    let expected = interner.object(vec![PropertyInfo {
+        name: data_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert_eq!(result, expected);
+}
+
+/// Test key remapping that filters out keys (produces never).
+///
+/// { [K in "a" | "b" | "c" as K extends "b" ? never : K]: string }
+/// should produce { a: string; c: string } (b filtered out).
+#[test]
+fn test_mapped_type_key_remap_filter_out_key() {
+    let interner = TypeInterner::new();
+
+    let key_a = interner.literal_string("a");
+    let key_b = interner.literal_string("b");
+    let key_c = interner.literal_string("c");
+    let keys = interner.union(vec![key_a, key_b, key_c]);
+
+    let key_param = TypeParamInfo {
+        name: interner.intern_string("K"),
+        constraint: Some(keys),
+        default: None,
+    };
+    let key_param_id = interner.intern(TypeKey::TypeParameter(key_param.clone()));
+
+    // K extends "b" ? never : K
+    let name_type = interner.conditional(ConditionalType {
+        check_type: key_param_id,
+        extends_type: key_b,
+        true_type: TypeId::NEVER,
+        false_type: key_param_id,
+        is_distributive: true,
+    });
+
+    let mapped = MappedType {
+        type_param: key_param,
+        constraint: keys,
+        name_type: Some(name_type),
+        template: TypeId::STRING,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Expected: { a: string; c: string } (b filtered out)
+    let a_name = interner.intern_string("a");
+    let c_name = interner.intern_string("c");
+    let expected = interner.object(vec![
+        PropertyInfo {
+            name: a_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: c_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    assert_eq!(result, expected);
+}
+
+/// Test mapped type with multiple keys preserves all properties.
+///
+/// { [K in "str" | "num" | "bool"]: K } should produce 3 properties.
+#[test]
+fn test_mapped_type_preserves_source_types() {
+    let interner = TypeInterner::new();
+
+    let key_str = interner.literal_string("str");
+    let key_num = interner.literal_string("num");
+    let key_bool = interner.literal_string("bool");
+    let keys = interner.union(vec![key_str, key_num, key_bool]);
+
+    let key_param = TypeParamInfo {
+        name: interner.intern_string("K"),
+        constraint: None,
+        default: None,
+    };
+    let key_param_id = interner.intern(TypeKey::TypeParameter(key_param.clone()));
+
+    let mapped = MappedType {
+        type_param: key_param,
+        constraint: keys,
+        name_type: None,
+        template: key_param_id,  // Template is the key itself
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Expected: { bool: "bool"; num: "num"; str: "str" }
+    let str_name = interner.intern_string("str");
+    let num_name = interner.intern_string("num");
+    let bool_name = interner.intern_string("bool");
+    let expected = interner.object(vec![
+        PropertyInfo {
+            name: bool_name,
+            type_id: key_bool,
+            write_type: key_bool,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: num_name,
+            type_id: key_num,
+            write_type: key_num,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: str_name,
+            type_id: key_str,
+            write_type: key_str,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    assert_eq!(result, expected);
+}
+
 /// Test conditional with void check type.
 ///
 /// `void extends undefined ? true : false` should be false.
