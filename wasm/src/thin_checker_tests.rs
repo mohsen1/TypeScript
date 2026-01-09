@@ -12922,3 +12922,99 @@ x.type;
     let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
 }
+
+// =============================================================================
+// Tests for class method `this` return type assignability
+// =============================================================================
+
+#[test]
+#[ignore] // TODO: Fix class method returning this - currently produces spurious TS2322
+fn test_class_method_return_this_no_error() {
+    // This test documents a bug: returning `this` from a method that returns
+    // the class type should not produce TS2322.
+    //
+    // Bug: The checker compares `this` structurally with private brand markers
+    // against the class type, causing:
+    // "Type '{ ...; readonly __private_brand_0: any; ... }' is not assignable to type 'Builder<T>'"
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Builder<T> {
+    private value: T;
+
+    constructor(initial: T) {
+        this.value = initial;
+    }
+
+    set(value: T): Builder<T> {
+        this.value = value;
+        return this;  // Should be valid - this is Builder<T>
+    }
+
+    build(): T {
+        return this.value;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2322),
+        "Should NOT have TS2322 for returning `this` from method, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+#[ignore] // TODO: Fix generic constructor type inference - currently produces spurious TS2322
+fn test_generic_constructor_return_type_no_error() {
+    // This test documents a bug: calling a generic constructor with inferred type
+    // argument should return the properly typed instance.
+    //
+    // Bug: `new Builder(fn(this.value))` where fn: (T) => U returns Builder<U>,
+    // but the checker sees a structural type with brand markers instead of Builder<U>.
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Builder<T> {
+    private value: T;
+
+    constructor(initial: T) {
+        this.value = initial;
+    }
+
+    transform<U>(fn: (value: T) => U): Builder<U> {
+        return new Builder(fn(this.value));  // Should be valid
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2322),
+        "Should NOT have TS2322 for generic constructor return, got: {:?}",
+        codes
+    );
+}
