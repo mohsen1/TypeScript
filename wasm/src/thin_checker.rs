@@ -6974,12 +6974,14 @@ impl<'a> ThinCheckerState<'a> {
             }
             // Other type declarations - just register them, no expression checking needed
             syntax_kind_ext::ENUM_DECLARATION |
-            syntax_kind_ext::IMPORT_DECLARATION |
             syntax_kind_ext::EMPTY_STATEMENT |
             syntax_kind_ext::DEBUGGER_STATEMENT |
             syntax_kind_ext::BREAK_STATEMENT |
             syntax_kind_ext::CONTINUE_STATEMENT => {
                 // No action needed
+            }
+            syntax_kind_ext::IMPORT_DECLARATION => {
+                self.check_import_declaration(stmt_idx);
             }
             syntax_kind_ext::MODULE_DECLARATION => {
                 // Check module declaration (errors 5061, 2819, etc.)
@@ -7506,6 +7508,44 @@ impl<'a> ThinCheckerState<'a> {
                 }
             }
         }
+    }
+
+    /// Check an import declaration for unresolved modules.
+    /// Emits TS2792 when the module cannot be resolved.
+    fn check_import_declaration(&mut self, stmt_idx: NodeIndex) {
+        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages, format_message};
+
+        let Some(node) = self.ctx.arena.get(stmt_idx) else {
+            return;
+        };
+
+        let Some(import) = self.ctx.arena.get_import_decl(node) else {
+            return;
+        };
+
+        // Get module specifier string
+        let Some(spec_node) = self.ctx.arena.get(import.module_specifier) else {
+            return;
+        };
+
+        let Some(literal) = self.ctx.arena.get_literal(spec_node) else {
+            return;
+        };
+
+        let module_name = &literal.text;
+
+        // In single-file mode, any external import is considered unresolved.
+        // This is correct because WASM checker operates on individual files
+        // without access to the module graph or ambient module declarations.
+        let message = format_message(
+            diagnostic_messages::CANNOT_FIND_MODULE,
+            &[module_name],
+        );
+        self.error_at_node(
+            import.module_specifier,
+            &message,
+            diagnostic_codes::CANNOT_FIND_MODULE,
+        );
     }
 
     /// Check a class declaration.
