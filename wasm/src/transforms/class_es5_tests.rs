@@ -9473,3 +9473,326 @@ class BoundedValue {
         output
     );
 }
+
+// ============================================================================
+// new.target Tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_new_target_basic() {
+    // Basic new.target usage in constructor
+    let source = r#"
+class Example {
+    name: string;
+
+    constructor() {
+        this.name = new.target.name;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("Example"),
+        "Expected Example class: {}",
+        output
+    );
+
+    // new.target should be transformed for ES5
+    assert!(
+        output.contains("name"),
+        "Expected name property: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_new_target_derived() {
+    // new.target in derived class constructor
+    let source = r#"
+class Base {
+    constructor() {
+        console.log(new.target.name);
+    }
+}
+
+class Derived extends Base {
+    constructor() {
+        super();
+        console.log(new.target.name);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Both classes should be present
+    assert!(
+        output.contains("Base"),
+        "Expected Base class: {}",
+        output
+    );
+    assert!(
+        output.contains("Derived"),
+        "Expected Derived class: {}",
+        output
+    );
+
+    // Inheritance should be set up
+    assert!(
+        output.contains("__extends") || output.contains("extends"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_new_target_abstract_pattern() {
+    // new.target check to prevent direct instantiation (abstract class pattern)
+    let source = r#"
+class AbstractBase {
+    constructor() {
+        if (new.target === AbstractBase) {
+            throw new Error("Cannot instantiate abstract class");
+        }
+    }
+
+    abstract doWork(): void;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("AbstractBase"),
+        "Expected AbstractBase class: {}",
+        output
+    );
+
+    // Error throw should be present
+    assert!(
+        output.contains("Error") || output.contains("throw"),
+        "Expected error handling: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_new_target_with_static() {
+    // new.target with static factory method
+    let source = r#"
+class Factory {
+    private data: string;
+
+    constructor(data: string) {
+        if (!new.target) {
+            throw new Error("Must use new");
+        }
+        this.data = data;
+    }
+
+    static create(data: string): Factory {
+        return new Factory(data);
+    }
+
+    getData(): string {
+        return this.data;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("Factory"),
+        "Expected Factory class: {}",
+        output
+    );
+
+    // Static method should be present
+    assert!(
+        output.contains("create"),
+        "Expected create static method: {}",
+        output
+    );
+
+    // Instance method should be present
+    assert!(
+        output.contains("getData"),
+        "Expected getData method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_new_target_inheritance_chain() {
+    // new.target through inheritance chain
+    let source = r#"
+class Animal {
+    type: string;
+
+    constructor() {
+        this.type = new.target.name;
+    }
+}
+
+class Mammal extends Animal {
+    warm: boolean = true;
+}
+
+class Dog extends Mammal {
+    breed: string;
+
+    constructor(breed: string) {
+        super();
+        this.breed = breed;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // All classes should be present
+    assert!(
+        output.contains("Animal"),
+        "Expected Animal class: {}",
+        output
+    );
+    assert!(
+        output.contains("Mammal"),
+        "Expected Mammal class: {}",
+        output
+    );
+    assert!(
+        output.contains("Dog"),
+        "Expected Dog class: {}",
+        output
+    );
+
+    // Inheritance should be set up
+    assert!(
+        output.contains("__extends") || output.contains("_super"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_new_target_undefined_check() {
+    // new.target undefined check for callable class pattern
+    let source = r#"
+class Callable {
+    value: number;
+
+    constructor(value: number) {
+        if (new.target === undefined) {
+            return new Callable(value);
+        }
+        this.value = value;
+    }
+
+    getValue(): number {
+        return this.value;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("Callable"),
+        "Expected Callable class: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("getValue"),
+        "Expected getValue method: {}",
+        output
+    );
+
+    // undefined check pattern should be in output
+    assert!(
+        output.contains("undefined") || output.contains("value"),
+        "Expected undefined check or value property: {}",
+        output
+    );
+}
