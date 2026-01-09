@@ -58,6 +58,8 @@ Reduce false positives for property access errors by aligning TS2339 behavior wi
 
 ## Task Queue
 - Fix control flow narrowing for property access after type guards (highest priority - affects 10 files)
+  - **Root cause identified:** In `handle_assignment` in control_flow.rs, when an assignment affects a reference, we return the declared type instead of the assigned expression's type. For example, after `x = ""` where `x: string | number`, we should narrow `x` to `string`, but we return `string | number`.
+  - **Fix needed:** Track assigned types in flow nodes and use them for narrowing.
 - Investigate private name (#prop) handling - both extra and missing errors
 - Fix mixin class property resolution
 - Add globalThis property checking
