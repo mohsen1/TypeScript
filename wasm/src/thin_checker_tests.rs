@@ -12937,6 +12937,151 @@ class Foo {
     );
 }
 
+/// Test that parameter properties don't emit TS2564 (they're auto-initialized)
+#[test]
+fn test_ts2564_parameter_property_skips_check() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Test {
+    constructor(public name: string, private age: number, readonly id: number) {
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Parameter properties should not have TS2564 errors
+    let has_2564 = checker.ctx.diagnostics.iter().any(|d| d.code == 2564);
+    assert!(
+        !has_2564,
+        "Expected no TS2564 errors for parameter properties, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Test that properties assigned in if/else branches both need assignment
+#[test]
+fn test_ts2564_conditional_constructor_assignment() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Test {
+    name: string;
+    constructor(condition: boolean) {
+        if (condition) {
+            this.name = "a";
+        } else {
+            this.name = "b";
+        }
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Property assigned in both branches should not have TS2564 errors
+    let has_2564 = checker.ctx.diagnostics.iter().any(|d| d.code == 2564);
+    assert!(
+        !has_2564,
+        "Expected no TS2564 for conditional assignment in both branches, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Test that properties assigned in only if branch DO emit TS2564
+#[test]
+fn test_ts2564_partial_conditional_assignment_error() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Test {
+    name: string;
+    constructor(condition: boolean) {
+        if (condition) {
+            this.name = "a";
+        }
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Property assigned in only if branch SHOULD have TS2564 error
+    let count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2564).count();
+    assert_eq!(
+        count,
+        1,
+        "Expected TS2564 for partial conditional assignment, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Test that properties assigned in derived class with super call work
+#[test]
+fn test_ts2564_derived_class_with_super() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Base {
+    constructor(public id: number) {}
+}
+class Derived extends Base {
+    name: string;
+    constructor() {
+        super(1);
+        this.name = "test";
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Property assigned after super call should not have TS2564 errors
+    let has_2564 = checker.ctx.diagnostics.iter().any(|d| d.code == 2564);
+    assert!(
+        !has_2564,
+        "Expected no TS2564 for property assigned after super, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
 #[test]
 fn test_recursive_mapped_type_stack_guard() {
     use crate::thin_parser::ThinParserState;
