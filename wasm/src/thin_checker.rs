@@ -878,6 +878,8 @@ impl<'a> ThinCheckerState<'a> {
             call_signatures: shape.call_signatures.clone(),
             construct_signatures: shape.construct_signatures.clone(),
             properties,
+            string_index: None,
+            number_index: None,
         })
     }
 
@@ -1826,6 +1828,8 @@ impl<'a> ThinCheckerState<'a> {
                 call_signatures,
                 construct_signatures,
                 properties,
+                string_index,
+                number_index,
             });
         }
 
@@ -2050,6 +2054,8 @@ impl<'a> ThinCheckerState<'a> {
                 call_signatures,
                 construct_signatures,
                 properties,
+                string_index,
+                number_index,
             };
             self.ctx.types.callable(shape)
         } else if string_index.is_some() || number_index.is_some() {
@@ -2247,6 +2253,8 @@ impl<'a> ThinCheckerState<'a> {
                     call_signatures,
                     construct_signatures,
                     properties,
+                    string_index: None,
+                    number_index: None,
                 })
             }
             (Some(TypeKey::Callable(derived_shape_id)), Some(TypeKey::Object(base_shape_id))) => {
@@ -2257,6 +2265,8 @@ impl<'a> ThinCheckerState<'a> {
                     call_signatures: derived_shape.call_signatures.clone(),
                     construct_signatures: derived_shape.construct_signatures.clone(),
                     properties,
+                    string_index: None,
+                    number_index: None,
                 })
             }
             (Some(TypeKey::Callable(derived_shape_id)), Some(TypeKey::ObjectWithIndex(base_shape_id))) => {
@@ -2267,6 +2277,8 @@ impl<'a> ThinCheckerState<'a> {
                     call_signatures: derived_shape.call_signatures.clone(),
                     construct_signatures: derived_shape.construct_signatures.clone(),
                     properties,
+                    string_index: None,
+                    number_index: None,
                 })
             }
             (Some(TypeKey::Object(derived_shape_id)), Some(TypeKey::Callable(base_shape_id))) => {
@@ -2277,6 +2289,8 @@ impl<'a> ThinCheckerState<'a> {
                     call_signatures: base_shape.call_signatures.clone(),
                     construct_signatures: base_shape.construct_signatures.clone(),
                     properties,
+                    string_index: None,
+                    number_index: None,
                 })
             }
             (Some(TypeKey::ObjectWithIndex(derived_shape_id)), Some(TypeKey::Callable(base_shape_id))) => {
@@ -2287,6 +2301,8 @@ impl<'a> ThinCheckerState<'a> {
                     call_signatures: base_shape.call_signatures.clone(),
                     construct_signatures: base_shape.construct_signatures.clone(),
                     properties,
+                    string_index: None,
+                    number_index: None,
                 })
             }
             (Some(TypeKey::Object(derived_shape_id)), Some(TypeKey::Object(base_shape_id))) => {
@@ -2916,6 +2932,8 @@ impl<'a> ThinCheckerState<'a> {
                 call_signatures: signatures,
                 construct_signatures: Vec::new(),
                 properties: Vec::new(),
+                string_index: None,
+                number_index: None,
             });
             properties.insert(name, PropertyInfo {
                 name,
@@ -3415,6 +3433,8 @@ impl<'a> ThinCheckerState<'a> {
                 call_signatures: signatures,
                 construct_signatures: Vec::new(),
                 properties: Vec::new(),
+                string_index: None,
+                number_index: None,
             });
             properties.insert(name, PropertyInfo {
                 name,
@@ -3591,6 +3611,8 @@ impl<'a> ThinCheckerState<'a> {
             call_signatures: Vec::new(),
             construct_signatures,
             properties,
+            string_index: None,
+            number_index: None,
         });
 
         if let Some(level) = constructor_access {
@@ -3752,6 +3774,8 @@ impl<'a> ThinCheckerState<'a> {
             call_signatures: vec![call_signature],
             construct_signatures: Vec::new(),
             properties,
+            string_index: None,
+            number_index: None,
         })
     }
 
@@ -4170,6 +4194,8 @@ impl<'a> ThinCheckerState<'a> {
                     call_signatures: overloads,
                     construct_signatures: Vec::new(),
                     properties: Vec::new(),
+                    string_index: None,
+                    number_index: None,
                 };
                 return (self.ctx.types.callable(shape), Vec::new());
             }
@@ -4979,6 +5005,8 @@ impl<'a> ThinCheckerState<'a> {
                         call_signatures: shape.construct_signatures.clone(),
                         construct_signatures: Vec::new(),
                         properties: Vec::new(),
+                        string_index: None,
+                        number_index: None,
                     }))
                 }
             }
@@ -7303,6 +7331,15 @@ impl<'a> ThinCheckerState<'a> {
         type1 == type2
     }
 
+    /// Check if source type is assignable to target type, resolving TypeQuery types first.
+    /// This is needed because `typeof x` (TypeQuery) needs to be resolved to its structural
+    /// type before checking assignability.
+    pub fn is_assignable_to_resolving_type_queries(&mut self, source: TypeId, target: TypeId) -> bool {
+        let resolved_source = self.resolve_type_query_to_structural(source);
+        let resolved_target = self.resolve_type_query_to_structural(target);
+        self.is_assignable_to(resolved_source, resolved_target)
+    }
+
     /// Check if a type is assignable to a union of types.
     /// Uses the context's TypeEnvironment for resolving type references and expanding Applications.
     pub fn is_assignable_to_union(&self, source: TypeId, targets: &[TypeId]) -> bool {
@@ -8033,6 +8070,8 @@ impl<'a> ThinCheckerState<'a> {
                         call_signatures,
                         construct_signatures,
                         properties,
+                        string_index: None,
+                        number_index: None,
                     })
                 } else {
                     type_id
@@ -10337,7 +10376,8 @@ impl<'a> ThinCheckerState<'a> {
         self.ensure_application_symbols_resolved(expected_type);
 
         // Check if the return type is assignable to the expected type
-        if expected_type != TypeId::ANY && !self.is_assignable_to(return_type, expected_type) {
+        // Resolve TypeQuery types (typeof) before checking assignability
+        if expected_type != TypeId::ANY && !self.is_assignable_to_resolving_type_queries(return_type, expected_type) {
             // Report error at the return expression (or at return keyword if no expression)
             let error_node = if !return_data.expression.is_none() {
                 return_data.expression
@@ -12620,7 +12660,8 @@ impl<'a> ThinCheckerState<'a> {
                 }
 
                 // Check if getter return type is assignable to setter param type
-                if !self.is_assignable_to(getter_type, setter_type) {
+                // Resolve TypeQuery types (typeof) before checking assignability
+                if !self.is_assignable_to_resolving_type_queries(getter_type, setter_type) {
                     // Get type strings for error message
                     let getter_type_str = self.format_type(getter_type);
                     let setter_type_str = self.format_type(setter_type);
@@ -13163,7 +13204,8 @@ impl<'a> ThinCheckerState<'a> {
                             found = true;
                             let base_type = instantiate_type(self.ctx.types, base_type, &substitution);
 
-                            if !self.is_assignable_to(*member_type, base_type) {
+                            // Resolve TypeQuery types (typeof) before checking assignability
+                            if !self.is_assignable_to_resolving_type_queries(*member_type, base_type) {
                                 let member_type_str = self.format_type(*member_type);
                                 let base_type_str = self.format_type(base_type);
 
@@ -13756,7 +13798,8 @@ impl<'a> ThinCheckerState<'a> {
             let init_type = self.get_type_of_node(param.initializer);
 
             // Check if the initializer type is assignable to the declared type
-            if !self.is_assignable_to(init_type, declared_type) {
+            // Resolve TypeQuery types (typeof) before checking assignability
+            if !self.is_assignable_to_resolving_type_queries(init_type, declared_type) {
                 self.error_type_not_assignable_with_reason_at(
                     init_type,
                     declared_type,
@@ -14175,7 +14218,8 @@ impl<'a> ThinCheckerState<'a> {
             let declared_type = self.get_type_from_type_node(prop.type_annotation);
             let init_type = self.get_type_of_node(prop.initializer);
 
-            if declared_type != TypeId::ANY && !self.is_assignable_to(init_type, declared_type) {
+            // Resolve TypeQuery types (typeof) before checking assignability
+            if declared_type != TypeId::ANY && !self.is_assignable_to_resolving_type_queries(init_type, declared_type) {
                 self.error_type_not_assignable_with_reason_at(init_type, declared_type, prop.initializer);
             }
         } else if !prop.initializer.is_none() {
