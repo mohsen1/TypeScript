@@ -7,7 +7,14 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-(Waiting for next assignment from EM-Anvil)
+Fix TS2403 false positives ("Subsequent variable declarations must have the same type") from `wasm/specs/squads/anvil/GOALS.md`.
+
+Focus:
+1. Capture 5-10 TS2403 failing samples from conformance output.
+2. Inspect symbol merge / variable declaration compatibility in `wasm/src/thin_binder.rs` and `wasm/src/thin_checker.rs`.
+3. Implement the smallest fix that reduces TS2403 count without new errors.
+4. Add regression tests (prefer `wasm/src/thin_checker_tests.rs` or `wasm/src/thin_binder_tests.rs`).
+5. Run conformance before/after and record exact match + extra errors here.
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
@@ -188,6 +195,7 @@ Priority: 2
 - [x] Added integration coverage for computed `super[...]` in class field arrow initializers; `./wasm/test.sh` failed at `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports` (unrelated).
 - [x] Confirmed `super()` ordering remains stable with computed field initializers via regression; `./wasm/test.sh` failed at `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports` (unrelated).
 - [x] Updated emitter edge case and parity tests for CommonJS export/parse error tolerance; `./wasm/test.sh` now fails at `solver::compat::tests::test_explain_failure_reports_rest_mismatch` (unrelated).
+- [x] Fixed TS2322/TS2416 false positives for TypeQuery (typeof) comparisons in class property inheritance: added `resolve_type_query_to_structural` helper in `thin_checker.rs` to resolve `typeof x` to structural types before assignability check; updated SubtypeChecker to resolve TypeQuery symbols; TS2322 eliminated from top 10 extra errors.
 
 ## Ready for Merge
 Yes

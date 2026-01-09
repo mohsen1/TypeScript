@@ -694,6 +694,12 @@ impl<'a> ThinCheckerState<'a> {
     }
 
     fn class_instance_type_from_symbol(&mut self, sym_id: SymbolId) -> Option<TypeId> {
+        // Check for circular reference to prevent infinite recursion with
+        // self-referential types like `method(): cls`
+        if self.ctx.symbol_resolution_set.contains(&sym_id) {
+            return None;
+        }
+
         let symbol = self.ctx.binder.get_symbol(sym_id)?;
         let decl_idx = if !symbol.value_declaration.is_none() {
             symbol.value_declaration
@@ -705,9 +711,17 @@ impl<'a> ThinCheckerState<'a> {
         }
         let node = self.ctx.arena.get(decl_idx)?;
         let class = self.ctx.arena.get_class(node)?;
+
+        // Mark this symbol as being resolved
+        self.ctx.symbol_resolution_set.insert(sym_id);
+
         let (_params, updates) = self.push_type_parameters(&class.type_parameters);
         let instance_type = self.get_class_instance_type(decl_idx, class);
         self.pop_type_parameters(updates);
+
+        // Remove from resolution set
+        self.ctx.symbol_resolution_set.remove(&sym_id);
+
         Some(instance_type)
     }
 
@@ -3734,6 +3748,21 @@ impl<'a> ThinCheckerState<'a> {
                 LiteralValue::Boolean(_) => TypeId::BOOLEAN,
             },
             _ => type_id,
+        }
+    }
+
+    /// Resolve a TypeQuery type to its structural type.
+    /// If the type is `typeof x`, this returns the actual type of `x`.
+    /// If the type is not a TypeQuery, it returns the type unchanged.
+    fn resolve_type_query_to_structural(&mut self, type_id: TypeId) -> TypeId {
+        use crate::solver::{TypeKey, SymbolRef};
+        use crate::binder::SymbolId;
+
+        if let Some(TypeKey::TypeQuery(SymbolRef(sym_id))) = self.ctx.types.lookup(type_id) {
+            // Resolve the symbol to its actual type
+            self.get_type_of_symbol(SymbolId(sym_id))
+        } else {
+            type_id
         }
     }
 
@@ -10383,8 +10412,14 @@ impl<'a> ThinCheckerState<'a> {
                     continue;
                 }
 
+                // Resolve TypeQuery types (typeof) before comparison
+                // If member_type is `typeof y` and base_type is `typeof x`,
+                // we need to compare the actual types of y and x
+                let resolved_member_type = self.resolve_type_query_to_structural(member_type);
+                let resolved_base_type = self.resolve_type_query_to_structural(base_type);
+
                 // Check type compatibility - derived type must be assignable to base type
-                if !self.is_assignable_to(member_type, base_type) {
+                if !self.is_assignable_to(resolved_member_type, resolved_base_type) {
                     // Format type strings for error message
                     let member_type_str = self.format_type(member_type);
                     let base_type_str = self.format_type(base_type);
