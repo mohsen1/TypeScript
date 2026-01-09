@@ -5680,3 +5680,211 @@ class ApiClient {
         output
     );
 }
+
+/// Parity test for ES5 multiple property decorators.
+/// Multiple decorators on a property should be lowered without decorator syntax.
+#[test]
+fn test_parity_es5_property_decorator_multiple() {
+    let source = r#"function observable(target: any, key: string) {}
+function validate(target: any, key: string) {}
+function persist(target: any, key: string) {}
+
+class FormField {
+    @observable
+    @validate
+    @persist
+    value: string = "";
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify class and property exist
+    assert!(
+        output.contains("FormField") && output.contains("value"),
+        "Output should define FormField with value: {}",
+        output
+    );
+    // No decorator syntax in ES5
+    assert!(
+        !output.contains("@observable") && !output.contains("@validate") && !output.contains("@persist"),
+        "ES5 output should not contain decorator syntax: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": any"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 property decorator factory.
+/// Decorator factories with arguments should be lowered properly.
+#[test]
+fn test_parity_es5_property_decorator_factory() {
+    let source = r#"function column(name: string) {
+    return function(target: any, key: string) {};
+}
+
+class Entity {
+    @column("user_name")
+    userName: string = "";
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify class and property exist
+    assert!(
+        output.contains("Entity") && output.contains("userName"),
+        "Output should define Entity with userName: {}",
+        output
+    );
+    // No decorator syntax in ES5
+    assert!(
+        !output.contains("@column"),
+        "ES5 output should not contain @column decorator syntax: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": any"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 static property decorator.
+/// Decorators on static properties should be lowered properly.
+#[test]
+fn test_parity_es5_property_decorator_static() {
+    let source = r#"function readonly(target: any, key: string) {}
+
+class Config {
+    @readonly
+    static version: string = "1.0.0";
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify class and static property exist
+    assert!(
+        output.contains("Config") && output.contains("version"),
+        "Output should define Config with version: {}",
+        output
+    );
+    // No decorator syntax in ES5
+    assert!(
+        !output.contains("@readonly"),
+        "ES5 output should not contain @readonly decorator syntax: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": any"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 property decorator with complex initializer.
+/// Property decorators with arrow function initializers should be lowered properly.
+#[test]
+fn test_parity_es5_property_decorator_initializer() {
+    let source = r#"function lazy(target: any, key: string) {}
+
+class DataLoader {
+    @lazy
+    loader: () => Promise<string> = () => Promise.resolve("data");
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify class and property exist
+    assert!(
+        output.contains("DataLoader") && output.contains("loader"),
+        "Output should define DataLoader with loader: {}",
+        output
+    );
+    // No decorator syntax in ES5
+    assert!(
+        !output.contains("@lazy"),
+        "ES5 output should not contain @lazy decorator syntax: {}",
+        output
+    );
+    // Arrow function should be transformed
+    assert!(
+        !output.contains("() =>"),
+        "ES5 output should not contain arrow function: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains("Promise<string>") && !output.contains(": any"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
