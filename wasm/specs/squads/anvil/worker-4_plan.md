@@ -7,25 +7,13 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-Add ES5 class tests for key remapping patterns: as clause, template literals
-
-Steps:
-1. Add 6 ES5 class tests covering key remapping patterns to `wasm/src/transforms/class_es5_tests.rs`:
-   - Basic as clause in mapped types
-   - Template literal key remapping
-   - Conditional as clause
-   - Nested key remapping
-   - Key filtering with as
-   - Combined key remapping patterns
-2. Run `./wasm/test.sh class_es5_tests` to verify all tests pass
-3. Commit with message: `[wasm] transforms: add key remapping patterns ES5 class tests`
-4. Push to `origin/worker/anvil-4`
-5. Update this plan file and push
+None - awaiting assignment from EM-Anvil (final task completed)
 
 ## Task Queue
-(empty - this is Worker 4's final assigned task)
+(empty)
 
 ## Completed
+- [x] Add ES5 class tests for key remapping patterns: as clause, template literals. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for variadic tuple patterns: spread, labeled, optional. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for recursive type patterns: tree, linked list, JSON. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for infer keyword patterns: array element, function return, promise unwrap. Tests: `./wasm/test.sh class_es5_tests`

@@ -37537,271 +37537,85 @@ class OptionalArgsHandler<T extends unknown[]> {
     );
 }
 
-// ============================================================================
-// TRIPLE-SLASH DIRECTIVE PATTERN TESTS
-// ============================================================================
+// =============================================================================
+// KEY REMAPPING PATTERN TESTS - as clause, template literals
+// =============================================================================
 
-/// Test /// <reference path="..."> directive
 #[test]
-fn test_class_es5_triple_slash_reference_path() {
+fn test_class_es5_key_remapping_basic_as_clause() {
     let source = r#"
-/// <reference path="./types.d.ts" />
-/// <reference path="../common/utils.d.ts" />
+// Basic as clause in mapped types
+type Getters<T> = {
+    [K in keyof T as `get${Capitalize<string & K>}`]: () => T[K];
+};
 
-class FileManager {
-    private basePath: string;
-    private files: string[] = [];
+type Setters<T> = {
+    [K in keyof T as `set${Capitalize<string & K>}`]: (value: T[K]) => void;
+};
 
-    constructor(basePath: string) {
-        this.basePath = basePath;
-    }
-
-    addFile(filename: string): void {
-        this.files.push(this.basePath + "/" + filename);
-    }
-
-    removeFile(filename: string): boolean {
-        const path = this.basePath + "/" + filename;
-        const index = this.files.indexOf(path);
-        if (index !== -1) {
-            this.files.splice(index, 1);
-            return true;
-        }
-        return false;
-    }
-
-    listFiles(): string[] {
-        return [...this.files];
-    }
-
-    getBasePath(): string {
-        return this.basePath;
-    }
-
-    getFileCount(): number {
-        return this.files.length;
-    }
+interface Person {
+    name: string;
+    age: number;
+    email: string;
 }
 
-class DirectoryManager extends FileManager {
-    private directories: string[] = [];
+class PersonAccessors {
+    private data: Person;
 
-    constructor(basePath: string) {
-        super(basePath);
-    }
-
-    addDirectory(dirname: string): void {
-        this.directories.push(this.getBasePath() + "/" + dirname);
-    }
-
-    listDirectories(): string[] {
-        return [...this.directories];
-    }
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // FileManager class should be ES5 constructor
-    assert!(
-        output.contains("function FileManager"),
-        "Expected ES5 FileManager class: {}",
-        output
-    );
-
-    // DirectoryManager class should be ES5 constructor
-    assert!(
-        output.contains("function DirectoryManager"),
-        "Expected ES5 DirectoryManager class: {}",
-        output
-    );
-
-    // Methods should exist
-    assert!(
-        output.contains("addFile") && output.contains("removeFile") && output.contains("listFiles"),
-        "Expected FileManager methods: {}",
-        output
-    );
-
-    // Inheritance should be present
-    assert!(
-        output.contains("__extends") || output.contains("_super"),
-        "Expected inheritance pattern: {}",
-        output
-    );
-}
-
-/// Test /// <reference types="..."> directive
-#[test]
-fn test_class_es5_triple_slash_reference_types() {
-    let source = r#"
-/// <reference types="node" />
-/// <reference types="jest" />
-
-class TestRunner {
-    private tests: Map<string, () => void> = new Map();
-    private results: { name: string; passed: boolean }[] = [];
-
-    addTest(name: string, fn: () => void): void {
-        this.tests.set(name, fn);
-    }
-
-    run(): void {
-        this.tests.forEach((fn, name) => {
-            try {
-                fn();
-                this.results.push({ name, passed: true });
-            } catch (e) {
-                this.results.push({ name, passed: false });
-            }
-        });
-    }
-
-    getResults(): { name: string; passed: boolean }[] {
-        return [...this.results];
-    }
-
-    getPassedCount(): number {
-        return this.results.filter(r => r.passed).length;
-    }
-
-    getFailedCount(): number {
-        return this.results.filter(r => !r.passed).length;
-    }
-
-    clear(): void {
-        this.tests.clear();
-        this.results = [];
-    }
-}
-
-class MockTestRunner extends TestRunner {
-    private mocks: Map<string, any> = new Map();
-
-    mock(name: string, value: any): void {
-        this.mocks.set(name, value);
-    }
-
-    getMock(name: string): any {
-        return this.mocks.get(name);
-    }
-
-    clearMocks(): void {
-        this.mocks.clear();
-    }
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // TestRunner class should be ES5 constructor
-    assert!(
-        output.contains("function TestRunner"),
-        "Expected ES5 TestRunner class: {}",
-        output
-    );
-
-    // MockTestRunner class should be ES5 constructor
-    assert!(
-        output.contains("function MockTestRunner"),
-        "Expected ES5 MockTestRunner class: {}",
-        output
-    );
-
-    // Methods should exist
-    assert!(
-        output.contains("addTest") && output.contains("run") && output.contains("getResults"),
-        "Expected TestRunner methods: {}",
-        output
-    );
-
-    // MockTestRunner methods
-    assert!(
-        output.contains("mock") && output.contains("getMock") && output.contains("clearMocks"),
-        "Expected MockTestRunner methods: {}",
-        output
-    );
-}
-
-/// Test /// <amd-module name="..."> directive
-#[test]
-fn test_class_es5_triple_slash_amd_module() {
-    let source = r#"
-/// <amd-module name="MyModule" />
-
-class ModuleExport {
-    private name: string;
-    private version: string;
-
-    constructor(name: string, version: string) {
-        this.name = name;
-        this.version = version;
+    constructor(name: string, age: number, email: string) {
+        this.data = { name, age, email };
     }
 
     getName(): string {
-        return this.name;
+        return this.data.name;
     }
 
-    getVersion(): string {
-        return this.version;
+    setName(value: string): void {
+        this.data.name = value;
     }
 
-    getFullName(): string {
-        return this.name + "@" + this.version;
+    getAge(): number {
+        return this.data.age;
     }
 
-    isCompatible(other: ModuleExport): boolean {
-        return this.name === other.getName();
+    setAge(value: number): void {
+        this.data.age = value;
+    }
+
+    getEmail(): string {
+        return this.data.email;
+    }
+
+    setEmail(value: string): void {
+        this.data.email = value;
+    }
+
+    getData(): Person {
+        return { ...this.data };
     }
 }
 
-class ModuleRegistry {
-    private modules: Map<string, ModuleExport> = new Map();
+class PropertyMapper<T extends object> {
+    private source: T;
 
-    register(module: ModuleExport): void {
-        this.modules.set(module.getName(), module);
+    constructor(source: T) {
+        this.source = source;
     }
 
-    get(name: string): ModuleExport | undefined {
-        return this.modules.get(name);
+    getSource(): T {
+        return this.source;
     }
 
-    has(name: string): boolean {
-        return this.modules.has(name);
+    get<K extends keyof T>(key: K): T[K] {
+        return this.source[key];
     }
 
-    unregister(name: string): boolean {
-        return this.modules.delete(name);
+    set<K extends keyof T>(key: K, value: T[K]): void {
+        this.source[key] = value;
     }
 
-    list(): string[] {
-        return Array.from(this.modules.keys());
+    keys(): (keyof T)[] {
+        return Object.keys(this.source) as (keyof T)[];
     }
 }
 "#;
@@ -37821,103 +37635,124 @@ class ModuleRegistry {
 
     let output = printer.get_output().to_string();
 
-    // ModuleExport class should be ES5 constructor
+    // Classes should be converted
     assert!(
-        output.contains("function ModuleExport"),
-        "Expected ES5 ModuleExport class: {}",
+        output.contains("PersonAccessors") && output.contains("PropertyMapper"),
+        "Expected basic as clause classes: {}",
         output
     );
 
-    // ModuleRegistry class should be ES5 constructor
+    // PersonAccessors methods
     assert!(
-        output.contains("function ModuleRegistry"),
-        "Expected ES5 ModuleRegistry class: {}",
+        output.contains("getName") && output.contains("setName") && output.contains("getAge") && output.contains("setAge"),
+        "Expected PersonAccessors methods: {}",
         output
     );
 
-    // Methods should exist
+    // PropertyMapper methods
     assert!(
-        output.contains("getName") && output.contains("getVersion") && output.contains("getFullName"),
-        "Expected ModuleExport methods: {}",
+        output.contains("getSource") && output.contains("get") && output.contains("set") && output.contains("keys"),
+        "Expected PropertyMapper methods: {}",
         output
     );
 
-    // Registry methods
+    // Type aliases and interface should be stripped
     assert!(
-        output.contains("register") && output.contains(".get") && output.contains(".has"),
-        "Expected ModuleRegistry methods: {}",
+        !output.contains("type Getters") && !output.contains("type Setters") && !output.contains("interface Person"),
+        "Expected type aliases to be stripped: {}",
         output
     );
 }
 
-/// Test /// <reference lib="..."> directive
 #[test]
-fn test_class_es5_triple_slash_reference_lib() {
+fn test_class_es5_key_remapping_template_literal() {
     let source = r#"
-/// <reference lib="es2015" />
-/// <reference lib="dom" />
+// Template literal key remapping
+type EventHandlers<T> = {
+    [K in keyof T as `on${Capitalize<string & K>}Change`]: (newValue: T[K], oldValue: T[K]) => void;
+};
 
-class DOMHelper {
-    private element: any;
+type PrefixedKeys<T, P extends string> = {
+    [K in keyof T as `${P}_${string & K}`]: T[K];
+};
 
-    constructor(selector: string) {
-        self.element = { selector };
+type SuffixedKeys<T, S extends string> = {
+    [K in keyof T as `${string & K}_${S}`]: T[K];
+};
+
+class EventEmitter<T extends object> {
+    private state: T;
+    private handlers: Map<string, Function[]> = new Map();
+
+    constructor(initialState: T) {
+        this.state = initialState;
     }
 
-    getSelector(): string {
-        return this.element.selector;
+    getState(): T {
+        return { ...this.state };
     }
-
-    addClass(className: string): void {
-        // Would add class to element
-    }
-
-    removeClass(className: string): void {
-        // Would remove class from element
-    }
-
-    toggleClass(className: string): void {
-        // Would toggle class on element
-    }
-
-    setAttribute(name: string, value: string): void {
-        // Would set attribute
-    }
-
-    getAttribute(name: string): string | null {
-        return null;
-    }
-}
-
-class EventHelper {
-    private listeners: Map<string, Function[]> = new Map();
 
     on(event: string, handler: Function): void {
-        if (!this.listeners.has(event)) {
-            this.listeners.set(event, []);
+        if (!this.handlers.has(event)) {
+            this.handlers.set(event, []);
         }
-        this.listeners.get(event)!.push(handler);
+        this.handlers.get(event)!.push(handler);
     }
 
     off(event: string, handler: Function): void {
-        const handlers = this.listeners.get(event);
+        const handlers = this.handlers.get(event);
         if (handlers) {
             const index = handlers.indexOf(handler);
-            if (index !== -1) {
+            if (index >= 0) {
                 handlers.splice(index, 1);
             }
         }
     }
 
-    trigger(event: string, ...args: any[]): void {
-        const handlers = this.listeners.get(event);
+    emit(event: string, ...args: unknown[]): void {
+        const handlers = this.handlers.get(event);
         if (handlers) {
             handlers.forEach(h => h(...args));
         }
     }
 
+    update<K extends keyof T>(key: K, value: T[K]): void {
+        const oldValue = this.state[key];
+        this.state[key] = value;
+        this.emit("on" + String(key) + "Change", value, oldValue);
+    }
+}
+
+class PrefixedStorage<T extends object> {
+    private prefix: string;
+    private data: Map<string, unknown> = new Map();
+
+    constructor(prefix: string) {
+        this.prefix = prefix;
+    }
+
+    getPrefix(): string {
+        return this.prefix;
+    }
+
+    set<K extends keyof T>(key: K, value: T[K]): void {
+        this.data.set(this.prefix + "_" + String(key), value);
+    }
+
+    get<K extends keyof T>(key: K): T[K] | undefined {
+        return this.data.get(this.prefix + "_" + String(key)) as T[K] | undefined;
+    }
+
+    has<K extends keyof T>(key: K): boolean {
+        return this.data.has(this.prefix + "_" + String(key));
+    }
+
+    delete<K extends keyof T>(key: K): boolean {
+        return this.data.delete(this.prefix + "_" + String(key));
+    }
+
     clear(): void {
-        this.listeners.clear();
+        this.data.clear();
     }
 }
 "#;
@@ -37937,308 +37772,140 @@ class EventHelper {
 
     let output = printer.get_output().to_string();
 
-    // DOMHelper class should be ES5 constructor
+    // Classes should be converted
     assert!(
-        output.contains("function DOMHelper"),
-        "Expected ES5 DOMHelper class: {}",
+        output.contains("EventEmitter") && output.contains("PrefixedStorage"),
+        "Expected template literal key remapping classes: {}",
         output
     );
 
-    // EventHelper class should be ES5 constructor
+    // EventEmitter methods
     assert!(
-        output.contains("function EventHelper"),
-        "Expected ES5 EventHelper class: {}",
+        output.contains("getState") && output.contains("on") && output.contains("off") && output.contains("emit") && output.contains("update"),
+        "Expected EventEmitter methods: {}",
         output
     );
 
-    // DOMHelper methods
+    // PrefixedStorage methods
     assert!(
-        output.contains("addClass") && output.contains("removeClass") && output.contains("toggleClass"),
-        "Expected DOMHelper methods: {}",
+        output.contains("getPrefix") && output.contains("set") && output.contains("get") && output.contains("has") && output.contains("delete"),
+        "Expected PrefixedStorage methods: {}",
         output
     );
 
-    // EventHelper methods
+    // Type aliases should be stripped
     assert!(
-        output.contains(".on") && output.contains(".off") && output.contains("trigger"),
-        "Expected EventHelper methods: {}",
+        !output.contains("type EventHandlers") && !output.contains("type PrefixedKeys") && !output.contains("type SuffixedKeys"),
+        "Expected type aliases to be stripped: {}",
         output
     );
 }
 
-/// Test multiple triple-slash directives in a file
 #[test]
-fn test_class_es5_triple_slash_multiple_directives() {
+fn test_class_es5_key_remapping_conditional_as() {
     let source = r#"
-/// <reference path="./interfaces.d.ts" />
-/// <reference path="./utils.d.ts" />
-/// <reference types="node" />
-/// <reference lib="es2015" />
-/// <amd-module name="ComplexModule" />
+// Conditional as clause
+type OnlyStrings<T> = {
+    [K in keyof T as T[K] extends string ? K : never]: T[K];
+};
 
-class ConfigLoader {
-    private config: Record<string, any> = {};
-    private loaded: boolean = false;
+type OnlyNumbers<T> = {
+    [K in keyof T as T[K] extends number ? K : never]: T[K];
+};
 
-    async load(path: string): Promise<void> {
-        this.config = { path, loaded: true };
-        this.loaded = true;
-    }
+type OnlyFunctions<T> = {
+    [K in keyof T as T[K] extends Function ? K : never]: T[K];
+};
 
-    get<T>(key: string): T | undefined {
-        return this.config[key] as T;
-    }
-
-    set(key: string, value: any): void {
-        this.config[key] = value;
-    }
-
-    has(key: string): boolean {
-        return key in this.config;
-    }
-
-    isLoaded(): boolean {
-        return this.loaded;
-    }
-
-    getAll(): Record<string, any> {
-        return { ...this.config };
-    }
+interface MixedData {
+    name: string;
+    age: number;
+    active: boolean;
+    greet: () => string;
+    calculate: (x: number) => number;
 }
 
-class EnvironmentConfig extends ConfigLoader {
-    private env: string;
+class StringFieldsHandler<T extends object> {
+    private data: T;
 
-    constructor(env: string = "development") {
-        super();
-        this.env = env;
-    }
-
-    getEnvironment(): string {
-        return this.env;
-    }
-
-    isDevelopment(): boolean {
-        return this.env === "development";
-    }
-
-    isProduction(): boolean {
-        return this.env === "production";
-    }
-
-    async loadForEnv(): Promise<void> {
-        await this.load("./config/" + this.env + ".json");
-    }
-}
-
-class SecureConfig extends EnvironmentConfig {
-    private secrets: Map<string, string> = new Map();
-
-    setSecret(key: string, value: string): void {
-        this.secrets.set(key, value);
-    }
-
-    getSecret(key: string): string | undefined {
-        return this.secrets.get(key);
-    }
-
-    hasSecret(key: string): boolean {
-        return this.secrets.has(key);
-    }
-
-    clearSecrets(): void {
-        this.secrets.clear();
-    }
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // ConfigLoader class should be ES5 constructor
-    assert!(
-        output.contains("function ConfigLoader"),
-        "Expected ES5 ConfigLoader class: {}",
-        output
-    );
-
-    // EnvironmentConfig class should be ES5 constructor
-    assert!(
-        output.contains("function EnvironmentConfig"),
-        "Expected ES5 EnvironmentConfig class: {}",
-        output
-    );
-
-    // SecureConfig class should be ES5 constructor
-    assert!(
-        output.contains("function SecureConfig"),
-        "Expected ES5 SecureConfig class: {}",
-        output
-    );
-
-    // ConfigLoader methods
-    assert!(
-        output.contains("load") && output.contains(".get") && output.contains(".set"),
-        "Expected ConfigLoader methods: {}",
-        output
-    );
-
-    // EnvironmentConfig methods
-    assert!(
-        output.contains("getEnvironment") && output.contains("isDevelopment") && output.contains("isProduction"),
-        "Expected EnvironmentConfig methods: {}",
-        output
-    );
-
-    // SecureConfig methods
-    assert!(
-        output.contains("setSecret") && output.contains("getSecret") && output.contains("clearSecrets"),
-        "Expected SecureConfig methods: {}",
-        output
-    );
-}
-
-/// Test combined triple-slash directives with complex class patterns
-#[test]
-fn test_class_es5_triple_slash_combined_patterns() {
-    let source = r#"
-/// <reference path="./base.d.ts" />
-/// <reference types="lodash" />
-/// <reference lib="es2015.collection" />
-
-interface Disposable {
-    dispose(): void;
-}
-
-interface Serializable {
-    toJSON(): string;
-    fromJSON(json: string): void;
-}
-
-class Resource implements Disposable, Serializable {
-    private id: string;
-    private data: any;
-    private disposed: boolean = false;
-
-    constructor(id: string, data: any = null) {
-        this.id = id;
+    constructor(data: T) {
         this.data = data;
     }
 
-    getId(): string {
-        return this.id;
-    }
-
-    getData(): any {
+    getData(): T {
         return this.data;
     }
 
-    setData(data: any): void {
-        if (!this.disposed) {
-            this.data = data;
+    getStringFields(): string[] {
+        return Object.entries(this.data)
+            .filter(([_, value]) => typeof value === "string")
+            .map(([key, _]) => key);
+    }
+
+    getStringValue(key: string): string | undefined {
+        const value = (this.data as Record<string, unknown>)[key];
+        return typeof value === "string" ? value : undefined;
+    }
+
+    setStringValue(key: string, value: string): void {
+        if (typeof (this.data as Record<string, unknown>)[key] === "string") {
+            (this.data as Record<string, unknown>)[key] = value;
         }
-    }
-
-    isDisposed(): boolean {
-        return this.disposed;
-    }
-
-    dispose(): void {
-        this.data = null;
-        this.disposed = true;
-    }
-
-    toJSON(): string {
-        return JSON.stringify({ id: this.id, data: this.data });
-    }
-
-    fromJSON(json: string): void {
-        const parsed = JSON.parse(json);
-        this.id = parsed.id;
-        this.data = parsed.data;
     }
 }
 
-class ResourcePool {
-    private resources: Map<string, Resource> = new Map();
-    private maxSize: number;
+class NumberFieldsHandler<T extends object> {
+    private data: T;
 
-    constructor(maxSize: number = 100) {
-        this.maxSize = maxSize;
+    constructor(data: T) {
+        this.data = data;
     }
 
-    acquire(id: string): Resource {
-        if (this.resources.has(id)) {
-            return this.resources.get(id)!;
-        }
-        const resource = new Resource(id);
-        this.resources.set(id, resource);
-        return resource;
+    getData(): T {
+        return this.data;
     }
 
-    release(id: string): void {
-        const resource = this.resources.get(id);
-        if (resource) {
-            resource.dispose();
-            this.resources.delete(id);
-        }
+    getNumberFields(): string[] {
+        return Object.entries(this.data)
+            .filter(([_, value]) => typeof value === "number")
+            .map(([key, _]) => key);
     }
 
-    getSize(): number {
-        return this.resources.size;
+    sum(): number {
+        return Object.values(this.data)
+            .filter((value): value is number => typeof value === "number")
+            .reduce((acc, val) => acc + val, 0);
     }
 
-    getMaxSize(): number {
-        return this.maxSize;
-    }
-
-    isFull(): boolean {
-        return this.resources.size >= this.maxSize;
-    }
-
-    clear(): void {
-        this.resources.forEach(r => r.dispose());
-        this.resources.clear();
+    average(): number {
+        const numbers = Object.values(this.data).filter((value): value is number => typeof value === "number");
+        return numbers.length > 0 ? numbers.reduce((acc, val) => acc + val, 0) / numbers.length : 0;
     }
 }
 
-class ManagedResourcePool extends ResourcePool {
-    private cleanupInterval: number;
-    private lastCleanup: Date;
+class FunctionFieldsHandler<T extends object> {
+    private data: T;
 
-    constructor(maxSize: number = 100, cleanupInterval: number = 60000) {
-        super(maxSize);
-        this.cleanupInterval = cleanupInterval;
-        this.lastCleanup = new Date();
+    constructor(data: T) {
+        this.data = data;
     }
 
-    getCleanupInterval(): number {
-        return this.cleanupInterval;
+    getData(): T {
+        return this.data;
     }
 
-    getLastCleanup(): Date {
-        return this.lastCleanup;
+    getFunctionFields(): string[] {
+        return Object.entries(this.data)
+            .filter(([_, value]) => typeof value === "function")
+            .map(([key, _]) => key);
     }
 
-    cleanup(): void {
-        this.lastCleanup = new Date();
-        // Would clean up expired resources
-    }
-
-    setCleanupInterval(interval: number): void {
-        this.cleanupInterval = interval;
+    invoke(key: string, ...args: unknown[]): unknown {
+        const fn = (this.data as Record<string, unknown>)[key];
+        if (typeof fn === "function") {
+            return fn(...args);
+        }
+        return undefined;
     }
 }
 "#;
@@ -38258,52 +37925,581 @@ class ManagedResourcePool extends ResourcePool {
 
     let output = printer.get_output().to_string();
 
-    // Resource class should be ES5 constructor
+    // Classes should be converted
     assert!(
-        output.contains("function Resource"),
-        "Expected ES5 Resource class: {}",
+        output.contains("StringFieldsHandler") && output.contains("NumberFieldsHandler") && output.contains("FunctionFieldsHandler"),
+        "Expected conditional as clause classes: {}",
         output
     );
 
-    // ResourcePool class should be ES5 constructor
+    // StringFieldsHandler methods
     assert!(
-        output.contains("function ResourcePool"),
-        "Expected ES5 ResourcePool class: {}",
+        output.contains("getStringFields") && output.contains("getStringValue") && output.contains("setStringValue"),
+        "Expected StringFieldsHandler methods: {}",
         output
     );
 
-    // ManagedResourcePool class should be ES5 constructor
+    // NumberFieldsHandler methods
     assert!(
-        output.contains("function ManagedResourcePool"),
-        "Expected ES5 ManagedResourcePool class: {}",
+        output.contains("getNumberFields") && output.contains("sum") && output.contains("average"),
+        "Expected NumberFieldsHandler methods: {}",
         output
     );
 
-    // Resource methods (including interface implementations)
+    // FunctionFieldsHandler methods
     assert!(
-        output.contains("dispose") && output.contains("toJSON") && output.contains("fromJSON"),
-        "Expected Resource interface methods: {}",
+        output.contains("getFunctionFields") && output.contains("invoke"),
+        "Expected FunctionFieldsHandler methods: {}",
         output
     );
 
-    // ResourcePool methods
+    // Type aliases and interface should be stripped
     assert!(
-        output.contains("acquire") && output.contains("release") && output.contains("isFull"),
-        "Expected ResourcePool methods: {}",
+        !output.contains("type OnlyStrings") && !output.contains("type OnlyNumbers") && !output.contains("interface MixedData"),
+        "Expected type aliases to be stripped: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_key_remapping_nested() {
+    let source = r#"
+// Nested key remapping
+type DeepGetters<T> = {
+    [K in keyof T as `get${Capitalize<string & K>}`]: T[K] extends object
+        ? () => DeepGetters<T[K]>
+        : () => T[K];
+};
+
+type NestedKeys<T, Prefix extends string = ""> = {
+    [K in keyof T as `${Prefix}${Prefix extends "" ? "" : "."}${string & K}`]: T[K] extends object
+        ? NestedKeys<T[K], `${Prefix}${Prefix extends "" ? "" : "."}${string & K}`>
+        : T[K];
+};
+
+interface NestedConfig {
+    database: {
+        host: string;
+        port: number;
+    };
+    server: {
+        host: string;
+        port: number;
+    };
+}
+
+class NestedConfigHandler {
+    private config: NestedConfig;
+
+    constructor(config: NestedConfig) {
+        this.config = config;
+    }
+
+    getConfig(): NestedConfig {
+        return this.config;
+    }
+
+    getDatabaseHost(): string {
+        return this.config.database.host;
+    }
+
+    getDatabasePort(): number {
+        return this.config.database.port;
+    }
+
+    getServerHost(): string {
+        return this.config.server.host;
+    }
+
+    getServerPort(): number {
+        return this.config.server.port;
+    }
+
+    setDatabaseHost(host: string): void {
+        this.config.database.host = host;
+    }
+
+    setDatabasePort(port: number): void {
+        this.config.database.port = port;
+    }
+
+    setServerHost(host: string): void {
+        this.config.server.host = host;
+    }
+
+    setServerPort(port: number): void {
+        this.config.server.port = port;
+    }
+}
+
+class DeepPropertyAccessor<T extends object> {
+    private data: T;
+
+    constructor(data: T) {
+        this.data = data;
+    }
+
+    getData(): T {
+        return this.data;
+    }
+
+    getByPath(path: string): unknown {
+        const keys = path.split(".");
+        let current: unknown = this.data;
+        for (const key of keys) {
+            if (current === null || current === undefined) {
+                return undefined;
+            }
+            current = (current as Record<string, unknown>)[key];
+        }
+        return current;
+    }
+
+    setByPath(path: string, value: unknown): void {
+        const keys = path.split(".");
+        let current: unknown = this.data;
+        for (let i = 0; i < keys.length - 1; i++) {
+            if (current === null || current === undefined) {
+                return;
+            }
+            current = (current as Record<string, unknown>)[keys[i]];
+        }
+        if (current !== null && current !== undefined) {
+            (current as Record<string, unknown>)[keys[keys.length - 1]] = value;
+        }
+    }
+
+    hasPath(path: string): boolean {
+        return this.getByPath(path) !== undefined;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("NestedConfigHandler") && output.contains("DeepPropertyAccessor"),
+        "Expected nested key remapping classes: {}",
         output
     );
 
-    // ManagedResourcePool methods
+    // NestedConfigHandler methods
     assert!(
-        output.contains("cleanup") && output.contains("getCleanupInterval") && output.contains("setCleanupInterval"),
-        "Expected ManagedResourcePool methods: {}",
+        output.contains("getDatabaseHost") && output.contains("getDatabasePort") && output.contains("getServerHost") && output.contains("getServerPort"),
+        "Expected NestedConfigHandler methods: {}",
         output
     );
 
-    // Interfaces should be stripped
+    // DeepPropertyAccessor methods
     assert!(
-        !output.contains("interface Disposable") && !output.contains("interface Serializable"),
-        "Expected interfaces to be stripped: {}",
+        output.contains("getByPath") && output.contains("setByPath") && output.contains("hasPath"),
+        "Expected DeepPropertyAccessor methods: {}",
+        output
+    );
+
+    // Type aliases and interface should be stripped
+    assert!(
+        !output.contains("type DeepGetters") && !output.contains("type NestedKeys") && !output.contains("interface NestedConfig"),
+        "Expected type aliases to be stripped: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_key_remapping_filtering() {
+    let source = r#"
+// Key filtering with as
+type ExcludeKeys<T, K extends keyof T> = {
+    [P in keyof T as P extends K ? never : P]: T[P];
+};
+
+type IncludeKeys<T, K extends keyof T> = {
+    [P in keyof T as P extends K ? P : never]: T[P];
+};
+
+type OmitByType<T, U> = {
+    [K in keyof T as T[K] extends U ? never : K]: T[K];
+};
+
+type PickByType<T, U> = {
+    [K in keyof T as T[K] extends U ? K : never]: T[K];
+};
+
+interface FullUser {
+    id: number;
+    name: string;
+    email: string;
+    password: string;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+class PublicUserView {
+    private user: FullUser;
+
+    constructor(user: FullUser) {
+        this.user = user;
+    }
+
+    getId(): number {
+        return this.user.id;
+    }
+
+    getName(): string {
+        return this.user.name;
+    }
+
+    getEmail(): string {
+        return this.user.email;
+    }
+
+    getCreatedAt(): Date {
+        return this.user.createdAt;
+    }
+
+    toJSON(): object {
+        return {
+            id: this.user.id,
+            name: this.user.name,
+            email: this.user.email,
+            createdAt: this.user.createdAt
+        };
+    }
+}
+
+class FilteredDataHandler<T extends object> {
+    private data: T;
+    private excludedKeys: Set<string>;
+
+    constructor(data: T, excludedKeys: string[] = []) {
+        this.data = data;
+        this.excludedKeys = new Set(excludedKeys);
+    }
+
+    getData(): T {
+        return this.data;
+    }
+
+    getFiltered(): Partial<T> {
+        const result: Partial<T> = {};
+        for (const key of Object.keys(this.data) as (keyof T)[]) {
+            if (!this.excludedKeys.has(key as string)) {
+                result[key] = this.data[key];
+            }
+        }
+        return result;
+    }
+
+    exclude(key: string): void {
+        this.excludedKeys.add(key);
+    }
+
+    include(key: string): void {
+        this.excludedKeys.delete(key);
+    }
+
+    isExcluded(key: string): boolean {
+        return this.excludedKeys.has(key);
+    }
+
+    getExcludedKeys(): string[] {
+        return Array.from(this.excludedKeys);
+    }
+}
+
+class TypeFilteredHandler<T extends object> {
+    private data: T;
+
+    constructor(data: T) {
+        this.data = data;
+    }
+
+    getData(): T {
+        return this.data;
+    }
+
+    pickByType<U>(typeChecker: (value: unknown) => value is U): Record<string, U> {
+        const result: Record<string, U> = {};
+        for (const [key, value] of Object.entries(this.data)) {
+            if (typeChecker(value)) {
+                result[key] = value;
+            }
+        }
+        return result;
+    }
+
+    omitByType<U>(typeChecker: (value: unknown) => value is U): Record<string, unknown> {
+        const result: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(this.data)) {
+            if (!typeChecker(value)) {
+                result[key] = value;
+            }
+        }
+        return result;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("PublicUserView") && output.contains("FilteredDataHandler") && output.contains("TypeFilteredHandler"),
+        "Expected key filtering classes: {}",
+        output
+    );
+
+    // PublicUserView methods
+    assert!(
+        output.contains("getId") && output.contains("getName") && output.contains("getEmail") && output.contains("toJSON"),
+        "Expected PublicUserView methods: {}",
+        output
+    );
+
+    // FilteredDataHandler methods
+    assert!(
+        output.contains("getFiltered") && output.contains("exclude") && output.contains("include") && output.contains("isExcluded"),
+        "Expected FilteredDataHandler methods: {}",
+        output
+    );
+
+    // TypeFilteredHandler methods
+    assert!(
+        output.contains("pickByType") && output.contains("omitByType"),
+        "Expected TypeFilteredHandler methods: {}",
+        output
+    );
+
+    // Type aliases and interface should be stripped
+    assert!(
+        !output.contains("type ExcludeKeys") && !output.contains("type PickByType") && !output.contains("interface FullUser"),
+        "Expected type aliases to be stripped: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_key_remapping_combined() {
+    let source = r#"
+// Combined key remapping patterns
+type AsyncMethods<T> = {
+    [K in keyof T as T[K] extends (...args: infer A) => infer R
+        ? `${string & K}Async`
+        : never]: T[K] extends (...args: infer A) => infer R
+        ? (...args: A) => Promise<R>
+        : never;
+};
+
+type ObservableProps<T> = {
+    [K in keyof T as T[K] extends Function ? never : `${string & K}$`]: {
+        subscribe: (callback: (value: T[K]) => void) => () => void;
+        getValue: () => T[K];
+    };
+};
+
+type ValidatedFields<T> = {
+    [K in keyof T as `validate${Capitalize<string & K>}`]: (value: T[K]) => boolean;
+} & {
+    [K in keyof T as `${string & K}Error`]: string | null;
+};
+
+class AsyncWrapper<T extends object> {
+    private target: T;
+
+    constructor(target: T) {
+        this.target = target;
+    }
+
+    getTarget(): T {
+        return this.target;
+    }
+
+    async callAsync<K extends keyof T>(
+        method: K,
+        ...args: T[K] extends (...args: infer A) => unknown ? A : never[]
+    ): Promise<T[K] extends (...args: unknown[]) => infer R ? R : never> {
+        const fn = this.target[method];
+        if (typeof fn === "function") {
+            return Promise.resolve(fn.apply(this.target, args));
+        }
+        throw new Error("Not a function: " + String(method));
+    }
+
+    wrapMethod<K extends keyof T>(method: K): (...args: unknown[]) => Promise<unknown> {
+        return async (...args: unknown[]) => {
+            const fn = this.target[method];
+            if (typeof fn === "function") {
+                return fn.apply(this.target, args);
+            }
+            throw new Error("Not a function: " + String(method));
+        };
+    }
+}
+
+class ObservableState<T extends object> {
+    private state: T;
+    private subscribers: Map<keyof T, Set<(value: unknown) => void>> = new Map();
+
+    constructor(initialState: T) {
+        this.state = initialState;
+    }
+
+    getState(): T {
+        return { ...this.state };
+    }
+
+    getValue<K extends keyof T>(key: K): T[K] {
+        return this.state[key];
+    }
+
+    setValue<K extends keyof T>(key: K, value: T[K]): void {
+        this.state[key] = value;
+        this.notify(key, value);
+    }
+
+    subscribe<K extends keyof T>(key: K, callback: (value: T[K]) => void): () => void {
+        if (!this.subscribers.has(key)) {
+            this.subscribers.set(key, new Set());
+        }
+        this.subscribers.get(key)!.add(callback as (value: unknown) => void);
+        return () => {
+            this.subscribers.get(key)?.delete(callback as (value: unknown) => void);
+        };
+    }
+
+    private notify<K extends keyof T>(key: K, value: T[K]): void {
+        const callbacks = this.subscribers.get(key);
+        if (callbacks) {
+            callbacks.forEach(cb => cb(value));
+        }
+    }
+}
+
+class FormValidator<T extends object> {
+    private data: T;
+    private errors: Map<keyof T, string | null> = new Map();
+    private validators: Map<keyof T, (value: unknown) => boolean> = new Map();
+
+    constructor(data: T) {
+        this.data = data;
+    }
+
+    getData(): T {
+        return this.data;
+    }
+
+    addValidator<K extends keyof T>(field: K, validator: (value: T[K]) => boolean): void {
+        this.validators.set(field, validator as (value: unknown) => boolean);
+    }
+
+    validate<K extends keyof T>(field: K): boolean {
+        const validator = this.validators.get(field);
+        if (validator) {
+            const isValid = validator(this.data[field]);
+            this.errors.set(field, isValid ? null : "Validation failed for " + String(field));
+            return isValid;
+        }
+        return true;
+    }
+
+    validateAll(): boolean {
+        let allValid = true;
+        for (const field of Object.keys(this.data) as (keyof T)[]) {
+            if (!this.validate(field)) {
+                allValid = false;
+            }
+        }
+        return allValid;
+    }
+
+    getError<K extends keyof T>(field: K): string | null {
+        return this.errors.get(field) ?? null;
+    }
+
+    getAllErrors(): Record<string, string | null> {
+        const result: Record<string, string | null> = {};
+        for (const [key, value] of this.errors) {
+            result[key as string] = value;
+        }
+        return result;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("AsyncWrapper") && output.contains("ObservableState") && output.contains("FormValidator"),
+        "Expected combined key remapping classes: {}",
+        output
+    );
+
+    // AsyncWrapper methods
+    assert!(
+        output.contains("getTarget") && output.contains("callAsync") && output.contains("wrapMethod"),
+        "Expected AsyncWrapper methods: {}",
+        output
+    );
+
+    // ObservableState methods
+    assert!(
+        output.contains("getState") && output.contains("getValue") && output.contains("setValue") && output.contains("subscribe"),
+        "Expected ObservableState methods: {}",
+        output
+    );
+
+    // FormValidator methods
+    assert!(
+        output.contains("addValidator") && output.contains("validate") && output.contains("validateAll") && output.contains("getError"),
+        "Expected FormValidator methods: {}",
+        output
+    );
+
+    // Type aliases should be stripped
+    assert!(
+        !output.contains("type AsyncMethods") && !output.contains("type ObservableProps") && !output.contains("type ValidatedFields"),
+        "Expected type aliases to be stripped: {}",
         output
     );
 }
