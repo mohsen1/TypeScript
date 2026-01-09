@@ -30573,3 +30573,358 @@ export class LocaleManager {
         output
     );
 }
+
+// ============================================================================
+// DECORATOR METADATA PATTERN TESTS
+// ============================================================================
+
+/// Test ES5 class downleveling with reflect metadata patterns
+#[test]
+fn test_class_es5_decorator_metadata_reflect() {
+    let source = r#"
+import "reflect-metadata";
+
+function Injectable(): ClassDecorator {
+    return function(target: Function) {
+        Reflect.defineMetadata("injectable", true, target);
+    };
+}
+
+function Inject(token: string): ParameterDecorator {
+    return function(target: Object, propertyKey: string | symbol | undefined, parameterIndex: number) {
+        const existingInjections = Reflect.getMetadata("injections", target) || [];
+        existingInjections.push({ index: parameterIndex, token });
+        Reflect.defineMetadata("injections", existingInjections, target);
+    };
+}
+
+@Injectable()
+class UserService {
+    private apiUrl: string;
+
+    constructor(@Inject("API_URL") apiUrl: string) {
+        this.apiUrl = apiUrl;
+    }
+
+    getUsers(): Promise<User[]> {
+        return fetch(this.apiUrl + "/users").then(r => r.json());
+    }
+}
+
+@Injectable()
+class AuthService {
+    constructor(
+        @Inject("UserService") private userService: UserService,
+        @Inject("SECRET_KEY") private secretKey: string
+    ) {}
+
+    authenticate(token: string): boolean {
+        const metadata = Reflect.getMetadata("injectable", UserService);
+        return metadata === true;
+    }
+}
+
+class Container {
+    private services: Map<string, any> = new Map();
+
+    register<T>(token: string, instance: T): void {
+        this.services.set(token, instance);
+    }
+
+    resolve<T>(target: new (...args: any[]) => T): T {
+        const injections = Reflect.getMetadata("injections", target) || [];
+        const args = injections.map((inj: any) => this.services.get(inj.token));
+        return new target(...args);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("UserService") && output.contains("AuthService") && output.contains("Container"),
+        "Expected reflect metadata classes: {}",
+        output
+    );
+
+    // Methods should be preserved
+    assert!(
+        output.contains("getUsers") && output.contains("authenticate") && output.contains("resolve"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Decorator functions should be present
+    assert!(
+        output.contains("Injectable") && output.contains("Inject"),
+        "Expected decorator functions: {}",
+        output
+    );
+}
+
+/// Test ES5 class downleveling with design type metadata patterns
+#[test]
+fn test_class_es5_decorator_metadata_design_types() {
+    let source = r#"
+import "reflect-metadata";
+
+function LogType(): PropertyDecorator {
+    return function(target: Object, propertyKey: string | symbol) {
+        const type = Reflect.getMetadata("design:type", target, propertyKey);
+        console.log("Property type:", type?.name);
+    };
+}
+
+function LogParams(): MethodDecorator {
+    return function(target: Object, propertyKey: string | symbol, descriptor: PropertyDescriptor) {
+        const paramTypes = Reflect.getMetadata("design:paramtypes", target, propertyKey);
+        console.log("Parameter types:", paramTypes?.map((t: any) => t.name));
+    };
+}
+
+function LogReturn(): MethodDecorator {
+    return function(target: Object, propertyKey: string | symbol, descriptor: PropertyDescriptor) {
+        const returnType = Reflect.getMetadata("design:returntype", target, propertyKey);
+        console.log("Return type:", returnType?.name);
+    };
+}
+
+class User {
+    @LogType()
+    name: string;
+
+    @LogType()
+    age: number;
+
+    @LogType()
+    active: boolean;
+
+    constructor(name: string, age: number) {
+        this.name = name;
+        this.age = age;
+        this.active = true;
+    }
+}
+
+class Calculator {
+    @LogParams()
+    @LogReturn()
+    add(a: number, b: number): number {
+        return a + b;
+    }
+
+    @LogParams()
+    @LogReturn()
+    concat(items: string[]): string {
+        return items.join("");
+    }
+
+    @LogParams()
+    multiply(a: number, b: number, c?: number): number {
+        return a * b * (c || 1);
+    }
+}
+
+class TypeRegistry {
+    private types: Map<string, Function> = new Map();
+
+    registerType(key: string, target: Object, propertyKey: string): void {
+        const type = Reflect.getMetadata("design:type", target, propertyKey);
+        if (type) {
+            this.types.set(key, type);
+        }
+    }
+
+    getType(key: string): Function | undefined {
+        return this.types.get(key);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("User") && output.contains("Calculator") && output.contains("TypeRegistry"),
+        "Expected design type metadata classes: {}",
+        output
+    );
+
+    // Methods should be preserved
+    assert!(
+        output.contains("add") && output.contains("concat") && output.contains("multiply"),
+        "Expected Calculator methods: {}",
+        output
+    );
+
+    // Decorator functions should be present
+    assert!(
+        output.contains("LogType") && output.contains("LogParams") && output.contains("LogReturn"),
+        "Expected decorator functions: {}",
+        output
+    );
+}
+
+/// Test ES5 class downleveling with parameter metadata patterns
+#[test]
+fn test_class_es5_decorator_metadata_parameter() {
+    let source = r#"
+import "reflect-metadata";
+
+const PARAM_METADATA_KEY = Symbol("paramMetadata");
+
+// Decorator factory functions that store parameter metadata
+function createParamDecorator(key: string) {
+    return function(target: Object, propertyKey: string | symbol | undefined, parameterIndex: number) {
+        const existing: number[] = Reflect.getMetadata(key, target, propertyKey as string) || [];
+        existing.push(parameterIndex);
+        Reflect.defineMetadata(key, existing, target, propertyKey as string);
+    };
+}
+
+function createValidatorDecorator(validator: Function) {
+    return function(target: Object, propertyKey: string | symbol | undefined, parameterIndex: number) {
+        const validators: Map<number, Function> = Reflect.getMetadata("validators", target, propertyKey as string) || new Map();
+        validators.set(parameterIndex, validator);
+        Reflect.defineMetadata("validators", validators, target, propertyKey as string);
+    };
+}
+
+class UserController {
+    createUser(name: string, email: string, age?: number): void {
+        console.log("Creating user:", name, email, age);
+    }
+
+    updateUser(id: string, name?: string, email?: string): void {
+        console.log("Updating user:", id, name, email);
+    }
+
+    validateInput(input: string, count: number): boolean {
+        return true;
+    }
+}
+
+class ValidationService {
+    validate(target: Object, methodName: string, args: any[]): boolean {
+        const required: number[] = Reflect.getMetadata("required", target, methodName) || [];
+        const validators: Map<number, Function> = Reflect.getMetadata("validators", target, methodName) || new Map();
+
+        for (const index of required) {
+            if (args[index] === undefined || args[index] === null) {
+                return false;
+            }
+        }
+
+        for (const [index, validator] of validators) {
+            if (!validator(args[index])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    getParameterMetadata(target: Object, methodName: string): object {
+        return {
+            required: Reflect.getMetadata("required", target, methodName) || [],
+            optional: Reflect.getMetadata("optional", target, methodName) || [],
+            validators: Reflect.getMetadata("validators", target, methodName) || new Map()
+        };
+    }
+}
+
+class MetadataReader {
+    readParamTypes(target: Object, methodName: string): Function[] {
+        return Reflect.getMetadata("design:paramtypes", target, methodName) || [];
+    }
+
+    readReturnType(target: Object, methodName: string): Function {
+        return Reflect.getMetadata("design:returntype", target, methodName);
+    }
+
+    readAllMetadata(target: Object, methodName: string): object {
+        return {
+            paramTypes: this.readParamTypes(target, methodName),
+            returnType: this.readReturnType(target, methodName)
+        };
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("UserController") && output.contains("ValidationService") && output.contains("MetadataReader"),
+        "Expected parameter metadata classes: {}",
+        output
+    );
+
+    // UserController methods should be preserved
+    assert!(
+        output.contains("createUser") && output.contains("updateUser") && output.contains("validateInput"),
+        "Expected UserController methods: {}",
+        output
+    );
+
+    // ValidationService methods should be preserved
+    assert!(
+        output.contains("validate") && output.contains("getParameterMetadata"),
+        "Expected ValidationService methods: {}",
+        output
+    );
+
+    // MetadataReader methods should be preserved
+    assert!(
+        output.contains("readParamTypes") && output.contains("readReturnType") && output.contains("readAllMetadata"),
+        "Expected MetadataReader methods: {}",
+        output
+    );
+
+    // Decorator factory functions should be present
+    assert!(
+        output.contains("createParamDecorator") && output.contains("createValidatorDecorator"),
+        "Expected decorator factory functions: {}",
+        output
+    );
+}
