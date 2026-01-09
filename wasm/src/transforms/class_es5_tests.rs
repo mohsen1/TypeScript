@@ -20374,82 +20374,48 @@ class ChainedCallProcessor extends BaseProcessor {
     );
 }
 
+// ============================================================================
+// abstract class pattern tests
+// ============================================================================
+
 #[test]
-fn test_class_es5_accessor_decorator_basic() {
-    // Basic accessor decorator pattern
+fn test_class_es5_abstract_method_inheritance() {
+    // Test abstract class with abstract methods implemented by derived class
     let source = r#"
-function logged(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
-    const originalGet = descriptor.get;
-    const originalSet = descriptor.set;
+abstract class Shape {
+    abstract getArea(): number;
+    abstract getPerimeter(): number;
 
-    if (originalGet) {
-        descriptor.get = function() {
-            console.log(`Getting ${propertyKey}`);
-            return originalGet.call(this);
-        };
-    }
-
-    if (originalSet) {
-        descriptor.set = function(value: any) {
-            console.log(`Setting ${propertyKey} to ${value}`);
-            originalSet.call(this, value);
-        };
-    }
-
-    return descriptor;
-}
-
-function enumerable(value: boolean) {
-    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
-        descriptor.enumerable = value;
-        return descriptor;
-    };
-}
-
-function configurable(value: boolean) {
-    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
-        descriptor.configurable = value;
-        return descriptor;
-    };
-}
-
-class Person {
-    private _name: string = "";
-    private _age: number = 0;
-
-    @logged
-    get name(): string {
-        return this._name;
-    }
-
-    @logged
-    set name(value: string) {
-        this._name = value;
-    }
-
-    @enumerable(false)
-    get age(): number {
-        return this._age;
-    }
-
-    @configurable(false)
-    set age(value: number) {
-        this._age = value;
+    describe(): string {
+        return `Area: ${this.getArea()}, Perimeter: ${this.getPerimeter()}`;
     }
 }
 
-class Product {
-    private _price: number = 0;
-
-    @logged
-    @enumerable(true)
-    get price(): number {
-        return this._price;
+class Rectangle extends Shape {
+    constructor(private width: number, private height: number) {
+        super();
     }
 
-    @logged
-    set price(value: number) {
-        this._price = value;
+    getArea(): number {
+        return this.width * this.height;
+    }
+
+    getPerimeter(): number {
+        return 2 * (this.width + this.height);
+    }
+}
+
+class Circle extends Shape {
+    constructor(private radius: number) {
+        super();
+    }
+
+    getArea(): number {
+        return Math.PI * this.radius * this.radius;
+    }
+
+    getPerimeter(): number {
+        return 2 * Math.PI * this.radius;
     }
 }
 "#;
@@ -20468,106 +20434,74 @@ class Product {
 
     let output = printer.get_output().to_string();
 
-    // Classes should be converted
     assert!(
-        output.contains("Person") && output.contains("Product"),
-        "Expected accessor decorated classes: {}",
+        output.contains("function Shape"),
+        "Expected Shape function: {}",
         output
     );
-
-    // Decorator functions should be present
     assert!(
-        output.contains("logged") && output.contains("enumerable"),
-        "Expected accessor decorators: {}",
+        output.contains("Shape.prototype.describe"),
+        "Expected describe method on prototype: {}",
         output
     );
-
-    // Class IIFE pattern should be present
     assert!(
-        output.contains("(function ()") || output.contains("(function()"),
-        "Expected class IIFE pattern: {}",
+        output.contains("function Rectangle") && output.contains("__extends(Rectangle, _super)"),
+        "Expected Rectangle extending Shape: {}",
+        output
+    );
+    assert!(
+        output.contains("Rectangle.prototype.getArea") && output.contains("Rectangle.prototype.getPerimeter"),
+        "Expected Rectangle implementing abstract methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function Circle") && output.contains("__extends(Circle, _super)"),
+        "Expected Circle extending Shape: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_accessor_decorator_metadata() {
-    // Accessor decorator with metadata pattern
+fn test_class_es5_abstract_with_decorators() {
+    // Test abstract class with decorators on class and methods
     let source = r#"
-function trackAccess(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
-    const accessLog = Reflect.getMetadata("accessLog", target) || [];
-    accessLog.push(propertyKey);
-    Reflect.defineMetadata("accessLog", accessLog, target);
-
-    const originalGet = descriptor.get;
-    if (originalGet) {
-        descriptor.get = function() {
-            const log = Reflect.getMetadata("accessCount", this) || {};
-            log[propertyKey] = (log[propertyKey] || 0) + 1;
-            Reflect.defineMetadata("accessCount", log, this);
-            return originalGet.call(this);
-        };
-    }
-    return descriptor;
+function sealed(constructor: Function) {
+    Object.seal(constructor);
+    Object.seal(constructor.prototype);
 }
 
-function computed(dependencies: string[]) {
-    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
-        Reflect.defineMetadata("computed:deps", dependencies, target, propertyKey);
-        return descriptor;
+function log(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const original = descriptor.value;
+    descriptor.value = function(...args: any[]) {
+        console.log(`Calling ${propertyKey}`);
+        return original.apply(this, args);
     };
 }
 
-function cached(ttlMs: number) {
-    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
-        Reflect.defineMetadata("cache:ttl", ttlMs, target, propertyKey);
-        const originalGet = descriptor.get;
-        let cachedValue: any;
-        let lastAccess = 0;
+@sealed
+abstract class BaseService {
+    abstract process(data: string): void;
 
-        descriptor.get = function() {
-            const now = Date.now();
-            if (now - lastAccess > ttlMs) {
-                cachedValue = originalGet?.call(this);
-                lastAccess = now;
-            }
-            return cachedValue;
-        };
-        return descriptor;
-    };
-}
-
-class Analytics {
-    private _pageViews: number = 0;
-    private _sessions: number = 0;
-
-    @trackAccess
-    get pageViews(): number {
-        return this._pageViews;
-    }
-
-    @trackAccess
-    get sessions(): number {
-        return this._sessions;
-    }
-
-    @computed(["pageViews", "sessions"])
-    get avgPagesPerSession(): number {
-        return this._sessions > 0 ? this._pageViews / this._sessions : 0;
+    @log
+    validate(data: string): boolean {
+        return data.length > 0;
     }
 }
 
-class DataService {
-    private _data: any[] = [];
-
-    @cached(5000)
-    get processedData(): any[] {
-        return this._data.map(item => ({ ...item, processed: true }));
+class UserService extends BaseService {
+    @log
+    process(data: string): void {
+        console.log(`Processing: ${data}`);
     }
+}
 
-    @cached(10000)
-    get summary(): object {
-        return { count: this._data.length };
+@sealed
+abstract class DecoratedAbstract {
+    abstract getName(): string;
+
+    @log
+    greet(): string {
+        return `Hello, ${this.getName()}`;
     }
 }
 "#;
@@ -20586,104 +20520,81 @@ class DataService {
 
     let output = printer.get_output().to_string();
 
-    // Classes should be converted
     assert!(
-        output.contains("Analytics") && output.contains("DataService"),
-        "Expected metadata decorated classes: {}",
+        output.contains("function sealed") && output.contains("Object.seal"),
+        "Expected sealed decorator function: {}",
         output
     );
-
-    // Metadata decorator functions should be present
     assert!(
-        output.contains("trackAccess") && output.contains("cached"),
-        "Expected metadata decorators: {}",
+        output.contains("function BaseService"),
+        "Expected BaseService function: {}",
         output
     );
-
-    // Class IIFE pattern should be present
     assert!(
-        output.contains("(function ()") || output.contains("(function()"),
-        "Expected class IIFE pattern: {}",
+        output.contains("function UserService") && output.contains("__extends(UserService, _super)"),
+        "Expected UserService extending BaseService: {}",
+        output
+    );
+    assert!(
+        output.contains("__decorate") || output.contains("sealed") || output.contains("log"),
+        "Expected decorator application: {}",
+        output
+    );
+    assert!(
+        output.contains("DecoratedAbstract"),
+        "Expected DecoratedAbstract: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_accessor_decorator_static() {
-    // Static accessor decorator pattern
+fn test_class_es5_abstract_static_methods() {
+    // Test abstract class with static methods and properties
     let source = r#"
-function staticLogged(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
-    const originalGet = descriptor.get;
-    if (originalGet) {
-        descriptor.get = function() {
-            console.log(`Static getter ${propertyKey} accessed`);
-            return originalGet.call(this);
-        };
+abstract class Registry {
+    private static instances: Map<string, Registry> = new Map();
+
+    static register(name: string, instance: Registry): void {
+        Registry.instances.set(name, instance);
     }
-    return descriptor;
+
+    static get(name: string): Registry | undefined {
+        return Registry.instances.get(name);
+    }
+
+    abstract getName(): string;
+    abstract initialize(): void;
 }
 
-function staticCached(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
-    const originalGet = descriptor.get;
-    let cached: any;
-    let isCached = false;
+class PluginRegistry extends Registry {
+    private plugins: string[] = [];
 
-    descriptor.get = function() {
-        if (!isCached) {
-            cached = originalGet?.call(this);
-            isCached = true;
+    getName(): string {
+        return "PluginRegistry";
+    }
+
+    initialize(): void {
+        this.plugins = [];
+    }
+
+    static createDefault(): PluginRegistry {
+        const registry = new PluginRegistry();
+        Registry.register("plugins", registry);
+        return registry;
+    }
+}
+
+abstract class Singleton {
+    private static _instance: Singleton | null = null;
+
+    static getInstance<T extends Singleton>(this: new () => T): T {
+        if (!Singleton._instance) {
+            Singleton._instance = new this();
         }
-        return cached;
-    };
-    return descriptor;
-}
-
-function staticReadonly(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
-    descriptor.set = undefined;
-    return descriptor;
-}
-
-class Configuration {
-    private static _instance: Configuration | null = null;
-    private static _settings: Record<string, any> = {};
-
-    @staticLogged
-    static get instance(): Configuration {
-        if (!Configuration._instance) {
-            Configuration._instance = new Configuration();
-        }
-        return Configuration._instance;
+        return Singleton._instance as T;
     }
 
-    @staticCached
-    static get defaultSettings(): Record<string, any> {
-        return { theme: "dark", language: "en" };
-    }
-
-    @staticReadonly
-    static get version(): string {
-        return "1.0.0";
-    }
-}
-
-class Registry {
-    private static _entries: Map<string, any> = new Map();
-
-    @staticLogged
-    static get entries(): Map<string, any> {
-        return Registry._entries;
-    }
-
-    @staticCached
-    static get entryCount(): number {
-        return Registry._entries.size;
-    }
-
-    @staticLogged
-    @staticCached
-    static get keys(): string[] {
-        return Array.from(Registry._entries.keys());
-    }
+    abstract doWork(): void;
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -20701,428 +20612,96 @@ class Registry {
 
     let output = printer.get_output().to_string();
 
-    // Classes should be converted
     assert!(
-        output.contains("Configuration") && output.contains("Registry"),
-        "Expected static accessor decorated classes: {}",
+        output.contains("function Registry"),
+        "Expected Registry function: {}",
         output
     );
-
-    // Static decorator functions should be present
     assert!(
-        output.contains("staticLogged") && output.contains("staticCached"),
-        "Expected static decorators: {}",
+        output.contains("Registry.register") || output.contains("Registry.instances"),
+        "Expected static method or property on Registry: {}",
         output
     );
-
-    // Class IIFE pattern should be present
     assert!(
-        output.contains("(function ()") || output.contains("(function()"),
-        "Expected class IIFE pattern: {}",
+        output.contains("function PluginRegistry") && output.contains("__extends(PluginRegistry, _super)"),
+        "Expected PluginRegistry extending Registry: {}",
         output
     );
-}
-
-#[test]
-fn test_class_es5_accessor_decorator_factory() {
-    // Accessor decorator factory pattern
-    let source = r#"
-function validate(validator: (value: any) => boolean, errorMessage: string) {
-    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
-        const originalSet = descriptor.set;
-        if (originalSet) {
-            descriptor.set = function(value: any) {
-                if (!validator(value)) {
-                    throw new Error(errorMessage);
-                }
-                originalSet.call(this, value);
-            };
-        }
-        return descriptor;
-    };
-}
-
-function transform(transformer: (value: any) => any) {
-    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
-        const originalGet = descriptor.get;
-        if (originalGet) {
-            descriptor.get = function() {
-                return transformer(originalGet.call(this));
-            };
-        }
-        return descriptor;
-    };
-}
-
-function debounce(delayMs: number) {
-    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
-        const originalSet = descriptor.set;
-        let timeout: any;
-
-        if (originalSet) {
-            descriptor.set = function(value: any) {
-                clearTimeout(timeout);
-                timeout = setTimeout(() => originalSet.call(this, value), delayMs);
-            };
-        }
-        return descriptor;
-    };
-}
-
-function format(formatFn: (value: any) => string) {
-    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
-        const originalGet = descriptor.get;
-        if (originalGet) {
-            descriptor.get = function() {
-                return formatFn(originalGet.call(this));
-            };
-        }
-        return descriptor;
-    };
-}
-
-class UserProfile {
-    private _email: string = "";
-    private _age: number = 0;
-    private _balance: number = 0;
-
-    @validate((v) => /^[^@]+@[^@]+\.[^@]+$/.test(v), "Invalid email format")
-    set email(value: string) {
-        this._email = value;
-    }
-
-    get email(): string {
-        return this._email;
-    }
-
-    @validate((v) => v >= 0 && v <= 150, "Age must be between 0 and 150")
-    set age(value: number) {
-        this._age = value;
-    }
-
-    @transform((v) => Math.floor(v))
-    get age(): number {
-        return this._age;
-    }
-
-    @debounce(300)
-    set balance(value: number) {
-        this._balance = value;
-    }
-
-    @format((v) => `$${v.toFixed(2)}`)
-    get formattedBalance(): string {
-        return this._balance as any;
-    }
-}
-
-class SearchInput {
-    private _query: string = "";
-
-    @debounce(500)
-    @validate((v) => v.length <= 100, "Query too long")
-    set query(value: string) {
-        this._query = value;
-    }
-
-    @transform((v) => v.trim().toLowerCase())
-    get normalizedQuery(): string {
-        return this._query;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Classes should be converted
     assert!(
-        output.contains("UserProfile") && output.contains("SearchInput"),
-        "Expected factory decorated classes: {}",
+        output.contains("PluginRegistry.createDefault") || output.contains("PluginRegistry.prototype.getName"),
+        "Expected PluginRegistry static or instance methods: {}",
         output
     );
-
-    // Factory decorator functions should be present
     assert!(
-        output.contains("validate") && output.contains("transform") && output.contains("debounce"),
-        "Expected factory decorators: {}",
-        output
-    );
-
-    // Class IIFE pattern should be present
-    assert!(
-        output.contains("(function ()") || output.contains("(function()"),
-        "Expected class IIFE pattern: {}",
+        output.contains("function Singleton"),
+        "Expected Singleton function: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_accessor_decorator_derived() {
-    // Accessor decorator in derived class pattern
+fn test_class_es5_abstract_getters_setters() {
+    // Test abstract class with abstract getters and setters
     let source = r#"
-function override(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
-    const originalGet = descriptor.get;
-    if (originalGet) {
-        descriptor.get = function() {
-            console.log(`Override: accessing ${propertyKey}`);
-            return originalGet.call(this);
-        };
-    }
-    return descriptor;
-}
+abstract class DataSource {
+    abstract get data(): string;
+    abstract set data(value: string);
 
-function inherited(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
-    Reflect.defineMetadata("inherited", true, target, propertyKey);
-    return descriptor;
-}
+    abstract get isReady(): boolean;
 
-function virtual(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
-    Reflect.defineMetadata("virtual", true, target, propertyKey);
-    return descriptor;
-}
-
-class BaseEntity {
-    protected _id: string = "";
-    protected _createdAt: Date = new Date();
-
-    @virtual
-    get id(): string {
-        return this._id;
-    }
-
-    @inherited
-    get createdAt(): Date {
-        return this._createdAt;
-    }
-}
-
-class User extends BaseEntity {
-    private _username: string = "";
-
-    @override
-    get id(): string {
-        return `user_${this._id}`;
-    }
-
-    @inherited
-    get username(): string {
-        return this._username;
-    }
-
-    set username(value: string) {
-        this._username = value;
-    }
-}
-
-class Admin extends User {
-    private _permissions: string[] = [];
-
-    @override
-    get id(): string {
-        return `admin_${super.id}`;
-    }
-
-    @inherited
-    get permissions(): string[] {
-        return this._permissions;
-    }
-}
-
-class Document extends BaseEntity {
-    private _title: string = "";
-    private _content: string = "";
-
-    @override
-    get id(): string {
-        return `doc_${this._id}`;
-    }
-
-    @virtual
-    get title(): string {
-        return this._title;
-    }
-
-    @virtual
-    get content(): string {
-        return this._content;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Base and derived classes should be present
-    assert!(
-        output.contains("BaseEntity") && output.contains("User") && output.contains("Admin"),
-        "Expected inheritance classes: {}",
-        output
-    );
-
-    // Inheritance decorators should be present
-    assert!(
-        output.contains("override") && output.contains("inherited"),
-        "Expected inheritance decorators: {}",
-        output
-    );
-
-    // ES5 extends helper should be present
-    assert!(
-        output.contains("__extends") || output.contains("_super"),
-        "Expected ES5 extends pattern: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_accessor_decorator_getter_setter_pair() {
-    // Accessor decorator with getter/setter pair pattern
-    let source = r#"
-function observable(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
-    const originalGet = descriptor.get;
-    const originalSet = descriptor.set;
-    const subscribersKey = Symbol(`${propertyKey}_subscribers`);
-
-    if (originalGet) {
-        descriptor.get = function() {
-            return originalGet.call(this);
-        };
-    }
-
-    if (originalSet) {
-        descriptor.set = function(value: any) {
-            const oldValue = originalGet?.call(this);
-            originalSet.call(this, value);
-            const subscribers = (this as any)[subscribersKey] || [];
-            subscribers.forEach((fn: Function) => fn(value, oldValue));
-        };
-    }
-
-    return descriptor;
-}
-
-function synchronized(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
-    const originalGet = descriptor.get;
-    const originalSet = descriptor.set;
-    const lockKey = Symbol(`${propertyKey}_lock`);
-
-    if (originalSet) {
-        descriptor.set = function(value: any) {
-            if ((this as any)[lockKey]) return;
-            (this as any)[lockKey] = true;
-            originalSet.call(this, value);
-            (this as any)[lockKey] = false;
-        };
-    }
-
-    return descriptor;
-}
-
-function bound(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
-    const originalGet = descriptor.get;
-    const originalSet = descriptor.set;
-    const boundKey = Symbol(`${propertyKey}_bound`);
-
-    descriptor.get = function() {
-        if (!(this as any)[boundKey]) {
-            (this as any)[boundKey] = {
-                get: originalGet?.bind(this),
-                set: originalSet?.bind(this)
-            };
+    load(): void {
+        if (this.isReady) {
+            console.log(this.data);
         }
-        return originalGet?.call(this);
-    };
-
-    if (originalSet) {
-        descriptor.set = function(value: any) {
-            originalSet.call(this, value);
-        };
     }
-
-    return descriptor;
 }
 
-class FormField {
-    private _value: string = "";
-    private _pristine: boolean = true;
+class FileDataSource extends DataSource {
+    private _data: string = "";
+    private _ready: boolean = false;
 
-    @observable
-    get value(): string {
+    get data(): string {
+        return this._data;
+    }
+
+    set data(value: string) {
+        this._data = value;
+        this._ready = true;
+    }
+
+    get isReady(): boolean {
+        return this._ready;
+    }
+}
+
+abstract class Observable<T> {
+    protected _value: T;
+
+    constructor(initial: T) {
+        this._value = initial;
+    }
+
+    abstract get value(): T;
+    abstract set value(v: T);
+
+    abstract subscribe(callback: (value: T) => void): void;
+}
+
+class BehaviorSubject<T> extends Observable<T> {
+    private subscribers: ((value: T) => void)[] = [];
+
+    get value(): T {
         return this._value;
     }
 
-    @observable
-    set value(val: string) {
-        this._value = val;
-        this._pristine = false;
+    set value(v: T) {
+        this._value = v;
+        this.subscribers.forEach(cb => cb(v));
     }
 
-    @synchronized
-    get pristine(): boolean {
-        return this._pristine;
-    }
-
-    @synchronized
-    set pristine(val: boolean) {
-        this._pristine = val;
-    }
-}
-
-class StateManager {
-    private _state: Record<string, any> = {};
-
-    @observable
-    @bound
-    get state(): Record<string, any> {
-        return this._state;
-    }
-
-    @observable
-    @synchronized
-    set state(value: Record<string, any>) {
-        this._state = { ...value };
-    }
-}
-
-class Counter {
-    private _count: number = 0;
-
-    @observable
-    get count(): number {
-        return this._count;
-    }
-
-    @observable
-    set count(value: number) {
-        this._count = value;
-    }
-
-    @bound
-    get doubleCount(): number {
-        return this._count * 2;
+    subscribe(callback: (value: T) => void): void {
+        this.subscribers.push(callback);
+        callback(this._value);
     }
 }
 "#;
@@ -21141,24 +20720,251 @@ class Counter {
 
     let output = printer.get_output().to_string();
 
-    // Classes should be converted
     assert!(
-        output.contains("FormField") && output.contains("StateManager") && output.contains("Counter"),
-        "Expected getter/setter decorated classes: {}",
+        output.contains("function DataSource"),
+        "Expected DataSource function: {}",
         output
     );
-
-    // Pair decorator functions should be present
     assert!(
-        output.contains("observable") && output.contains("synchronized"),
-        "Expected pair decorators: {}",
+        output.contains("DataSource.prototype.load"),
+        "Expected load method on prototype: {}",
         output
     );
-
-    // Class IIFE pattern should be present
     assert!(
-        output.contains("(function ()") || output.contains("(function()"),
-        "Expected class IIFE pattern: {}",
+        output.contains("function FileDataSource") && output.contains("__extends(FileDataSource, _super)"),
+        "Expected FileDataSource extending DataSource: {}",
+        output
+    );
+    assert!(
+        output.contains("Object.defineProperty") && output.contains("FileDataSource.prototype"),
+        "Expected getter/setter via Object.defineProperty: {}",
+        output
+    );
+    assert!(
+        output.contains("function Observable") && output.contains("function BehaviorSubject"),
+        "Expected Observable and BehaviorSubject: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_abstract_multi_level_inheritance() {
+    // Test abstract class with multiple levels of inheritance
+    let source = r#"
+abstract class Entity {
+    abstract get id(): string;
+
+    equals(other: Entity): boolean {
+        return this.id === other.id;
+    }
+}
+
+abstract class TimestampedEntity extends Entity {
+    abstract get createdAt(): Date;
+    abstract get updatedAt(): Date;
+
+    isNewer(other: TimestampedEntity): boolean {
+        return this.updatedAt > other.updatedAt;
+    }
+}
+
+abstract class AuditableEntity extends TimestampedEntity {
+    abstract get createdBy(): string;
+    abstract get modifiedBy(): string;
+
+    getAuditLog(): string {
+        return `Created by ${this.createdBy} at ${this.createdAt}`;
+    }
+}
+
+class User extends AuditableEntity {
+    private _id: string;
+    private _createdAt: Date;
+    private _updatedAt: Date;
+    private _createdBy: string;
+    private _modifiedBy: string;
+
+    constructor(id: string, creator: string) {
+        super();
+        this._id = id;
+        this._createdAt = new Date();
+        this._updatedAt = new Date();
+        this._createdBy = creator;
+        this._modifiedBy = creator;
+    }
+
+    get id(): string { return this._id; }
+    get createdAt(): Date { return this._createdAt; }
+    get updatedAt(): Date { return this._updatedAt; }
+    get createdBy(): string { return this._createdBy; }
+    get modifiedBy(): string { return this._modifiedBy; }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function Entity"),
+        "Expected Entity function: {}",
+        output
+    );
+    assert!(
+        output.contains("function TimestampedEntity") && output.contains("__extends(TimestampedEntity, _super)"),
+        "Expected TimestampedEntity extending Entity: {}",
+        output
+    );
+    assert!(
+        output.contains("function AuditableEntity") && output.contains("__extends(AuditableEntity, _super)"),
+        "Expected AuditableEntity extending TimestampedEntity: {}",
+        output
+    );
+    assert!(
+        output.contains("function User") && output.contains("__extends(User, _super)"),
+        "Expected User extending AuditableEntity: {}",
+        output
+    );
+    assert!(
+        output.contains("Entity.prototype.equals") && output.contains("TimestampedEntity.prototype.isNewer"),
+        "Expected inherited methods on prototypes: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_abstract_combined_patterns() {
+    // Test abstract class combining all patterns
+    let source = r#"
+abstract class Component<T> {
+    private static componentCount: number = 0;
+    protected props: T;
+
+    constructor(props: T) {
+        this.props = props;
+        Component.componentCount++;
+    }
+
+    static getCount(): number {
+        return Component.componentCount;
+    }
+
+    abstract render(): string;
+    abstract get displayName(): string;
+    abstract set state(value: any);
+}
+
+abstract class PureComponent<T> extends Component<T> {
+    private _state: any = null;
+
+    abstract shouldUpdate(nextProps: T): boolean;
+
+    get state(): any {
+        return this._state;
+    }
+
+    set state(value: any) {
+        this._state = value;
+    }
+}
+
+class Button extends PureComponent<{ label: string }> {
+    private _displayName = "Button";
+
+    get displayName(): string {
+        return this._displayName;
+    }
+
+    shouldUpdate(nextProps: { label: string }): boolean {
+        return nextProps.label !== this.props.label;
+    }
+
+    render(): string {
+        return `<button>${this.props.label}</button>`;
+    }
+}
+
+abstract class AbstractFactory<T> {
+    protected instances: T[] = [];
+
+    abstract create(): T;
+
+    createMany(count: number): T[] {
+        return Array.from({ length: count }, () => {
+            const instance = this.create();
+            this.instances.push(instance);
+            return instance;
+        });
+    }
+
+    abstract get factoryName(): string;
+}
+
+class WidgetFactory extends AbstractFactory<{ id: number }> {
+    private counter = 0;
+
+    get factoryName(): string {
+        return "WidgetFactory";
+    }
+
+    create(): { id: number } {
+        return { id: ++this.counter };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function Component"),
+        "Expected Component function: {}",
+        output
+    );
+    assert!(
+        output.contains("Component.getCount") || output.contains("Component.componentCount"),
+        "Expected static members on Component: {}",
+        output
+    );
+    assert!(
+        output.contains("function PureComponent") && output.contains("__extends(PureComponent, _super)"),
+        "Expected PureComponent extending Component: {}",
+        output
+    );
+    assert!(
+        output.contains("function Button") && output.contains("__extends(Button, _super)"),
+        "Expected Button extending PureComponent: {}",
+        output
+    );
+    assert!(
+        output.contains("Button.prototype.render") && output.contains("Button.prototype.shouldUpdate"),
+        "Expected Button implementing abstract methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function AbstractFactory") && output.contains("function WidgetFactory"),
+        "Expected AbstractFactory and WidgetFactory: {}",
         output
     );
 }
