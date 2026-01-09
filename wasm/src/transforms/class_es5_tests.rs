@@ -35825,3 +35825,571 @@ class CapitalizedApiRouter extends ApiRouter<CapitalizedEndpoint> {
         output
     );
 }
+
+// =============================================================================
+// INFER KEYWORD PATTERN TESTS - array element, function return, promise unwrap
+// =============================================================================
+
+#[test]
+fn test_class_es5_infer_keyword_array_element() {
+    let source = r#"
+// Infer array element type pattern
+type ArrayElement<T> = T extends (infer U)[] ? U : never;
+type FirstElement<T extends unknown[]> = T extends [infer F, ...unknown[]] ? F : never;
+type LastElement<T extends unknown[]> = T extends [...unknown[], infer L] ? L : never;
+
+class ArrayProcessor<T extends unknown[]> {
+    private items: T;
+
+    constructor(items: T) {
+        this.items = items;
+    }
+
+    getFirst(): FirstElement<T> {
+        return this.items[0] as FirstElement<T>;
+    }
+
+    getLast(): LastElement<T> {
+        return this.items[this.items.length - 1] as LastElement<T>;
+    }
+
+    getAll(): T {
+        return this.items;
+    }
+
+    getLength(): number {
+        return this.items.length;
+    }
+}
+
+class NumberArrayProcessor extends ArrayProcessor<number[]> {
+    sum(): number {
+        return this.getAll().reduce((a, b) => a + b, 0);
+    }
+
+    average(): number {
+        const all = this.getAll();
+        return all.length > 0 ? this.sum() / all.length : 0;
+    }
+
+    max(): number {
+        return Math.max(...this.getAll());
+    }
+
+    min(): number {
+        return Math.min(...this.getAll());
+    }
+}
+
+class StringArrayProcessor extends ArrayProcessor<string[]> {
+    join(separator: string): string {
+        return this.getAll().join(separator);
+    }
+
+    toUpperCase(): string[] {
+        return this.getAll().map(s => s.toUpperCase());
+    }
+
+    toLowerCase(): string[] {
+        return this.getAll().map(s => s.toLowerCase());
+    }
+
+    filter(predicate: (s: string) => boolean): string[] {
+        return this.getAll().filter(predicate);
+    }
+}
+
+type Flatten<T> = T extends (infer U)[] ? Flatten<U> : T;
+
+class DeepArrayFlattener<T> {
+    private data: T;
+
+    constructor(data: T) {
+        this.data = data;
+    }
+
+    getData(): T {
+        return this.data;
+    }
+
+    isArray(): boolean {
+        return Array.isArray(this.data);
+    }
+
+    flatten(): Flatten<T>[] {
+        const result: Flatten<T>[] = [];
+        const flattenHelper = (arr: unknown): void => {
+            if (Array.isArray(arr)) {
+                arr.forEach(item => flattenHelper(item));
+            } else {
+                result.push(arr as Flatten<T>);
+            }
+        };
+        flattenHelper(this.data);
+        return result;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("ArrayProcessor") && output.contains("NumberArrayProcessor") && output.contains("StringArrayProcessor"),
+        "Expected infer array element type classes: {}",
+        output
+    );
+
+    // ArrayProcessor methods
+    assert!(
+        output.contains("getFirst") && output.contains("getLast") && output.contains("getAll"),
+        "Expected ArrayProcessor methods: {}",
+        output
+    );
+
+    // NumberArrayProcessor methods
+    assert!(
+        output.contains("sum") && output.contains("average") && output.contains("max") && output.contains("min"),
+        "Expected NumberArrayProcessor methods: {}",
+        output
+    );
+
+    // StringArrayProcessor methods
+    assert!(
+        output.contains("join") && output.contains("toUpperCase") && output.contains("toLowerCase"),
+        "Expected StringArrayProcessor methods: {}",
+        output
+    );
+
+    // DeepArrayFlattener class
+    assert!(
+        output.contains("DeepArrayFlattener") && output.contains("flatten") && output.contains("isArray"),
+        "Expected DeepArrayFlattener class: {}",
+        output
+    );
+
+    // Type aliases should be stripped
+    assert!(
+        !output.contains("type ArrayElement") && !output.contains("type FirstElement") && !output.contains("type Flatten"),
+        "Expected type aliases to be stripped: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_infer_keyword_function_return() {
+    let source = r#"
+// Infer function return type pattern
+type ReturnType<T> = T extends (...args: unknown[]) => infer R ? R : never;
+type Parameters<T> = T extends (...args: infer P) => unknown ? P : never;
+type ConstructorParameters<T> = T extends new (...args: infer P) => unknown ? P : never;
+
+class FunctionWrapper<F extends (...args: unknown[]) => unknown> {
+    private fn: F;
+
+    constructor(fn: F) {
+        this.fn = fn;
+    }
+
+    call(...args: Parameters<F>): ReturnType<F> {
+        return this.fn(...args) as ReturnType<F>;
+    }
+
+    bind<T>(thisArg: T): FunctionWrapper<F> {
+        return new FunctionWrapper(this.fn.bind(thisArg) as F);
+    }
+
+    getFunction(): F {
+        return this.fn;
+    }
+}
+
+class MemoizedFunction<F extends (...args: unknown[]) => unknown> {
+    private fn: F;
+    private cache: Map<string, ReturnType<F>> = new Map();
+
+    constructor(fn: F) {
+        this.fn = fn;
+    }
+
+    call(...args: Parameters<F>): ReturnType<F> {
+        const key = JSON.stringify(args);
+        if (this.cache.has(key)) {
+            return this.cache.get(key)!;
+        }
+        const result = this.fn(...args) as ReturnType<F>;
+        this.cache.set(key, result);
+        return result;
+    }
+
+    clearCache(): void {
+        this.cache.clear();
+    }
+
+    getCacheSize(): number {
+        return this.cache.size;
+    }
+
+    hasCache(args: Parameters<F>): boolean {
+        return this.cache.has(JSON.stringify(args));
+    }
+}
+
+class DebouncedFunction<F extends (...args: unknown[]) => unknown> {
+    private fn: F;
+    private delay: number;
+    private timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    constructor(fn: F, delay: number) {
+        this.fn = fn;
+        this.delay = delay;
+    }
+
+    call(...args: Parameters<F>): void {
+        if (this.timeoutId !== null) {
+            clearTimeout(this.timeoutId);
+        }
+        this.timeoutId = setTimeout(() => {
+            this.fn(...args);
+            this.timeoutId = null;
+        }, this.delay);
+    }
+
+    cancel(): void {
+        if (this.timeoutId !== null) {
+            clearTimeout(this.timeoutId);
+            this.timeoutId = null;
+        }
+    }
+
+    isPending(): boolean {
+        return this.timeoutId !== null;
+    }
+
+    getDelay(): number {
+        return this.delay;
+    }
+}
+
+class ThrottledFunction<F extends (...args: unknown[]) => unknown> {
+    private fn: F;
+    private limit: number;
+    private lastCall: number = 0;
+
+    constructor(fn: F, limit: number) {
+        this.fn = fn;
+        this.limit = limit;
+    }
+
+    call(...args: Parameters<F>): ReturnType<F> | undefined {
+        const now = Date.now();
+        if (now - this.lastCall >= this.limit) {
+            this.lastCall = now;
+            return this.fn(...args) as ReturnType<F>;
+        }
+        return undefined;
+    }
+
+    reset(): void {
+        this.lastCall = 0;
+    }
+
+    getLimit(): number {
+        return this.limit;
+    }
+
+    getTimeSinceLastCall(): number {
+        return Date.now() - this.lastCall;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("FunctionWrapper") && output.contains("MemoizedFunction"),
+        "Expected infer function return type classes: {}",
+        output
+    );
+
+    // FunctionWrapper methods
+    assert!(
+        output.contains("call") && output.contains("bind") && output.contains("getFunction"),
+        "Expected FunctionWrapper methods: {}",
+        output
+    );
+
+    // MemoizedFunction methods
+    assert!(
+        output.contains("clearCache") && output.contains("getCacheSize") && output.contains("hasCache"),
+        "Expected MemoizedFunction methods: {}",
+        output
+    );
+
+    // DebouncedFunction class
+    assert!(
+        output.contains("DebouncedFunction") && output.contains("cancel") && output.contains("isPending"),
+        "Expected DebouncedFunction class: {}",
+        output
+    );
+
+    // ThrottledFunction class
+    assert!(
+        output.contains("ThrottledFunction") && output.contains("reset") && output.contains("getLimit"),
+        "Expected ThrottledFunction class: {}",
+        output
+    );
+
+    // Type aliases should be stripped
+    assert!(
+        !output.contains("type ReturnType") && !output.contains("type Parameters") && !output.contains("type ConstructorParameters"),
+        "Expected type aliases to be stripped: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_infer_keyword_promise_unwrap() {
+    let source = r#"
+// Infer promise unwrap type pattern
+type Awaited<T> = T extends Promise<infer U> ? Awaited<U> : T;
+type PromiseType<T> = T extends Promise<infer U> ? U : never;
+type UnwrapPromise<T> = T extends Promise<infer U> ? U : T;
+
+class AsyncWrapper<T> {
+    private promise: Promise<T>;
+
+    constructor(promise: Promise<T>) {
+        this.promise = promise;
+    }
+
+    then<U>(callback: (value: T) => U | Promise<U>): AsyncWrapper<U> {
+        return new AsyncWrapper(this.promise.then(callback));
+    }
+
+    catch<U>(callback: (error: unknown) => U | Promise<U>): AsyncWrapper<T | U> {
+        return new AsyncWrapper(this.promise.catch(callback));
+    }
+
+    finally(callback: () => void): AsyncWrapper<T> {
+        return new AsyncWrapper(this.promise.finally(callback));
+    }
+
+    getPromise(): Promise<T> {
+        return this.promise;
+    }
+}
+
+class AsyncResult<T> {
+    private valuePromise: Promise<T>;
+
+    constructor(valuePromise: Promise<T>) {
+        this.valuePromise = valuePromise;
+    }
+
+    async getValue(): Promise<T> {
+        return this.valuePromise;
+    }
+
+    async map<U>(fn: (value: T) => U): Promise<U> {
+        const value = await this.valuePromise;
+        return fn(value);
+    }
+
+    async flatMap<U>(fn: (value: T) => Promise<U>): Promise<U> {
+        const value = await this.valuePromise;
+        return fn(value);
+    }
+
+    async filter(predicate: (value: T) => boolean): Promise<T | null> {
+        const value = await this.valuePromise;
+        return predicate(value) ? value : null;
+    }
+}
+
+class PromiseQueue<T> {
+    private queue: Promise<T>[] = [];
+
+    add(promise: Promise<T>): void {
+        this.queue.push(promise);
+    }
+
+    async all(): Promise<T[]> {
+        return Promise.all(this.queue);
+    }
+
+    async race(): Promise<T> {
+        return Promise.race(this.queue);
+    }
+
+    async allSettled(): Promise<PromiseSettledResult<T>[]> {
+        return Promise.allSettled(this.queue);
+    }
+
+    clear(): void {
+        this.queue = [];
+    }
+
+    getCount(): number {
+        return this.queue.length;
+    }
+}
+
+class RetryablePromise<T> {
+    private factory: () => Promise<T>;
+    private maxRetries: number;
+    private delay: number;
+
+    constructor(factory: () => Promise<T>, maxRetries: number, delay: number) {
+        this.factory = factory;
+        this.maxRetries = maxRetries;
+        this.delay = delay;
+    }
+
+    async execute(): Promise<T> {
+        let lastError: unknown;
+        for (let i = 0; i <= this.maxRetries; i++) {
+            try {
+                return await this.factory();
+            } catch (error) {
+                lastError = error;
+                if (i < this.maxRetries) {
+                    await this.sleep(this.delay);
+                }
+            }
+        }
+        throw lastError;
+    }
+
+    private sleep(ms: number): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    getMaxRetries(): number {
+        return this.maxRetries;
+    }
+
+    getDelay(): number {
+        return this.delay;
+    }
+}
+
+class TimeoutPromise<T> {
+    private promise: Promise<T>;
+    private timeout: number;
+
+    constructor(promise: Promise<T>, timeout: number) {
+        this.promise = promise;
+        this.timeout = timeout;
+    }
+
+    async execute(): Promise<T> {
+        return Promise.race([
+            this.promise,
+            new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error("Timeout")), this.timeout)
+            )
+        ]);
+    }
+
+    getTimeout(): number {
+        return this.timeout;
+    }
+
+    getPromise(): Promise<T> {
+        return this.promise;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("AsyncWrapper") && output.contains("AsyncResult") && output.contains("PromiseQueue"),
+        "Expected infer promise unwrap type classes: {}",
+        output
+    );
+
+    // AsyncWrapper methods
+    assert!(
+        output.contains("then") && output.contains("catch") && output.contains("finally"),
+        "Expected AsyncWrapper methods: {}",
+        output
+    );
+
+    // AsyncResult methods
+    assert!(
+        output.contains("getValue") && output.contains("map") && output.contains("flatMap"),
+        "Expected AsyncResult methods: {}",
+        output
+    );
+
+    // PromiseQueue methods
+    assert!(
+        output.contains("all") && output.contains("race") && output.contains("allSettled"),
+        "Expected PromiseQueue methods: {}",
+        output
+    );
+
+    // RetryablePromise class
+    assert!(
+        output.contains("RetryablePromise") && output.contains("execute") && output.contains("getMaxRetries"),
+        "Expected RetryablePromise class: {}",
+        output
+    );
+
+    // TimeoutPromise class
+    assert!(
+        output.contains("TimeoutPromise") && output.contains("getTimeout"),
+        "Expected TimeoutPromise class: {}",
+        output
+    );
+
+    // Type aliases should be stripped
+    assert!(
+        !output.contains("type Awaited") && !output.contains("type PromiseType") && !output.contains("type UnwrapPromise"),
+        "Expected type aliases to be stripped: {}",
+        output
+    );
+}
