@@ -16408,3 +16408,403 @@ class UserRepository extends AbstractRepository<{ id: string; name: string }> {
         output
     );
 }
+
+#[test]
+fn test_class_es5_string_fromcodepoint_basic() {
+    // Basic String.fromCodePoint usage
+    let source = r#"
+class UnicodeBuilder {
+    static fromCodePoints(...codePoints: number[]): string {
+        return String.fromCodePoint(...codePoints);
+    }
+
+    static emoji(codePoint: number): string {
+        return String.fromCodePoint(codePoint);
+    }
+
+    buildString(codePoints: number[]): string {
+        return String.fromCodePoint(...codePoints);
+    }
+
+    static surrogatePair(high: number, low: number): string {
+        return String.fromCodePoint(high, low);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("UnicodeBuilder"),
+        "Expected UnicodeBuilder class: {}",
+        output
+    );
+    assert!(
+        output.contains("String.fromCodePoint"),
+        "Expected String.fromCodePoint: {}",
+        output
+    );
+    assert!(
+        output.contains("fromCodePoints") && output.contains("emoji"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_string_codepointat_basic() {
+    // Basic String.prototype.codePointAt usage
+    let source = r#"
+class UnicodeAnalyzer {
+    getCodePointAt(str: string, index: number): number | undefined {
+        return str.codePointAt(index);
+    }
+
+    getAllCodePoints(str: string): number[] {
+        const result: number[] = [];
+        for (let i = 0; i < str.length; i++) {
+            const cp = str.codePointAt(i);
+            if (cp !== undefined) {
+                result.push(cp);
+                if (cp > 0xFFFF) i++;
+            }
+        }
+        return result;
+    }
+
+    static firstCodePoint(str: string): number | undefined {
+        return str.codePointAt(0);
+    }
+
+    hasHighCodePoint(str: string): boolean {
+        for (let i = 0; i < str.length; i++) {
+            const cp = str.codePointAt(i);
+            if (cp !== undefined && cp > 0xFFFF) return true;
+        }
+        return false;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("UnicodeAnalyzer"),
+        "Expected UnicodeAnalyzer class: {}",
+        output
+    );
+    assert!(
+        output.contains("codePointAt"),
+        "Expected codePointAt: {}",
+        output
+    );
+    assert!(
+        output.contains("getCodePointAt") && output.contains("getAllCodePoints"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_string_includes_basic() {
+    // Basic String.prototype.includes usage
+    let source = r#"
+class StringSearcher {
+    includes(str: string, search: string): boolean {
+        return str.includes(search);
+    }
+
+    includesAt(str: string, search: string, position: number): boolean {
+        return str.includes(search, position);
+    }
+
+    static containsAny(str: string, searches: string[]): boolean {
+        return searches.some(s => str.includes(s));
+    }
+
+    static containsAll(str: string, searches: string[]): boolean {
+        return searches.every(s => str.includes(s));
+    }
+
+    filterByContent(strings: string[], search: string): string[] {
+        return strings.filter(s => s.includes(search));
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("StringSearcher"),
+        "Expected StringSearcher class: {}",
+        output
+    );
+    assert!(
+        output.contains(".includes("),
+        "Expected includes: {}",
+        output
+    );
+    assert!(
+        output.contains("containsAny") && output.contains("containsAll"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_string_startswith_endswith_basic() {
+    // Basic String.prototype.startsWith and endsWith usage
+    let source = r#"
+class PrefixSuffixChecker {
+    startsWith(str: string, prefix: string): boolean {
+        return str.startsWith(prefix);
+    }
+
+    endsWith(str: string, suffix: string): boolean {
+        return str.endsWith(suffix);
+    }
+
+    startsWithAt(str: string, prefix: string, position: number): boolean {
+        return str.startsWith(prefix, position);
+    }
+
+    endsWithLength(str: string, suffix: string, length: number): boolean {
+        return str.endsWith(suffix, length);
+    }
+
+    static hasPrefix(strings: string[], prefix: string): string[] {
+        return strings.filter(s => s.startsWith(prefix));
+    }
+
+    static hasSuffix(strings: string[], suffix: string): string[] {
+        return strings.filter(s => s.endsWith(suffix));
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("PrefixSuffixChecker"),
+        "Expected PrefixSuffixChecker class: {}",
+        output
+    );
+    assert!(
+        output.contains(".startsWith(") && output.contains(".endsWith("),
+        "Expected startsWith and endsWith: {}",
+        output
+    );
+    assert!(
+        output.contains("hasPrefix") && output.contains("hasSuffix"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_string_methods_in_constructor() {
+    // String ES6 methods in constructor
+    let source = r#"
+class StringValidator {
+    private hasEmoji: boolean;
+    private startsWithPrefix: boolean;
+    private endsWithSuffix: boolean;
+    private containsKeyword: boolean;
+
+    constructor(
+        value: string,
+        prefix: string,
+        suffix: string,
+        keyword: string
+    ) {
+        const firstCodePoint = value.codePointAt(0);
+        this.hasEmoji = firstCodePoint !== undefined && firstCodePoint > 0xFFFF;
+        this.startsWithPrefix = value.startsWith(prefix);
+        this.endsWithSuffix = value.endsWith(suffix);
+        this.containsKeyword = value.includes(keyword);
+    }
+
+    isValid(): boolean {
+        return this.startsWithPrefix && this.endsWithSuffix;
+    }
+
+    hasKeyword(): boolean {
+        return this.containsKeyword;
+    }
+
+    hasEmojiStart(): boolean {
+        return this.hasEmoji;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("StringValidator"),
+        "Expected StringValidator class: {}",
+        output
+    );
+    assert!(
+        output.contains("codePointAt") && output.contains(".includes("),
+        "Expected codePointAt and includes: {}",
+        output
+    );
+    assert!(
+        output.contains(".startsWith(") && output.contains(".endsWith("),
+        "Expected startsWith and endsWith: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_string_methods_combined() {
+    // Combined String ES6 methods
+    let source = r#"
+class StringUtilities {
+    static analyze(str: string): {
+        length: number;
+        codePoints: number[];
+        startsWithLetter: boolean;
+        endsWithPunctuation: boolean;
+    } {
+        const codePoints: number[] = [];
+        for (let i = 0; i < str.length; i++) {
+            const cp = str.codePointAt(i);
+            if (cp !== undefined) {
+                codePoints.push(cp);
+                if (cp > 0xFFFF) i++;
+            }
+        }
+
+        return {
+            length: str.length,
+            codePoints,
+            startsWithLetter: /^[a-zA-Z]/.test(str),
+            endsWithPunctuation: str.endsWith('.') || str.endsWith('!') || str.endsWith('?')
+        };
+    }
+
+    static buildFromCodePoints(codePoints: number[]): string {
+        return String.fromCodePoint(...codePoints);
+    }
+
+    static matchPattern(
+        str: string,
+        options: { prefix?: string; suffix?: string; contains?: string }
+    ): boolean {
+        if (options.prefix && !str.startsWith(options.prefix)) return false;
+        if (options.suffix && !str.endsWith(options.suffix)) return false;
+        if (options.contains && !str.includes(options.contains)) return false;
+        return true;
+    }
+
+    transformCodePoints(str: string, transform: (cp: number) => number): string {
+        const newCodePoints: number[] = [];
+        for (let i = 0; i < str.length; i++) {
+            const cp = str.codePointAt(i);
+            if (cp !== undefined) {
+                newCodePoints.push(transform(cp));
+                if (cp > 0xFFFF) i++;
+            }
+        }
+        return String.fromCodePoint(...newCodePoints);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("StringUtilities"),
+        "Expected StringUtilities class: {}",
+        output
+    );
+    assert!(
+        output.contains("String.fromCodePoint") && output.contains("codePointAt"),
+        "Expected String.fromCodePoint and codePointAt: {}",
+        output
+    );
+    assert!(
+        output.contains(".startsWith(") && output.contains(".endsWith(") && output.contains(".includes("),
+        "Expected startsWith, endsWith, and includes: {}",
+        output
+    );
+    assert!(
+        output.contains("analyze") && output.contains("matchPattern"),
+        "Expected utility methods: {}",
+        output
+    );
+}
