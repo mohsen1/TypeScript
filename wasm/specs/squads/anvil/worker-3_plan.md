@@ -7,7 +7,7 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-(none)
+- [ ] Add class declaration ES5 source map tests (basic class, constructor, methods, accessors, inheritance) in `wasm/src/source_map_tests.rs`. Run `./wasm/test.sh source_map`.
 
 ## Task Queue
 - [ ] (empty)
