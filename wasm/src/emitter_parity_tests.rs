@@ -28164,3 +28164,516 @@ class Pipeline<TInput, TOutput = TInput> {
         output
     );
 }
+
+// ============================================================================
+// ES5 Tuple Type Patterns Parity Tests
+// ============================================================================
+
+/// Test ES5 basic tuple type
+#[test]
+fn test_parity_es5_tuple_basic() {
+    let source = r#"
+type Point = [number, number];
+type RGB = [number, number, number];
+type NameAge = [string, number];
+
+function createPoint(x: number, y: number): Point {
+    return [x, y];
+}
+
+function getColor(): RGB {
+    return [255, 128, 0];
+}
+
+function processEntry(entry: NameAge): void {
+    const [name, age] = entry;
+    console.log(name, age);
+}
+
+const point: Point = [10, 20];
+const color: RGB = [100, 150, 200];
+const person: NameAge = ["Alice", 30];
+
+// Destructuring tuples
+const [x, y] = point;
+const [r, g, b] = color;
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions should be present
+    assert!(
+        output.contains("createPoint") && output.contains("getColor") && output.contains("processEntry"),
+        "Functions should be present: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type Point") && !output.contains("type RGB") && !output.contains("type NameAge"),
+        "Type aliases should be erased: {}",
+        output
+    );
+    // Return type annotations should be erased
+    assert!(
+        !output.contains("): Point") && !output.contains("): RGB") && !output.contains("): void"),
+        "Return type annotations should be erased: {}",
+        output
+    );
+    // Variable type annotations should be erased
+    assert!(
+        !output.contains(": Point") && !output.contains(": RGB") && !output.contains(": NameAge"),
+        "Variable type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 tuple with optional elements
+#[test]
+fn test_parity_es5_tuple_optional() {
+    let source = r#"
+type OptionalTuple = [string, number?, boolean?];
+type ConfigTuple = [string, number | undefined, boolean?];
+
+function processOptional(tuple: OptionalTuple): string {
+    const [name, age, active] = tuple;
+    return name + (age ?? 0) + (active ?? false);
+}
+
+function createConfig(name: string, count?: number, enabled?: boolean): ConfigTuple {
+    return [name, count, enabled];
+}
+
+class TupleHandler {
+    private data: OptionalTuple;
+
+    constructor(name: string, age?: number) {
+        this.data = [name, age];
+    }
+
+    getData(): OptionalTuple {
+        return this.data;
+    }
+
+    setActive(active: boolean): void {
+        this.data = [this.data[0], this.data[1], active];
+    }
+}
+
+const minimal: OptionalTuple = ["test"];
+const partial: OptionalTuple = ["test", 42];
+const full: OptionalTuple = ["test", 42, true];
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions and class should be present
+    assert!(
+        output.contains("processOptional") && output.contains("createConfig") && output.contains("TupleHandler"),
+        "Functions and class should be present: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type OptionalTuple") && !output.contains("type ConfigTuple"),
+        "Type aliases should be erased: {}",
+        output
+    );
+    // Tuple type annotations should be erased
+    assert!(
+        !output.contains(": OptionalTuple") && !output.contains(": ConfigTuple"),
+        "Tuple type annotations should be erased: {}",
+        output
+    );
+    // Private modifier should be erased
+    assert!(
+        !output.contains("private data"),
+        "Private modifier should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 tuple with rest elements
+#[test]
+fn test_parity_es5_tuple_rest() {
+    let source = r#"
+type StringNumberBooleans = [string, number, ...boolean[]];
+type StringNumbers = [string, ...number[]];
+type Unbounded = [...string[]];
+
+function logStringsAndNumbers(first: string, ...rest: number[]): void {
+    console.log(first, ...rest);
+}
+
+function processRestTuple(tuple: StringNumberBooleans): number {
+    const [str, num, ...flags] = tuple;
+    return flags.filter(f => f).length + num;
+}
+
+function combineArrays<T, U>(arr1: T[], arr2: U[]): [...T[], ...U[]] {
+    return [...arr1, ...arr2];
+}
+
+class RestTupleProcessor {
+    process(data: StringNumbers): string[] {
+        const [prefix, ...numbers] = data;
+        return numbers.map(n => prefix + n);
+    }
+}
+
+const tuple1: StringNumberBooleans = ["start", 10, true, false, true];
+const tuple2: StringNumbers = ["value", 1, 2, 3, 4, 5];
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions and class should be present
+    assert!(
+        output.contains("logStringsAndNumbers") && output.contains("processRestTuple") && output.contains("RestTupleProcessor"),
+        "Functions and class should be present: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type StringNumberBooleans") && !output.contains("type StringNumbers") && !output.contains("type Unbounded"),
+        "Type aliases should be erased: {}",
+        output
+    );
+    // Generic return types should be erased
+    assert!(
+        !output.contains("): [...T[]") && !output.contains("<T, U>"),
+        "Generic types should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 named tuple elements
+#[test]
+fn test_parity_es5_tuple_named() {
+    let source = r#"
+type Coordinate = [x: number, y: number, z?: number];
+type Person = [name: string, age: number, email: string];
+type Range = [start: number, end: number];
+
+function createCoordinate(x: number, y: number, z?: number): Coordinate {
+    return z !== undefined ? [x, y, z] : [x, y];
+}
+
+function formatPerson(person: Person): string {
+    const [name, age, email] = person;
+    return `${name} (${age}): ${email}`;
+}
+
+function* iterateRange(range: Range): Generator<number> {
+    const [start, end] = range;
+    for (let i = start; i <= end; i++) {
+        yield i;
+    }
+}
+
+interface CoordinateProcessor {
+    process(coord: Coordinate): number;
+}
+
+class RangeCalculator implements CoordinateProcessor {
+    process(coord: Coordinate): number {
+        const [x, y, z = 0] = coord;
+        return Math.sqrt(x * x + y * y + z * z);
+    }
+}
+
+const point3D: Coordinate = [1, 2, 3];
+const user: Person = ["John", 25, "john@example.com"];
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions and class should be present
+    assert!(
+        output.contains("createCoordinate") && output.contains("formatPerson") && output.contains("RangeCalculator"),
+        "Functions and class should be present: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type Coordinate") && !output.contains("type Person") && !output.contains("type Range"),
+        "Type aliases should be erased: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface CoordinateProcessor"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Implements clause should be erased
+    assert!(
+        !output.contains("implements CoordinateProcessor"),
+        "Implements clause should be erased: {}",
+        output
+    );
+    // Return type with Generator should be erased
+    assert!(
+        !output.contains("): Generator<"),
+        "Generator return type should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 variadic tuple types
+#[test]
+fn test_parity_es5_tuple_variadic() {
+    let source = r#"
+type Concat<T extends unknown[], U extends unknown[]> = [...T, ...U];
+type Prepend<T, U extends unknown[]> = [T, ...U];
+type Append<T extends unknown[], U> = [...T, U];
+
+function concat<T extends unknown[], U extends unknown[]>(arr1: T, arr2: U): Concat<T, U> {
+    return [...arr1, ...arr2] as Concat<T, U>;
+}
+
+function prepend<T, U extends unknown[]>(item: T, arr: U): Prepend<T, U> {
+    return [item, ...arr];
+}
+
+function append<T extends unknown[], U>(arr: T, item: U): Append<T, U> {
+    return [...arr, item] as Append<T, U>;
+}
+
+type Tail<T extends unknown[]> = T extends [unknown, ...infer Rest] ? Rest : never;
+type Head<T extends unknown[]> = T extends [infer First, ...unknown[]] ? First : never;
+
+function tail<T extends unknown[]>(arr: T): Tail<T> {
+    const [, ...rest] = arr;
+    return rest as Tail<T>;
+}
+
+function head<T extends unknown[]>(arr: T): Head<T> {
+    return arr[0] as Head<T>;
+}
+
+const combined = concat([1, 2], ["a", "b"]);
+const withPrefix = prepend("start", [1, 2, 3]);
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions should be present
+    assert!(
+        output.contains("concat") && output.contains("prepend") && output.contains("append") && output.contains("tail"),
+        "Functions should be present: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type Concat") && !output.contains("type Prepend") && !output.contains("type Tail"),
+        "Type aliases should be erased: {}",
+        output
+    );
+    // Generic type parameters should be erased
+    assert!(
+        !output.contains("<T extends unknown[]") && !output.contains("<T, U extends"),
+        "Generic type parameters should be erased: {}",
+        output
+    );
+    // Return type annotations should be erased
+    assert!(
+        !output.contains("): Concat<") && !output.contains("): Prepend<") && !output.contains("): Tail<"),
+        "Return type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 combined tuple patterns
+#[test]
+fn test_parity_es5_tuple_combined() {
+    let source = r#"
+type EventData = [type: string, timestamp: number, payload?: unknown];
+type AsyncResult<T> = [error: Error | null, data: T | null];
+type PaginatedResult<T> = [items: T[], total: number, page: number, ...metadata: string[]];
+
+interface EventHandler {
+    handle(event: EventData): AsyncResult<boolean>;
+}
+
+abstract class BaseProcessor<T> {
+    protected abstract transform(input: T): AsyncResult<T>;
+
+    async process(input: T): Promise<AsyncResult<T>> {
+        try {
+            return this.transform(input);
+        } catch (e) {
+            return [e as Error, null];
+        }
+    }
+}
+
+class DataProcessor extends BaseProcessor<string> implements EventHandler {
+    protected transform(input: string): AsyncResult<string> {
+        return [null, input.toUpperCase()];
+    }
+
+    handle(event: EventData): AsyncResult<boolean> {
+        const [type, timestamp, payload] = event;
+        console.log(type, timestamp, payload);
+        return [null, true];
+    }
+}
+
+function paginate<T>(items: T[], page: number, perPage: number): PaginatedResult<T> {
+    const start = (page - 1) * perPage;
+    const pageItems = items.slice(start, start + perPage);
+    return [pageItems, items.length, page, "cached", "validated"];
+}
+
+type ReadonlyTuple = readonly [string, number];
+type MutableFromReadonly<T extends readonly unknown[]> = [...T];
+
+const readonlyData: ReadonlyTuple = ["immutable", 42];
+const mutableCopy: MutableFromReadonly<ReadonlyTuple> = [...readonlyData];
+
+async function fetchData(): Promise<AsyncResult<object>> {
+    return [null, { success: true }];
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes and functions should be present
+    assert!(
+        output.contains("BaseProcessor") && output.contains("DataProcessor") && output.contains("paginate"),
+        "Classes and functions should be present: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type EventData") && !output.contains("type AsyncResult") && !output.contains("type PaginatedResult"),
+        "Type aliases should be erased: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface EventHandler"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Abstract keyword should be erased
+    assert!(
+        !output.contains("abstract class") && !output.contains("protected abstract"),
+        "Abstract keyword should be erased: {}",
+        output
+    );
+    // Implements clause should be erased
+    assert!(
+        !output.contains("implements EventHandler"),
+        "Implements clause should be erased: {}",
+        output
+    );
+    // Generic type parameters should be erased
+    assert!(
+        !output.contains("<T>") && !output.contains("<T extends readonly"),
+        "Generic type parameters should be erased: {}",
+        output
+    );
+    // Readonly modifier in type should be erased
+    assert!(
+        !output.contains("readonly [string"),
+        "Readonly tuple type should be erased: {}",
+        output
+    );
+}
