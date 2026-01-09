@@ -11248,3 +11248,205 @@ fn test_async_mutex_ignores_nested_async() {
     );
     assert!(!result, "Should not detect await inside nested async in mutex function");
 }
+
+// ============================================================================
+// ASYNC BARRIER PATTERN TESTS
+// Tests for barrier patterns: wait all, count down, reset, timeout
+// ============================================================================
+
+#[test]
+fn test_async_barrier_wait() {
+    let result = async_error_propagation_contains_await(
+        "async function wait() { await barrier.wait(); }",
+    );
+    assert!(result, "Should detect await in barrier wait");
+}
+
+#[test]
+fn test_async_barrier_wait_all() {
+    let result = async_error_propagation_contains_await(
+        "async function waitAll() { await barrier.waitForAll(); }",
+    );
+    assert!(result, "Should detect await in barrier wait all");
+}
+
+#[test]
+fn test_async_barrier_count_down() {
+    let result = async_error_propagation_contains_await(
+        "async function countDown() { await latch.countDown(); }",
+    );
+    assert!(result, "Should detect await in count down latch");
+}
+
+#[test]
+fn test_async_barrier_reset() {
+    let result = async_error_propagation_contains_await(
+        "async function reset() { await barrier.reset(); }",
+    );
+    assert!(result, "Should detect await in barrier reset");
+}
+
+#[test]
+fn test_async_barrier_timeout() {
+    let result = async_error_propagation_contains_await(
+        "async function waitTimeout() { return await barrier.waitWithTimeout(5000); }",
+    );
+    assert!(result, "Should detect await in barrier wait with timeout");
+}
+
+#[test]
+fn test_async_barrier_arrive() {
+    let result = async_error_propagation_contains_await(
+        "async function arrive() { await barrier.arrive(); }",
+    );
+    assert!(result, "Should detect await in barrier arrive");
+}
+
+#[test]
+fn test_async_barrier_parties() {
+    let result = async_error_propagation_contains_await(
+        "async function getParties() { return await barrier.getNumberWaiting(); }",
+    );
+    assert!(result, "Should detect await in barrier parties check");
+}
+
+#[test]
+fn test_async_barrier_phase() {
+    let result = async_error_propagation_contains_await(
+        "async function awaitPhase() { await phaser.arriveAndAwaitAdvance(); }",
+    );
+    assert!(result, "Should detect await in phase completion");
+}
+
+#[test]
+fn test_async_barrier_broken() {
+    let result = async_error_propagation_contains_await(
+        "async function checkBroken() { return await barrier.isBroken(); }",
+    );
+    assert!(result, "Should detect await in broken barrier check");
+}
+
+#[test]
+fn test_async_barrier_action() {
+    let result = async_error_propagation_contains_await(
+        "async function barrierAction() { await barrier.runAction(); }",
+    );
+    assert!(result, "Should detect await in barrier action execution");
+}
+
+#[test]
+fn test_async_barrier_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function syncBarrier() { return barrier.getParties(); }",
+    );
+    assert!(!result, "Should not detect await when barrier access is sync");
+}
+
+#[test]
+fn test_async_barrier_ignores_nested_async() {
+    let result = async_error_propagation_contains_await(
+        "async function outer() { const waiter = async () => await barrier.wait(); }",
+    );
+    assert!(!result, "Should not detect await inside nested async in barrier function");
+}
+
+// ============================================================================
+// ASYNC POOL PATTERN TESTS
+// Tests for pool patterns: worker pool, task pool, connection pool
+// ============================================================================
+
+#[test]
+fn test_async_pool_worker() {
+    let result = async_error_propagation_contains_await(
+        "async function submitWork() { return await workerPool.submit(task); }",
+    );
+    assert!(result, "Should detect await in worker pool submit");
+}
+
+#[test]
+fn test_async_pool_task() {
+    let result = async_error_propagation_contains_await(
+        "async function executeTask() { return await taskPool.execute(job); }",
+    );
+    assert!(result, "Should detect await in task pool execute");
+}
+
+#[test]
+fn test_async_pool_connection() {
+    let result = async_error_propagation_contains_await(
+        "async function getConnection() { return await connectionPool.acquire(); }",
+    );
+    assert!(result, "Should detect await in connection pool acquire");
+}
+
+#[test]
+fn test_async_pool_release() {
+    let result = async_error_propagation_contains_await(
+        "async function releaseConnection() { await pool.release(connection); }",
+    );
+    assert!(result, "Should detect await in pool release");
+}
+
+#[test]
+fn test_async_pool_resize() {
+    let result = async_error_propagation_contains_await(
+        "async function resizePool() { await pool.resize(newSize); }",
+    );
+    assert!(result, "Should detect await in pool resize");
+}
+
+#[test]
+fn test_async_pool_drain() {
+    let result = async_error_propagation_contains_await(
+        "async function drainPool() { await pool.drain(); }",
+    );
+    assert!(result, "Should detect await in pool drain");
+}
+
+#[test]
+fn test_async_pool_shutdown() {
+    let result = async_error_propagation_contains_await(
+        "async function shutdownPool() { await pool.shutdown(); }",
+    );
+    assert!(result, "Should detect await in pool shutdown");
+}
+
+#[test]
+fn test_async_pool_health_check() {
+    let result = async_error_propagation_contains_await(
+        "async function healthCheck() { return await pool.checkHealth(); }",
+    );
+    assert!(result, "Should detect await in pool health check");
+}
+
+#[test]
+fn test_async_pool_evict() {
+    let result = async_error_propagation_contains_await(
+        "async function evictStale() { await pool.evictStaleConnections(); }",
+    );
+    assert!(result, "Should detect await in pool eviction");
+}
+
+#[test]
+fn test_async_pool_batch() {
+    let result = async_error_propagation_contains_await(
+        "async function batchExecute() { return await pool.executeBatch(tasks); }",
+    );
+    assert!(result, "Should detect await in pool batch execution");
+}
+
+#[test]
+fn test_async_pool_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function syncPool() { return pool.getSize(); }",
+    );
+    assert!(!result, "Should not detect await when pool access is sync");
+}
+
+#[test]
+fn test_async_pool_ignores_nested_async() {
+    let result = async_error_propagation_contains_await(
+        "async function outer() { const worker = async () => await pool.acquire(); }",
+    );
+    assert!(!result, "Should not detect await inside nested async in pool function");
+}

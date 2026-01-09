@@ -7,12 +7,14 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] Add ES5 super call patterns parity tests: super property access, super method call, super in async, super in arrow. Tests: `./wasm/test.sh emitter_parity`
+- [ ] Add ES5 async function patterns parity tests: async arrow, async method, async generator, await expressions. Tests: `./wasm/test.sh emitter_parity`
 
 ## Task Queue
-- [ ] Add ES5 generator method patterns parity tests: yield expressions, delegation, async generators
+- [ ] Add ES5 for-of/for-in patterns parity tests: destructuring, iterator protocol
 
 ## Completed
+- [x] Added ES5 generator method patterns parity tests (yield-conditional, yield-argument, delegation-nested, async-promise-all) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (327 tests).
+- [x] Added ES5 super call patterns parity tests (property-access, method-computed, async-method, in-arrow) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (323 tests).
 - [x] Added ES5 static block patterns parity tests (complex-init-order, interleaved, async-pattern) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (319 tests).
 - [x] Added ES5 private field patterns parity tests (instance-methods, static-complex, method-context, accessor-validation) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (316 tests).
 - [x] Added ES5 class accessor patterns parity tests (auto-accessor, computed-symbol, inherited-override) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (312 tests).

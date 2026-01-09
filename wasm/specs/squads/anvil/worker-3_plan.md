@@ -7,12 +7,13 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] Add ES5 source map tests for arrow function patterns: expression body, block body, this binding, rest params, defaults. Tests: `./wasm/test.sh source_map`
-
-## Task Queue
 - [ ] Add ES5 source map tests for template literal patterns: basic, tagged, nested expressions
 
+## Task Queue
+(empty)
+
 ## Completed
+- [x] Added arrow function ES5 source map tests (expression body, block body, this binding, rest params, default params, destructuring params, class property, higher order, callbacks, comprehensive); 767 tests pass.
 - [x] Added class expression ES5 source map tests (anonymous, named, in return, with extends, with static, in variable, in array, in object, with methods, comprehensive); 757 tests pass.
 - [x] Added spread/rest transform ES5 source map tests (array spread basic, object spread basic, function call spread, array with elements, object with properties, rest parameters, array rest elements, object rest properties, nested patterns, comprehensive); 747 tests pass.
 - [x] Added destructuring transform ES5 source map tests (array basic, object basic, nested array, nested object, mixed, defaults, function params, rest patterns, loop patterns, comprehensive); 737 tests pass.

@@ -18190,3 +18190,552 @@ fn test_parity_es5_static_block_async_pattern() {
         output
     );
 }
+
+/// Parity test for ES5 super property access.
+/// Accessing properties on super in derived classes.
+#[test]
+fn test_parity_es5_super_property_access() {
+    let source = r#"class Base {
+    protected name: string = 'Base';
+    protected getValue(): number {
+        return 42;
+    }
+}
+
+class Derived extends Base {
+    private derivedName: string;
+
+    constructor() {
+        super();
+        this.derivedName = super.name + 'Derived';
+    }
+
+    getDoubleValue(): number {
+        return super.getValue() * 2;
+    }
+
+    getNames(): string {
+        return `${super.name} -> ${this.derivedName}`;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes should be present
+    assert!(
+        output.contains("Base") && output.contains("Derived"),
+        "Output should contain classes: {}",
+        output
+    );
+    // Methods should be present
+    assert!(
+        output.contains("getDoubleValue") && output.contains("getNames"),
+        "Output should contain methods: {}",
+        output
+    );
+    // Protected/private modifiers should be erased
+    assert!(
+        !output.contains("protected name") && !output.contains("private derivedName"),
+        "Access modifiers should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 super method call with computed property.
+/// Calling super methods using computed property names.
+#[test]
+fn test_parity_es5_super_method_computed() {
+    let source = r#"const methodName = 'process';
+
+class BaseProcessor {
+    process(data: string): string {
+        return data.toUpperCase();
+    }
+
+    validate(data: string): boolean {
+        return data.length > 0;
+    }
+}
+
+class DerivedProcessor extends BaseProcessor {
+    process(data: string): string {
+        const validated = super.validate(data);
+        if (!validated) return '';
+        return super[methodName](data) + '!';
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes should be present
+    assert!(
+        output.contains("BaseProcessor") && output.contains("DerivedProcessor"),
+        "Output should contain classes: {}",
+        output
+    );
+    // Methods should be present
+    assert!(
+        output.contains("process") && output.contains("validate"),
+        "Output should contain methods: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": boolean"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 super in async method.
+/// Calling super methods from async methods with await.
+#[test]
+fn test_parity_es5_super_in_async_method() {
+    let source = r#"class BaseService {
+    async fetchData(url: string): Promise<string> {
+        return `data from ${url}`;
+    }
+
+    async processData(data: string): Promise<string> {
+        return data.trim();
+    }
+}
+
+class DerivedService extends BaseService {
+    async fetchData(url: string): Promise<string> {
+        const baseData = await super.fetchData(url);
+        return `enhanced: ${baseData}`;
+    }
+
+    async fetchAndProcess(url: string): Promise<string> {
+        const data = await super.fetchData(url);
+        const processed = await super.processData(data);
+        return processed;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes should be present
+    assert!(
+        output.contains("BaseService") && output.contains("DerivedService"),
+        "Output should contain classes: {}",
+        output
+    );
+    // Should have async helper
+    assert!(
+        output.contains("__awaiter"),
+        "ES5 output should use __awaiter helper: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": Promise<") && !output.contains(": string"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 super in arrow function.
+/// Super captured correctly in arrow functions within class methods.
+#[test]
+fn test_parity_es5_super_in_arrow() {
+    let source = r#"class BaseHandler {
+    handle(value: number): number {
+        return value * 2;
+    }
+
+    handleAsync(value: number): Promise<number> {
+        return Promise.resolve(value * 2);
+    }
+}
+
+class DerivedHandler extends BaseHandler {
+    handleAll(values: number[]): number[] {
+        return values.map(v => super.handle(v));
+    }
+
+    handleAllAsync(values: number[]): Promise<number[]> {
+        return Promise.all(values.map(v => super.handleAsync(v)));
+    }
+
+    createHandler(): (value: number) => number {
+        return (v) => super.handle(v) + 1;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes should be present
+    assert!(
+        output.contains("BaseHandler") && output.contains("DerivedHandler"),
+        "Output should contain classes: {}",
+        output
+    );
+    // Methods should be present
+    assert!(
+        output.contains("handleAll") && output.contains("createHandler"),
+        "Output should contain methods: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number[]") && !output.contains(": Promise<"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+// =============================================================================
+// ES5 Generator Method Patterns Parity Tests
+// =============================================================================
+
+/// Test: yield expressions in conditional branches
+#[test]
+fn test_parity_es5_generator_yield_in_conditional() {
+    let source = r#"
+class StateMachine<T> {
+    private state: string = "idle";
+
+    *process(items: T[], condition: boolean): Generator<T | string, void, unknown> {
+        for (const item of items) {
+            if (condition) {
+                yield item;
+            } else {
+                yield "skipped";
+            }
+        }
+        yield this.state;
+    }
+
+    *processWithTernary(value: T): Generator<T | null, void, unknown> {
+        const result = value ? yield value : yield null;
+        yield result as T;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Class should be present
+    assert!(
+        output.contains("StateMachine"),
+        "Output should contain class: {}",
+        output
+    );
+    // Generator methods should be defined
+    assert!(
+        output.contains("process") && output.contains("processWithTernary"),
+        "Output should contain generator methods: {}",
+        output
+    );
+    // Type parameters should be erased
+    assert!(
+        !output.contains("<T>") && !output.contains("Generator<"),
+        "Type parameters should be erased: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": T[]") && !output.contains(": boolean"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test: yield as function argument
+#[test]
+fn test_parity_es5_generator_yield_as_argument() {
+    let source = r#"
+function log<T>(value: T): T {
+    console.log(value);
+    return value;
+}
+
+function* produceWithLogging(): Generator<number, void, number> {
+    const received = yield log(1);
+    yield log(received + 1);
+    yield log(received + 2);
+}
+
+class DataProducer {
+    private transform<T>(value: T): T {
+        return value;
+    }
+
+    *produceTransformed(values: number[]): Generator<number, void, unknown> {
+        for (const v of values) {
+            yield this.transform(v * 2);
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions should be present
+    assert!(
+        output.contains("function log") && output.contains("produceWithLogging"),
+        "Output should contain functions: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("DataProducer"),
+        "Output should contain class: {}",
+        output
+    );
+    // Type parameters should be erased
+    assert!(
+        !output.contains("<T>") && !output.contains("Generator<"),
+        "Type parameters should be erased: {}",
+        output
+    );
+}
+
+/// Test: nested yield* delegation with multiple levels
+#[test]
+fn test_parity_es5_generator_delegation_nested() {
+    let source = r#"
+function* innerGenerator(): Generator<number, void, unknown> {
+    yield 1;
+    yield 2;
+}
+
+function* middleGenerator(): Generator<number, void, unknown> {
+    yield* innerGenerator();
+    yield 3;
+    yield* innerGenerator();
+}
+
+function* outerGenerator(): Generator<number, void, unknown> {
+    yield 0;
+    yield* middleGenerator();
+    yield 4;
+}
+
+class NestedDelegator {
+    private *inner(): Generator<string, void, unknown> {
+        yield "a";
+        yield "b";
+    }
+
+    *outer(): Generator<string, void, unknown> {
+        yield* this.inner();
+        yield "c";
+        yield* this.inner();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // All generator functions should be present
+    assert!(
+        output.contains("innerGenerator") && output.contains("middleGenerator") && output.contains("outerGenerator"),
+        "Output should contain all generator functions: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("NestedDelegator"),
+        "Output should contain class: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains("Generator<"),
+        "Generator type should be erased: {}",
+        output
+    );
+}
+
+/// Test: async generator with Promise.all pattern
+#[test]
+fn test_parity_es5_async_generator_promise_all() {
+    let source = r#"
+async function* fetchMultiple(urls: string[]): AsyncGenerator<Response, void, unknown> {
+    const responses = await Promise.all(urls.map(url => fetch(url)));
+    for (const response of responses) {
+        yield response;
+    }
+}
+
+class BatchProcessor<T, R> {
+    private async processItem(item: T): Promise<R> {
+        return item as unknown as R;
+    }
+
+    async *processBatch(items: T[]): AsyncGenerator<R, void, unknown> {
+        const results = await Promise.all(items.map(item => this.processItem(item)));
+        for (const result of results) {
+            yield result;
+        }
+    }
+
+    async *processWithRace(items: T[]): AsyncGenerator<R, void, unknown> {
+        const first = await Promise.race(items.map(item => this.processItem(item)));
+        yield first;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions and class should be present
+    assert!(
+        output.contains("fetchMultiple") && output.contains("BatchProcessor"),
+        "Output should contain function and class: {}",
+        output
+    );
+    // Methods should be present
+    assert!(
+        output.contains("processBatch") && output.contains("processWithRace"),
+        "Output should contain methods: {}",
+        output
+    );
+    // Type parameters should be erased
+    assert!(
+        !output.contains("<T,") && !output.contains("AsyncGenerator<"),
+        "Type parameters should be erased: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string[]") && !output.contains(": Promise<"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
