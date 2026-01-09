@@ -7,7 +7,22 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-(none - awaiting new task from EM)
+Add ES5 async tests for async method chaining patterns
+
+Per GOALS.md Objective 1: ES5 downleveling correctness
+
+Steps:
+1. Add 6 ES5 async tests for async method chaining patterns to `wasm/src/transforms/async_es5_tests.rs`:
+   - Basic async method chain
+   - Async chain with await
+   - Fluent async builder
+   - Async pipeline pattern
+   - Async chain with error handling
+   - Combined async chain patterns
+2. Run `./wasm/test.sh async_es5_tests` to verify all tests pass
+3. Commit with message: `[wasm] async_es5: add async method chaining tests`
+4. Push to `origin/worker/anvil-5`
+5. Update this plan file and push
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
