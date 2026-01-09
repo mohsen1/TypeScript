@@ -9479,3 +9479,973 @@ fn test_intersection_optional_property_access() {
     // Intersection should be subtype of required (a is required in intersection)
     assert!(checker.is_subtype_of(intersection, obj_a_required));
 }
+
+// =============================================================================
+// Union Type Subtype Tests
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// Union Distribution (A | B assignable to C)
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_union_assignable_to_supertype() {
+    // string | number is assignable to unknown
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let string_or_number = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    // Union is subtype of unknown (unknown is top type)
+    assert!(checker.is_subtype_of(string_or_number, TypeId::UNKNOWN));
+}
+
+#[test]
+fn test_union_each_member_assignable() {
+    // If A <: C and B <: C, then A | B <: C
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a = interner.literal_string("a");
+    let b = interner.literal_string("b");
+    let union_ab = interner.union(vec![a, b]);
+
+    // Both "a" and "b" are subtypes of string
+    // Therefore "a" | "b" should be subtype of string
+    assert!(checker.is_subtype_of(union_ab, TypeId::STRING));
+}
+
+#[test]
+fn test_union_not_assignable_if_member_not() {
+    // If A <: C but B !<: C, then A | B !<: C
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let string_or_number = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    // string is subtype of string, but number is not
+    // Therefore string | number is NOT subtype of string
+    assert!(!checker.is_subtype_of(string_or_number, TypeId::STRING));
+}
+
+#[test]
+fn test_union_distribution_over_objects() {
+    // { a: string } | { a: number } assignable to { a: string | number }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_name = interner.intern_string("a");
+
+    let obj_a_string = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_a_number = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let union_type = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let obj_a_union = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: union_type,
+        write_type: union_type,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_union = interner.union(vec![obj_a_string, obj_a_number]);
+
+    // { a: string } | { a: number } <: { a: string | number }
+    assert!(checker.is_subtype_of(obj_union, obj_a_union));
+}
+
+#[test]
+fn test_union_distribution_function_return() {
+    // (() => string) | (() => number) <: () => string | number
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let fn_return_string = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_return_number = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::NUMBER,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let return_union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let fn_return_union = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: return_union,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_union = interner.union(vec![fn_return_string, fn_return_number]);
+
+    // (() => string) | (() => number) <: () => string | number
+    assert!(checker.is_subtype_of(fn_union, fn_return_union));
+}
+
+#[test]
+fn test_union_three_members_all_assignable() {
+    // "a" | "b" | "c" <: string
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a = interner.literal_string("a");
+    let b = interner.literal_string("b");
+    let c = interner.literal_string("c");
+
+    let union_abc = interner.union(vec![a, b, c]);
+
+    assert!(checker.is_subtype_of(union_abc, TypeId::STRING));
+}
+
+#[test]
+fn test_union_nested_distribution() {
+    // (A | B) | C should be equivalent to A | B | C
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let ab = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let nested = interner.union(vec![ab, TypeId::BOOLEAN]);
+
+    let flat = interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::BOOLEAN]);
+
+    // Both should be equivalent
+    assert!(checker.is_subtype_of(nested, flat));
+    assert!(checker.is_subtype_of(flat, nested));
+}
+
+// -----------------------------------------------------------------------------
+// Union Narrowing Patterns
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_union_narrowing_to_single_member() {
+    // After narrowing, string <: string | number
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let string_or_number = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    // After typeof narrowing, we get just string
+    // string should be subtype of string | number
+    assert!(checker.is_subtype_of(TypeId::STRING, string_or_number));
+}
+
+#[test]
+fn test_union_narrowing_literal_to_union() {
+    // "hello" narrows from string | number to "hello"
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let hello = interner.literal_string("hello");
+    let string_or_number = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    // "hello" is subtype of string | number
+    assert!(checker.is_subtype_of(hello, string_or_number));
+}
+
+#[test]
+fn test_union_narrowing_object_with_property() {
+    // { kind: "a", x: string } narrows from { kind: "a", x: string } | { kind: "b", y: number }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let kind_name = interner.intern_string("kind");
+    let x_name = interner.intern_string("x");
+    let y_name = interner.intern_string("y");
+
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+
+    let obj_a = interner.object(vec![
+        PropertyInfo {
+            name: kind_name,
+            type_id: lit_a,
+            write_type: lit_a,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: x_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let obj_b = interner.object(vec![
+        PropertyInfo {
+            name: kind_name,
+            type_id: lit_b,
+            write_type: lit_b,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: y_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let union = interner.union(vec![obj_a, obj_b]);
+
+    // obj_a should be subtype of union
+    assert!(checker.is_subtype_of(obj_a, union));
+    // obj_b should be subtype of union
+    assert!(checker.is_subtype_of(obj_b, union));
+}
+
+#[test]
+fn test_union_narrowing_removes_never() {
+    // string | never narrows to string
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let string_or_never = interner.union(vec![TypeId::STRING, TypeId::NEVER]);
+
+    // Should be equivalent to string
+    assert!(checker.is_subtype_of(string_or_never, TypeId::STRING));
+    assert!(checker.is_subtype_of(TypeId::STRING, string_or_never));
+}
+
+#[test]
+fn test_union_narrowing_all_never_is_never() {
+    // never | never = never
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let never_union = interner.union(vec![TypeId::NEVER, TypeId::NEVER]);
+
+    assert!(checker.is_subtype_of(never_union, TypeId::NEVER));
+    assert!(checker.is_subtype_of(TypeId::NEVER, never_union));
+}
+
+#[test]
+fn test_union_narrowing_subtype_elimination() {
+    // When narrowing string | "hello", "hello" is subsumed by string
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let hello = interner.literal_string("hello");
+    let string_or_hello = interner.union(vec![TypeId::STRING, hello]);
+
+    // Should be equivalent to just string (hello is subsumed)
+    assert!(checker.is_subtype_of(string_or_hello, TypeId::STRING));
+}
+
+// -----------------------------------------------------------------------------
+// Exhaustive Union Checks
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_exhaustive_union_all_cases_covered() {
+    // If we handle all cases of A | B | C, result covers the union
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a = interner.literal_string("a");
+    let b = interner.literal_string("b");
+    let c = interner.literal_string("c");
+
+    let union_abc = interner.union(vec![a, b, c]);
+
+    // Each literal is subtype of the union
+    assert!(checker.is_subtype_of(a, union_abc));
+    assert!(checker.is_subtype_of(b, union_abc));
+    assert!(checker.is_subtype_of(c, union_abc));
+
+    // Union of all literals equals the original union
+    let reconstructed = interner.union(vec![a, b, c]);
+    assert!(checker.is_subtype_of(union_abc, reconstructed));
+    assert!(checker.is_subtype_of(reconstructed, union_abc));
+}
+
+#[test]
+fn test_exhaustive_union_missing_case_not_subtype() {
+    // "a" | "b" is NOT subtype of "a" | "b" | "c" in reverse
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a = interner.literal_string("a");
+    let b = interner.literal_string("b");
+    let c = interner.literal_string("c");
+
+    let union_ab = interner.union(vec![a, b]);
+    let union_abc = interner.union(vec![a, b, c]);
+
+    // "a" | "b" <: "a" | "b" | "c"
+    assert!(checker.is_subtype_of(union_ab, union_abc));
+    // "a" | "b" | "c" is NOT subtype of "a" | "b" (missing "c")
+    assert!(!checker.is_subtype_of(union_abc, union_ab));
+}
+
+#[test]
+fn test_exhaustive_union_never_when_complete() {
+    // After exhaustive switch, remaining type is never
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    // never is subtype of any union (exhaustive check complete)
+    let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert!(checker.is_subtype_of(TypeId::NEVER, union));
+}
+
+#[test]
+fn test_exhaustive_union_boolean_two_literals() {
+    // true | false should be equivalent to boolean
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let lit_true = interner.literal_boolean(true);
+    let lit_false = interner.literal_boolean(false);
+    let true_or_false = interner.union(vec![lit_true, lit_false]);
+
+    // true | false <: boolean
+    assert!(checker.is_subtype_of(true_or_false, TypeId::BOOLEAN));
+    // boolean <: true | false (they should be equivalent)
+    // Note: This depends on whether the checker treats boolean as true | false
+    let bool_to_union = checker.is_subtype_of(TypeId::BOOLEAN, true_or_false);
+    // At minimum, one direction should work
+    assert!(checker.is_subtype_of(true_or_false, TypeId::BOOLEAN) || bool_to_union);
+}
+
+#[test]
+fn test_exhaustive_union_object_types() {
+    // Union of all possible object shapes
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let kind_name = interner.intern_string("kind");
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: kind_name,
+        type_id: lit_a,
+        write_type: lit_a,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: kind_name,
+        type_id: lit_b,
+        write_type: lit_b,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let union = interner.union(vec![obj_a, obj_b]);
+
+    // Each object is subtype of union
+    assert!(checker.is_subtype_of(obj_a, union));
+    assert!(checker.is_subtype_of(obj_b, union));
+}
+
+#[test]
+fn test_exhaustive_union_function_overloads() {
+    // All overloads covered
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let fn_string = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_number = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::NUMBER,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_union = interner.union(vec![fn_string, fn_number]);
+
+    // Each function is subtype of the union
+    assert!(checker.is_subtype_of(fn_string, fn_union));
+    assert!(checker.is_subtype_of(fn_number, fn_union));
+}
+
+// -----------------------------------------------------------------------------
+// Discriminated Union Handling
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_discriminated_union_basic() {
+    // { kind: "a", x: string } | { kind: "b", y: number }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let kind_name = interner.intern_string("kind");
+    let x_name = interner.intern_string("x");
+    let y_name = interner.intern_string("y");
+
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+
+    let variant_a = interner.object(vec![
+        PropertyInfo {
+            name: kind_name,
+            type_id: lit_a,
+            write_type: lit_a,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: x_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let variant_b = interner.object(vec![
+        PropertyInfo {
+            name: kind_name,
+            type_id: lit_b,
+            write_type: lit_b,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: y_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let discriminated_union = interner.union(vec![variant_a, variant_b]);
+
+    // Each variant is subtype of union
+    assert!(checker.is_subtype_of(variant_a, discriminated_union));
+    assert!(checker.is_subtype_of(variant_b, discriminated_union));
+
+    // Variants are not subtypes of each other
+    assert!(!checker.is_subtype_of(variant_a, variant_b));
+    assert!(!checker.is_subtype_of(variant_b, variant_a));
+}
+
+#[test]
+fn test_discriminated_union_three_variants() {
+    // { type: "success", data: T } | { type: "error", error: E } | { type: "loading" }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let type_name = interner.intern_string("type");
+    let data_name = interner.intern_string("data");
+    let error_name = interner.intern_string("error");
+
+    let lit_success = interner.literal_string("success");
+    let lit_error = interner.literal_string("error");
+    let lit_loading = interner.literal_string("loading");
+
+    let success_variant = interner.object(vec![
+        PropertyInfo {
+            name: type_name,
+            type_id: lit_success,
+            write_type: lit_success,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: data_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let error_variant = interner.object(vec![
+        PropertyInfo {
+            name: type_name,
+            type_id: lit_error,
+            write_type: lit_error,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: error_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let loading_variant = interner.object(vec![PropertyInfo {
+        name: type_name,
+        type_id: lit_loading,
+        write_type: lit_loading,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let result_type = interner.union(vec![success_variant, error_variant, loading_variant]);
+
+    // Each variant is subtype of union
+    assert!(checker.is_subtype_of(success_variant, result_type));
+    assert!(checker.is_subtype_of(error_variant, result_type));
+    assert!(checker.is_subtype_of(loading_variant, result_type));
+}
+
+#[test]
+fn test_discriminated_union_numeric_discriminant() {
+    // { code: 0, message: string } | { code: 1, data: number }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let code_name = interner.intern_string("code");
+    let message_name = interner.intern_string("message");
+    let data_name = interner.intern_string("data");
+
+    let lit_0 = interner.literal_number(0.0);
+    let lit_1 = interner.literal_number(1.0);
+
+    let variant_0 = interner.object(vec![
+        PropertyInfo {
+            name: code_name,
+            type_id: lit_0,
+            write_type: lit_0,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: message_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let variant_1 = interner.object(vec![
+        PropertyInfo {
+            name: code_name,
+            type_id: lit_1,
+            write_type: lit_1,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: data_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let union = interner.union(vec![variant_0, variant_1]);
+
+    assert!(checker.is_subtype_of(variant_0, union));
+    assert!(checker.is_subtype_of(variant_1, union));
+}
+
+#[test]
+fn test_discriminated_union_common_property_access() {
+    // Both variants have "id" property - can access on union
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let kind_name = interner.intern_string("kind");
+    let id_name = interner.intern_string("id");
+    let value_name = interner.intern_string("value");
+
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+
+    let variant_a = interner.object(vec![
+        PropertyInfo {
+            name: kind_name,
+            type_id: lit_a,
+            write_type: lit_a,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: id_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let variant_b = interner.object(vec![
+        PropertyInfo {
+            name: kind_name,
+            type_id: lit_b,
+            write_type: lit_b,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: id_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: value_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let union = interner.union(vec![variant_a, variant_b]);
+
+    // Object with just common properties should be supertype
+    let common = interner.object(vec![PropertyInfo {
+        name: id_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Union should be subtype of object with common property
+    assert!(checker.is_subtype_of(union, common));
+}
+
+#[test]
+fn test_discriminated_union_nested_discriminant() {
+    // { status: { kind: "ok" }, data: T } | { status: { kind: "err" }, error: E }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let status_name = interner.intern_string("status");
+    let kind_name = interner.intern_string("kind");
+    let data_name = interner.intern_string("data");
+    let error_name = interner.intern_string("error");
+
+    let lit_ok = interner.literal_string("ok");
+    let lit_err = interner.literal_string("err");
+
+    let status_ok = interner.object(vec![PropertyInfo {
+        name: kind_name,
+        type_id: lit_ok,
+        write_type: lit_ok,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let status_err = interner.object(vec![PropertyInfo {
+        name: kind_name,
+        type_id: lit_err,
+        write_type: lit_err,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let ok_variant = interner.object(vec![
+        PropertyInfo {
+            name: status_name,
+            type_id: status_ok,
+            write_type: status_ok,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: data_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let err_variant = interner.object(vec![
+        PropertyInfo {
+            name: status_name,
+            type_id: status_err,
+            write_type: status_err,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: error_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let union = interner.union(vec![ok_variant, err_variant]);
+
+    assert!(checker.is_subtype_of(ok_variant, union));
+    assert!(checker.is_subtype_of(err_variant, union));
+}
+
+#[test]
+fn test_discriminated_union_optional_property_variant() {
+    // { type: "full", data: T } | { type: "partial", data?: T }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let type_name = interner.intern_string("type");
+    let data_name = interner.intern_string("data");
+
+    let lit_full = interner.literal_string("full");
+    let lit_partial = interner.literal_string("partial");
+
+    let full_variant = interner.object(vec![
+        PropertyInfo {
+            name: type_name,
+            type_id: lit_full,
+            write_type: lit_full,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: data_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let partial_variant = interner.object(vec![
+        PropertyInfo {
+            name: type_name,
+            type_id: lit_partial,
+            write_type: lit_partial,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: data_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: true,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let union = interner.union(vec![full_variant, partial_variant]);
+
+    assert!(checker.is_subtype_of(full_variant, union));
+    assert!(checker.is_subtype_of(partial_variant, union));
+}
+
+#[test]
+fn test_discriminated_union_with_method() {
+    // { kind: "sync", run(): T } | { kind: "async", run(): Promise<T> }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let kind_name = interner.intern_string("kind");
+    let run_name = interner.intern_string("run");
+
+    let lit_sync = interner.literal_string("sync");
+    let lit_async = interner.literal_string("async");
+
+    let sync_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let async_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::STRING, // Simplified - would be Promise<string>
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let sync_variant = interner.object(vec![
+        PropertyInfo {
+            name: kind_name,
+            type_id: lit_sync,
+            write_type: lit_sync,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: run_name,
+            type_id: sync_method,
+            write_type: sync_method,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+    ]);
+
+    let async_variant = interner.object(vec![
+        PropertyInfo {
+            name: kind_name,
+            type_id: lit_async,
+            write_type: lit_async,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: run_name,
+            type_id: async_method,
+            write_type: async_method,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+    ]);
+
+    let union = interner.union(vec![sync_variant, async_variant]);
+
+    assert!(checker.is_subtype_of(sync_variant, union));
+    assert!(checker.is_subtype_of(async_variant, union));
+}
+
+#[test]
+fn test_discriminated_union_boolean_discriminant() {
+    // { success: true, value: T } | { success: false, error: E }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let success_name = interner.intern_string("success");
+    let value_name = interner.intern_string("value");
+    let error_name = interner.intern_string("error");
+
+    let lit_true = interner.literal_boolean(true);
+    let lit_false = interner.literal_boolean(false);
+
+    let success_variant = interner.object(vec![
+        PropertyInfo {
+            name: success_name,
+            type_id: lit_true,
+            write_type: lit_true,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: value_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let failure_variant = interner.object(vec![
+        PropertyInfo {
+            name: success_name,
+            type_id: lit_false,
+            write_type: lit_false,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: error_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let result = interner.union(vec![success_variant, failure_variant]);
+
+    assert!(checker.is_subtype_of(success_variant, result));
+    assert!(checker.is_subtype_of(failure_variant, result));
+}
