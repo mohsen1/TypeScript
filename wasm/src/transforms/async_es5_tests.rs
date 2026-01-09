@@ -11652,3 +11652,104 @@ fn test_async_event_emitter_ignores_nested_async() {
     );
     assert!(!result, "Should not detect await inside nested async in event emitter function");
 }
+
+// ============================================================================
+// ASYNC QUEUE OPERATIONS PATTERN TESTS
+// Tests for queue operations patterns: enqueue, dequeue, peek, drain, priority
+// ============================================================================
+
+#[test]
+fn test_async_queue_ops_enqueue() {
+    let result = async_error_propagation_contains_await(
+        "async function enqueue() { await queue.enqueue(item); }",
+    );
+    assert!(result, "Should detect await in queue enqueue");
+}
+
+#[test]
+fn test_async_queue_ops_dequeue() {
+    let result = async_error_propagation_contains_await(
+        "async function dequeue() { return await queue.dequeue(); }",
+    );
+    assert!(result, "Should detect await in queue dequeue");
+}
+
+#[test]
+fn test_async_queue_ops_peek() {
+    let result = async_error_propagation_contains_await(
+        "async function peek() { return await queue.peek(); }",
+    );
+    assert!(result, "Should detect await in queue peek");
+}
+
+#[test]
+fn test_async_queue_ops_drain() {
+    let result = async_error_propagation_contains_await(
+        "async function drainQueue() { return await queue.drainAll(); }",
+    );
+    assert!(result, "Should detect await in queue drain");
+}
+
+#[test]
+fn test_async_queue_ops_priority() {
+    let result = async_error_propagation_contains_await(
+        "async function priorityEnqueue() { await priorityQueue.insert(item, priority); }",
+    );
+    assert!(result, "Should detect await in priority queue insert");
+}
+
+#[test]
+fn test_async_queue_ops_size() {
+    let result = async_error_propagation_contains_await(
+        "async function getSize() { return await queue.getSize(); }",
+    );
+    assert!(result, "Should detect await in queue size check");
+}
+
+#[test]
+fn test_async_queue_ops_clear() {
+    let result = async_error_propagation_contains_await(
+        "async function clearQueue() { await queue.clear(); }",
+    );
+    assert!(result, "Should detect await in queue clear");
+}
+
+#[test]
+fn test_async_queue_ops_contains() {
+    let result = async_error_propagation_contains_await(
+        "async function contains() { return await queue.contains(item); }",
+    );
+    assert!(result, "Should detect await in queue contains check");
+}
+
+#[test]
+fn test_async_queue_ops_iterator() {
+    let result = async_error_propagation_contains_await(
+        "async function iterate() { for (const item of await queue.items()) { } }",
+    );
+    assert!(result, "Should detect await in queue iteration");
+}
+
+#[test]
+fn test_async_queue_ops_batch() {
+    let result = async_error_propagation_contains_await(
+        "async function batchEnqueue() { await queue.enqueueAll(items); }",
+    );
+    assert!(result, "Should detect await in batch enqueue");
+}
+
+#[test]
+fn test_async_queue_ops_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function syncQueue() { return queue.isEmpty(); }",
+    );
+    assert!(!result, "Should not detect await when queue access is sync");
+}
+
+#[test]
+fn test_async_queue_ops_ignores_nested_async() {
+    let result = async_error_propagation_contains_await(
+        "async function outer() { const worker = async () => await queue.dequeue(); }",
+    );
+    assert!(!result, "Should not detect await inside nested async in queue function");
+}
