@@ -16757,3 +16757,399 @@ class AppConfig {
         output
     );
 }
+
+#[test]
+fn test_class_es5_array_find_basic() {
+    // Basic Array.prototype.find usage
+    let source = r#"
+class ArrayFinder<T> {
+    private items: T[];
+
+    constructor(items: T[]) {
+        this.items = items;
+    }
+
+    find(predicate: (item: T) => boolean): T | undefined {
+        return this.items.find(predicate);
+    }
+
+    findByProperty<K extends keyof T>(key: K, value: T[K]): T | undefined {
+        return this.items.find(item => item[key] === value);
+    }
+
+    static findFirst<U>(arr: U[], predicate: (item: U) => boolean): U | undefined {
+        return arr.find(predicate);
+    }
+
+    findWithDefault(predicate: (item: T) => boolean, defaultValue: T): T {
+        return this.items.find(predicate) ?? defaultValue;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("ArrayFinder"),
+        "Expected ArrayFinder class: {}",
+        output
+    );
+    assert!(
+        output.contains(".find("),
+        "Expected find: {}",
+        output
+    );
+    assert!(
+        output.contains("findByProperty") && output.contains("findWithDefault"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_array_findindex_basic() {
+    // Basic Array.prototype.findIndex usage
+    let source = r#"
+class IndexFinder<T> {
+    private items: T[];
+
+    constructor(items: T[]) {
+        this.items = items;
+    }
+
+    findIndex(predicate: (item: T) => boolean): number {
+        return this.items.findIndex(predicate);
+    }
+
+    indexOfMatch<K extends keyof T>(key: K, value: T[K]): number {
+        return this.items.findIndex(item => item[key] === value);
+    }
+
+    static firstMatchIndex<U>(arr: U[], predicate: (item: U) => boolean): number {
+        return arr.findIndex(predicate);
+    }
+
+    exists(predicate: (item: T) => boolean): boolean {
+        return this.items.findIndex(predicate) !== -1;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("IndexFinder"),
+        "Expected IndexFinder class: {}",
+        output
+    );
+    assert!(
+        output.contains(".findIndex("),
+        "Expected findIndex: {}",
+        output
+    );
+    assert!(
+        output.contains("indexOfMatch") && output.contains("exists"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_array_fill_basic() {
+    // Basic Array.prototype.fill usage
+    let source = r#"
+class ArrayFiller<T> {
+    fill(arr: T[], value: T): T[] {
+        return arr.fill(value);
+    }
+
+    fillRange(arr: T[], value: T, start: number, end: number): T[] {
+        return arr.fill(value, start, end);
+    }
+
+    static createFilled<U>(length: number, value: U): U[] {
+        return new Array(length).fill(value);
+    }
+
+    static fillFrom<U>(arr: U[], value: U, start: number): U[] {
+        return arr.fill(value, start);
+    }
+
+    reset(arr: T[], defaultValue: T): T[] {
+        return arr.fill(defaultValue);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("ArrayFiller"),
+        "Expected ArrayFiller class: {}",
+        output
+    );
+    assert!(
+        output.contains(".fill("),
+        "Expected fill: {}",
+        output
+    );
+    assert!(
+        output.contains("fillRange") && output.contains("createFilled"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_array_copywithin_basic() {
+    // Basic Array.prototype.copyWithin usage
+    let source = r#"
+class ArrayCopier<T> {
+    copyWithin(arr: T[], target: number, start: number): T[] {
+        return arr.copyWithin(target, start);
+    }
+
+    copyRange(arr: T[], target: number, start: number, end: number): T[] {
+        return arr.copyWithin(target, start, end);
+    }
+
+    static shiftLeft<U>(arr: U[], positions: number): U[] {
+        return arr.copyWithin(0, positions);
+    }
+
+    static duplicate<U>(arr: U[], sourceIndex: number, targetIndex: number): U[] {
+        return arr.copyWithin(targetIndex, sourceIndex, sourceIndex + 1);
+    }
+
+    rotateLeft(arr: T[]): T[] {
+        const first = arr[0];
+        arr.copyWithin(0, 1);
+        arr[arr.length - 1] = first;
+        return arr;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("ArrayCopier"),
+        "Expected ArrayCopier class: {}",
+        output
+    );
+    assert!(
+        output.contains(".copyWithin("),
+        "Expected copyWithin: {}",
+        output
+    );
+    assert!(
+        output.contains("copyRange") && output.contains("shiftLeft"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_array_methods_in_constructor() {
+    // Array ES6 methods in constructor
+    let source = r#"
+class ArrayProcessor<T> {
+    private firstMatch: T | undefined;
+    private firstMatchIndex: number;
+    private filledArray: T[];
+
+    constructor(items: T[], predicate: (item: T) => boolean, fillValue: T) {
+        this.firstMatch = items.find(predicate);
+        this.firstMatchIndex = items.findIndex(predicate);
+        this.filledArray = new Array(items.length).fill(fillValue);
+    }
+
+    getFirstMatch(): T | undefined {
+        return this.firstMatch;
+    }
+
+    getFirstMatchIndex(): number {
+        return this.firstMatchIndex;
+    }
+
+    getFilledArray(): T[] {
+        return this.filledArray;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("ArrayProcessor"),
+        "Expected ArrayProcessor class: {}",
+        output
+    );
+    assert!(
+        output.contains(".find(") && output.contains(".findIndex("),
+        "Expected find and findIndex: {}",
+        output
+    );
+    assert!(
+        output.contains(".fill("),
+        "Expected fill: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_array_methods_combined() {
+    // Combined Array ES6 methods
+    let source = r#"
+class ArrayUtilities<T> {
+    static findAndReplace<U>(
+        arr: U[],
+        predicate: (item: U) => boolean,
+        replacement: U
+    ): { found: boolean; index: number; array: U[] } {
+        const index = arr.findIndex(predicate);
+        if (index !== -1) {
+            arr[index] = replacement;
+        }
+        return { found: index !== -1, index, array: arr };
+    }
+
+    static findOrCreate<U>(
+        arr: U[],
+        predicate: (item: U) => boolean,
+        factory: () => U
+    ): U {
+        const found = arr.find(predicate);
+        if (found !== undefined) {
+            return found;
+        }
+        const newItem = factory();
+        arr.push(newItem);
+        return newItem;
+    }
+
+    static createMatrix<U>(rows: number, cols: number, value: U): U[][] {
+        return new Array(rows).fill(null).map(() => new Array(cols).fill(value));
+    }
+
+    static rotateArray<U>(arr: U[], positions: number): U[] {
+        const normalizedPos = positions % arr.length;
+        if (normalizedPos === 0) return arr;
+
+        const copy = [...arr];
+        copy.copyWithin(0, normalizedPos);
+        for (let i = 0; i < normalizedPos; i++) {
+            copy[arr.length - normalizedPos + i] = arr[i];
+        }
+        return copy;
+    }
+
+    processAll(
+        items: T[],
+        findPredicate: (item: T) => boolean,
+        fillValue: T
+    ): { found: T | undefined; index: number; filled: T[] } {
+        return {
+            found: items.find(findPredicate),
+            index: items.findIndex(findPredicate),
+            filled: [...items].fill(fillValue)
+        };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("ArrayUtilities"),
+        "Expected ArrayUtilities class: {}",
+        output
+    );
+    assert!(
+        output.contains(".find(") && output.contains(".findIndex("),
+        "Expected find and findIndex: {}",
+        output
+    );
+    assert!(
+        output.contains(".fill(") && output.contains(".copyWithin("),
+        "Expected fill and copyWithin: {}",
+        output
+    );
+    assert!(
+        output.contains("findAndReplace") && output.contains("findOrCreate"),
+        "Expected utility methods: {}",
+        output
+    );
+}
