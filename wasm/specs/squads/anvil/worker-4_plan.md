@@ -7,12 +7,15 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-Add ES5 class tests for mapped type patterns: Partial, Required, Readonly. Tests: `./wasm/test.sh class_es5_tests`
+Add ES5 class tests for infer keyword patterns: array element, function return, promise unwrap. Tests: `./wasm/test.sh class_es5_tests`
 
 ## Task Queue
-- [ ] Add ES5 class tests for conditional type patterns: Exclude, Extract, NonNullable
+- [ ] Add ES5 class tests for recursive type patterns: tree, linked list, JSON
 
 ## Completed
+- [x] Add ES5 class tests for template literal type patterns: Uppercase, Lowercase, Capitalize. Tests: `./wasm/test.sh class_es5_tests`
+- [x] Add ES5 class tests for conditional type patterns: Exclude, Extract, NonNullable. Tests: `./wasm/test.sh class_es5_tests`
+- [x] Add ES5 class tests for mapped type patterns: Partial, Required, Readonly. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for type alias patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for generic constraint patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for constructor signature patterns. Tests: `./wasm/test.sh class_es5_tests`

@@ -33809,3 +33809,2794 @@ class FunctionAnalyzer<T extends (...args: any[]) => any> {
         output
     );
 }
+
+// ============================================================================
+// ENUM PATTERN TESTS
+// ============================================================================
+
+/// Test enum patterns: const enum (inlined values)
+#[test]
+fn test_class_es5_enum_const() {
+    let source = r#"
+const enum Direction {
+    Up = 0,
+    Down = 1,
+    Left = 2,
+    Right = 3
+}
+
+const enum HttpStatus {
+    OK = 200,
+    Created = 201,
+    BadRequest = 400,
+    NotFound = 404,
+    InternalError = 500
+}
+
+class DirectionHandler {
+    private direction: number;
+
+    constructor() {
+        this.direction = 0;
+    }
+
+    setDirection(dir: Direction): void {
+        this.direction = dir;
+    }
+
+    getDirection(): number {
+        return this.direction;
+    }
+
+    isHorizontal(): boolean {
+        return this.direction === Direction.Left || this.direction === Direction.Right;
+    }
+
+    isVertical(): boolean {
+        return this.direction === Direction.Up || this.direction === Direction.Down;
+    }
+}
+
+class HttpStatusChecker {
+    isSuccess(status: HttpStatus): boolean {
+        return status >= 200 && status < 300;
+    }
+
+    isClientError(status: HttpStatus): boolean {
+        return status >= 400 && status < 500;
+    }
+
+    isServerError(status: HttpStatus): boolean {
+        return status >= 500;
+    }
+
+    getStatusText(status: HttpStatus): string {
+        switch (status) {
+            case HttpStatus.OK: return "OK";
+            case HttpStatus.Created: return "Created";
+            case HttpStatus.BadRequest: return "Bad Request";
+            case HttpStatus.NotFound: return "Not Found";
+            case HttpStatus.InternalError: return "Internal Server Error";
+            default: return "Unknown";
+        }
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted to ES5
+    assert!(
+        output.contains("function DirectionHandler") && output.contains("function HttpStatusChecker"),
+        "Expected ES5 class constructors: {}",
+        output
+    );
+
+    // Methods should be on prototype
+    assert!(
+        output.contains("DirectionHandler.prototype.setDirection") &&
+        output.contains("HttpStatusChecker.prototype.isSuccess"),
+        "Expected methods on prototype: {}",
+        output
+    );
+
+    // Direction check methods
+    assert!(
+        output.contains("isHorizontal") && output.contains("isVertical"),
+        "Expected direction methods: {}",
+        output
+    );
+}
+
+/// Test enum patterns: string enum
+#[test]
+fn test_class_es5_enum_string() {
+    let source = r#"
+enum Color {
+    Red = "RED",
+    Green = "GREEN",
+    Blue = "BLUE",
+    Yellow = "YELLOW"
+}
+
+enum LogLevel {
+    Debug = "debug",
+    Info = "info",
+    Warning = "warning",
+    Error = "error"
+}
+
+class ColorPicker {
+    private currentColor: Color;
+
+    constructor() {
+        this.currentColor = Color.Red;
+    }
+
+    setColor(color: Color): void {
+        this.currentColor = color;
+    }
+
+    getColor(): Color {
+        return this.currentColor;
+    }
+
+    getColorName(): string {
+        return this.currentColor;
+    }
+
+    isPrimary(): boolean {
+        return this.currentColor === Color.Red ||
+               this.currentColor === Color.Green ||
+               this.currentColor === Color.Blue;
+    }
+}
+
+class Logger {
+    private level: LogLevel;
+    private messages: string[] = [];
+
+    constructor(level: LogLevel) {
+        this.level = level;
+    }
+
+    log(level: LogLevel, message: string): void {
+        if (this.shouldLog(level)) {
+            this.messages.push("[" + level + "] " + message);
+        }
+    }
+
+    private shouldLog(level: LogLevel): boolean {
+        const levels = [LogLevel.Debug, LogLevel.Info, LogLevel.Warning, LogLevel.Error];
+        return levels.indexOf(level) >= levels.indexOf(this.level);
+    }
+
+    getMessages(): string[] {
+        return this.messages.slice();
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("function ColorPicker") && output.contains("function Logger"),
+        "Expected ES5 class constructors: {}",
+        output
+    );
+
+    // Enum should be emitted
+    assert!(
+        output.contains("Color") && output.contains("LogLevel"),
+        "Expected enum declarations: {}",
+        output
+    );
+
+    // Methods preserved
+    assert!(
+        output.contains("setColor") && output.contains("isPrimary"),
+        "Expected ColorPicker methods: {}",
+        output
+    );
+}
+
+/// Test enum patterns: numeric enum
+#[test]
+fn test_class_es5_enum_numeric() {
+    let source = r#"
+enum Priority {
+    Low,
+    Medium,
+    High,
+    Critical
+}
+
+enum Weekday {
+    Monday = 1,
+    Tuesday,
+    Wednesday,
+    Thursday,
+    Friday,
+    Saturday,
+    Sunday
+}
+
+class TaskPrioritizer {
+    private priority: Priority;
+
+    constructor() {
+        this.priority = Priority.Medium;
+    }
+
+    setPriority(priority: Priority): void {
+        this.priority = priority;
+    }
+
+    getPriority(): Priority {
+        return this.priority;
+    }
+
+    isUrgent(): boolean {
+        return this.priority >= Priority.High;
+    }
+
+    compare(other: Priority): number {
+        return this.priority - other;
+    }
+}
+
+class WeekdayScheduler {
+    private workdays: Set<Weekday> = new Set();
+
+    addWorkday(day: Weekday): void {
+        this.workdays.add(day);
+    }
+
+    isWorkday(day: Weekday): boolean {
+        return this.workdays.has(day);
+    }
+
+    isWeekend(day: Weekday): boolean {
+        return day === Weekday.Saturday || day === Weekday.Sunday;
+    }
+
+    getWorkdayCount(): number {
+        return this.workdays.size;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("function TaskPrioritizer") && output.contains("function WeekdayScheduler"),
+        "Expected ES5 class constructors: {}",
+        output
+    );
+
+    // Enum should be emitted
+    assert!(
+        output.contains("Priority") && output.contains("Weekday"),
+        "Expected enum declarations: {}",
+        output
+    );
+
+    // Methods preserved
+    assert!(
+        output.contains("isUrgent") && output.contains("isWeekend"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+/// Test enum patterns: computed enum values
+#[test]
+fn test_class_es5_enum_computed() {
+    let source = r#"
+enum FileSize {
+    Kilobyte = 1024,
+    Megabyte = 1024 * 1024,
+    Gigabyte = 1024 * 1024 * 1024
+}
+
+enum Permission {
+    None = 0,
+    Read = 1 << 0,
+    Write = 1 << 1,
+    Execute = 1 << 2,
+    All = Read | Write | Execute
+}
+
+class FileSizeFormatter {
+    format(bytes: number): string {
+        if (bytes >= FileSize.Gigabyte) {
+            return (bytes / FileSize.Gigabyte).toFixed(2) + " GB";
+        } else if (bytes >= FileSize.Megabyte) {
+            return (bytes / FileSize.Megabyte).toFixed(2) + " MB";
+        } else if (bytes >= FileSize.Kilobyte) {
+            return (bytes / FileSize.Kilobyte).toFixed(2) + " KB";
+        }
+        return bytes + " B";
+    }
+
+    parse(size: string): number {
+        const value = parseFloat(size);
+        if (size.includes("GB")) return value * FileSize.Gigabyte;
+        if (size.includes("MB")) return value * FileSize.Megabyte;
+        if (size.includes("KB")) return value * FileSize.Kilobyte;
+        return value;
+    }
+}
+
+class PermissionManager {
+    private permissions: Permission;
+
+    constructor() {
+        this.permissions = Permission.None;
+    }
+
+    grant(permission: Permission): void {
+        this.permissions = this.permissions | permission;
+    }
+
+    revoke(permission: Permission): void {
+        this.permissions = this.permissions & ~permission;
+    }
+
+    has(permission: Permission): boolean {
+        return (this.permissions & permission) === permission;
+    }
+
+    canRead(): boolean {
+        return this.has(Permission.Read);
+    }
+
+    canWrite(): boolean {
+        return this.has(Permission.Write);
+    }
+
+    canExecute(): boolean {
+        return this.has(Permission.Execute);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("function FileSizeFormatter") && output.contains("function PermissionManager"),
+        "Expected ES5 class constructors: {}",
+        output
+    );
+
+    // Enums should be emitted
+    assert!(
+        output.contains("FileSize") && output.contains("Permission"),
+        "Expected enum declarations: {}",
+        output
+    );
+
+    // Methods preserved
+    assert!(
+        output.contains("format") && output.contains("parse"),
+        "Expected FileSizeFormatter methods: {}",
+        output
+    );
+
+    // Permission methods
+    assert!(
+        output.contains("grant") && output.contains("revoke") && output.contains("has"),
+        "Expected PermissionManager methods: {}",
+        output
+    );
+}
+
+/// Test enum patterns: enum as class property type
+#[test]
+fn test_class_es5_enum_class_property() {
+    let source = r#"
+enum Status {
+    Pending = "pending",
+    Active = "active",
+    Completed = "completed",
+    Cancelled = "cancelled"
+}
+
+enum UserRole {
+    Guest,
+    User,
+    Moderator,
+    Admin
+}
+
+class Order {
+    private id: string;
+    private status: Status;
+    private items: string[];
+
+    constructor(id: string) {
+        this.id = id;
+        this.status = Status.Pending;
+        this.items = [];
+    }
+
+    addItem(item: string): void {
+        this.items.push(item);
+    }
+
+    activate(): void {
+        if (this.status === Status.Pending) {
+            this.status = Status.Active;
+        }
+    }
+
+    complete(): void {
+        if (this.status === Status.Active) {
+            this.status = Status.Completed;
+        }
+    }
+
+    cancel(): void {
+        if (this.status !== Status.Completed) {
+            this.status = Status.Cancelled;
+        }
+    }
+
+    getStatus(): Status {
+        return this.status;
+    }
+}
+
+class User {
+    private id: string;
+    private name: string;
+    private role: UserRole;
+
+    constructor(id: string, name: string, role: UserRole = UserRole.User) {
+        this.id = id;
+        this.name = name;
+        this.role = role;
+    }
+
+    promote(): void {
+        if (this.role < UserRole.Admin) {
+            this.role++;
+        }
+    }
+
+    demote(): void {
+        if (this.role > UserRole.Guest) {
+            this.role--;
+        }
+    }
+
+    isAdmin(): boolean {
+        return this.role === UserRole.Admin;
+    }
+
+    hasModeratorAccess(): boolean {
+        return this.role >= UserRole.Moderator;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("function Order") && output.contains("function User"),
+        "Expected ES5 class constructors: {}",
+        output
+    );
+
+    // Enums should be emitted
+    assert!(
+        output.contains("Status") && output.contains("UserRole"),
+        "Expected enum declarations: {}",
+        output
+    );
+
+    // Order methods
+    assert!(
+        output.contains("activate") && output.contains("complete") && output.contains("cancel"),
+        "Expected Order methods: {}",
+        output
+    );
+
+    // User methods
+    assert!(
+        output.contains("promote") && output.contains("demote") && output.contains("isAdmin"),
+        "Expected User methods: {}",
+        output
+    );
+}
+
+/// Test enum patterns: combined enum patterns
+#[test]
+fn test_class_es5_enum_combined_patterns() {
+    let source = r#"
+const enum MessageType {
+    Text = 0,
+    Image = 1,
+    Video = 2,
+    Audio = 3
+}
+
+enum DeliveryStatus {
+    Sent = "sent",
+    Delivered = "delivered",
+    Read = "read",
+    Failed = "failed"
+}
+
+enum Priority {
+    Low = 1,
+    Normal = 2,
+    High = 3,
+    Urgent = 4
+}
+
+class Message {
+    private type: MessageType;
+    private content: string;
+    private status: DeliveryStatus;
+    private priority: Priority;
+
+    constructor(type: MessageType, content: string) {
+        this.type = type;
+        this.content = content;
+        this.status = DeliveryStatus.Sent;
+        this.priority = Priority.Normal;
+    }
+
+    getType(): number {
+        return this.type;
+    }
+
+    isMedia(): boolean {
+        return this.type === MessageType.Image ||
+               this.type === MessageType.Video ||
+               this.type === MessageType.Audio;
+    }
+
+    markDelivered(): void {
+        this.status = DeliveryStatus.Delivered;
+    }
+
+    markRead(): void {
+        this.status = DeliveryStatus.Read;
+    }
+
+    markFailed(): void {
+        this.status = DeliveryStatus.Failed;
+    }
+
+    setPriority(priority: Priority): void {
+        this.priority = priority;
+    }
+
+    isHighPriority(): boolean {
+        return this.priority >= Priority.High;
+    }
+}
+
+class MessageQueue {
+    private messages: Message[] = [];
+
+    add(message: Message): void {
+        this.messages.push(message);
+    }
+
+    getByStatus(status: DeliveryStatus): Message[] {
+        return this.messages.filter(m => {
+            return true;
+        });
+    }
+
+    getHighPriority(): Message[] {
+        return this.messages.filter(m => m.isHighPriority());
+    }
+
+    countByType(type: MessageType): number {
+        return this.messages.filter(m => m.getType() === type).length;
+    }
+
+    clear(): void {
+        this.messages = [];
+    }
+}
+
+class NotificationManager {
+    private queue: MessageQueue;
+
+    constructor() {
+        this.queue = new MessageQueue();
+    }
+
+    sendText(content: string, priority: Priority = Priority.Normal): void {
+        const message = new Message(MessageType.Text, content);
+        message.setPriority(priority);
+        this.queue.add(message);
+    }
+
+    sendImage(url: string): void {
+        this.queue.add(new Message(MessageType.Image, url));
+    }
+
+    sendVideo(url: string): void {
+        this.queue.add(new Message(MessageType.Video, url));
+    }
+
+    getQueue(): MessageQueue {
+        return this.queue;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // All classes should be converted
+    assert!(
+        output.contains("function Message") &&
+        output.contains("function MessageQueue") &&
+        output.contains("function NotificationManager"),
+        "Expected ES5 class constructors: {}",
+        output
+    );
+
+    // Enums should be present
+    assert!(
+        output.contains("DeliveryStatus") && output.contains("Priority"),
+        "Expected enum declarations: {}",
+        output
+    );
+
+    // Message methods
+    assert!(
+        output.contains("isMedia") && output.contains("markDelivered") && output.contains("markRead"),
+        "Expected Message methods: {}",
+        output
+    );
+
+    // MessageQueue methods
+    assert!(
+        output.contains("getByStatus") && output.contains("getHighPriority") && output.contains("countByType"),
+        "Expected MessageQueue methods: {}",
+        output
+    );
+
+    // NotificationManager methods
+    assert!(
+        output.contains("sendText") && output.contains("sendImage") && output.contains("sendVideo"),
+        "Expected NotificationManager methods: {}",
+        output
+    );
+}
+
+// ============================================================================
+// NAMESPACE PATTERN TESTS
+// ============================================================================
+
+/// Test namespace merged with class (declaration merging)
+#[test]
+fn test_class_es5_namespace_merged() {
+    let source = r#"
+class Validator {
+    private rules: string[] = [];
+
+    addRule(rule: string): void {
+        this.rules.push(rule);
+    }
+
+    validate(value: string): boolean {
+        return this.rules.every(rule => value.includes(rule));
+    }
+}
+
+namespace Validator {
+    export const VERSION = "1.0.0";
+    export function isEmail(value: string): boolean {
+        return value.includes("@");
+    }
+    export function isUrl(value: string): boolean {
+        return value.startsWith("http");
+    }
+}
+
+class FormValidator {
+    private validator: Validator;
+
+    constructor() {
+        this.validator = new Validator();
+    }
+
+    checkEmail(email: string): boolean {
+        return Validator.isEmail(email);
+    }
+
+    getVersion(): string {
+        return Validator.VERSION;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be ES5 constructor
+    assert!(
+        output.contains("function Validator"),
+        "Expected ES5 Validator class: {}",
+        output
+    );
+
+    // FormValidator should be ES5 constructor
+    assert!(
+        output.contains("function FormValidator"),
+        "Expected ES5 FormValidator class: {}",
+        output
+    );
+
+    // Namespace functions should be emitted
+    assert!(
+        output.contains("isEmail") && output.contains("isUrl"),
+        "Expected namespace functions: {}",
+        output
+    );
+}
+
+/// Test exported namespace with classes inside
+#[test]
+fn test_class_es5_namespace_exported() {
+    let source = r#"
+export namespace Geometry {
+    export class Point {
+        constructor(public x: number, public y: number) {}
+
+        distanceTo(other: Point): number {
+            const dx = this.x - other.x;
+            const dy = this.y - other.y;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+    }
+
+    export class Rectangle {
+        constructor(
+            public topLeft: Point,
+            public width: number,
+            public height: number
+        ) {}
+
+        area(): number {
+            return this.width * this.height;
+        }
+
+        contains(point: Point): boolean {
+            return point.x >= this.topLeft.x &&
+                   point.x <= this.topLeft.x + this.width &&
+                   point.y >= this.topLeft.y &&
+                   point.y <= this.topLeft.y + this.height;
+        }
+    }
+
+    export function createPoint(x: number, y: number): Point {
+        return new Point(x, y);
+    }
+}
+
+class Canvas {
+    private shapes: Geometry.Rectangle[] = [];
+
+    addRectangle(rect: Geometry.Rectangle): void {
+        this.shapes.push(rect);
+    }
+
+    getTotalArea(): number {
+        return this.shapes.reduce((sum, rect) => sum + rect.area(), 0);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Geometry namespace should exist
+    assert!(
+        output.contains("Geometry"),
+        "Expected Geometry namespace: {}",
+        output
+    );
+
+    // Canvas class should be ES5 constructor
+    assert!(
+        output.contains("function Canvas"),
+        "Expected ES5 Canvas class: {}",
+        output
+    );
+
+    // Methods should be on prototype
+    assert!(
+        output.contains("addRectangle") && output.contains("getTotalArea"),
+        "Expected Canvas methods: {}",
+        output
+    );
+}
+
+/// Test nested namespaces
+#[test]
+fn test_class_es5_namespace_nested() {
+    let source = r#"
+namespace Company {
+    export namespace Departments {
+        export namespace Engineering {
+            export class Developer {
+                private name: string;
+                private level: number;
+
+                constructor(name: string, level: number) {
+                    this.name = name;
+                    this.level = level;
+                }
+
+                getName(): string {
+                    return this.name;
+                }
+
+                getLevel(): number {
+                    return this.level;
+                }
+
+                promote(): void {
+                    this.level++;
+                }
+            }
+
+            export class Team {
+                private members: Developer[] = [];
+
+                addMember(dev: Developer): void {
+                    this.members.push(dev);
+                }
+
+                getSize(): number {
+                    return this.members.length;
+                }
+            }
+        }
+
+        export namespace HR {
+            export class Employee {
+                constructor(public id: string, public department: string) {}
+
+                getInfo(): string {
+                    return this.id + " - " + this.department;
+                }
+            }
+        }
+    }
+}
+
+class HRManager {
+    private employees: Company.Departments.HR.Employee[] = [];
+
+    hire(id: string, dept: string): void {
+        this.employees.push(new Company.Departments.HR.Employee(id, dept));
+    }
+
+    getCount(): number {
+        return this.employees.length;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Nested namespace structure
+    assert!(
+        output.contains("Company"),
+        "Expected Company namespace: {}",
+        output
+    );
+
+    // HRManager class should be ES5 constructor
+    assert!(
+        output.contains("function HRManager"),
+        "Expected ES5 HRManager class: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("hire") && output.contains("getCount"),
+        "Expected HRManager methods: {}",
+        output
+    );
+}
+
+/// Test namespace with repository pattern (interface and classes)
+#[test]
+fn test_class_es5_namespace_repository_pattern() {
+    let source = r#"
+namespace DataAccess {
+    export interface Repository<T> {
+        find(id: string): T | null;
+        save(item: T): void;
+        delete(id: string): boolean;
+    }
+
+    export class InMemoryRepository<T extends { id: string }> implements Repository<T> {
+        private items: Map<string, T> = new Map();
+
+        find(id: string): T | null {
+            return this.items.get(id) || null;
+        }
+
+        save(item: T): void {
+            this.items.set(item.id, item);
+        }
+
+        delete(id: string): boolean {
+            return this.items.delete(id);
+        }
+
+        getAll(): T[] {
+            return Array.from(this.items.values());
+        }
+    }
+
+    export class CachedRepository<T extends { id: string }> implements Repository<T> {
+        private cache: Map<string, T> = new Map();
+        private inner: Repository<T>;
+
+        constructor(inner: Repository<T>) {
+            this.inner = inner;
+        }
+
+        find(id: string): T | null {
+            if (this.cache.has(id)) {
+                return this.cache.get(id)!;
+            }
+            const item = this.inner.find(id);
+            if (item) {
+                this.cache.set(id, item);
+            }
+            return item;
+        }
+
+        save(item: T): void {
+            this.cache.set(item.id, item);
+            this.inner.save(item);
+        }
+
+        delete(id: string): boolean {
+            this.cache.delete(id);
+            return this.inner.delete(id);
+        }
+
+        clearCache(): void {
+            this.cache.clear();
+        }
+    }
+}
+
+class UserService {
+    private repo: DataAccess.Repository<{ id: string; name: string }>;
+
+    constructor() {
+        this.repo = new DataAccess.InMemoryRepository();
+    }
+
+    getUser(id: string): { id: string; name: string } | null {
+        return this.repo.find(id);
+    }
+
+    createUser(id: string, name: string): void {
+        this.repo.save({ id, name });
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // DataAccess namespace should exist
+    assert!(
+        output.contains("DataAccess"),
+        "Expected DataAccess namespace: {}",
+        output
+    );
+
+    // UserService class should be ES5 constructor
+    assert!(
+        output.contains("function UserService"),
+        "Expected ES5 UserService class: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("getUser") && output.contains("createUser"),
+        "Expected UserService methods: {}",
+        output
+    );
+}
+
+/// Test namespace with constants and utility functions
+#[test]
+fn test_class_es5_namespace_utilities() {
+    let source = r#"
+namespace StringUtils {
+    export const EMPTY = "";
+    export const SPACE = " ";
+
+    export function isEmpty(str: string): boolean {
+        return str.length === 0;
+    }
+
+    export function trim(str: string): string {
+        return str.trim();
+    }
+
+    export function capitalize(str: string): string {
+        if (isEmpty(str)) return str;
+        return str.charAt(0).toUpperCase() + str.slice(1);
+    }
+
+    export function split(str: string, delimiter: string): string[] {
+        return str.split(delimiter);
+    }
+
+    export class StringBuilder {
+        private parts: string[] = [];
+
+        append(str: string): StringBuilder {
+            this.parts.push(str);
+            return this;
+        }
+
+        appendLine(str: string): StringBuilder {
+            this.parts.push(str + "\n");
+            return this;
+        }
+
+        toString(): string {
+            return this.parts.join(EMPTY);
+        }
+
+        clear(): void {
+            this.parts = [];
+        }
+    }
+}
+
+class TextProcessor {
+    private builder: StringUtils.StringBuilder;
+
+    constructor() {
+        this.builder = new StringUtils.StringBuilder();
+    }
+
+    process(text: string): string {
+        const words = StringUtils.split(text, StringUtils.SPACE);
+        for (const word of words) {
+            const capitalized = StringUtils.capitalize(word);
+            this.builder.append(capitalized).append(StringUtils.SPACE);
+        }
+        return StringUtils.trim(this.builder.toString());
+    }
+
+    reset(): void {
+        this.builder.clear();
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // StringUtils namespace should exist
+    assert!(
+        output.contains("StringUtils"),
+        "Expected StringUtils namespace: {}",
+        output
+    );
+
+    // TextProcessor class should be ES5 constructor
+    assert!(
+        output.contains("function TextProcessor"),
+        "Expected ES5 TextProcessor class: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("process") && output.contains("reset"),
+        "Expected TextProcessor methods: {}",
+        output
+    );
+}
+
+/// Test combined namespace patterns with multiple features
+#[test]
+fn test_class_es5_namespace_combined() {
+    let source = r#"
+namespace App {
+    export const VERSION = "2.0.0";
+
+    export namespace Models {
+        export interface Entity {
+            id: string;
+            createdAt: Date;
+        }
+
+        export class User implements Entity {
+            id: string;
+            createdAt: Date;
+            name: string;
+
+            constructor(id: string, name: string) {
+                this.id = id;
+                this.name = name;
+                this.createdAt = new Date();
+            }
+
+            toString(): string {
+                return this.name + " (" + this.id + ")";
+            }
+        }
+
+        export class Product implements Entity {
+            id: string;
+            createdAt: Date;
+            title: string;
+            price: number;
+
+            constructor(id: string, title: string, price: number) {
+                this.id = id;
+                this.title = title;
+                this.price = price;
+                this.createdAt = new Date();
+            }
+
+            getFormattedPrice(): string {
+                return "$" + this.price.toFixed(2);
+            }
+        }
+    }
+
+    export namespace Services {
+        export class UserService {
+            private users: Models.User[] = [];
+
+            add(user: Models.User): void {
+                this.users.push(user);
+            }
+
+            findById(id: string): Models.User | undefined {
+                return this.users.find(u => u.id === id);
+            }
+
+            getAll(): Models.User[] {
+                return [...this.users];
+            }
+        }
+
+        export class ProductService {
+            private products: Models.Product[] = [];
+
+            add(product: Models.Product): void {
+                this.products.push(product);
+            }
+
+            findByPriceRange(min: number, max: number): Models.Product[] {
+                return this.products.filter(p => p.price >= min && p.price <= max);
+            }
+
+            getTotalValue(): number {
+                return this.products.reduce((sum, p) => sum + p.price, 0);
+            }
+        }
+    }
+
+    export namespace Utils {
+        export function generateId(): string {
+            return Math.random().toString(36).substr(2, 9);
+        }
+
+        export function formatDate(date: Date): string {
+            return date.toISOString();
+        }
+    }
+}
+
+class Application {
+    private userService: App.Services.UserService;
+    private productService: App.Services.ProductService;
+
+    constructor() {
+        this.userService = new App.Services.UserService();
+        this.productService = new App.Services.ProductService();
+    }
+
+    createUser(name: string): App.Models.User {
+        const user = new App.Models.User(App.Utils.generateId(), name);
+        this.userService.add(user);
+        return user;
+    }
+
+    createProduct(title: string, price: number): App.Models.Product {
+        const product = new App.Models.Product(App.Utils.generateId(), title, price);
+        this.productService.add(product);
+        return product;
+    }
+
+    getVersion(): string {
+        return App.VERSION;
+    }
+
+    getUserCount(): number {
+        return this.userService.getAll().length;
+    }
+
+    getProductValue(): number {
+        return this.productService.getTotalValue();
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // App namespace should exist
+    assert!(
+        output.contains("App"),
+        "Expected App namespace: {}",
+        output
+    );
+
+    // Application class should be ES5 constructor
+    assert!(
+        output.contains("function Application"),
+        "Expected ES5 Application class: {}",
+        output
+    );
+
+    // All Application methods should exist
+    assert!(
+        output.contains("createUser") &&
+        output.contains("createProduct") &&
+        output.contains("getVersion") &&
+        output.contains("getUserCount") &&
+        output.contains("getProductValue"),
+        "Expected Application methods: {}",
+        output
+    );
+}
+
+// =============================================================================
+// TEMPLATE LITERAL TYPE PATTERN TESTS - Uppercase, Lowercase, Capitalize
+// =============================================================================
+
+#[test]
+fn test_class_es5_template_literal_type_uppercase() {
+    let source = r#"
+// Uppercase template literal type pattern
+type EventName = "click" | "focus" | "blur";
+type UpperEventName = Uppercase<EventName>;
+
+type HttpMethod = "get" | "post" | "put" | "delete";
+type UpperHttpMethod = Uppercase<HttpMethod>;
+
+class EventRegistry<T extends string> {
+    private events: Map<T, Function[]> = new Map();
+
+    register(event: T, handler: Function): void {
+        if (!this.events.has(event)) {
+            this.events.set(event, []);
+        }
+        this.events.get(event)!.push(handler);
+    }
+
+    unregister(event: T, handler: Function): void {
+        const handlers = this.events.get(event);
+        if (handlers) {
+            const index = handlers.indexOf(handler);
+            if (index >= 0) {
+                handlers.splice(index, 1);
+            }
+        }
+    }
+
+    trigger(event: T, data?: unknown): void {
+        const handlers = this.events.get(event);
+        if (handlers) {
+            handlers.forEach(h => h(data));
+        }
+    }
+
+    getEventNames(): T[] {
+        return Array.from(this.events.keys());
+    }
+}
+
+class UppercaseEventRegistry extends EventRegistry<UpperEventName> {
+    registerClick(handler: Function): void {
+        this.register("CLICK", handler);
+    }
+
+    registerFocus(handler: Function): void {
+        this.register("FOCUS", handler);
+    }
+
+    registerBlur(handler: Function): void {
+        this.register("BLUR", handler);
+    }
+}
+
+class HttpClient<M extends string> {
+    protected baseUrl: string;
+
+    constructor(baseUrl: string) {
+        this.baseUrl = baseUrl;
+    }
+
+    request(method: M, path: string): Promise<Response> {
+        return fetch(this.baseUrl + path, { method: method as string });
+    }
+
+    getBaseUrl(): string {
+        return this.baseUrl;
+    }
+}
+
+class UppercaseHttpClient extends HttpClient<UpperHttpMethod> {
+    get(path: string): Promise<Response> {
+        return this.request("GET", path);
+    }
+
+    post(path: string): Promise<Response> {
+        return this.request("POST", path);
+    }
+
+    put(path: string): Promise<Response> {
+        return this.request("PUT", path);
+    }
+
+    delete(path: string): Promise<Response> {
+        return this.request("DELETE", path);
+    }
+}
+
+type StatusLevel = "info" | "warn" | "error";
+type UpperStatusLevel = Uppercase<StatusLevel>;
+
+class Logger<L extends string> {
+    private level: L;
+
+    constructor(level: L) {
+        this.level = level;
+    }
+
+    log(message: string): void {
+        console.log("[" + this.level + "]", message);
+    }
+
+    getLevel(): L {
+        return this.level;
+    }
+}
+
+class UppercaseLogger extends Logger<UpperStatusLevel> {
+    info(message: string): void {
+        console.log("[INFO]", message);
+    }
+
+    warn(message: string): void {
+        console.log("[WARN]", message);
+    }
+
+    error(message: string): void {
+        console.log("[ERROR]", message);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("EventRegistry") && output.contains("UppercaseEventRegistry"),
+        "Expected Uppercase template literal type classes: {}",
+        output
+    );
+
+    // EventRegistry methods
+    assert!(
+        output.contains("register") && output.contains("unregister") && output.contains("trigger"),
+        "Expected EventRegistry methods: {}",
+        output
+    );
+
+    // UppercaseEventRegistry methods
+    assert!(
+        output.contains("registerClick") && output.contains("registerFocus") && output.contains("registerBlur"),
+        "Expected UppercaseEventRegistry methods: {}",
+        output
+    );
+
+    // HttpClient classes
+    assert!(
+        output.contains("HttpClient") && output.contains("UppercaseHttpClient"),
+        "Expected HttpClient classes: {}",
+        output
+    );
+
+    // Logger classes
+    assert!(
+        output.contains("Logger") && output.contains("UppercaseLogger"),
+        "Expected Logger classes: {}",
+        output
+    );
+
+    // Type aliases should be stripped
+    assert!(
+        !output.contains("type EventName") && !output.contains("type UpperEventName") && !output.contains("type HttpMethod"),
+        "Expected type aliases to be stripped: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_template_literal_type_lowercase() {
+    let source = r#"
+// Lowercase template literal type pattern
+type Command = "START" | "STOP" | "PAUSE" | "RESUME";
+type LowerCommand = Lowercase<Command>;
+
+type Priority = "HIGH" | "MEDIUM" | "LOW";
+type LowerPriority = Lowercase<Priority>;
+
+class CommandProcessor<C extends string> {
+    private commands: Map<C, () => void> = new Map();
+
+    addCommand(name: C, action: () => void): void {
+        this.commands.set(name, action);
+    }
+
+    execute(name: C): void {
+        const action = this.commands.get(name);
+        if (action) {
+            action();
+        }
+    }
+
+    hasCommand(name: C): boolean {
+        return this.commands.has(name);
+    }
+
+    getCommands(): C[] {
+        return Array.from(this.commands.keys());
+    }
+}
+
+class LowercaseCommandProcessor extends CommandProcessor<LowerCommand> {
+    start(): void {
+        this.execute("start");
+    }
+
+    stop(): void {
+        this.execute("stop");
+    }
+
+    pause(): void {
+        this.execute("pause");
+    }
+
+    resume(): void {
+        this.execute("resume");
+    }
+}
+
+class TaskQueue<P extends string> {
+    private tasks: Array<{ priority: P; task: () => void }> = [];
+
+    add(priority: P, task: () => void): void {
+        this.tasks.push({ priority, task });
+    }
+
+    process(): void {
+        this.tasks.forEach(t => t.task());
+        this.tasks = [];
+    }
+
+    getCount(): number {
+        return this.tasks.length;
+    }
+
+    clear(): void {
+        this.tasks = [];
+    }
+}
+
+class LowercasePriorityQueue extends TaskQueue<LowerPriority> {
+    addHighPriority(task: () => void): void {
+        this.add("high", task);
+    }
+
+    addMediumPriority(task: () => void): void {
+        this.add("medium", task);
+    }
+
+    addLowPriority(task: () => void): void {
+        this.add("low", task);
+    }
+}
+
+type DatabaseAction = "SELECT" | "INSERT" | "UPDATE" | "DELETE";
+type LowerDatabaseAction = Lowercase<DatabaseAction>;
+
+class QueryBuilder<A extends string> {
+    protected action: A;
+    protected table: string = "";
+
+    constructor(action: A) {
+        this.action = action;
+    }
+
+    from(table: string): this {
+        this.table = table;
+        return this;
+    }
+
+    build(): string {
+        return this.action + " FROM " + this.table;
+    }
+
+    getAction(): A {
+        return this.action;
+    }
+}
+
+class LowercaseQueryBuilder extends QueryBuilder<LowerDatabaseAction> {
+    select(table: string): this {
+        this.table = table;
+        return this;
+    }
+
+    insert(table: string): this {
+        this.table = table;
+        return this;
+    }
+
+    update(table: string): this {
+        this.table = table;
+        return this;
+    }
+
+    deleteFrom(table: string): this {
+        this.table = table;
+        return this;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("CommandProcessor") && output.contains("LowercaseCommandProcessor"),
+        "Expected Lowercase template literal type classes: {}",
+        output
+    );
+
+    // CommandProcessor methods
+    assert!(
+        output.contains("addCommand") && output.contains("execute") && output.contains("hasCommand"),
+        "Expected CommandProcessor methods: {}",
+        output
+    );
+
+    // LowercaseCommandProcessor methods
+    assert!(
+        output.contains("start") && output.contains("stop") && output.contains("pause") && output.contains("resume"),
+        "Expected LowercaseCommandProcessor methods: {}",
+        output
+    );
+
+    // TaskQueue classes
+    assert!(
+        output.contains("TaskQueue") && output.contains("LowercasePriorityQueue"),
+        "Expected TaskQueue classes: {}",
+        output
+    );
+
+    // LowercasePriorityQueue methods
+    assert!(
+        output.contains("addHighPriority") && output.contains("addMediumPriority") && output.contains("addLowPriority"),
+        "Expected LowercasePriorityQueue methods: {}",
+        output
+    );
+
+    // QueryBuilder classes
+    assert!(
+        output.contains("QueryBuilder") && output.contains("LowercaseQueryBuilder"),
+        "Expected QueryBuilder classes: {}",
+        output
+    );
+
+    // Type aliases should be stripped
+    assert!(
+        !output.contains("type Command") && !output.contains("type LowerCommand") && !output.contains("type Priority"),
+        "Expected type aliases to be stripped: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_template_literal_type_capitalize() {
+    let source = r#"
+// Capitalize template literal type pattern
+type FieldName = "name" | "email" | "address" | "phone";
+type CapitalizedField = Capitalize<FieldName>;
+
+type ComponentType = "button" | "input" | "select" | "textarea";
+type CapitalizedComponent = Capitalize<ComponentType>;
+
+class FormFieldGenerator<F extends string> {
+    private fields: Map<F, HTMLElement> = new Map();
+
+    createField(name: F): HTMLElement {
+        const input = document.createElement("input");
+        input.name = name;
+        this.fields.set(name, input);
+        return input;
+    }
+
+    getField(name: F): HTMLElement | undefined {
+        return this.fields.get(name);
+    }
+
+    hasField(name: F): boolean {
+        return this.fields.has(name);
+    }
+
+    removeField(name: F): void {
+        this.fields.delete(name);
+    }
+
+    getAllFieldNames(): F[] {
+        return Array.from(this.fields.keys());
+    }
+}
+
+class CapitalizedFieldGenerator extends FormFieldGenerator<CapitalizedField> {
+    createNameField(): HTMLElement {
+        return this.createField("Name");
+    }
+
+    createEmailField(): HTMLElement {
+        return this.createField("Email");
+    }
+
+    createAddressField(): HTMLElement {
+        return this.createField("Address");
+    }
+
+    createPhoneField(): HTMLElement {
+        return this.createField("Phone");
+    }
+}
+
+class ComponentFactory<C extends string> {
+    protected registry: Map<C, () => HTMLElement> = new Map();
+
+    register(type: C, factory: () => HTMLElement): void {
+        this.registry.set(type, factory);
+    }
+
+    create(type: C): HTMLElement | null {
+        const factory = this.registry.get(type);
+        return factory ? factory() : null;
+    }
+
+    isRegistered(type: C): boolean {
+        return this.registry.has(type);
+    }
+
+    getTypes(): C[] {
+        return Array.from(this.registry.keys());
+    }
+}
+
+class CapitalizedComponentFactory extends ComponentFactory<CapitalizedComponent> {
+    createButton(): HTMLElement | null {
+        return this.create("Button");
+    }
+
+    createInput(): HTMLElement | null {
+        return this.create("Input");
+    }
+
+    createSelect(): HTMLElement | null {
+        return this.create("Select");
+    }
+
+    createTextarea(): HTMLElement | null {
+        return this.create("Textarea");
+    }
+}
+
+type ApiEndpoint = "users" | "posts" | "comments" | "likes";
+type CapitalizedEndpoint = Capitalize<ApiEndpoint>;
+
+class ApiRouter<E extends string> {
+    private baseUrl: string;
+    private routes: Map<E, string> = new Map();
+
+    constructor(baseUrl: string) {
+        this.baseUrl = baseUrl;
+    }
+
+    addRoute(endpoint: E, path: string): void {
+        this.routes.set(endpoint, path);
+    }
+
+    getUrl(endpoint: E): string {
+        const path = this.routes.get(endpoint) || endpoint;
+        return this.baseUrl + "/" + path;
+    }
+
+    hasRoute(endpoint: E): boolean {
+        return this.routes.has(endpoint);
+    }
+
+    getBaseUrl(): string {
+        return this.baseUrl;
+    }
+}
+
+class CapitalizedApiRouter extends ApiRouter<CapitalizedEndpoint> {
+    getUsersUrl(): string {
+        return this.getUrl("Users");
+    }
+
+    getPostsUrl(): string {
+        return this.getUrl("Posts");
+    }
+
+    getCommentsUrl(): string {
+        return this.getUrl("Comments");
+    }
+
+    getLikesUrl(): string {
+        return this.getUrl("Likes");
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("FormFieldGenerator") && output.contains("CapitalizedFieldGenerator"),
+        "Expected Capitalize template literal type classes: {}",
+        output
+    );
+
+    // FormFieldGenerator methods
+    assert!(
+        output.contains("createField") && output.contains("getField") && output.contains("hasField"),
+        "Expected FormFieldGenerator methods: {}",
+        output
+    );
+
+    // CapitalizedFieldGenerator methods
+    assert!(
+        output.contains("createNameField") && output.contains("createEmailField") && output.contains("createAddressField"),
+        "Expected CapitalizedFieldGenerator methods: {}",
+        output
+    );
+
+    // ComponentFactory classes
+    assert!(
+        output.contains("ComponentFactory") && output.contains("CapitalizedComponentFactory"),
+        "Expected ComponentFactory classes: {}",
+        output
+    );
+
+    // CapitalizedComponentFactory methods
+    assert!(
+        output.contains("createButton") && output.contains("createInput") && output.contains("createSelect"),
+        "Expected CapitalizedComponentFactory methods: {}",
+        output
+    );
+
+    // ApiRouter classes
+    assert!(
+        output.contains("ApiRouter") && output.contains("CapitalizedApiRouter"),
+        "Expected ApiRouter classes: {}",
+        output
+    );
+
+    // CapitalizedApiRouter methods
+    assert!(
+        output.contains("getUsersUrl") && output.contains("getPostsUrl") && output.contains("getCommentsUrl"),
+        "Expected CapitalizedApiRouter methods: {}",
+        output
+    );
+
+    // Type aliases should be stripped
+    assert!(
+        !output.contains("type FieldName") && !output.contains("type CapitalizedField") && !output.contains("type ComponentType"),
+        "Expected type aliases to be stripped: {}",
+        output
+    );
+}
+
+// ============================================================================
+// DECLARATION MERGING PATTERN TESTS
+// ============================================================================
+
+/// Test interface merging with class implementation
+#[test]
+fn test_class_es5_declaration_merging_interface() {
+    let source = r#"
+interface Animal {
+    name: string;
+    age: number;
+}
+
+interface Animal {
+    species: string;
+    makeSound(): void;
+}
+
+interface Animal {
+    weight?: number;
+    isWild: boolean;
+}
+
+class Dog implements Animal {
+    name: string;
+    age: number;
+    species: string;
+    isWild: boolean;
+    weight?: number;
+
+    constructor(name: string, age: number) {
+        this.name = name;
+        this.age = age;
+        this.species = "Canis familiaris";
+        this.isWild = false;
+    }
+
+    makeSound(): void {
+        console.log("Woof!");
+    }
+
+    setWeight(w: number): void {
+        this.weight = w;
+    }
+
+    getInfo(): string {
+        return this.name + " (" + this.species + ")";
+    }
+}
+
+class Cat implements Animal {
+    name: string;
+    age: number;
+    species: string;
+    isWild: boolean;
+
+    constructor(name: string, age: number, isWild: boolean = false) {
+        this.name = name;
+        this.age = age;
+        this.species = "Felis catus";
+        this.isWild = isWild;
+    }
+
+    makeSound(): void {
+        console.log("Meow!");
+    }
+
+    getInfo(): string {
+        return this.name + " - " + (this.isWild ? "Wild" : "Domestic");
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be ES5 constructors
+    assert!(
+        output.contains("function Dog") && output.contains("function Cat"),
+        "Expected ES5 Dog and Cat classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("makeSound") && output.contains("getInfo"),
+        "Expected class methods: {}",
+        output
+    );
+
+    // Interfaces should be stripped
+    assert!(
+        !output.contains("interface Animal"),
+        "Expected interfaces to be stripped: {}",
+        output
+    );
+}
+
+/// Test namespace merging with function
+#[test]
+fn test_class_es5_declaration_merging_function_namespace() {
+    let source = r#"
+function greet(name: string): string {
+    return "Hello, " + name + "!";
+}
+
+namespace greet {
+    export const defaultGreeting = "Hello";
+    export const version = "1.0.0";
+
+    export function formal(name: string): string {
+        return "Good day, " + name + ".";
+    }
+
+    export function casual(name: string): string {
+        return "Hey " + name + "!";
+    }
+}
+
+class Greeter {
+    private prefix: string;
+
+    constructor(prefix: string = greet.defaultGreeting) {
+        this.prefix = prefix;
+    }
+
+    greet(name: string): string {
+        return this.prefix + ", " + name + "!";
+    }
+
+    greetFormal(name: string): string {
+        return greet.formal(name);
+    }
+
+    greetCasual(name: string): string {
+        return greet.casual(name);
+    }
+
+    getVersion(): string {
+        return greet.version;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Greeter class should be ES5 constructor
+    assert!(
+        output.contains("function Greeter"),
+        "Expected ES5 Greeter class: {}",
+        output
+    );
+
+    // Greeter methods should exist
+    assert!(
+        output.contains("greetFormal") && output.contains("greetCasual") && output.contains("getVersion"),
+        "Expected Greeter methods: {}",
+        output
+    );
+
+    // greet function and namespace should exist
+    assert!(
+        output.contains("greet"),
+        "Expected greet function/namespace: {}",
+        output
+    );
+}
+
+/// Test class merging with namespace (static-like members)
+#[test]
+fn test_class_es5_declaration_merging_class_namespace() {
+    let source = r#"
+class Color {
+    constructor(public r: number, public g: number, public b: number) {}
+
+    toHex(): string {
+        const toHexPart = (n: number) => n.toString(16).padStart(2, '0');
+        return '#' + toHexPart(this.r) + toHexPart(this.g) + toHexPart(this.b);
+    }
+
+    toRgb(): string {
+        return "rgb(" + this.r + ", " + this.g + ", " + this.b + ")";
+    }
+
+    blend(other: Color, ratio: number = 0.5): Color {
+        return new Color(
+            Math.round(this.r * (1 - ratio) + other.r * ratio),
+            Math.round(this.g * (1 - ratio) + other.g * ratio),
+            Math.round(this.b * (1 - ratio) + other.b * ratio)
+        );
+    }
+}
+
+namespace Color {
+    export const RED = new Color(255, 0, 0);
+    export const GREEN = new Color(0, 255, 0);
+    export const BLUE = new Color(0, 0, 255);
+    export const WHITE = new Color(255, 255, 255);
+    export const BLACK = new Color(0, 0, 0);
+
+    export function fromHex(hex: string): Color {
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        return new Color(r, g, b);
+    }
+
+    export function random(): Color {
+        return new Color(
+            Math.floor(Math.random() * 256),
+            Math.floor(Math.random() * 256),
+            Math.floor(Math.random() * 256)
+        );
+    }
+}
+
+class ColorPalette {
+    private colors: Color[] = [];
+
+    addColor(color: Color): void {
+        this.colors.push(color);
+    }
+
+    addPrimaries(): void {
+        this.colors.push(Color.RED);
+        this.colors.push(Color.GREEN);
+        this.colors.push(Color.BLUE);
+    }
+
+    addFromHex(hex: string): void {
+        this.colors.push(Color.fromHex(hex));
+    }
+
+    addRandom(): void {
+        this.colors.push(Color.random());
+    }
+
+    getColors(): Color[] {
+        return [...this.colors];
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Color class should be ES5 constructor
+    assert!(
+        output.contains("function Color"),
+        "Expected ES5 Color class: {}",
+        output
+    );
+
+    // ColorPalette class should be ES5 constructor
+    assert!(
+        output.contains("function ColorPalette"),
+        "Expected ES5 ColorPalette class: {}",
+        output
+    );
+
+    // Color methods should exist
+    assert!(
+        output.contains("toHex") && output.contains("toRgb") && output.contains("blend"),
+        "Expected Color methods: {}",
+        output
+    );
+
+    // ColorPalette methods should exist
+    assert!(
+        output.contains("addColor") && output.contains("addPrimaries") && output.contains("addFromHex"),
+        "Expected ColorPalette methods: {}",
+        output
+    );
+}
+
+/// Test enum merging with namespace
+#[test]
+fn test_class_es5_declaration_merging_enum_namespace() {
+    let source = r#"
+enum Status {
+    Pending = 0,
+    Active = 1,
+    Completed = 2,
+    Failed = 3
+}
+
+namespace Status {
+    export function isTerminal(status: Status): boolean {
+        return status === Status.Completed || status === Status.Failed;
+    }
+
+    export function isPending(status: Status): boolean {
+        return status === Status.Pending;
+    }
+
+    export function toString(status: Status): string {
+        switch (status) {
+            case Status.Pending: return "Pending";
+            case Status.Active: return "Active";
+            case Status.Completed: return "Completed";
+            case Status.Failed: return "Failed";
+            default: return "Unknown";
+        }
+    }
+
+    export const DEFAULT = Status.Pending;
+}
+
+class Task {
+    private status: Status;
+    private name: string;
+
+    constructor(name: string) {
+        this.name = name;
+        this.status = Status.DEFAULT;
+    }
+
+    start(): void {
+        if (this.status === Status.Pending) {
+            this.status = Status.Active;
+        }
+    }
+
+    complete(): void {
+        if (this.status === Status.Active) {
+            this.status = Status.Completed;
+        }
+    }
+
+    fail(): void {
+        this.status = Status.Failed;
+    }
+
+    isFinished(): boolean {
+        return Status.isTerminal(this.status);
+    }
+
+    getStatusString(): string {
+        return Status.toString(this.status);
+    }
+
+    getName(): string {
+        return this.name;
+    }
+}
+
+class TaskManager {
+    private tasks: Task[] = [];
+
+    addTask(name: string): Task {
+        const task = new Task(name);
+        this.tasks.push(task);
+        return task;
+    }
+
+    getActiveTasks(): Task[] {
+        return this.tasks.filter(t => !t.isFinished());
+    }
+
+    getCompletedTasks(): Task[] {
+        return this.tasks.filter(t => t.isFinished());
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Task class should be ES5 constructor
+    assert!(
+        output.contains("function Task"),
+        "Expected ES5 Task class: {}",
+        output
+    );
+
+    // TaskManager class should be ES5 constructor
+    assert!(
+        output.contains("function TaskManager"),
+        "Expected ES5 TaskManager class: {}",
+        output
+    );
+
+    // Task methods should exist
+    assert!(
+        output.contains("start") && output.contains("complete") && output.contains("fail"),
+        "Expected Task methods: {}",
+        output
+    );
+
+    // Status enum should exist
+    assert!(
+        output.contains("Status"),
+        "Expected Status enum: {}",
+        output
+    );
+}
+
+/// Test multiple interface merging for extension
+#[test]
+fn test_class_es5_declaration_merging_interface_extension() {
+    let source = r#"
+interface Serializable {
+    serialize(): string;
+}
+
+interface Serializable {
+    deserialize(data: string): void;
+}
+
+interface Comparable<T> {
+    compareTo(other: T): number;
+}
+
+interface Comparable<T> {
+    equals(other: T): boolean;
+}
+
+class Person implements Serializable, Comparable<Person> {
+    constructor(
+        public firstName: string,
+        public lastName: string,
+        public age: number
+    ) {}
+
+    serialize(): string {
+        return JSON.stringify({
+            firstName: this.firstName,
+            lastName: this.lastName,
+            age: this.age
+        });
+    }
+
+    deserialize(data: string): void {
+        const obj = JSON.parse(data);
+        this.firstName = obj.firstName;
+        this.lastName = obj.lastName;
+        this.age = obj.age;
+    }
+
+    compareTo(other: Person): number {
+        if (this.lastName !== other.lastName) {
+            return this.lastName.localeCompare(other.lastName);
+        }
+        return this.firstName.localeCompare(other.firstName);
+    }
+
+    equals(other: Person): boolean {
+        return this.firstName === other.firstName &&
+               this.lastName === other.lastName &&
+               this.age === other.age;
+    }
+
+    getFullName(): string {
+        return this.firstName + " " + this.lastName;
+    }
+}
+
+class Employee extends Person {
+    constructor(
+        firstName: string,
+        lastName: string,
+        age: number,
+        public employeeId: string,
+        public department: string
+    ) {
+        super(firstName, lastName, age);
+    }
+
+    serialize(): string {
+        return JSON.stringify({
+            firstName: this.firstName,
+            lastName: this.lastName,
+            age: this.age,
+            employeeId: this.employeeId,
+            department: this.department
+        });
+    }
+
+    deserialize(data: string): void {
+        const obj = JSON.parse(data);
+        this.firstName = obj.firstName;
+        this.lastName = obj.lastName;
+        this.age = obj.age;
+        this.employeeId = obj.employeeId;
+        this.department = obj.department;
+    }
+
+    getEmployeeInfo(): string {
+        return this.getFullName() + " (" + this.employeeId + ")";
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Person class should be ES5 constructor
+    assert!(
+        output.contains("function Person"),
+        "Expected ES5 Person class: {}",
+        output
+    );
+
+    // Employee class should be ES5 constructor
+    assert!(
+        output.contains("function Employee"),
+        "Expected ES5 Employee class: {}",
+        output
+    );
+
+    // Merged interface methods should exist
+    assert!(
+        output.contains("serialize") && output.contains("deserialize"),
+        "Expected Serializable methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("compareTo") && output.contains("equals"),
+        "Expected Comparable methods: {}",
+        output
+    );
+
+    // __extends helper for inheritance
+    assert!(
+        output.contains("__extends") || output.contains("_super"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+}
+
+/// Test combined declaration merging patterns
+#[test]
+fn test_class_es5_declaration_merging_combined() {
+    let source = r#"
+// Interface merging
+interface Config {
+    host: string;
+    port: number;
+}
+
+interface Config {
+    timeout: number;
+    retries: number;
+}
+
+// Function with namespace
+function createLogger(name: string): Logger {
+    return new Logger(name);
+}
+
+namespace createLogger {
+    export const defaultLevel = "info";
+    export function withTimestamp(name: string): Logger {
+        const logger = new Logger(name);
+        logger.enableTimestamp();
+        return logger;
+    }
+}
+
+// Class with namespace
+class Logger {
+    private name: string;
+    private level: string;
+    private timestampEnabled: boolean = false;
+
+    constructor(name: string) {
+        this.name = name;
+        this.level = createLogger.defaultLevel;
+    }
+
+    setLevel(level: string): void {
+        this.level = level;
+    }
+
+    enableTimestamp(): void {
+        this.timestampEnabled = true;
+    }
+
+    log(message: string): void {
+        const prefix = this.timestampEnabled ? new Date().toISOString() + " " : "";
+        console.log(prefix + "[" + this.name + "] " + message);
+    }
+
+    info(message: string): void {
+        this.log("[INFO] " + message);
+    }
+
+    error(message: string): void {
+        this.log("[ERROR] " + message);
+    }
+}
+
+namespace Logger {
+    export const VERSION = "2.0.0";
+    export function create(name: string): Logger {
+        return new Logger(name);
+    }
+}
+
+// Enum with namespace
+enum LogLevel {
+    DEBUG = 0,
+    INFO = 1,
+    WARN = 2,
+    ERROR = 3
+}
+
+namespace LogLevel {
+    export function fromString(level: string): LogLevel {
+        switch (level.toLowerCase()) {
+            case "debug": return LogLevel.DEBUG;
+            case "info": return LogLevel.INFO;
+            case "warn": return LogLevel.WARN;
+            case "error": return LogLevel.ERROR;
+            default: return LogLevel.INFO;
+        }
+    }
+}
+
+class Application {
+    private config: Config;
+    private logger: Logger;
+
+    constructor(config: Config) {
+        this.config = config;
+        this.logger = createLogger.withTimestamp("App");
+    }
+
+    getHost(): string {
+        return this.config.host;
+    }
+
+    getPort(): number {
+        return this.config.port;
+    }
+
+    getTimeout(): number {
+        return this.config.timeout;
+    }
+
+    log(message: string): void {
+        this.logger.info(message);
+    }
+
+    getLoggerVersion(): string {
+        return Logger.VERSION;
+    }
+
+    setLogLevel(levelStr: string): void {
+        const level = LogLevel.fromString(levelStr);
+        this.logger.setLevel(levelStr);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Logger class should be ES5 constructor
+    assert!(
+        output.contains("function Logger"),
+        "Expected ES5 Logger class: {}",
+        output
+    );
+
+    // Application class should be ES5 constructor
+    assert!(
+        output.contains("function Application"),
+        "Expected ES5 Application class: {}",
+        output
+    );
+
+    // Logger methods
+    assert!(
+        output.contains("setLevel") && output.contains("enableTimestamp") && output.contains(".log"),
+        "Expected Logger methods: {}",
+        output
+    );
+
+    // Application methods
+    assert!(
+        output.contains("getHost") && output.contains("getPort") && output.contains("getTimeout"),
+        "Expected Application methods: {}",
+        output
+    );
+
+    // createLogger function should exist
+    assert!(
+        output.contains("createLogger"),
+        "Expected createLogger function: {}",
+        output
+    );
+
+    // LogLevel enum should exist
+    assert!(
+        output.contains("LogLevel"),
+        "Expected LogLevel enum: {}",
+        output
+    );
+}
