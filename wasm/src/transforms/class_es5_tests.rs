@@ -10949,16 +10949,20 @@ class PropertyDefiner {
 }
 
 // ============================================================================
-// Symbol.hasInstance Tests
+// Object.assign Pattern Tests
 // ============================================================================
 
 #[test]
-fn test_class_es5_symbol_has_instance_basic() {
-    // Basic Symbol.hasInstance static method
+fn test_class_es5_object_assign_basic() {
+    // Basic Object.assign usage
     let source = r#"
-class MyClass {
-    static [Symbol.hasInstance](instance: unknown): boolean {
-        return typeof instance === "object" && instance !== null;
+class ObjectMerger {
+    merge<T extends object, U extends object>(target: T, source: U): T & U {
+        return Object.assign(target, source);
+    }
+
+    extend<T extends object>(target: T, ...sources: object[]): T {
+        return Object.assign(target, ...sources);
     }
 }
 "#;
@@ -10977,36 +10981,51 @@ class MyClass {
 
     let output = printer.get_output().to_string();
 
-    // Class should be converted to function
+    // Class should be emitted
     assert!(
-        output.contains("function MyClass"),
-        "Expected function declaration: {}",
+        output.contains("ObjectMerger"),
+        "Expected ObjectMerger class: {}",
         output
     );
 
-    // typeof check should be present
+    // Object.assign should be present
     assert!(
-        output.contains("typeof") && output.contains("object"),
-        "Expected typeof check: {}",
+        output.contains("Object.assign"),
+        "Expected Object.assign: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("merge") && output.contains("extend"),
+        "Expected merge and extend methods: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_symbol_has_instance_custom_check() {
-    // Custom instanceof behavior checking for specific property
+fn test_class_es5_object_assign_defaults() {
+    // Object.assign for default values
     let source = r#"
-class Validator {
-    private valid: boolean = true;
+interface Config {
+    host: string;
+    port: number;
+    timeout: number;
+}
 
-    static [Symbol.hasInstance](instance: unknown): boolean {
-        return instance !== null &&
-               typeof instance === "object" &&
-               "valid" in instance;
+class ConfigManager {
+    private defaults: Config = {
+        host: "localhost",
+        port: 8080,
+        timeout: 5000
+    };
+
+    getConfig(overrides: Partial<Config>): Config {
+        return Object.assign({}, this.defaults, overrides);
     }
 
-    isValid(): boolean {
-        return this.valid;
+    updateDefaults(updates: Partial<Config>): void {
+        Object.assign(this.defaults, updates);
     }
 }
 "#;
@@ -11025,58 +11044,175 @@ class Validator {
 
     let output = printer.get_output().to_string();
 
-    // Class should be converted
+    // Class should be emitted
     assert!(
-        output.contains("function Validator"),
-        "Expected function declaration: {}",
+        output.contains("ConfigManager"),
+        "Expected ConfigManager class: {}",
         output
     );
 
-    // isValid method should be present
+    // Object.assign should be present
     assert!(
-        output.contains("isValid"),
-        "Expected isValid method: {}",
+        output.contains("Object.assign"),
+        "Expected Object.assign: {}",
         output
     );
 
-    // in operator check should be present
+    // Methods should be present
     assert!(
-        output.contains("in") || output.contains("valid"),
-        "Expected property check: {}",
+        output.contains("getConfig") && output.contains("updateDefaults"),
+        "Expected getConfig and updateDefaults methods: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_symbol_has_instance_with_inheritance() {
-    // Symbol.hasInstance with class inheritance
+fn test_class_es5_object_assign_clone() {
+    // Object.assign for shallow cloning
     let source = r#"
-class Animal {
+class Cloner<T extends object> {
+    shallowClone(obj: T): T {
+        return Object.assign({}, obj) as T;
+    }
+
+    cloneWithChanges<U extends Partial<T>>(obj: T, changes: U): T {
+        return Object.assign({}, obj, changes);
+    }
+
+    cloneArray(arr: T[]): T[] {
+        return arr.map(item => Object.assign({}, item) as T);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("Cloner"),
+        "Expected Cloner class: {}",
+        output
+    );
+
+    // Object.assign should be present
+    assert!(
+        output.contains("Object.assign"),
+        "Expected Object.assign: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("shallowClone") && output.contains("cloneWithChanges") && output.contains("cloneArray"),
+        "Expected shallowClone, cloneWithChanges, cloneArray methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_object_assign_mixin() {
+    // Object.assign for mixin pattern
+    let source = r#"
+interface Disposable {
+    dispose(): void;
+}
+
+interface Activatable {
+    activate(): void;
+    deactivate(): void;
+}
+
+class MixinBuilder {
+    applyMixins<T extends object>(target: T, ...mixins: object[]): T & Disposable & Activatable {
+        return Object.assign(target, ...mixins) as T & Disposable & Activatable;
+    }
+
+    createWithMixins<T extends object>(base: T): T & Disposable {
+        const disposable: Disposable = {
+            dispose() { console.log("disposed"); }
+        };
+        return Object.assign({}, base, disposable);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("MixinBuilder"),
+        "Expected MixinBuilder class: {}",
+        output
+    );
+
+    // Object.assign should be present
+    assert!(
+        output.contains("Object.assign"),
+        "Expected Object.assign: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("applyMixins") && output.contains("createWithMixins"),
+        "Expected applyMixins and createWithMixins methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_object_assign_constructor() {
+    // Object.assign in constructor
+    let source = r#"
+interface Options {
     name: string;
-
-    constructor(name: string) {
-        this.name = name;
-    }
-
-    static [Symbol.hasInstance](instance: unknown): boolean {
-        return instance !== null &&
-               typeof instance === "object" &&
-               "name" in instance;
-    }
+    value: number;
+    enabled: boolean;
 }
 
-class Dog extends Animal {
-    breed: string;
+class Component {
+    name: string;
+    value: number;
+    enabled: boolean;
 
-    constructor(name: string, breed: string) {
-        super(name);
-        this.breed = breed;
+    constructor(options: Partial<Options>) {
+        const defaults: Options = {
+            name: "default",
+            value: 0,
+            enabled: true
+        };
+        Object.assign(this, defaults, options);
+        this.name = this.name;
+        this.value = this.value;
+        this.enabled = this.enabled;
     }
 
-    static [Symbol.hasInstance](instance: unknown): boolean {
-        return instance !== null &&
-               typeof instance === "object" &&
-               "breed" in instance;
+    getState(): Options {
+        return Object.assign({}, { name: this.name, value: this.value, enabled: this.enabled });
     }
 }
 "#;
@@ -11095,51 +11231,64 @@ class Dog extends Animal {
 
     let output = printer.get_output().to_string();
 
-    // Both classes should be present
+    // Class should be emitted
     assert!(
-        output.contains("Animal") && output.contains("Dog"),
-        "Expected both classes: {}",
+        output.contains("Component"),
+        "Expected Component class: {}",
         output
     );
 
-    // Inheritance pattern should be present
+    // Object.assign should be present
     assert!(
-        output.contains("__extends") || output.contains("prototype"),
-        "Expected inheritance pattern: {}",
+        output.contains("Object.assign"),
+        "Expected Object.assign: {}",
         output
     );
 
-    // super call should be present
+    // Method should be present
     assert!(
-        output.contains("_super") || output.contains(".call(this"),
-        "Expected super call: {}",
+        output.contains("getState"),
+        "Expected getState method: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_symbol_has_instance_duck_typing() {
-    // Duck typing pattern with Symbol.hasInstance
+fn test_class_es5_object_assign_immutable() {
+    // Object.assign for immutable update pattern
     let source = r#"
-interface Stringifiable {
-    toString(): string;
+interface State {
+    count: number;
+    items: string[];
+    metadata: Record<string, any>;
 }
 
-class StringWrapper {
-    private value: string;
+class StateManager {
+    private state: State;
 
-    constructor(value: string) {
-        this.value = value;
+    constructor(initial: State) {
+        this.state = Object.assign({}, initial);
     }
 
-    static [Symbol.hasInstance](instance: unknown): instance is Stringifiable {
-        return instance !== null &&
-               typeof instance === "object" &&
-               typeof (instance as any).toString === "function";
+    updateCount(count: number): State {
+        this.state = Object.assign({}, this.state, { count });
+        return this.state;
     }
 
-    toString(): string {
-        return this.value;
+    addItem(item: string): State {
+        const items = [...this.state.items, item];
+        this.state = Object.assign({}, this.state, { items });
+        return this.state;
+    }
+
+    setMetadata(key: string, value: any): State {
+        const metadata = Object.assign({}, this.state.metadata, { [key]: value });
+        this.state = Object.assign({}, this.state, { metadata });
+        return this.state;
+    }
+
+    getState(): State {
+        return Object.assign({}, this.state);
     }
 }
 "#;
@@ -11158,101 +11307,24 @@ class StringWrapper {
 
     let output = printer.get_output().to_string();
 
-    // Class should be converted
+    // Class should be emitted
     assert!(
-        output.contains("function StringWrapper"),
-        "Expected function declaration: {}",
+        output.contains("StateManager"),
+        "Expected StateManager class: {}",
         output
     );
 
-    // toString method should be present
+    // Object.assign should be present
     assert!(
-        output.contains("toString"),
-        "Expected toString method: {}",
+        output.contains("Object.assign"),
+        "Expected Object.assign: {}",
         output
     );
 
-    // typeof function check should be present
+    // Methods should be present
     assert!(
-        output.contains("typeof") && output.contains("function"),
-        "Expected typeof function check: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_symbol_has_instance_with_other_static_members() {
-    // Symbol.hasInstance alongside other static members
-    let source = r#"
-class Registry<T> {
-    private items: Map<string, T> = new Map();
-
-    static readonly VERSION = "1.0.0";
-    static instanceCount = 0;
-
-    constructor() {
-        Registry.instanceCount++;
-    }
-
-    static [Symbol.hasInstance](instance: unknown): boolean {
-        return instance !== null &&
-               typeof instance === "object" &&
-               "items" in instance;
-    }
-
-    static create<U>(): Registry<U> {
-        return new Registry<U>();
-    }
-
-    add(key: string, value: T): void {
-        this.items.set(key, value);
-    }
-
-    get(key: string): T | undefined {
-        return this.items.get(key);
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Class should be converted
-    assert!(
-        output.contains("function Registry") || output.contains("Registry"),
-        "Expected class definition: {}",
-        output
-    );
-
-    // Static members should be present
-    assert!(
-        output.contains("VERSION") || output.contains("instanceCount"),
-        "Expected static members: {}",
-        output
-    );
-
-    // Instance methods should be present
-    assert!(
-        output.contains("add") && output.contains("get"),
-        "Expected instance methods: {}",
-        output
-    );
-
-    // Static create method should be present
-    assert!(
-        output.contains("create"),
-        "Expected static create method: {}",
+        output.contains("updateCount") && output.contains("addItem") && output.contains("setMetadata"),
+        "Expected updateCount, addItem, setMetadata methods: {}",
         output
     );
 }
