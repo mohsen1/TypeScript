@@ -42,14 +42,13 @@ Reduce false positives for property access errors by aligning TS2339 behavior wi
 - Recent changes: Added static index signature support to CallableShape for class constructors, fixed merge conflict in solver/subtype.rs, created find-ts2339.mjs conformance scan script.
 - Last tests: `./wasm/test.sh test_ts2339_` (9 tests pass).
 - **Latest TS2339 conformance scan results (1000 files):**
-  - Extra (false positives): 28 files
+  - Extra (false positives): 27 files (was 28, fixed staticIndexSignature4.ts)
   - Missing: 29 files
   - Main categories of false positives:
     1. **Control flow narrowing** (10 files) - `length` property errors on narrowed unions (constLocalsInFunctionExpressions, controlFlowWhileStatement, etc.)
     2. **Private names** (6 files) - `#prop` access on class types
     3. **Mixin classes** (4 files) - Properties not found on mixin types
-    4. **Static index signature** (1 file) - staticIndexSignature4.ts still failing despite fix attempt
-    5. **Dynamic imports** (5 files) - importCallExpression tests
+    4. **Dynamic imports** (5 files) - importCallExpression tests
   - Main categories of missing errors:
     1. **Private names** (14 files) - Missing errors for invalid #prop access
     2. **globalThis** (9 files) - Property access on globalThis
@@ -61,7 +60,6 @@ Reduce false positives for property access errors by aligning TS2339 behavior wi
 - Fix control flow narrowing for property access after type guards (highest priority - affects 10 files)
 - Investigate private name (#prop) handling - both extra and missing errors
 - Fix mixin class property resolution
-- Investigate static index signature on class constructors (staticIndexSignature4.ts)
 - Add globalThis property checking
 
 ## Completed
@@ -77,6 +75,9 @@ Reduce false positives for property access errors by aligning TS2339 behavior wi
 - Created find-ts2339.mjs conformance scan script for TS2339 analysis.
 - Added static index signature support to CallableShape (fields + property access resolution).
 - Ran conformance scan: 28 extra, 29 missing (from 1000 files).
+- Fixed parser to preserve static modifier on index signatures (was dropping static keyword).
+- Fixed static index signature property access - staticIndexSignature4.ts now passes.
+- Conformance scan after fix: 27 extra, 29 missing (from 1000 files).
 
 ## Ready for Merge
 Yes
