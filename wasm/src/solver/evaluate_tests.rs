@@ -23864,3 +23864,620 @@ fn test_template_constrained_prefix_infer() {
     let expected = interner.literal_string("Value");
     assert!(result == expected || result == TypeId::STRING || result == TypeId::NEVER);
 }
+
+// ============================================================================
+// Function Utility Type Tests (OmitThisParameter, Parameters, etc.)
+// ============================================================================
+
+#[test]
+fn test_omit_this_parameter_basic() {
+    // OmitThisParameter<(this: Foo, x: string) => void> = (x: string) => void
+    let interner = TypeInterner::new();
+
+    let foo_type = interner.object(vec![]); // Empty object as Foo
+
+    // Function with this parameter
+    let fn_with_this = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: Some(foo_type), // Has this parameter
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Function without this parameter (result of OmitThisParameter)
+    let fn_without_this = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None, // No this parameter
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Verify original has this
+    match interner.lookup(fn_with_this) {
+        Some(TypeKey::Function(shape_id)) => {
+            let shape = interner.function_shape(shape_id);
+            assert!(shape.this_type.is_some());
+        }
+        _ => panic!("Expected Function type"),
+    }
+
+    // Verify result has no this
+    match interner.lookup(fn_without_this) {
+        Some(TypeKey::Function(shape_id)) => {
+            let shape = interner.function_shape(shape_id);
+            assert!(shape.this_type.is_none());
+        }
+        _ => panic!("Expected Function type"),
+    }
+}
+
+#[test]
+fn test_omit_this_parameter_no_this() {
+    // OmitThisParameter<(x: string) => void> = (x: string) => void
+    // When there's no this parameter, returns same type
+    let interner = TypeInterner::new();
+
+    let fn_no_this = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    match interner.lookup(fn_no_this) {
+        Some(TypeKey::Function(shape_id)) => {
+            let shape = interner.function_shape(shape_id);
+            assert!(shape.this_type.is_none());
+            assert_eq!(shape.params.len(), 1);
+        }
+        _ => panic!("Expected Function type"),
+    }
+}
+
+#[test]
+fn test_omit_this_preserves_generics() {
+    // OmitThisParameter<(this: T, x: U) => U> should preserve type params
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let u_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: u_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // After OmitThisParameter, type params remain
+    let fn_result = interner.function(FunctionShape {
+        type_params: vec![
+            TypeParamInfo { name: t_name, constraint: None, default: None },
+            TypeParamInfo { name: u_name, constraint: None, default: None },
+        ],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: u_param,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None, // Removed
+        return_type: u_param,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    match interner.lookup(fn_result) {
+        Some(TypeKey::Function(shape_id)) => {
+            let shape = interner.function_shape(shape_id);
+            assert_eq!(shape.type_params.len(), 2);
+            assert!(shape.this_type.is_none());
+        }
+        _ => panic!("Expected Function type"),
+    }
+}
+
+#[test]
+fn test_parameters_simple() {
+    // Parameters<(a: string, b: number) => void> = [string, number]
+    let interner = TypeInterner::new();
+
+    // Parameters<T> extracts to tuple
+    let params_tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: Some(interner.intern_string("a")),
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: Some(interner.intern_string("b")),
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    match interner.lookup(params_tuple) {
+        Some(TypeKey::Tuple(list_id)) => {
+            let elements = interner.tuple_list(list_id);
+            assert_eq!(elements.len(), 2);
+            assert_eq!(elements[0].type_id, TypeId::STRING);
+            assert_eq!(elements[1].type_id, TypeId::NUMBER);
+        }
+        _ => panic!("Expected Tuple type"),
+    }
+}
+
+#[test]
+fn test_parameters_with_optional() {
+    // Parameters<(a: string, b?: number) => void> = [string, number?]
+    let interner = TypeInterner::new();
+
+    let params_tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: Some(interner.intern_string("a")),
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: Some(interner.intern_string("b")),
+            optional: true, // Optional parameter
+            rest: false,
+        },
+    ]);
+
+    match interner.lookup(params_tuple) {
+        Some(TypeKey::Tuple(list_id)) => {
+            let elements = interner.tuple_list(list_id);
+            assert!(!elements[0].optional);
+            assert!(elements[1].optional);
+        }
+        _ => panic!("Expected Tuple type"),
+    }
+}
+
+#[test]
+fn test_parameters_with_rest() {
+    // Parameters<(a: string, ...rest: number[]) => void> = [string, ...number[]]
+    let interner = TypeInterner::new();
+
+    let number_array = interner.array(TypeId::NUMBER);
+
+    let params_tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: Some(interner.intern_string("a")),
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: number_array,
+            name: Some(interner.intern_string("rest")),
+            optional: false,
+            rest: true, // Rest parameter
+        },
+    ]);
+
+    match interner.lookup(params_tuple) {
+        Some(TypeKey::Tuple(list_id)) => {
+            let elements = interner.tuple_list(list_id);
+            assert!(!elements[0].rest);
+            assert!(elements[1].rest);
+        }
+        _ => panic!("Expected Tuple type"),
+    }
+}
+
+#[test]
+fn test_parameters_empty() {
+    // Parameters<() => void> = []
+    let interner = TypeInterner::new();
+
+    let params_tuple = interner.tuple(vec![]);
+
+    match interner.lookup(params_tuple) {
+        Some(TypeKey::Tuple(list_id)) => {
+            let elements = interner.tuple_list(list_id);
+            assert_eq!(elements.len(), 0);
+        }
+        _ => panic!("Expected Tuple type"),
+    }
+}
+
+#[test]
+fn test_parameters_with_overloads() {
+    // For overloaded functions, Parameters uses the last signature
+    let interner = TypeInterner::new();
+
+    let callable = interner.callable(CallableShape {
+        call_signatures: vec![
+            CallSignature {
+                type_params: vec![],
+                params: vec![ParamInfo {
+                    name: Some(interner.intern_string("x")),
+                    type_id: TypeId::STRING,
+                    optional: false,
+                    rest: false,
+                }],
+                this_type: None,
+                return_type: TypeId::STRING,
+                type_predicate: None,
+            },
+            CallSignature {
+                type_params: vec![],
+                params: vec![
+                    ParamInfo {
+                        name: Some(interner.intern_string("x")),
+                        type_id: TypeId::NUMBER,
+                        optional: false,
+                        rest: false,
+                    },
+                    ParamInfo {
+                        name: Some(interner.intern_string("y")),
+                        type_id: TypeId::NUMBER,
+                        optional: false,
+                        rest: false,
+                    },
+                ],
+                this_type: None,
+                return_type: TypeId::NUMBER,
+                type_predicate: None,
+            },
+        ],
+        construct_signatures: vec![],
+        properties: vec![],
+    });
+
+    match interner.lookup(callable) {
+        Some(TypeKey::Callable(shape_id)) => {
+            let shape = interner.callable_shape(shape_id);
+            assert_eq!(shape.call_signatures.len(), 2);
+            let last = &shape.call_signatures[1];
+            assert_eq!(last.params.len(), 2);
+        }
+        _ => panic!("Expected Callable type"),
+    }
+}
+
+#[test]
+fn test_constructor_parameters_simple() {
+    // ConstructorParameters<new (a: string) => Foo> = [string]
+    let interner = TypeInterner::new();
+
+    let foo_type = interner.object(vec![]);
+
+    let ctor = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("a")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: foo_type,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    match interner.lookup(ctor) {
+        Some(TypeKey::Function(shape_id)) => {
+            let shape = interner.function_shape(shape_id);
+            assert!(shape.is_constructor);
+            assert_eq!(shape.params.len(), 1);
+        }
+        _ => panic!("Expected Function type"),
+    }
+
+    let params_tuple = interner.tuple(vec![TupleElement {
+        type_id: TypeId::STRING,
+        name: Some(interner.intern_string("a")),
+        optional: false,
+        rest: false,
+    }]);
+
+    match interner.lookup(params_tuple) {
+        Some(TypeKey::Tuple(list_id)) => {
+            let elements = interner.tuple_list(list_id);
+            assert_eq!(elements.len(), 1);
+        }
+        _ => panic!("Expected Tuple type"),
+    }
+}
+
+#[test]
+fn test_constructor_parameters_callable() {
+    // ConstructorParameters from Callable with construct signatures
+    let interner = TypeInterner::new();
+
+    let instance_type = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("value"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let callable = interner.callable(CallableShape {
+        call_signatures: vec![],
+        construct_signatures: vec![CallSignature {
+            type_params: vec![],
+            params: vec![
+                ParamInfo {
+                    name: Some(interner.intern_string("x")),
+                    type_id: TypeId::NUMBER,
+                    optional: false,
+                    rest: false,
+                },
+                ParamInfo {
+                    name: Some(interner.intern_string("y")),
+                    type_id: TypeId::STRING,
+                    optional: false,
+                    rest: false,
+                },
+            ],
+            this_type: None,
+            return_type: instance_type,
+            type_predicate: None,
+        }],
+        properties: vec![],
+    });
+
+    match interner.lookup(callable) {
+        Some(TypeKey::Callable(shape_id)) => {
+            let shape = interner.callable_shape(shape_id);
+            assert_eq!(shape.construct_signatures.len(), 1);
+            assert_eq!(shape.construct_signatures[0].params.len(), 2);
+        }
+        _ => panic!("Expected Callable type"),
+    }
+}
+
+#[test]
+fn test_instance_type_simple() {
+    // InstanceType<new () => Foo> = Foo
+    let interner = TypeInterner::new();
+
+    let foo_type = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("name"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let ctor = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: foo_type,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    match interner.lookup(ctor) {
+        Some(TypeKey::Function(shape_id)) => {
+            let shape = interner.function_shape(shape_id);
+            assert!(shape.is_constructor);
+            assert_eq!(shape.return_type, foo_type);
+        }
+        _ => panic!("Expected Function type"),
+    }
+}
+
+#[test]
+fn test_instance_type_callable() {
+    // InstanceType from Callable with construct signatures
+    let interner = TypeInterner::new();
+
+    let instance = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("value"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let callable = interner.callable(CallableShape {
+        call_signatures: vec![],
+        construct_signatures: vec![CallSignature {
+            type_params: vec![],
+            params: vec![],
+            this_type: None,
+            return_type: instance,
+            type_predicate: None,
+        }],
+        properties: vec![],
+    });
+
+    match interner.lookup(callable) {
+        Some(TypeKey::Callable(shape_id)) => {
+            let shape = interner.callable_shape(shape_id);
+            let ctor = &shape.construct_signatures[0];
+            assert_eq!(ctor.return_type, instance);
+        }
+        _ => panic!("Expected Callable type"),
+    }
+}
+
+#[test]
+fn test_instance_type_with_generics() {
+    // InstanceType<new <T>(x: T) => Container<T>> = Container<T>
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let container = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("value"),
+        type_id: t_param,
+        write_type: t_param,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let ctor = interner.function(FunctionShape {
+        type_params: vec![TypeParamInfo {
+            name: t_name,
+            constraint: None,
+            default: None,
+        }],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: t_param,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: container,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    match interner.lookup(ctor) {
+        Some(TypeKey::Function(shape_id)) => {
+            let shape = interner.function_shape(shape_id);
+            assert_eq!(shape.type_params.len(), 1);
+            match interner.lookup(shape.return_type) {
+                Some(TypeKey::Object(obj_id)) => {
+                    let obj = interner.object_shape(obj_id);
+                    assert_eq!(obj.properties[0].type_id, t_param);
+                }
+                _ => panic!("Expected Object return type"),
+            }
+        }
+        _ => panic!("Expected Function type"),
+    }
+}
+
+#[test]
+fn test_this_parameter_type() {
+    // ThisParameterType<(this: Foo, x: string) => void> = Foo
+    let interner = TypeInterner::new();
+
+    let foo_type = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("id"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let fn_with_this = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: Some(foo_type),
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    match interner.lookup(fn_with_this) {
+        Some(TypeKey::Function(shape_id)) => {
+            let shape = interner.function_shape(shape_id);
+            assert_eq!(shape.this_type, Some(foo_type));
+        }
+        _ => panic!("Expected Function type"),
+    }
+}
+
+#[test]
+fn test_return_type_simple() {
+    // ReturnType<() => string> = string
+    let interner = TypeInterner::new();
+
+    let func = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    match interner.lookup(func) {
+        Some(TypeKey::Function(shape_id)) => {
+            let shape = interner.function_shape(shape_id);
+            assert_eq!(shape.return_type, TypeId::STRING);
+        }
+        _ => panic!("Expected Function type"),
+    }
+}
+
+#[test]
+fn test_return_type_overloads() {
+    // For overloaded functions, ReturnType uses the last signature
+    let interner = TypeInterner::new();
+
+    let callable = interner.callable(CallableShape {
+        call_signatures: vec![
+            CallSignature {
+                type_params: vec![],
+                params: vec![],
+                this_type: None,
+                return_type: TypeId::STRING,
+                type_predicate: None,
+            },
+            CallSignature {
+                type_params: vec![],
+                params: vec![ParamInfo {
+                    name: Some(interner.intern_string("x")),
+                    type_id: TypeId::NUMBER,
+                    optional: false,
+                    rest: false,
+                }],
+                this_type: None,
+                return_type: TypeId::NUMBER,
+                type_predicate: None,
+            },
+        ],
+        construct_signatures: vec![],
+        properties: vec![],
+    });
+
+    match interner.lookup(callable) {
+        Some(TypeKey::Callable(shape_id)) => {
+            let shape = interner.callable_shape(shape_id);
+            let last = &shape.call_signatures[shape.call_signatures.len() - 1];
+            assert_eq!(last.return_type, TypeId::NUMBER);
+        }
+        _ => panic!("Expected Callable type"),
+    }
+}
