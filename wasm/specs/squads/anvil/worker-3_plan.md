@@ -7,7 +7,7 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- (awaiting assignment)
+- [ ] Add async/await ES5 source map tests (await expressions, async arrow functions, async class methods, try/catch with await, for-await-of loops) in `wasm/src/source_map_tests.rs`. Run `./wasm/test.sh source_map`.
 
 ## Task Queue
 - [ ] (empty)
