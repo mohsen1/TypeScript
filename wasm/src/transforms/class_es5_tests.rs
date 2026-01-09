@@ -11708,3 +11708,314 @@ class Deferred<T> {
         output
     );
 }
+
+// ============================================================================
+// Symbol.isConcatSpreadable Tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_symbol_is_concat_spreadable_basic() {
+    // Basic Symbol.isConcatSpreadable property
+    let source = r#"
+class SpreadableArray<T> {
+    private items: T[] = [];
+
+    [Symbol.isConcatSpreadable]: boolean = true;
+
+    push(item: T): void {
+        this.items.push(item);
+    }
+
+    get length(): number {
+        return this.items.length;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted to function
+    assert!(
+        output.contains("function SpreadableArray"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // push method should be present
+    assert!(
+        output.contains("push"),
+        "Expected push method: {}",
+        output
+    );
+
+    // length getter should be present
+    assert!(
+        output.contains("length"),
+        "Expected length property: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_is_concat_spreadable_false() {
+    // Symbol.isConcatSpreadable set to false (non-spreadable)
+    let source = r#"
+class NonSpreadable {
+    private data: number[];
+
+    [Symbol.isConcatSpreadable]: boolean = false;
+
+    constructor(data: number[]) {
+        this.data = data;
+    }
+
+    getData(): number[] {
+        return this.data;
+    }
+
+    get 0(): number {
+        return this.data[0];
+    }
+
+    get length(): number {
+        return this.data.length;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function NonSpreadable"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // getData method should be present
+    assert!(
+        output.contains("getData"),
+        "Expected getData method: {}",
+        output
+    );
+
+    // false value should be present
+    assert!(
+        output.contains("false"),
+        "Expected false value: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_is_concat_spreadable_array_like() {
+    // Array-like class with Symbol.isConcatSpreadable
+    let source = r#"
+class ArrayLike<T> {
+    [index: number]: T;
+    length: number = 0;
+
+    [Symbol.isConcatSpreadable]: boolean = true;
+
+    add(item: T): void {
+        (this as any)[this.length] = item;
+        this.length++;
+    }
+
+    toArray(): T[] {
+        const result: T[] = [];
+        for (let i = 0; i < this.length; i++) {
+            result.push((this as any)[i]);
+        }
+        return result;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function ArrayLike"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("add") && output.contains("toArray"),
+        "Expected methods: {}",
+        output
+    );
+
+    // length should be initialized
+    assert!(
+        output.contains("length"),
+        "Expected length property: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_is_concat_spreadable_with_inheritance() {
+    // Symbol.isConcatSpreadable with inheritance
+    let source = r#"
+class BaseCollection<T> {
+    protected items: T[] = [];
+
+    [Symbol.isConcatSpreadable]: boolean = true;
+
+    add(item: T): void {
+        this.items.push(item);
+    }
+}
+
+class ExtendedCollection<T> extends BaseCollection<T> {
+    [Symbol.isConcatSpreadable]: boolean = false;
+
+    addMany(items: T[]): void {
+        for (const item of items) {
+            this.add(item);
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Both classes should be present
+    assert!(
+        output.contains("BaseCollection") && output.contains("ExtendedCollection"),
+        "Expected both classes: {}",
+        output
+    );
+
+    // Inheritance pattern should be present
+    assert!(
+        output.contains("__extends") || output.contains("prototype"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("add") && output.contains("addMany"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_is_concat_spreadable_with_other_symbols() {
+    // Symbol.isConcatSpreadable alongside other symbols
+    let source = r#"
+class SmartArray<T> {
+    private data: T[] = [];
+
+    [Symbol.isConcatSpreadable]: boolean = true;
+
+    get [Symbol.toStringTag](): string {
+        return "SmartArray";
+    }
+
+    *[Symbol.iterator](): Iterator<T> {
+        yield* this.data;
+    }
+
+    push(item: T): void {
+        this.data.push(item);
+    }
+
+    pop(): T | undefined {
+        return this.data.pop();
+    }
+
+    get length(): number {
+        return this.data.length;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function SmartArray"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("push") && output.contains("pop"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Object.defineProperty for getter (toStringTag)
+    assert!(
+        output.contains("Object.defineProperty") || output.contains("prototype"),
+        "Expected property definition: {}",
+        output
+    );
+}
