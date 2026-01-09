@@ -58,16 +58,83 @@ function getTestFiles(dir, maxFiles = 500) {
   return files;
 }
 
-async function runTsc(code, fileName = 'test.ts') {
+/**
+ * Parse test directives from source code.
+ * Returns { options: Object, isMultiFile: boolean, cleanCode: string }
+ */
+function parseTestDirectives(code) {
+  const lines = code.split('\n');
+  const options = {};
+  let isMultiFile = false;
+  const cleanLines = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // Check for @filename directive (multi-file test)
+    if (trimmed.startsWith('// @filename:')) {
+      isMultiFile = true;
+      break;
+    }
+
+    // Parse compiler options like // @strict: true
+    const match = trimmed.match(/^\/\/\s*@(\w+):\s*(.+)$/);
+    if (match) {
+      const [, key, value] = match;
+      // Parse boolean/number values
+      if (value === 'true') options[key.toLowerCase()] = true;
+      else if (value === 'false') options[key.toLowerCase()] = false;
+      else if (!isNaN(Number(value))) options[key.toLowerCase()] = Number(value);
+      else options[key.toLowerCase()] = value;
+      continue; // Don't include directive in clean code
+    }
+
+    cleanLines.push(line);
+  }
+
+  return {
+    options,
+    isMultiFile,
+    cleanCode: cleanLines.join('\n'),
+  };
+}
+
+async function runTsc(code, fileName = 'test.ts', testOptions = {}) {
   const ts = require('typescript');
 
+  // Build compiler options from test directives
   const compilerOptions = {
-    strict: true,
+    strict: testOptions.strict !== false, // default true
     target: ts.ScriptTarget.ES2020,
     module: ts.ModuleKind.ESNext,
     noEmit: true,
     skipLibCheck: true,
   };
+
+  // Apply test-specific options
+  if (testOptions.target) {
+    const targetMap = {
+      'es5': ts.ScriptTarget.ES5,
+      'es6': ts.ScriptTarget.ES2015,
+      'es2015': ts.ScriptTarget.ES2015,
+      'es2016': ts.ScriptTarget.ES2016,
+      'es2017': ts.ScriptTarget.ES2017,
+      'es2018': ts.ScriptTarget.ES2018,
+      'es2019': ts.ScriptTarget.ES2019,
+      'es2020': ts.ScriptTarget.ES2020,
+      'es2021': ts.ScriptTarget.ES2021,
+      'es2022': ts.ScriptTarget.ES2022,
+      'esnext': ts.ScriptTarget.ESNext,
+    };
+    compilerOptions.target = targetMap[testOptions.target.toLowerCase()] || ts.ScriptTarget.ES2020;
+  }
+
+  if (testOptions.noimplicitany !== undefined) {
+    compilerOptions.noImplicitAny = testOptions.noimplicitany;
+  }
+  if (testOptions.strictnullchecks !== undefined) {
+    compilerOptions.strictNullChecks = testOptions.strictnullchecks;
+  }
 
   const sourceFile = ts.createSourceFile(
     fileName,
@@ -188,6 +255,7 @@ async function main() {
 
   const stats = {
     total: 0,
+    skippedMultiFile: 0,
     exactMatch: 0,
     sameCount: 0,
     crashed: 0,
@@ -213,16 +281,20 @@ async function main() {
     }
 
     try {
-      const code = readFileSync(filePath, 'utf-8');
+      const rawCode = readFileSync(filePath, 'utf-8');
 
-      // Skip files with specific directives that change behavior
-      if (code.includes('@filename') || code.includes('// @')) {
+      // Parse test directives
+      const { options, isMultiFile, cleanCode } = parseTestDirectives(rawCode);
+
+      // Skip multi-file tests (need special handling we don't support yet)
+      if (isMultiFile) {
+        stats.skippedMultiFile++;
         continue;
       }
 
       const [tscResult, wasmResult] = await Promise.all([
-        runTsc(code, fileName),
-        runWasm(code, fileName),
+        runTsc(cleanCode, fileName, options),
+        runWasm(cleanCode, fileName),
       ]);
 
       stats.total++;
@@ -287,7 +359,9 @@ async function main() {
   log('═'.repeat(60), colors.bold);
 
   log(`\n  Summary:`, colors.cyan);
-  log(`    Total Tests:      ${stats.total}`);
+  log(`    Files Found:      ${testFiles.length}`);
+  log(`    Multi-File Skipped: ${stats.skippedMultiFile}`, colors.dim);
+  log(`    Tests Run:        ${stats.total}`);
   log(`    Exact Match:      ${stats.exactMatch} (${(stats.exactMatch / stats.total * 100).toFixed(1)}%)`, colors.green);
   log(`    Same Error Count: ${stats.sameCount} (${(stats.sameCount / stats.total * 100).toFixed(1)}%)`, colors.blue);
   log(`    WASM Crashed:     ${stats.crashed}`, stats.crashed > 0 ? colors.red : '');
