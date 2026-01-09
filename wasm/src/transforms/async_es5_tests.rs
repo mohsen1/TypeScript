@@ -10844,3 +10844,104 @@ fn test_async_state_machine_ignores_nested_async() {
     );
     assert!(!result, "Should not detect await inside nested async in state machine function");
 }
+
+// ============================================================================
+// ASYNC OBSERVABLE PATTERN TESTS
+// Tests for observable patterns: subscription, unsubscribe, next/error/complete, operators
+// ============================================================================
+
+#[test]
+fn test_async_observable_subscribe() {
+    let result = async_error_propagation_contains_await(
+        "async function subscribe() { return await observable.subscribe(observer); }",
+    );
+    assert!(result, "Should detect await in observable subscription");
+}
+
+#[test]
+fn test_async_observable_unsubscribe() {
+    let result = async_error_propagation_contains_await(
+        "async function unsubscribe() { await subscription.unsubscribe(); }",
+    );
+    assert!(result, "Should detect await in unsubscribe");
+}
+
+#[test]
+fn test_async_observable_next() {
+    let result = async_error_propagation_contains_await(
+        "async function onNext() { await observer.next(value); }",
+    );
+    assert!(result, "Should detect await in next value handling");
+}
+
+#[test]
+fn test_async_observable_error() {
+    let result = async_error_propagation_contains_await(
+        "async function onError() { await observer.error(err); }",
+    );
+    assert!(result, "Should detect await in error handling");
+}
+
+#[test]
+fn test_async_observable_complete() {
+    let result = async_error_propagation_contains_await(
+        "async function onComplete() { await observer.complete(); }",
+    );
+    assert!(result, "Should detect await in complete notification");
+}
+
+#[test]
+fn test_async_observable_map() {
+    let result = async_error_propagation_contains_await(
+        "async function mapOp() { return await source.pipe(map(x => x * 2)).toPromise(); }",
+    );
+    assert!(result, "Should detect await in map operator");
+}
+
+#[test]
+fn test_async_observable_filter() {
+    let result = async_error_propagation_contains_await(
+        "async function filterOp() { return await source.pipe(filter(x => x > 0)).toPromise(); }",
+    );
+    assert!(result, "Should detect await in filter operator");
+}
+
+#[test]
+fn test_async_observable_merge() {
+    let result = async_error_propagation_contains_await(
+        "async function mergeOp() { return await merge(obs1, obs2).toPromise(); }",
+    );
+    assert!(result, "Should detect await in merge operator");
+}
+
+#[test]
+fn test_async_observable_concat() {
+    let result = async_error_propagation_contains_await(
+        "async function concatOp() { return await concat(obs1, obs2).toPromise(); }",
+    );
+    assert!(result, "Should detect await in concat operator");
+}
+
+#[test]
+fn test_async_observable_switch_map() {
+    let result = async_error_propagation_contains_await(
+        "async function switchMapOp() { return await source.pipe(switchMap(x => inner)).toPromise(); }",
+    );
+    assert!(result, "Should detect await in switchMap operator");
+}
+
+#[test]
+fn test_async_observable_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function syncObs() { return observable.pipe(take(1)); }",
+    );
+    assert!(!result, "Should not detect await when observable access is sync");
+}
+
+#[test]
+fn test_async_observable_ignores_nested_async() {
+    let result = async_error_propagation_contains_await(
+        "async function outer() { const sub = async () => await observable.subscribe(); }",
+    );
+    assert!(!result, "Should not detect await inside nested async in observable function");
+}
