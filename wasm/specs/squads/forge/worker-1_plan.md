@@ -44,6 +44,8 @@ Implement missing name diagnostics for unresolved identifiers.
 - Emitted TS2304 for missing names inside type aliases and interface members; added type-node traversal for complex types.
 - Ran `./wasm/test.sh missing_type_reference`, `./wasm/test.sh missing_identifier_emits_2304`, `./wasm/test.sh missing_property_access_emits_2339_not_2304`.
 - Rebuilt WASM and reran conformance (debug runner): 77/446 exact, 100/446 same count; TS2304 extra count 145 (up +2); OOB crashes persist.
+- Ran Docker conformance `run-conformance.sh --max=1000 --workers=6`: 879 tests run, 15.5% exact (136), 17.4% same count (153), 223 crashes, 121 skipped. Top missing: TS2705(37), TS2322(26), TS2339(22), TS1109(16), TS2524(15). Top extra: TS2304(192), TS2355(83), TS1005(64), TS7010(48), TS2339(31).
+- Docker conformance `run-conformance.sh --all --workers=14` OOM/exit 137 at 0% progress.
 
 ## Ready for Merge
 Yes
