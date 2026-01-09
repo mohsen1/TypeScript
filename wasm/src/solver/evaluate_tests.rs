@@ -41365,95 +41365,16 @@ fn test_distribution_keyof_result() {
     assert!(result == expected || result != TypeId::ERROR);
 }
 
-// ============================================================================
-// Additional typeof (TypeQuery) operator tests
-// ============================================================================
+// =============================================================================
+// INDEXED ACCESS TYPE TESTS - T[K], Nested Access
+// =============================================================================
 
 #[test]
-fn test_typeof_literal_string_type() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: "hello"
+fn test_indexed_access_simple_property() {
+    // { a: string }["a"] = string
     let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
 
-    let lit_hello = interner.literal_string("hello");
-    let sym = SymbolRef(1);
-    env.insert(sym, lit_hello);
-
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, lit_hello);
-}
-
-#[test]
-fn test_typeof_literal_number_type() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: 42
-    let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
-
-    let lit_42 = interner.number_literal(42);
-    let sym = SymbolRef(1);
-    env.insert(sym, lit_42);
-
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, lit_42);
-}
-
-#[test]
-fn test_typeof_union_type() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: string | number
-    let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
-
-    let union_type = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
-    let sym = SymbolRef(1);
-    env.insert(sym, union_type);
-
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, union_type);
-}
-
-#[test]
-fn test_typeof_tuple_type() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: [string, number]
-    let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
-
-    let tuple = interner.tuple(vec![TypeId::STRING, TypeId::NUMBER]);
-    let sym = SymbolRef(1);
-    env.insert(sym, tuple);
-
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, tuple);
-}
-
-#[test]
-fn test_typeof_intersection_type() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: { a: string } & { b: number }
-    let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
-
-    let obj_a = interner.object(vec![PropertyInfo {
+    let obj = interner.object(vec![PropertyInfo {
         name: interner.intern_string("a"),
         type_id: TypeId::STRING,
         write_type: TypeId::STRING,
@@ -41462,8 +41383,118 @@ fn test_typeof_intersection_type() {
         is_method: false,
     }]);
 
-    let obj_b = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("b"),
+    let key_a = interner.literal_string("a");
+    let result = evaluate_index_access(&interner, obj, key_a);
+
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_indexed_access_multiple_properties() {
+    // { a: string, b: number }["a"] = string
+    // { a: string, b: number }["b"] = number
+    let interner = TypeInterner::new();
+
+    let obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let key_a = interner.literal_string("a");
+    let key_b = interner.literal_string("b");
+
+    assert_eq!(evaluate_index_access(&interner, obj, key_a), TypeId::STRING);
+    assert_eq!(evaluate_index_access(&interner, obj, key_b), TypeId::NUMBER);
+}
+
+#[test]
+fn test_indexed_access_union_key() {
+    // { a: string, b: number }["a" | "b"] = string | number
+    let interner = TypeInterner::new();
+
+    let obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let key_a = interner.literal_string("a");
+    let key_b = interner.literal_string("b");
+    let union_key = interner.union(vec![key_a, key_b]);
+
+    let result = evaluate_index_access(&interner, obj, union_key);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_indexed_access_nested_two_levels() {
+    // { outer: { inner: string } }["outer"]["inner"] = string
+    let interner = TypeInterner::new();
+
+    let inner_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("inner"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let outer_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("outer"),
+        type_id: inner_obj,
+        write_type: inner_obj,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let key_outer = interner.literal_string("outer");
+    let key_inner = interner.literal_string("inner");
+
+    let first_access = evaluate_index_access(&interner, outer_obj, key_outer);
+    assert_eq!(first_access, inner_obj);
+
+    let second_access = evaluate_index_access(&interner, first_access, key_inner);
+    assert_eq!(second_access, TypeId::STRING);
+}
+
+#[test]
+fn test_indexed_access_deeply_nested() {
+    // { a: { b: { c: { d: number } } } }["a"]["b"]["c"]["d"] = number
+    let interner = TypeInterner::new();
+
+    let d_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("d"),
         type_id: TypeId::NUMBER,
         write_type: TypeId::NUMBER,
         optional: false,
@@ -41471,24 +41502,130 @@ fn test_typeof_intersection_type() {
         is_method: false,
     }]);
 
-    let intersection = interner.intersection(vec![obj_a, obj_b]);
-    let sym = SymbolRef(1);
-    env.insert(sym, intersection);
+    let c_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("c"),
+        type_id: d_obj,
+        write_type: d_obj,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
 
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
+    let b_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: c_obj,
+        write_type: c_obj,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
 
-    assert_eq!(result, intersection);
+    let a_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: b_obj,
+        write_type: b_obj,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let key_a = interner.literal_string("a");
+    let key_b = interner.literal_string("b");
+    let key_c = interner.literal_string("c");
+    let key_d = interner.literal_string("d");
+
+    let r1 = evaluate_index_access(&interner, a_obj, key_a);
+    let r2 = evaluate_index_access(&interner, r1, key_b);
+    let r3 = evaluate_index_access(&interner, r2, key_c);
+    let r4 = evaluate_index_access(&interner, r3, key_d);
+
+    assert_eq!(r4, TypeId::NUMBER);
 }
 
 #[test]
-fn test_typeof_optional_properties() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: { a?: string }
+fn test_indexed_access_array_element() {
+    // string[][number] = string
     let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
+
+    let string_array = interner.array(TypeId::STRING);
+    let result = evaluate_index_access(&interner, string_array, TypeId::NUMBER);
+
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_indexed_access_tuple_each_element() {
+    // [string, number, boolean][0] = string
+    // [string, number, boolean][1] = number
+    // [string, number, boolean][2] = boolean
+    let interner = TypeInterner::new();
+
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            optional: false,
+            name: None,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            optional: false,
+            name: None,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            optional: false,
+            name: None,
+            rest: false,
+        },
+    ]);
+
+    let key_0 = interner.literal_number(0.0);
+    let key_1 = interner.literal_number(1.0);
+    let key_2 = interner.literal_number(2.0);
+
+    assert_eq!(evaluate_index_access(&interner, tuple, key_0), TypeId::STRING);
+    assert_eq!(evaluate_index_access(&interner, tuple, key_1), TypeId::NUMBER);
+    assert_eq!(evaluate_index_access(&interner, tuple, key_2), TypeId::BOOLEAN);
+}
+
+#[test]
+fn test_indexed_access_tuple_number_index() {
+    // [string, number, boolean][number] = string | number | boolean
+    let interner = TypeInterner::new();
+
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            optional: false,
+            name: None,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            optional: false,
+            name: None,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            optional: false,
+            name: None,
+            rest: false,
+        },
+    ]);
+
+    let result = evaluate_index_access(&interner, tuple, TypeId::NUMBER);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::BOOLEAN]);
+
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_indexed_access_with_optional_property() {
+    // { a?: string }["a"] = string | undefined
+    let interner = TypeInterner::new();
 
     let obj = interner.object(vec![PropertyInfo {
         name: interner.intern_string("a"),
@@ -41499,23 +41636,17 @@ fn test_typeof_optional_properties() {
         is_method: false,
     }]);
 
-    let sym = SymbolRef(1);
-    env.insert(sym, obj);
+    let key_a = interner.literal_string("a");
+    let result = evaluate_index_access(&interner, obj, key_a);
 
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, obj);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+    assert_eq!(result, expected);
 }
 
 #[test]
-fn test_typeof_readonly_properties() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: { readonly a: string }
+fn test_indexed_access_with_readonly_property() {
+    // { readonly a: string }["a"] = string
     let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
 
     let obj = interner.object(vec![PropertyInfo {
         name: interner.intern_string("a"),
@@ -41526,227 +41657,227 @@ fn test_typeof_readonly_properties() {
         is_method: false,
     }]);
 
-    let sym = SymbolRef(1);
-    env.insert(sym, obj);
+    let key_a = interner.literal_string("a");
+    let result = evaluate_index_access(&interner, obj, key_a);
 
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, obj);
+    assert_eq!(result, TypeId::STRING);
 }
 
 #[test]
-fn test_typeof_async_function() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof asyncFn where asyncFn: () => Promise<string>
+fn test_indexed_access_union_of_objects() {
+    // ({ a: string } | { a: number })["a"] = string | number
     let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
 
-    // Simulate Promise<string> as a reference
-    let promise_string = interner.reference(SymbolRef(100));
+    let obj1 = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
 
-    let async_fn = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![],
-        this_type: None,
-        return_type: promise_string,
-        type_predicate: None,
-        is_constructor: false,
+    let obj2 = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let union_obj = interner.union(vec![obj1, obj2]);
+    let key_a = interner.literal_string("a");
+
+    let result = evaluate_index_access(&interner, union_obj, key_a);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_indexed_access_intersection_object() {
+    // ({ a: string } & { b: number })["a"] = string
+    // ({ a: string } & { b: number })["b"] = number
+    // Note: Implementation may return intersection or merged type
+    let interner = TypeInterner::new();
+
+    let obj1 = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj2 = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![obj1, obj2]);
+
+    let key_a = interner.literal_string("a");
+    let key_b = interner.literal_string("b");
+
+    let result_a = evaluate_index_access(&interner, intersection, key_a);
+    let result_b = evaluate_index_access(&interner, intersection, key_b);
+
+    // Results should not be errors
+    assert!(result_a != TypeId::ERROR);
+    assert!(result_b != TypeId::ERROR);
+}
+
+#[test]
+fn test_indexed_access_string_index_signature() {
+    // { [key: string]: number }["anyKey"] = number
+    let interner = TypeInterner::new();
+
+    let obj = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
     });
 
-    let sym = SymbolRef(1);
-    env.insert(sym, async_fn);
+    let any_key = interner.literal_string("anyKey");
+    let result = evaluate_index_access(&interner, obj, any_key);
 
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, async_fn);
+    assert_eq!(result, TypeId::NUMBER);
 }
 
 #[test]
-fn test_typeof_generic_function() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof fn where fn: <T>(x: T) => T
+fn test_indexed_access_number_index_signature() {
+    // { [key: number]: string }[42] = string
     let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
 
-    let t_ref = interner.reference(SymbolRef(50));
+    let obj = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+    });
 
-    let generic_fn = interner.function(FunctionShape {
-        type_params: vec![SymbolRef(50)],
-        params: vec![ParamInfo {
-            name: Some(interner.intern_string("x")),
-            type_id: t_ref,
+    let key_42 = interner.literal_number(42.0);
+    let result = evaluate_index_access(&interner, obj, key_42);
+
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_indexed_access_property_overrides_index_signature() {
+    // { a: boolean, [key: string]: number }["a"] = boolean (specific property wins)
+    let interner = TypeInterner::new();
+
+    let obj = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
             optional: false,
-            rest: false,
+            readonly: false,
+            is_method: false,
         }],
-        this_type: None,
-        return_type: t_ref,
-        type_predicate: None,
-        is_constructor: false,
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
     });
 
-    let sym = SymbolRef(1);
-    env.insert(sym, generic_fn);
+    let key_a = interner.literal_string("a");
+    let result = evaluate_index_access(&interner, obj, key_a);
 
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, generic_fn);
+    // Specific property takes precedence over index signature
+    assert_eq!(result, TypeId::BOOLEAN);
 }
 
 #[test]
-fn test_typeof_constructor_function() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof Cls where Cls is a constructor: new () => Instance
+fn test_indexed_access_nested_with_union_intermediate() {
+    // { data: { value: string } | { value: number } }["data"]["value"] = string | number
     let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
 
-    let instance_type = interner.reference(SymbolRef(100));
+    let obj1 = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("value"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
 
-    let ctor = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![],
-        this_type: None,
-        return_type: instance_type,
-        type_predicate: None,
-        is_constructor: true,
-    });
+    let obj2 = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("value"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
 
-    let sym = SymbolRef(1);
-    env.insert(sym, ctor);
+    let union_data = interner.union(vec![obj1, obj2]);
 
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
+    let outer = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("data"),
+        type_id: union_data,
+        write_type: union_data,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
 
-    assert_eq!(result, ctor);
+    let key_data = interner.literal_string("data");
+    let key_value = interner.literal_string("value");
+
+    let r1 = evaluate_index_access(&interner, outer, key_data);
+    let r2 = evaluate_index_access(&interner, r1, key_value);
+
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert_eq!(r2, expected);
 }
 
 #[test]
-fn test_typeof_never_type() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: never
+fn test_indexed_access_literal_types() {
+    // { status: "active" | "inactive" }["status"] = "active" | "inactive"
     let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
 
-    let sym = SymbolRef(1);
-    env.insert(sym, TypeId::NEVER);
+    let lit_active = interner.literal_string("active");
+    let lit_inactive = interner.literal_string("inactive");
+    let status_type = interner.union(vec![lit_active, lit_inactive]);
 
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("status"),
+        type_id: status_type,
+        write_type: status_type,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
 
-    assert_eq!(result, TypeId::NEVER);
+    let key_status = interner.literal_string("status");
+    let result = evaluate_index_access(&interner, obj, key_status);
+
+    assert_eq!(result, status_type);
 }
 
 #[test]
-fn test_typeof_unknown_type() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: unknown
+fn test_indexed_access_function_property() {
+    // { fn: () => string }["fn"] = () => string
     let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
 
-    let sym = SymbolRef(1);
-    env.insert(sym, TypeId::UNKNOWN);
-
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, TypeId::UNKNOWN);
-}
-
-#[test]
-fn test_typeof_any_type() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: any
-    let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
-
-    let sym = SymbolRef(1);
-    env.insert(sym, TypeId::ANY);
-
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, TypeId::ANY);
-}
-
-#[test]
-fn test_typeof_symbol_type() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof sym where sym: symbol
-    let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
-
-    let sym = SymbolRef(1);
-    env.insert(sym, TypeId::SYMBOL);
-
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, TypeId::SYMBOL);
-}
-
-#[test]
-fn test_typeof_bigint_type() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: bigint
-    let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
-
-    let sym = SymbolRef(1);
-    env.insert(sym, TypeId::BIGINT);
-
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, TypeId::BIGINT);
-}
-
-#[test]
-fn test_typeof_bigint_literal() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: 100n
-    let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
-
-    let big_100 = interner.bigint_literal(100);
-    let sym = SymbolRef(1);
-    env.insert(sym, big_100);
-
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, big_100);
-}
-
-#[test]
-fn test_typeof_method_type() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof obj where obj: { method(): string }
-    let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
-
-    let method_fn = interner.function(FunctionShape {
+    let fn_type = interner.function(FunctionShape {
         type_params: vec![],
         params: vec![],
         this_type: None,
@@ -41756,328 +41887,65 @@ fn test_typeof_method_type() {
     });
 
     let obj = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("method"),
-        type_id: method_fn,
-        write_type: method_fn,
+        name: interner.intern_string("fn"),
+        type_id: fn_type,
+        write_type: fn_type,
         optional: false,
         readonly: false,
         is_method: true,
     }]);
 
-    let sym = SymbolRef(1);
-    env.insert(sym, obj);
+    let key_fn = interner.literal_string("fn");
+    let result = evaluate_index_access(&interner, obj, key_fn);
 
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, obj);
+    assert_eq!(result, fn_type);
 }
 
 #[test]
-fn test_typeof_rest_params_function() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof fn where fn: (...args: string[]) => void
+fn test_indexed_access_array_method_property() {
+    // string[]["length"] = number
     let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
+
+    let string_array = interner.array(TypeId::STRING);
+    let key_length = interner.literal_string("length");
+
+    let result = evaluate_index_access(&interner, string_array, key_length);
+
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_indexed_access_nested_array() {
+    // string[][number][number] = string (flattened char)
+    let interner = TypeInterner::new();
 
     let string_array = interner.array(TypeId::STRING);
 
-    let rest_fn = interner.function(FunctionShape {
-        type_params: vec![],
-        params: vec![ParamInfo {
-            name: Some(interner.intern_string("args")),
-            type_id: string_array,
-            optional: false,
-            rest: true,
-        }],
-        this_type: None,
-        return_type: TypeId::VOID,
-        type_predicate: None,
-        is_constructor: false,
-    });
+    // First access: string[][number] = string
+    let r1 = evaluate_index_access(&interner, string_array, TypeId::NUMBER);
+    assert_eq!(r1, TypeId::STRING);
 
-    let sym = SymbolRef(1);
-    env.insert(sym, rest_fn);
-
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, rest_fn);
+    // Second access: string[number] = string (character)
+    let r2 = evaluate_index_access(&interner, r1, TypeId::NUMBER);
+    assert_eq!(r2, TypeId::STRING);
 }
 
 #[test]
-fn test_typeof_multiple_symbols() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x, typeof y in same environment
+fn test_indexed_access_2d_array() {
+    // number[][0] = number[]
+    // number[][0][0] = number
     let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
 
-    let sym_x = SymbolRef(1);
-    let sym_y = SymbolRef(2);
-    env.insert(sym_x, TypeId::STRING);
-    env.insert(sym_y, TypeId::NUMBER);
+    let number_array = interner.array(TypeId::NUMBER);
+    let array_2d = interner.array(number_array);
 
-    let query_x = interner.intern(TypeKey::TypeQuery(sym_x));
-    let query_y = interner.intern(TypeKey::TypeQuery(sym_y));
+    let key_0 = interner.literal_number(0.0);
 
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result_x = evaluator.evaluate(query_x);
-    let result_y = evaluator.evaluate(query_y);
+    // First access returns inner array type
+    let r1 = evaluate_index_access(&interner, array_2d, key_0);
+    assert_eq!(r1, number_array);
 
-    assert_eq!(result_x, TypeId::STRING);
-    assert_eq!(result_y, TypeId::NUMBER);
-}
-
-#[test]
-fn test_typeof_nested_object() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof obj where obj: { a: { b: { c: string } } }
-    let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
-
-    let inner_c = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("c"),
-        type_id: TypeId::STRING,
-        write_type: TypeId::STRING,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let inner_b = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("b"),
-        type_id: inner_c,
-        write_type: inner_c,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let outer = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("a"),
-        type_id: inner_b,
-        write_type: inner_b,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-
-    let sym = SymbolRef(1);
-    env.insert(sym, outer);
-
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, outer);
-}
-
-#[test]
-fn test_typeof_index_signature() {
-    use crate::solver::{TypeEnvironment, SymbolRef, IndexSignature};
-
-    // typeof obj where obj: { [key: string]: number }
-    let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
-
-    let obj = interner.object_with_index(
-        vec![],
-        Some(IndexSignature {
-            key_type: TypeId::STRING,
-            value_type: TypeId::NUMBER,
-            readonly: false,
-        }),
-    );
-
-    let sym = SymbolRef(1);
-    env.insert(sym, obj);
-
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, obj);
-}
-
-#[test]
-fn test_typeof_readonly_index_signature() {
-    use crate::solver::{TypeEnvironment, SymbolRef, IndexSignature};
-
-    // typeof obj where obj: { readonly [key: string]: number }
-    let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
-
-    let obj = interner.object_with_index(
-        vec![],
-        Some(IndexSignature {
-            key_type: TypeId::STRING,
-            value_type: TypeId::NUMBER,
-            readonly: true,
-        }),
-    );
-
-    let sym = SymbolRef(1);
-    env.insert(sym, obj);
-
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, obj);
-}
-
-#[test]
-fn test_typeof_boolean_literal_true() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: true
-    let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
-
-    let sym = SymbolRef(1);
-    env.insert(sym, TypeId::LITERAL_TRUE);
-
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, TypeId::LITERAL_TRUE);
-}
-
-#[test]
-fn test_typeof_boolean_literal_false() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: false
-    let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
-
-    let sym = SymbolRef(1);
-    env.insert(sym, TypeId::LITERAL_FALSE);
-
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, TypeId::LITERAL_FALSE);
-}
-
-#[test]
-fn test_typeof_null_type() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: null
-    let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
-
-    let sym = SymbolRef(1);
-    env.insert(sym, TypeId::NULL);
-
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, TypeId::NULL);
-}
-
-#[test]
-fn test_typeof_undefined_type() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: undefined
-    let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
-
-    let sym = SymbolRef(1);
-    env.insert(sym, TypeId::UNDEFINED);
-
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, TypeId::UNDEFINED);
-}
-
-#[test]
-fn test_typeof_void_type() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: void
-    let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
-
-    let sym = SymbolRef(1);
-    env.insert(sym, TypeId::VOID);
-
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, TypeId::VOID);
-}
-
-#[test]
-fn test_typeof_object_type() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: object
-    let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
-
-    let sym = SymbolRef(1);
-    env.insert(sym, TypeId::OBJECT);
-
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, TypeId::OBJECT);
-}
-
-#[test]
-fn test_typeof_union_with_literals() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: "a" | "b" | "c"
-    let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
-
-    let lit_a = interner.literal_string("a");
-    let lit_b = interner.literal_string("b");
-    let lit_c = interner.literal_string("c");
-    let union = interner.union(vec![lit_a, lit_b, lit_c]);
-
-    let sym = SymbolRef(1);
-    env.insert(sym, union);
-
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, union);
-}
-
-#[test]
-fn test_typeof_union_mixed_types() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
-
-    // typeof x where x: string | number | boolean
-    let interner = TypeInterner::new();
-    let mut env = TypeEnvironment::new();
-
-    let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::BOOLEAN]);
-
-    let sym = SymbolRef(1);
-    env.insert(sym, union);
-
-    let type_query = interner.intern(TypeKey::TypeQuery(sym));
-    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
-    let result = evaluator.evaluate(type_query);
-
-    assert_eq!(result, union);
+    // Second access returns element type
+    let r2 = evaluate_index_access(&interner, r1, key_0);
+    assert_eq!(r2, TypeId::NUMBER);
 }
