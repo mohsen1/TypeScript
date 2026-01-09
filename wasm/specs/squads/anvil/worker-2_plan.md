@@ -7,10 +7,10 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-(awaiting assignment)
+- [ ] Add ES5 class field patterns parity tests: public fields, private fields, static fields, computed fields. Tests: `./wasm/test.sh emitter_parity`
 
 ## Task Queue
-(empty)
+- [ ] Add ES5 arrow function edge case parity tests: nested arrows, this binding, rest params
 
 ## Completed
 - [x] Added ES5 for-of/for-in patterns parity tests (for-in-typed, for-in-computed, custom-iterator, map-set-destruct) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (335 tests).
