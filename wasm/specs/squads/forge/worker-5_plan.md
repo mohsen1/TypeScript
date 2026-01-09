@@ -6,6 +6,14 @@ Execute tasks assigned by EM-Forge for the Forge squad (type system).
 Status: Active
 Priority: 5
 
+## Current Assignment (TS7010/TS7006)
+- [x] Implement return-path analysis for missing return diagnostics (TS2366) in `thin_checker.rs`
+- [x] Add implicit-any parameter checks (TS7006) and implicit-any return checks (TS7010/TS7011)
+- [x] Add regression test for missing returns and implicit-any diagnostics in `wasm/src/thin_checker_tests.rs`
+
+### Test Status
+- Not run (`./wasm/test.sh`)
+
 ## Current Assignment
 - [x] Investigate `ExtractState<R>` and `ExtractAction<R>` conditional infer patterns from `test_check_redux_lodash_style_generics`. These use `infer S` inside mapped type values. Test in isolation in `wasm/src/solver/evaluate_tests.rs`.
 
