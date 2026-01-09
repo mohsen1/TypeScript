@@ -41961,3 +41961,7 @@ fn test_template_literal_getter_extraction() {
     let expected = interner.literal_string("Name");
     assert!(result == expected || result != TypeId::ERROR);
 }
+        template: TypeId::NUMBER,
+        readonly_modifier: Some(MappedModifier::Add),
+        readonly_modifier: Some(MappedModifier::Remove),
+        optional_modifier: Some(MappedModifier::Remove),
