@@ -14995,3 +14995,419 @@ class PropertyMixinBuilder {
         output
     );
 }
+
+#[test]
+fn test_class_es5_object_getprototypeof_basic() {
+    // Basic Object.getPrototypeOf usage for prototype inspection
+    let source = r#"
+class PrototypeInspector {
+    getProto(obj: object): object | null {
+        return Object.getPrototypeOf(obj);
+    }
+
+    getPrototypeChain(obj: object): object[] {
+        const chain: object[] = [];
+        let current = Object.getPrototypeOf(obj);
+        while (current !== null) {
+            chain.push(current);
+            current = Object.getPrototypeOf(current);
+        }
+        return chain;
+    }
+
+    hasPrototype(obj: object, proto: object): boolean {
+        let current = Object.getPrototypeOf(obj);
+        while (current !== null) {
+            if (current === proto) {
+                return true;
+            }
+            current = Object.getPrototypeOf(current);
+        }
+        return false;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("PrototypeInspector"),
+        "Expected PrototypeInspector class: {}",
+        output
+    );
+    assert!(
+        output.contains("Object.getPrototypeOf"),
+        "Expected Object.getPrototypeOf: {}",
+        output
+    );
+    assert!(
+        output.contains("getProto") && output.contains("getPrototypeChain"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_object_setprototypeof_basic() {
+    // Basic Object.setPrototypeOf usage for prototype modification
+    let source = r#"
+class PrototypeModifier {
+    static setProto(obj: object, proto: object | null): object {
+        return Object.setPrototypeOf(obj, proto);
+    }
+
+    static createWithProto<T extends object>(props: T, proto: object | null): T {
+        const obj = { ...props };
+        Object.setPrototypeOf(obj, proto);
+        return obj as T;
+    }
+
+    static removeProto(obj: object): object {
+        return Object.setPrototypeOf(obj, null);
+    }
+
+    changePrototype(target: object, newProto: object): void {
+        Object.setPrototypeOf(target, newProto);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("PrototypeModifier"),
+        "Expected PrototypeModifier class: {}",
+        output
+    );
+    assert!(
+        output.contains("Object.setPrototypeOf"),
+        "Expected Object.setPrototypeOf: {}",
+        output
+    );
+    assert!(
+        output.contains("setProto") && output.contains("createWithProto"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_object_getprototypeof_inheritance() {
+    // Object.getPrototypeOf for checking inheritance chain
+    let source = r#"
+class InheritanceChecker {
+    static isInstanceOf(obj: object, constructor: Function): boolean {
+        let proto = Object.getPrototypeOf(obj);
+        while (proto !== null) {
+            if (proto === constructor.prototype) {
+                return true;
+            }
+            proto = Object.getPrototypeOf(proto);
+        }
+        return false;
+    }
+
+    static getConstructor(obj: object): Function | undefined {
+        const proto = Object.getPrototypeOf(obj);
+        return proto?.constructor;
+    }
+
+    static getInheritanceDepth(obj: object): number {
+        let depth = 0;
+        let proto = Object.getPrototypeOf(obj);
+        while (proto !== null) {
+            depth++;
+            proto = Object.getPrototypeOf(proto);
+        }
+        return depth;
+    }
+
+    comparePrototypes(a: object, b: object): boolean {
+        return Object.getPrototypeOf(a) === Object.getPrototypeOf(b);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("InheritanceChecker"),
+        "Expected InheritanceChecker class: {}",
+        output
+    );
+    assert!(
+        output.contains("Object.getPrototypeOf"),
+        "Expected Object.getPrototypeOf: {}",
+        output
+    );
+    assert!(
+        output.contains("isInstanceOf") && output.contains("getInheritanceDepth"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_object_setprototypeof_mixin() {
+    // Object.setPrototypeOf for dynamic mixin pattern
+    let source = r#"
+class DynamicMixin {
+    static applyMixin<T extends object, M extends object>(target: T, mixin: M): T & M {
+        const combined = Object.create(Object.getPrototypeOf(target)) as T & M;
+        Object.assign(combined, target, mixin);
+        return combined;
+    }
+
+    static chainPrototypes(obj: object, ...protos: object[]): object {
+        let current = obj;
+        for (const proto of protos) {
+            const newProto = Object.create(proto);
+            Object.setPrototypeOf(current, newProto);
+            current = newProto;
+        }
+        return obj;
+    }
+
+    static insertPrototype(obj: object, newProto: object): object {
+        const oldProto = Object.getPrototypeOf(obj);
+        Object.setPrototypeOf(newProto, oldProto);
+        Object.setPrototypeOf(obj, newProto);
+        return obj;
+    }
+
+    wrapWithPrototype<T extends object>(target: T, wrapper: object): T {
+        Object.setPrototypeOf(wrapper, Object.getPrototypeOf(target));
+        Object.setPrototypeOf(target, wrapper);
+        return target;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("DynamicMixin"),
+        "Expected DynamicMixin class: {}",
+        output
+    );
+    assert!(
+        output.contains("Object.setPrototypeOf") && output.contains("Object.getPrototypeOf"),
+        "Expected prototype methods: {}",
+        output
+    );
+    assert!(
+        output.contains("applyMixin") && output.contains("chainPrototypes"),
+        "Expected mixin methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_prototype_in_constructor() {
+    // Object.getPrototypeOf/setPrototypeOf in constructor
+    let source = r#"
+class PrototypeAwareClass {
+    private originalProto: object | null;
+    private protoChain: object[];
+
+    constructor(inheritFrom?: object) {
+        this.originalProto = Object.getPrototypeOf(this);
+        this.protoChain = [];
+
+        let proto = Object.getPrototypeOf(this);
+        while (proto !== null) {
+            this.protoChain.push(proto);
+            proto = Object.getPrototypeOf(proto);
+        }
+
+        if (inheritFrom) {
+            const currentProto = Object.getPrototypeOf(this);
+            Object.setPrototypeOf(inheritFrom, currentProto);
+            Object.setPrototypeOf(this, inheritFrom);
+        }
+    }
+
+    getOriginalPrototype(): object | null {
+        return this.originalProto;
+    }
+
+    getChainLength(): number {
+        return this.protoChain.length;
+    }
+
+    resetPrototype(): void {
+        if (this.originalProto) {
+            Object.setPrototypeOf(this, this.originalProto);
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("PrototypeAwareClass"),
+        "Expected PrototypeAwareClass class: {}",
+        output
+    );
+    assert!(
+        output.contains("Object.getPrototypeOf"),
+        "Expected Object.getPrototypeOf: {}",
+        output
+    );
+    assert!(
+        output.contains("getOriginalPrototype") && output.contains("resetPrototype"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_prototype_combined() {
+    // Combined Object.getPrototypeOf/setPrototypeOf patterns
+    let source = r#"
+class PrototypeUtilities {
+    static cloneWithPrototype<T extends object>(source: T): T {
+        const proto = Object.getPrototypeOf(source);
+        const clone = Object.create(proto) as T;
+        Object.assign(clone, source);
+        return clone;
+    }
+
+    static swapPrototypes(a: object, b: object): void {
+        const protoA = Object.getPrototypeOf(a);
+        const protoB = Object.getPrototypeOf(b);
+        Object.setPrototypeOf(a, protoB);
+        Object.setPrototypeOf(b, protoA);
+    }
+
+    static isolate(obj: object): object {
+        const proto = Object.getPrototypeOf(obj);
+        const isolated = Object.create(null);
+        Object.keys(obj).forEach(key => {
+            (isolated as any)[key] = (obj as any)[key];
+        });
+        return isolated;
+    }
+
+    static reconnect(obj: object, proto: object): object {
+        Object.setPrototypeOf(obj, proto);
+        return obj;
+    }
+
+    static getPrototypeMethods(obj: object): string[] {
+        const methods: string[] = [];
+        let proto = Object.getPrototypeOf(obj);
+        while (proto !== null && proto !== Object.prototype) {
+            Object.getOwnPropertyNames(proto)
+                .filter(name => typeof (proto as any)[name] === 'function')
+                .forEach(name => methods.push(name));
+            proto = Object.getPrototypeOf(proto);
+        }
+        return methods;
+    }
+
+    copyPrototypeChain<T extends object>(source: T, target: object): void {
+        const sourceProto = Object.getPrototypeOf(source);
+        if (sourceProto) {
+            Object.setPrototypeOf(target, sourceProto);
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("PrototypeUtilities"),
+        "Expected PrototypeUtilities class: {}",
+        output
+    );
+    assert!(
+        output.contains("Object.getPrototypeOf") && output.contains("Object.setPrototypeOf"),
+        "Expected prototype methods: {}",
+        output
+    );
+    assert!(
+        output.contains("cloneWithPrototype") && output.contains("swapPrototypes"),
+        "Expected utility methods: {}",
+        output
+    );
+    assert!(
+        output.contains("isolate") && output.contains("reconnect"),
+        "Expected isolation methods: {}",
+        output
+    );
+}
