@@ -5183,6 +5183,226 @@ fn test_circular_extends_with_union_lower_bound() {
     assert_eq!(results[1], (u_name, union_type));
 }
 
+#[test]
+fn test_circular_extends_with_literal_types() {
+    // Test: <T extends U, U extends T> with literal type lower bounds
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let u_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: u_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends U, U extends T
+    ctx.add_upper_bound(var_t, u_type);
+    ctx.add_upper_bound(var_u, t_type);
+
+    // Both have literal string lower bounds
+    let hello = interner.literal_string("hello");
+    let world = interner.literal_string("world");
+    ctx.add_lower_bound(var_t, hello);
+    ctx.add_lower_bound(var_u, world);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+
+    assert_eq!(results.len(), 2);
+    // T gets union of literals from cycle propagation
+    let expected_union = interner.union(vec![hello, world]);
+    assert_eq!(results[0], (t_name, expected_union));
+    // U gets its direct lower bound
+    assert_eq!(results[1], (u_name, world));
+}
+
+#[test]
+fn test_circular_extends_four_way_cycle() {
+    // Test: <T extends U, U extends V, V extends W, W extends T>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+    let v_name = interner.intern_string("V");
+    let w_name = interner.intern_string("W");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+    let var_v = ctx.fresh_type_param(v_name);
+    let var_w = ctx.fresh_type_param(w_name);
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let u_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: u_name,
+        constraint: None,
+        default: None,
+    }));
+    let v_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: v_name,
+        constraint: None,
+        default: None,
+    }));
+    let w_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: w_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends U, U extends V, V extends W, W extends T
+    ctx.add_upper_bound(var_t, u_type);
+    ctx.add_upper_bound(var_u, v_type);
+    ctx.add_upper_bound(var_v, w_type);
+    ctx.add_upper_bound(var_w, t_type);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+
+    // All four resolve to unknown with no lower bounds
+    assert_eq!(results.len(), 4);
+    assert_eq!(results[0], (t_name, TypeId::UNKNOWN));
+    assert_eq!(results[1], (u_name, TypeId::UNKNOWN));
+    assert_eq!(results[2], (v_name, TypeId::UNKNOWN));
+    assert_eq!(results[3], (w_name, TypeId::UNKNOWN));
+}
+
+#[test]
+fn test_circular_extends_with_concrete_upper_and_lower() {
+    // Test: <T extends U, U extends T> with T having both upper and lower bounds
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let u_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: u_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends U, U extends T
+    ctx.add_upper_bound(var_t, u_type);
+    ctx.add_upper_bound(var_u, t_type);
+
+    // T has both upper bound (string) and lower bound (literal)
+    let hello = interner.literal_string("hello");
+    ctx.add_lower_bound(var_t, hello);
+    ctx.add_upper_bound(var_t, TypeId::STRING);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+
+    assert_eq!(results.len(), 2);
+    // T resolves to its lower bound (hello literal)
+    assert_eq!(results[0], (t_name, hello));
+    // U gets hello through propagation
+    assert_eq!(results[1], (u_name, hello));
+}
+
+#[test]
+fn test_circular_extends_chain_with_endpoint_bound() {
+    // Test: <T extends U, U extends V> (not circular) with V having lower bound
+    // Chain propagation: upper bounds become resolved types when no lower bounds
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+    let v_name = interner.intern_string("V");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+    let var_v = ctx.fresh_type_param(v_name);
+
+    let u_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: u_name,
+        constraint: None,
+        default: None,
+    }));
+    let v_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: v_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends U, U extends V (chain, not cycle)
+    ctx.add_upper_bound(var_t, u_type);
+    ctx.add_upper_bound(var_u, v_type);
+
+    // V has a lower bound
+    ctx.add_lower_bound(var_v, TypeId::NUMBER);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+
+    assert_eq!(results.len(), 3);
+    // V resolves to number (its lower bound)
+    assert_eq!(results[2], (v_name, TypeId::NUMBER));
+    // U has upper bound V but no lower bound, so resolves to its upper bound (V type param)
+    assert_eq!(results[1].0, u_name);
+    assert!(matches!(interner.lookup(results[1].1), Some(TypeKey::TypeParameter(_))));
+    // T has upper bound U but no lower bound, resolves to its upper bound (U type param)
+    assert_eq!(results[0].0, t_name);
+    assert!(matches!(interner.lookup(results[0].1), Some(TypeKey::TypeParameter(_))));
+}
+
+#[test]
+fn test_circular_extends_multiple_lower_bounds_same_param() {
+    // Test: <T extends U, U extends T> with T having multiple lower bounds
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let u_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: u_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends U, U extends T
+    ctx.add_upper_bound(var_t, u_type);
+    ctx.add_upper_bound(var_u, t_type);
+
+    // T has multiple lower bounds
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+    ctx.add_lower_bound(var_t, TypeId::NUMBER);
+    ctx.add_lower_bound(var_t, TypeId::BOOLEAN);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+
+    assert_eq!(results.len(), 2);
+    // T resolves to union of all its lower bounds
+    let expected_union = interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::BOOLEAN]);
+    assert_eq!(results[0], (t_name, expected_union));
+    // U gets the union through propagation
+    assert_eq!(results[1], (u_name, expected_union));
+}
+
 // =============================================================================
 // Context-Sensitive Typing Tests
 // =============================================================================
