@@ -7,10 +7,30 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-Add ES5 source map tests for decorator metadata patterns: reflect, design types. Tests: `./wasm/test.sh source_map_tests`
+Add ES5 source map tests for async/class integration patterns
+
+Per GOALS.md Objective 2: "Source maps must be valid and usable by debuggers"
+
+Steps:
+1. Add 6 ES5 source map tests for async/class integration to `wasm/src/source_map_tests.rs`:
+   - Async method in derived class with super call
+   - Async arrow field initializer
+   - Async static method with this capture
+   - Async generator class method
+   - Async constructor simulation pattern
+   - Combined async/class source map patterns
+2. Run `./wasm/test.sh source_map` to verify all tests pass
+3. Commit with message: `[wasm] source_map: add async/class integration pattern tests`
+4. Push to `origin/worker/anvil-3`
+5. Update this plan file and push
+
+**Sync instructions**: Use squad/anvil (not origin/rust):
+```
+git fetch origin && git reset --hard origin/squad/anvil
+```
 
 ## Task Queue
-- [ ] Add ES5 source map tests for private field patterns: WeakMap polyfill, accessor
+(empty - will receive new tasks from EM after completing current assignment)
 
 ## Completed
 - [x] Added class static block ES5 source map tests (basic, init order, multiple, private field access, private method access, static field init, computed props, async patterns, error handling, comprehensive); 857 tests pass.

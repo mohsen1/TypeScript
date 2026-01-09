@@ -6,12 +6,29 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-Add ES5 class tests for export assignment patterns: export =, import = require. Tests: `./wasm/test.sh class_es5_tests`
+Add ES5 class tests for super() ordering edge cases in derived constructors
+
+Per GOALS.md Objective 1: "Match tsc for super() in derived classes with field initializers"
+
+Steps:
+1. Add 6 ES5 class tests for super() ordering edge cases to `wasm/src/transforms/class_es5_tests.rs`:
+   - super() with field initializers before and after
+   - super() with parameter properties
+   - super() with private field initialization
+   - super() inside try/catch block
+   - super() with conditional field initialization
+   - Combined super() ordering patterns
+2. Run `./wasm/test.sh class_es5_tests` to verify all tests pass
+3. Commit with message: `[wasm] transforms: add super() ordering edge case ES5 class tests`
+4. Push to `origin/worker/anvil-1`
+5. Update this plan file and push
 
 ## Task Queue
-- [ ] Add ES5 class tests for triple-slash directive patterns: reference, amd-module
+(empty - will receive new tasks from EM after completing current assignment)
 
 ## Completed
+- [x] Added ES5 tests for triple-slash directive patterns (6 tests): reference path, reference types, amd-module, reference lib, multiple directives, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 473 pass).
+- [x] Added ES5 tests for export assignment patterns (6 tests): basic export =, export = with namespace, import = require, export = with interface, export = function, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 470 pass).
 - [x] Added ES5 tests for ambient module patterns (6 tests): basic declare module, global augmentation, module namespace, module with class, wildcard modules, combined ambient patterns. Ran `./wasm/test.sh class_es5_tests` (all 467 pass).
 - [x] Added ES5 tests for declaration merging patterns (6 tests): interface merging, function-namespace merging, class-namespace merging, enum-namespace merging, interface extension, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 461 pass).
 - [x] Added ES5 tests for namespace patterns (6 tests): merged namespace, exported namespace, nested namespace, repository pattern, utilities namespace, combined namespace patterns. Ran `./wasm/test.sh class_es5_tests` (all 452 pass).

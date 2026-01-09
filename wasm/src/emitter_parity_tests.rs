@@ -23662,3 +23662,443 @@ const fetcher = new AnyFirstFetcher<object>(["/api1", "/api2"]);
         output
     );
 }
+
+// =============================================================================
+// ES5 Iterator patterns parity tests
+// =============================================================================
+
+/// Test Symbol.iterator implementation with type annotations
+#[test]
+fn test_parity_es5_iterator_symbol_iterator() {
+    let source = r#"
+interface Iterable<T> {
+    [Symbol.iterator](): Iterator<T>;
+}
+
+class Range implements Iterable<number> {
+    private start: number;
+    private end: number;
+    private current: number = 0;
+
+    constructor(start: number, end: number) {
+        this.start = start;
+        this.end = end;
+        this.current = start;
+    }
+
+    [Symbol.iterator](): Iterator<number> {
+        this.current = this.start;
+        return this;
+    }
+
+    next(): IteratorResult<number> {
+        if (this.current <= this.end) {
+            return { value: this.current++, done: false };
+        }
+        return { value: undefined, done: true };
+    }
+}
+
+class ArrayIterator<T> implements Iterable<T> {
+    private items: T[];
+    private index: number = 0;
+
+    constructor(items: T[]) {
+        this.items = items;
+    }
+
+    [Symbol.iterator](): Iterator<T> {
+        this.index = 0;
+        return this;
+    }
+
+    next(): IteratorResult<T> {
+        if (this.index < this.items.length) {
+            return { value: this.items[this.index++], done: false };
+        }
+        return { value: undefined, done: true };
+    }
+}
+
+const range = new Range(1, 5);
+const arrIter = new ArrayIterator<string>(["a", "b", "c"]);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Interface should be erased
+    assert!(
+        !output.contains("interface Iterable"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Classes should be present
+    assert!(
+        output.contains("Range") && output.contains("ArrayIterator"),
+        "Classes should be present: {}",
+        output
+    );
+    // Symbol.iterator should be preserved
+    assert!(
+        output.contains("Symbol.iterator"),
+        "Symbol.iterator should be preserved: {}",
+        output
+    );
+    // next method should be preserved
+    assert!(
+        output.contains("next"),
+        "next method should be preserved: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": Iterator<") && !output.contains(": IteratorResult<"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test Iterator next method with type annotations
+#[test]
+fn test_parity_es5_iterator_next() {
+    let source = r#"
+interface IteratorResult<T> {
+    done: boolean;
+    value: T;
+}
+
+class CounterIterator {
+    private count: number = 0;
+    private max: number;
+
+    constructor(max: number) {
+        this.max = max;
+    }
+
+    next(): IteratorResult<number> {
+        if (this.count < this.max) {
+            return { done: false, value: this.count++ };
+        }
+        return { done: true, value: this.count };
+    }
+}
+
+class MappingIterator<T, U> {
+    private source: Iterator<T>;
+    private mapper: (value: T) => U;
+
+    constructor(source: Iterator<T>, mapper: (value: T) => U) {
+        this.source = source;
+        this.mapper = mapper;
+    }
+
+    next(): IteratorResult<U> {
+        const result = this.source.next();
+        if (result.done) {
+            return { done: true, value: undefined as any };
+        }
+        return { done: false, value: this.mapper(result.value) };
+    }
+}
+
+function consumeIterator<T>(iter: Iterator<T>): T[] {
+    const results: T[] = [];
+    let result = iter.next();
+    while (!result.done) {
+        results.push(result.value);
+        result = iter.next();
+    }
+    return results;
+}
+
+const counter = new CounterIterator(5);
+const first = counter.next();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Interface should be erased
+    assert!(
+        !output.contains("interface IteratorResult"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Classes should be present
+    assert!(
+        output.contains("CounterIterator") && output.contains("MappingIterator"),
+        "Classes should be present: {}",
+        output
+    );
+    // Function should be present
+    assert!(
+        output.contains("consumeIterator"),
+        "Function should be present: {}",
+        output
+    );
+    // next method calls should be preserved
+    assert!(
+        output.contains(".next()"),
+        "next method calls should be preserved: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": IteratorResult<") && !output.contains(": Iterator<"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test Iterator return method with type annotations
+#[test]
+fn test_parity_es5_iterator_return() {
+    let source = r#"
+interface IteratorReturnResult<T> {
+    done: true;
+    value: T;
+}
+
+class ResourceIterator<T> {
+    private items: T[];
+    private index: number = 0;
+    private closed: boolean = false;
+
+    constructor(items: T[]) {
+        this.items = items;
+    }
+
+    next(): IteratorResult<T> {
+        if (this.closed || this.index >= this.items.length) {
+            return { done: true, value: undefined as any };
+        }
+        return { done: false, value: this.items[this.index++] };
+    }
+
+    return(value?: T): IteratorResult<T> {
+        this.closed = true;
+        console.log("Iterator closed");
+        return { done: true, value: value as any };
+    }
+}
+
+class CleanupIterator<T> {
+    private source: Iterator<T>;
+    private cleanup: () => void;
+
+    constructor(source: Iterator<T>, cleanup: () => void) {
+        this.source = source;
+        this.cleanup = cleanup;
+    }
+
+    next(): IteratorResult<T> {
+        return this.source.next();
+    }
+
+    return(value?: T): IteratorResult<T> {
+        this.cleanup();
+        if (this.source.return) {
+            return this.source.return(value);
+        }
+        return { done: true, value: value as any };
+    }
+}
+
+const resourceIter = new ResourceIterator<number>([1, 2, 3]);
+const result = resourceIter.return(0);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Interface should be erased
+    assert!(
+        !output.contains("interface IteratorReturnResult"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Classes should be present
+    assert!(
+        output.contains("ResourceIterator") && output.contains("CleanupIterator"),
+        "Classes should be present: {}",
+        output
+    );
+    // return method should be defined (as prototype method)
+    assert!(
+        output.contains(".return") || output.contains("return:"),
+        "return method should be defined: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": IteratorResult<") && !output.contains(": IteratorReturnResult"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test Iterator throw method with type annotations
+#[test]
+fn test_parity_es5_iterator_throw() {
+    let source = r#"
+interface ThrowableIterator<T> extends Iterator<T> {
+    throw(error?: Error): IteratorResult<T>;
+}
+
+class ErrorHandlingIterator<T> {
+    private items: T[];
+    private index: number = 0;
+    private errorHandler: (e: Error) => T | undefined;
+
+    constructor(items: T[], errorHandler: (e: Error) => T | undefined) {
+        this.items = items;
+        this.errorHandler = errorHandler;
+    }
+
+    next(): IteratorResult<T> {
+        if (this.index >= this.items.length) {
+            return { done: true, value: undefined as any };
+        }
+        return { done: false, value: this.items[this.index++] };
+    }
+
+    throw(error?: Error): IteratorResult<T> {
+        if (error && this.errorHandler) {
+            const recovered = this.errorHandler(error);
+            if (recovered !== undefined) {
+                return { done: false, value: recovered };
+            }
+        }
+        return { done: true, value: undefined as any };
+    }
+}
+
+class DelegatingIterator<T> {
+    private inner: Iterator<T>;
+
+    constructor(inner: Iterator<T>) {
+        this.inner = inner;
+    }
+
+    next(): IteratorResult<T> {
+        return this.inner.next();
+    }
+
+    throw(error?: Error): IteratorResult<T> {
+        if (typeof this.inner.throw === "function") {
+            return this.inner.throw(error);
+        }
+        throw error;
+    }
+
+    return(value?: T): IteratorResult<T> {
+        if (typeof this.inner.return === "function") {
+            return this.inner.return(value);
+        }
+        return { done: true, value: value as any };
+    }
+}
+
+const iter = new ErrorHandlingIterator<number>([1, 2, 3], (e) => -1);
+const throwResult = iter.throw(new Error("test"));
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Interface should be erased
+    assert!(
+        !output.contains("interface ThrowableIterator"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Classes should be present
+    assert!(
+        output.contains("ErrorHandlingIterator") && output.contains("DelegatingIterator"),
+        "Classes should be present: {}",
+        output
+    );
+    // throw method should be defined
+    assert!(
+        output.contains(".throw") || output.contains("throw:"),
+        "throw method should be defined: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": IteratorResult<") && !output.contains(": ThrowableIterator"),
+        "Type annotations should be erased: {}",
+        output
+    );
+    // Extends clause should be erased
+    assert!(
+        !output.contains("extends Iterator"),
+        "Extends clause should be erased: {}",
+        output
+    );
+}

@@ -22,6 +22,7 @@ Priority: 4
 - [x] Add index signature tests - DONE (added 22 tests: string/number keys, intersection, readonly, value types)
 - [x] Add generic constraint tests - DONE (added 25 tests: extends, keyof constraints)
 - [x] Add recursive type tests - DONE (added 20 tests: self-referential types)
+- [x] Add readonly/optional modifier tests - DONE (added 25 tests)
 
 ## Completed
 - [x] Fixed method type parameter scope in check_method_declaration
@@ -44,9 +45,10 @@ Priority: 4
 - [x] Added 22 index signature tests (string/number keys, intersection, readonly, value types)
 - [x] Added 25 generic constraint tests (extends, keyof constraints)
 - [x] Added 20 recursive type tests (self-referential types)
+- [x] Added 25 readonly/optional modifier tests
 
 ## Ready for Merge
-Yes - 203+ solver tests added (circular constraints, inference from usage, context-sensitive typing, advanced generic inference, distributive conditional types, circular edge cases, mapped types, index signatures, generic constraints, recursive types)
+Yes - 228+ solver tests added (circular constraints, inference from usage, context-sensitive typing, advanced generic inference, distributive conditional types, circular edge cases, mapped types, index signatures, generic constraints, recursive types, readonly/optional modifiers)
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize solver correctness
