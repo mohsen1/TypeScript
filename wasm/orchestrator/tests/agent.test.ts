@@ -147,6 +147,31 @@ describe('AgentManager', () => {
     });
   });
 
+  describe('startAgent', () => {
+    it('exports NOTIFY_DIR for agent sessions', async () => {
+      const pane: PaneId = { session: 's', window: 'w', pane: 0 };
+      const originalNotifyDir = process.env.NOTIFY_DIR;
+      delete process.env.NOTIFY_DIR;
+
+      await agent.startAgent({
+        pane,
+        role: 'worker',
+        squad: 'forge',
+        workerNum: 1,
+        cwd: '/test/worker',
+      });
+
+      const firstCall = vi.mocked(tmux.sendKeys).mock.calls[0];
+      expect(firstCall?.[1]).toContain("export NOTIFY_DIR='/test/root/.notify'");
+
+      if (originalNotifyDir === undefined) {
+        delete process.env.NOTIFY_DIR;
+      } else {
+        process.env.NOTIFY_DIR = originalNotifyDir;
+      }
+    });
+  });
+
   describe('cancelOperation', () => {
     it('sends escape to pane', async () => {
       const pane: PaneId = { session: 's', window: 'w', pane: 0 };
