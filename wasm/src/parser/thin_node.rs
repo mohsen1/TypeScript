@@ -1557,42 +1557,82 @@ impl ThinNodeArena {
 
     /// Add a type alias declaration node
     pub fn add_type_alias(&mut self, kind: u16, pos: u32, end: u32, data: TypeAliasData) -> NodeIndex {
+        let modifiers = data.modifiers.clone();
+        let name = data.name;
+        let type_parameters = data.type_parameters.clone();
+        let type_node = data.type_node;
+
         let data_index = self.type_aliases.len() as u32;
         self.type_aliases.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+
+        let parent = NodeIndex(index);
+        self.set_parent_opt_list(&modifiers, parent);
+        self.set_parent(name, parent);
+        self.set_parent_opt_list(&type_parameters, parent);
+        self.set_parent(type_node, parent);
+
+        parent
     }
 
     /// Add an enum declaration node
     pub fn add_enum(&mut self, kind: u16, pos: u32, end: u32, data: EnumData) -> NodeIndex {
+        let modifiers = data.modifiers.clone();
+        let name = data.name;
+        let members = data.members.clone();
+
         let data_index = self.enums.len() as u32;
         self.enums.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+
+        let parent = NodeIndex(index);
+        self.set_parent_opt_list(&modifiers, parent);
+        self.set_parent(name, parent);
+        self.set_parent_list(&members, parent);
+
+        parent
     }
 
     /// Add an enum member node
     pub fn add_enum_member(&mut self, kind: u16, pos: u32, end: u32, data: EnumMemberData) -> NodeIndex {
+        let name = data.name;
+        let initializer = data.initializer;
+
         let data_index = self.enum_members.len() as u32;
         self.enum_members.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+
+        let parent = NodeIndex(index);
+        self.set_parent(name, parent);
+        self.set_parent(initializer, parent);
+
+        parent
     }
 
     /// Add a module declaration node
     pub fn add_module(&mut self, kind: u16, pos: u32, end: u32, data: ModuleData) -> NodeIndex {
+        let modifiers = data.modifiers.clone();
+        let name = data.name;
+        let body = data.body;
+
         let data_index = self.modules.len() as u32;
         self.modules.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+
+        let parent = NodeIndex(index);
+        self.set_parent_opt_list(&modifiers, parent);
+        self.set_parent(name, parent);
+        self.set_parent(body, parent);
+
+        parent
     }
 
     /// Add a module block node: { statements }
@@ -1613,22 +1653,46 @@ impl ThinNodeArena {
 
     /// Add a signature node (property/method signature)
     pub fn add_signature(&mut self, kind: u16, pos: u32, end: u32, data: SignatureData) -> NodeIndex {
+        let modifiers = data.modifiers.clone();
+        let name = data.name;
+        let type_parameters = data.type_parameters.clone();
+        let parameters = data.parameters.clone();
+        let type_annotation = data.type_annotation;
+
         let data_index = self.signatures.len() as u32;
         self.signatures.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+
+        let parent = NodeIndex(index);
+        self.set_parent_opt_list(&modifiers, parent);
+        self.set_parent(name, parent);
+        self.set_parent_opt_list(&type_parameters, parent);
+        self.set_parent_opt_list(&parameters, parent);
+        self.set_parent(type_annotation, parent);
+
+        parent
     }
 
     /// Add an index signature node
     pub fn add_index_signature(&mut self, kind: u16, pos: u32, end: u32, data: IndexSignatureData) -> NodeIndex {
+        let modifiers = data.modifiers.clone();
+        let parameters = data.parameters.clone();
+        let type_annotation = data.type_annotation;
+
         let data_index = self.index_signatures.len() as u32;
         self.index_signatures.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+
+        let parent = NodeIndex(index);
+        self.set_parent_opt_list(&modifiers, parent);
+        self.set_parent_list(&parameters, parent);
+        self.set_parent(type_annotation, parent);
+
+        parent
     }
 
     /// Add a property declaration node
@@ -1697,12 +1761,28 @@ impl ThinNodeArena {
 
     /// Add an accessor declaration node (get/set)
     pub fn add_accessor(&mut self, kind: u16, pos: u32, end: u32, data: AccessorData) -> NodeIndex {
+        let modifiers = data.modifiers.clone();
+        let name = data.name;
+        let type_parameters = data.type_parameters.clone();
+        let parameters = data.parameters.clone();
+        let type_annotation = data.type_annotation;
+        let body = data.body;
+
         let data_index = self.accessors.len() as u32;
         self.accessors.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+
+        let parent = NodeIndex(index);
+        self.set_parent_opt_list(&modifiers, parent);
+        self.set_parent(name, parent);
+        self.set_parent_opt_list(&type_parameters, parent);
+        self.set_parent_list(&parameters, parent);
+        self.set_parent(type_annotation, parent);
+        self.set_parent(body, parent);
+
+        parent
     }
 
     /// Add a parameter declaration node
