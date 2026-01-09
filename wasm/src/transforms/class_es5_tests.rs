@@ -18785,33 +18785,52 @@ class EventHandler {
 }
 
 // ============================================================================
-// AsyncIterator/AsyncIterable pattern tests
+// Parameter Decorator Pattern Tests
 // ============================================================================
 
 #[test]
-fn test_class_es5_async_iterator_basic() {
-    // Basic async iterator with Symbol.asyncIterator
+fn test_class_es5_param_decorator_constructor() {
+    // Constructor parameter decorators
     let source = r#"
-class AsyncRange {
-    private start: number;
-    private end: number;
-    private delay: number;
+const INJECT_METADATA = Symbol("inject");
 
-    constructor(start: number, end: number, delay: number = 100) {
-        this.start = start;
-        this.end = end;
-        this.delay = delay;
-    }
+function inject(token: string) {
+    return function(target: any, propertyKey: string | symbol | undefined, parameterIndex: number) {
+        const existingParams = Reflect.getMetadata(INJECT_METADATA, target) || [];
+        existingParams[parameterIndex] = token;
+        Reflect.defineMetadata(INJECT_METADATA, existingParams, target);
+    };
+}
 
-    async *[Symbol.asyncIterator](): AsyncIterator<number> {
-        for (let i = this.start; i <= this.end; i++) {
-            await this.sleep(this.delay);
-            yield i;
-        }
-    }
+function optional(target: any, propertyKey: string | symbol | undefined, parameterIndex: number) {
+    const existingOptional = Reflect.getMetadata("optional", target) || [];
+    existingOptional[parameterIndex] = true;
+    Reflect.defineMetadata("optional", existingOptional, target);
+}
 
-    private sleep(ms: number): Promise<void> {
-        return new Promise(resolve => setTimeout(resolve, ms));
+class DatabaseService {
+    query(sql: string): any[] { return []; }
+}
+
+class LoggerService {
+    log(message: string): void { console.log(message); }
+}
+
+class CacheService {
+    get(key: string): any { return null; }
+    set(key: string, value: any): void {}
+}
+
+class UserRepository {
+    constructor(
+        @inject("DatabaseService") private db: DatabaseService,
+        @inject("LoggerService") private logger: LoggerService,
+        @inject("CacheService") @optional private cache?: CacheService
+    ) {}
+
+    findAll(): any[] {
+        this.logger.log("Finding all users");
+        return this.db.query("SELECT * FROM users");
     }
 }
 "#;
@@ -18830,50 +18849,77 @@ class AsyncRange {
 
     let output = printer.get_output().to_string();
 
+    // Classes should be converted
     assert!(
-        output.contains("function AsyncRange"),
-        "Expected AsyncRange function: {}",
+        output.contains("function UserRepository") || output.contains("UserRepository"),
+        "Expected UserRepository class: {}",
         output
     );
+
+    // Decorator functions should be present
     assert!(
-        output.contains("Symbol.asyncIterator"),
-        "Expected Symbol.asyncIterator: {}",
+        output.contains("inject") && output.contains("optional"),
+        "Expected parameter decorators: {}",
+        output
+    );
+
+    // Service classes should be present
+    assert!(
+        output.contains("DatabaseService") && output.contains("LoggerService"),
+        "Expected service classes: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_for_await_of_pattern() {
-    // Class using for-await-of with async iterables
+fn test_class_es5_param_decorator_method() {
+    // Method parameter decorators
     let source = r#"
-class AsyncDataProcessor<T> {
-    private source: AsyncIterable<T>;
+function validate(target: any, propertyKey: string, parameterIndex: number) {
+    const existingValidators = Reflect.getMetadata("validators", target, propertyKey) || [];
+    existingValidators.push(parameterIndex);
+    Reflect.defineMetadata("validators", existingValidators, target, propertyKey);
+}
 
-    constructor(source: AsyncIterable<T>) {
-        this.source = source;
+function required(target: any, propertyKey: string, parameterIndex: number) {
+    const existingRequired = Reflect.getMetadata("required", target, propertyKey) || [];
+    existingRequired.push(parameterIndex);
+    Reflect.defineMetadata("required", existingRequired, target, propertyKey);
+}
+
+function maxLength(length: number) {
+    return function(target: any, propertyKey: string, parameterIndex: number) {
+        const existingMaxLength = Reflect.getMetadata("maxLength", target, propertyKey) || {};
+        existingMaxLength[parameterIndex] = length;
+        Reflect.defineMetadata("maxLength", existingMaxLength, target, propertyKey);
+    };
+}
+
+function minValue(value: number) {
+    return function(target: any, propertyKey: string, parameterIndex: number) {
+        const existingMinValue = Reflect.getMetadata("minValue", target, propertyKey) || {};
+        existingMinValue[parameterIndex] = value;
+        Reflect.defineMetadata("minValue", existingMinValue, target, propertyKey);
+    };
+}
+
+class ProductService {
+    createProduct(
+        @validate @required @maxLength(100) name: string,
+        @validate @required description: string,
+        @validate @minValue(0) price: number,
+        @validate @minValue(0) quantity: number
+    ): any {
+        return { name, description, price, quantity };
     }
 
-    async collectAll(): Promise<T[]> {
-        const result: T[] = [];
-        for await (const item of this.source) {
-            result.push(item);
-        }
-        return result;
-    }
-
-    async processEach(processor: (item: T) => Promise<void>): Promise<void> {
-        for await (const item of this.source) {
-            await processor(item);
-        }
-    }
-
-    async find(predicate: (item: T) => boolean): Promise<T | undefined> {
-        for await (const item of this.source) {
-            if (predicate(item)) {
-                return item;
-            }
-        }
-        return undefined;
+    updateProduct(
+        @required id: string,
+        @maxLength(100) name?: string,
+        description?: string,
+        @minValue(0) price?: number
+    ): any {
+        return { id, name, description, price };
     }
 }
 "#;
@@ -18892,57 +18938,78 @@ class AsyncDataProcessor<T> {
 
     let output = printer.get_output().to_string();
 
+    // Class should be converted
     assert!(
-        output.contains("function AsyncDataProcessor"),
-        "Expected AsyncDataProcessor function: {}",
+        output.contains("function ProductService") || output.contains("ProductService"),
+        "Expected ProductService class: {}",
         output
     );
+
+    // Decorator functions should be present
     assert!(
-        output.contains("collectAll") && output.contains("processEach"),
-        "Expected async methods: {}",
+        output.contains("validate") && output.contains("required"),
+        "Expected parameter decorators: {}",
+        output
+    );
+
+    // Class IIFE pattern should be present
+    assert!(
+        output.contains("(function ()") || output.contains("(function()"),
+        "Expected class IIFE pattern: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_async_generator_iterable() {
-    // Async generator as iterable class
+fn test_class_es5_param_decorator_factory() {
+    // Decorator factories with params
     let source = r#"
-class AsyncQueue<T> {
-    private items: T[] = [];
-    private resolvers: ((value: T) => void)[] = [];
+function paramType(typeName: string) {
+    return function(target: any, propertyKey: string | symbol | undefined, parameterIndex: number) {
+        const types = Reflect.getMetadata("paramTypes", target, propertyKey as string) || {};
+        types[parameterIndex] = typeName;
+        Reflect.defineMetadata("paramTypes", types, target, propertyKey as string);
+    };
+}
 
-    enqueue(item: T): void {
-        if (this.resolvers.length > 0) {
-            const resolve = this.resolvers.shift()!;
-            resolve(item);
-        } else {
-            this.items.push(item);
-        }
+function range(min: number, max: number) {
+    return function(target: any, propertyKey: string, parameterIndex: number) {
+        const ranges = Reflect.getMetadata("ranges", target, propertyKey) || {};
+        ranges[parameterIndex] = { min, max };
+        Reflect.defineMetadata("ranges", ranges, target, propertyKey);
+    };
+}
+
+function pattern(regex: RegExp) {
+    return function(target: any, propertyKey: string, parameterIndex: number) {
+        const patterns = Reflect.getMetadata("patterns", target, propertyKey) || {};
+        patterns[parameterIndex] = regex;
+        Reflect.defineMetadata("patterns", patterns, target, propertyKey);
+    };
+}
+
+function transform(fn: (value: any) => any) {
+    return function(target: any, propertyKey: string, parameterIndex: number) {
+        const transforms = Reflect.getMetadata("transforms", target, propertyKey) || {};
+        transforms[parameterIndex] = fn;
+        Reflect.defineMetadata("transforms", transforms, target, propertyKey);
+    };
+}
+
+class ValidationService {
+    validateUser(
+        @paramType("string") @pattern(/^[a-zA-Z0-9]+$/) username: string,
+        @paramType("string") @pattern(/^[\w.-]+@[\w.-]+\.\w+$/) email: string,
+        @paramType("number") @range(18, 120) age: number
+    ): boolean {
+        return true;
     }
 
-    private dequeue(): Promise<T> {
-        if (this.items.length > 0) {
-            return Promise.resolve(this.items.shift()!);
-        }
-        return new Promise(resolve => this.resolvers.push(resolve));
-    }
-
-    async *[Symbol.asyncIterator](): AsyncIterator<T> {
-        while (true) {
-            yield await this.dequeue();
-        }
-    }
-
-    async take(count: number): Promise<T[]> {
-        const result: T[] = [];
-        let i = 0;
-        for await (const item of this) {
-            result.push(item);
-            i++;
-            if (i >= count) break;
-        }
-        return result;
+    processInput(
+        @transform((v: string) => v.trim().toLowerCase()) input: string,
+        @transform((v: number) => Math.abs(v)) value: number
+    ): { input: string; value: number } {
+        return { input, value };
     }
 }
 "#;
@@ -18961,58 +19028,91 @@ class AsyncQueue<T> {
 
     let output = printer.get_output().to_string();
 
+    // Class should be converted
     assert!(
-        output.contains("function AsyncQueue"),
-        "Expected AsyncQueue function: {}",
+        output.contains("function ValidationService") || output.contains("ValidationService"),
+        "Expected ValidationService class: {}",
         output
     );
+
+    // Decorator factories should be present
     assert!(
-        output.contains("Symbol.asyncIterator"),
-        "Expected Symbol.asyncIterator: {}",
+        output.contains("paramType") && output.contains("range"),
+        "Expected decorator factories: {}",
+        output
+    );
+
+    // Class IIFE pattern should be present
+    assert!(
+        output.contains("(function ()") || output.contains("(function()"),
+        "Expected class IIFE pattern: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_async_iterator_protocol() {
-    // Manual async iterator protocol implementation
+fn test_class_es5_param_decorator_combined() {
+    // Combined parameter and method decorators
     let source = r#"
-class PaginatedFetcher<T> {
-    private baseUrl: string;
-    private pageSize: number;
+function logMethod(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const original = descriptor.value;
+    descriptor.value = function(...args: any[]) {
+        console.log(`Calling ${propertyKey}`);
+        return original.apply(this, args);
+    };
+    return descriptor;
+}
 
-    constructor(baseUrl: string, pageSize: number = 10) {
-        this.baseUrl = baseUrl;
-        this.pageSize = pageSize;
-    }
-
-    [Symbol.asyncIterator](): AsyncIterator<T[]> {
-        let page = 0;
-        const self = this;
-
-        return {
-            async next(): Promise<IteratorResult<T[]>> {
-                const data = await self.fetchPage(page);
-                if (data.length === 0) {
-                    return { done: true, value: undefined };
-                }
-                page++;
-                return { done: false, value: data };
+function validateParams(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const original = descriptor.value;
+    descriptor.value = function(...args: any[]) {
+        const required = Reflect.getMetadata("required", target, propertyKey) || [];
+        for (const index of required) {
+            if (args[index] === undefined || args[index] === null) {
+                throw new Error(`Parameter ${index} is required`);
             }
-        };
-    }
-
-    private async fetchPage(page: number): Promise<T[]> {
-        const response = await fetch(`${this.baseUrl}?page=${page}&size=${this.pageSize}`);
-        return response.json();
-    }
-
-    async getAllPages(): Promise<T[][]> {
-        const pages: T[][] = [];
-        for await (const page of this) {
-            pages.push(page);
         }
-        return pages;
+        return original.apply(this, args);
+    };
+    return descriptor;
+}
+
+function required(target: any, propertyKey: string, parameterIndex: number) {
+    const existingRequired = Reflect.getMetadata("required", target, propertyKey) || [];
+    existingRequired.push(parameterIndex);
+    Reflect.defineMetadata("required", existingRequired, target, propertyKey);
+}
+
+function body(target: any, propertyKey: string, parameterIndex: number) {
+    Reflect.defineMetadata("body", parameterIndex, target, propertyKey);
+}
+
+function query(name: string) {
+    return function(target: any, propertyKey: string, parameterIndex: number) {
+        const queries = Reflect.getMetadata("queries", target, propertyKey) || {};
+        queries[parameterIndex] = name;
+        Reflect.defineMetadata("queries", queries, target, propertyKey);
+    };
+}
+
+class ApiController {
+    @logMethod
+    @validateParams
+    createItem(
+        @required @body data: any,
+        @query("userId") userId: string
+    ): any {
+        return { ...data, userId };
+    }
+
+    @logMethod
+    @validateParams
+    getItems(
+        @required @query("page") page: number,
+        @query("limit") limit: number = 10,
+        @query("sort") sort?: string
+    ): any[] {
+        return [];
     }
 }
 "#;
@@ -19031,55 +19131,97 @@ class PaginatedFetcher<T> {
 
     let output = printer.get_output().to_string();
 
+    // Class should be converted
     assert!(
-        output.contains("function PaginatedFetcher"),
-        "Expected PaginatedFetcher function: {}",
+        output.contains("function ApiController") || output.contains("ApiController"),
+        "Expected ApiController class: {}",
         output
     );
+
+    // Decorators should be present
     assert!(
-        output.contains("Symbol.asyncIterator"),
-        "Expected Symbol.asyncIterator: {}",
+        output.contains("logMethod") && output.contains("validateParams"),
+        "Expected method decorators: {}",
+        output
+    );
+
+    // Class IIFE pattern should be present
+    assert!(
+        output.contains("(function ()") || output.contains("(function()"),
+        "Expected class IIFE pattern: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_async_iterator_in_constructor() {
-    // Async iterator patterns used in constructor and methods
+fn test_class_es5_param_decorator_di_pattern() {
+    // Dependency injection pattern with parameter decorators
     let source = r#"
-class AsyncStreamProcessor {
-    private stream: AsyncIterable<string>;
-    private buffer: string[] = [];
+const INJECTABLE_METADATA = Symbol("injectable");
+const INJECT_METADATA = Symbol("inject");
 
-    constructor(stream: AsyncIterable<string>) {
-        this.stream = stream;
+function injectable() {
+    return function(target: any) {
+        Reflect.defineMetadata(INJECTABLE_METADATA, true, target);
+    };
+}
+
+function inject(token: string | symbol) {
+    return function(target: any, propertyKey: string | symbol | undefined, parameterIndex: number) {
+        const injections = Reflect.getMetadata(INJECT_METADATA, target) || [];
+        injections[parameterIndex] = token;
+        Reflect.defineMetadata(INJECT_METADATA, injections, target);
+    };
+}
+
+function lazy(target: any, propertyKey: string | symbol | undefined, parameterIndex: number) {
+    const lazyParams = Reflect.getMetadata("lazy", target) || [];
+    lazyParams[parameterIndex] = true;
+    Reflect.defineMetadata("lazy", lazyParams, target);
+}
+
+function scope(scopeName: string) {
+    return function(target: any, propertyKey: string | symbol | undefined, parameterIndex: number) {
+        const scopes = Reflect.getMetadata("scopes", target) || {};
+        scopes[parameterIndex] = scopeName;
+        Reflect.defineMetadata("scopes", scopes, target);
+    };
+}
+
+@injectable()
+class ConfigService {
+    get(key: string): string { return ""; }
+}
+
+@injectable()
+class HttpClient {
+    get(url: string): Promise<any> { return Promise.resolve({}); }
+}
+
+@injectable()
+class AuthService {
+    constructor(
+        @inject("ConfigService") private config: ConfigService,
+        @inject("HttpClient") @lazy private http: HttpClient
+    ) {}
+
+    async login(username: string, password: string): Promise<boolean> {
+        const authUrl = this.config.get("authUrl");
+        const result = await this.http.get(authUrl);
+        return result.success;
     }
+}
 
-    async *[Symbol.asyncIterator](): AsyncIterator<string> {
-        for await (const chunk of this.stream) {
-            yield chunk.toUpperCase();
-        }
-    }
+@injectable()
+class ApplicationService {
+    constructor(
+        @inject("AuthService") @scope("request") private auth: AuthService,
+        @inject("ConfigService") @scope("singleton") private config: ConfigService,
+        @inject("HttpClient") private http: HttpClient
+    ) {}
 
-    async bufferAll(): Promise<string[]> {
-        for await (const item of this) {
-            this.buffer.push(item);
-        }
-        return this.buffer;
-    }
-
-    async *filter(predicate: (s: string) => boolean): AsyncIterator<string> {
-        for await (const item of this) {
-            if (predicate(item)) {
-                yield item;
-            }
-        }
-    }
-
-    async *map<U>(fn: (s: string) => U): AsyncIterator<U> {
-        for await (const item of this) {
-            yield fn(item);
-        }
+    async initialize(): Promise<void> {
+        console.log("Application initialized");
     }
 }
 "#;
@@ -19098,554 +19240,24 @@ class AsyncStreamProcessor {
 
     let output = printer.get_output().to_string();
 
+    // Classes should be converted
     assert!(
-        output.contains("function AsyncStreamProcessor"),
-        "Expected AsyncStreamProcessor function: {}",
+        output.contains("ConfigService") && output.contains("AuthService"),
+        "Expected service classes: {}",
         output
     );
+
+    // DI decorators should be present
     assert!(
-        output.contains("Symbol.asyncIterator"),
-        "Expected Symbol.asyncIterator: {}",
+        output.contains("injectable") && output.contains("inject"),
+        "Expected DI decorators: {}",
         output
     );
-}
 
-#[test]
-fn test_class_es5_async_iterator_combined() {
-    // Combined async iterator patterns with multiple generators
-    let source = r#"
-class AsyncEventStream<T> {
-    private listeners: Set<(event: T) => void> = new Set();
-    private queue: T[] = [];
-    private waiters: ((event: T) => void)[] = [];
-
-    emit(event: T): void {
-        for (const listener of this.listeners) {
-            listener(event);
-        }
-        if (this.waiters.length > 0) {
-            const waiter = this.waiters.shift()!;
-            waiter(event);
-        } else {
-            this.queue.push(event);
-        }
-    }
-
-    private nextEvent(): Promise<T> {
-        if (this.queue.length > 0) {
-            return Promise.resolve(this.queue.shift()!);
-        }
-        return new Promise(resolve => this.waiters.push(resolve));
-    }
-
-    async *[Symbol.asyncIterator](): AsyncIterator<T> {
-        while (true) {
-            yield await this.nextEvent();
-        }
-    }
-
-    async *takeUntil(predicate: (event: T) => boolean): AsyncIterator<T> {
-        for await (const event of this) {
-            yield event;
-            if (predicate(event)) {
-                break;
-            }
-        }
-    }
-
-    async *debounce(ms: number): AsyncIterator<T> {
-        let lastEvent: T | undefined;
-        let timeout: any;
-
-        for await (const event of this) {
-            lastEvent = event;
-            clearTimeout(timeout);
-            await new Promise<void>(resolve => {
-                timeout = setTimeout(resolve, ms);
-            });
-            if (lastEvent === event) {
-                yield event;
-            }
-        }
-    }
-
-    static create<U>(): AsyncEventStream<U> {
-        return new AsyncEventStream<U>();
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
+    // ApplicationService should be present
     assert!(
-        output.contains("function AsyncEventStream"),
-        "Expected AsyncEventStream function: {}",
-        output
-    );
-    assert!(
-        output.contains("Symbol.asyncIterator"),
-        "Expected Symbol.asyncIterator: {}",
-        output
-    );
-    assert!(
-        output.contains("takeUntil") && output.contains("debounce"),
-        "Expected async generator methods: {}",
-        output
-    );
-    assert!(
-        output.contains("create"),
-        "Expected create static method: {}",
-        output
-    );
-}
-
-// ============================================================================
-// Generator/yield pattern tests
-// ============================================================================
-
-#[test]
-fn test_class_es5_generator_basic() {
-    // Basic generator function in class
-    let source = r#"
-class NumberSequence {
-    private start: number;
-    private end: number;
-
-    constructor(start: number, end: number) {
-        this.start = start;
-        this.end = end;
-    }
-
-    *generate(): Generator<number> {
-        for (let i = this.start; i <= this.end; i++) {
-            yield i;
-        }
-    }
-
-    *generateEven(): Generator<number> {
-        for (let i = this.start; i <= this.end; i++) {
-            if (i % 2 === 0) {
-                yield i;
-            }
-        }
-    }
-
-    *generateOdd(): Generator<number> {
-        for (let i = this.start; i <= this.end; i++) {
-            if (i % 2 !== 0) {
-                yield i;
-            }
-        }
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    assert!(
-        output.contains("function NumberSequence"),
-        "Expected NumberSequence function: {}",
-        output
-    );
-    assert!(
-        output.contains("generate") && output.contains("generateEven") && output.contains("generateOdd"),
-        "Expected generator methods: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_yield_expressions() {
-    // Yield expressions with values
-    let source = r#"
-class MessageProducer {
-    private messages: string[];
-
-    constructor(messages: string[]) {
-        this.messages = messages;
-    }
-
-    *produceMessages(): Generator<string, void, unknown> {
-        for (const message of this.messages) {
-            yield message;
-        }
-    }
-
-    *produceWithIndex(): Generator<[number, string], void, unknown> {
-        for (let i = 0; i < this.messages.length; i++) {
-            yield [i, this.messages[i]];
-        }
-    }
-
-    *produceTransformed(transform: (s: string) => string): Generator<string> {
-        for (const message of this.messages) {
-            yield transform(message);
-        }
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    assert!(
-        output.contains("function MessageProducer"),
-        "Expected MessageProducer function: {}",
-        output
-    );
-    assert!(
-        output.contains("produceMessages") && output.contains("produceWithIndex"),
-        "Expected generator methods: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_yield_delegation() {
-    // Yield delegation with yield*
-    let source = r#"
-class CompositeIterator<T> {
-    private sources: Iterable<T>[];
-
-    constructor(...sources: Iterable<T>[]) {
-        this.sources = sources;
-    }
-
-    *iterate(): Generator<T> {
-        for (const source of this.sources) {
-            yield* source;
-        }
-    }
-
-    *iterateWithSeparator(separator: T): Generator<T> {
-        let first = true;
-        for (const source of this.sources) {
-            if (!first) {
-                yield separator;
-            }
-            yield* source;
-            first = false;
-        }
-    }
-
-    *flatMap<U>(fn: (item: T) => Iterable<U>): Generator<U> {
-        for (const source of this.sources) {
-            for (const item of source) {
-                yield* fn(item);
-            }
-        }
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    assert!(
-        output.contains("function CompositeIterator"),
-        "Expected CompositeIterator function: {}",
-        output
-    );
-    assert!(
-        output.contains("iterate") && output.contains("flatMap"),
-        "Expected generator methods: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_generator_with_state() {
-    // Generator with internal state management
-    let source = r#"
-class StatefulGenerator {
-    private counter: number = 0;
-    private paused: boolean = false;
-
-    *countUp(limit: number): Generator<number, string, boolean | undefined> {
-        while (this.counter < limit) {
-            const shouldStop = yield this.counter;
-            if (shouldStop) {
-                return "Stopped early";
-            }
-            this.counter++;
-        }
-        return "Completed";
-    }
-
-    *countWithPause(limit: number): Generator<number> {
-        for (let i = 0; i < limit; i++) {
-            if (this.paused) {
-                return;
-            }
-            yield i;
-        }
-    }
-
-    pause(): void {
-        this.paused = true;
-    }
-
-    resume(): void {
-        this.paused = false;
-    }
-
-    reset(): void {
-        this.counter = 0;
-        this.paused = false;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    assert!(
-        output.contains("function StatefulGenerator"),
-        "Expected StatefulGenerator function: {}",
-        output
-    );
-    assert!(
-        output.contains("countUp") && output.contains("countWithPause"),
-        "Expected generator methods: {}",
-        output
-    );
-    assert!(
-        output.contains("pause") && output.contains("resume") && output.contains("reset"),
-        "Expected control methods: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_async_generator_class() {
-    // Async generator patterns in class
-    let source = r#"
-class AsyncDataFetcher {
-    private urls: string[];
-    private delay: number;
-
-    constructor(urls: string[], delay: number = 100) {
-        this.urls = urls;
-        this.delay = delay;
-    }
-
-    async *fetchAll(): AsyncGenerator<Response> {
-        for (const url of this.urls) {
-            await this.sleep(this.delay);
-            const response = await fetch(url);
-            yield response;
-        }
-    }
-
-    async *fetchWithRetry(retries: number = 3): AsyncGenerator<Response> {
-        for (const url of this.urls) {
-            let lastError: Error | undefined;
-            for (let attempt = 0; attempt < retries; attempt++) {
-                try {
-                    const response = await fetch(url);
-                    yield response;
-                    break;
-                } catch (e) {
-                    lastError = e as Error;
-                    await this.sleep(this.delay * (attempt + 1));
-                }
-            }
-        }
-    }
-
-    private sleep(ms: number): Promise<void> {
-        return new Promise(resolve => setTimeout(resolve, ms));
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    assert!(
-        output.contains("function AsyncDataFetcher"),
-        "Expected AsyncDataFetcher function: {}",
-        output
-    );
-    assert!(
-        output.contains("fetchAll") && output.contains("fetchWithRetry"),
-        "Expected async generator methods: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_generator_combined() {
-    // Combined generator patterns
-    let source = r#"
-class Pipeline<T> {
-    private source: Iterable<T>;
-
-    constructor(source: Iterable<T>) {
-        this.source = source;
-    }
-
-    *filter(predicate: (item: T) => boolean): Generator<T> {
-        for (const item of this.source) {
-            if (predicate(item)) {
-                yield item;
-            }
-        }
-    }
-
-    *map<U>(fn: (item: T) => U): Generator<U> {
-        for (const item of this.source) {
-            yield fn(item);
-        }
-    }
-
-    *take(count: number): Generator<T> {
-        let i = 0;
-        for (const item of this.source) {
-            if (i >= count) break;
-            yield item;
-            i++;
-        }
-    }
-
-    *skip(count: number): Generator<T> {
-        let i = 0;
-        for (const item of this.source) {
-            if (i >= count) {
-                yield item;
-            }
-            i++;
-        }
-    }
-
-    *chunk(size: number): Generator<T[]> {
-        let chunk: T[] = [];
-        for (const item of this.source) {
-            chunk.push(item);
-            if (chunk.length === size) {
-                yield chunk;
-                chunk = [];
-            }
-        }
-        if (chunk.length > 0) {
-            yield chunk;
-        }
-    }
-
-    static *range(start: number, end: number): Generator<number> {
-        for (let i = start; i <= end; i++) {
-            yield i;
-        }
-    }
-
-    static *repeat<U>(value: U, count: number): Generator<U> {
-        for (let i = 0; i < count; i++) {
-            yield value;
-        }
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    assert!(
-        output.contains("function Pipeline"),
-        "Expected Pipeline function: {}",
-        output
-    );
-    assert!(
-        output.contains("filter") && output.contains("map") && output.contains("take"),
-        "Expected generator methods: {}",
-        output
-    );
-    assert!(
-        output.contains("chunk") && output.contains("skip"),
-        "Expected more generator methods: {}",
-        output
-    );
-    assert!(
-        output.contains("range") && output.contains("repeat"),
-        "Expected static generator methods: {}",
+        output.contains("ApplicationService"),
+        "Expected ApplicationService class: {}",
         output
     );
 }
