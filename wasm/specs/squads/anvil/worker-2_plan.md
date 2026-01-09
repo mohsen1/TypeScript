@@ -212,3 +212,6 @@ Yes
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/anvil-2`
 - **NEVER edit**: `DIRECTOR_AGENT.md`, `SQUAD_LEAD_AGENT.md`, `MANAGER_AGENT.md`, `AGENTS.md`, `start_*.sh`
+## Resume
+- Remaining work: TS2403 extras still at 77 (process-pool scan); investigate remaining cases.
+- Sample files to inspect next: `ambient/ambientDeclarationsExternal.ts`, `classes/classDeclarations/classAbstractKeyword/classAbstractInstantiations2.ts`, `classes/constructorDeclarations/constructorParameters/constructorParameterProperties.ts`, `enums/enumBasics.ts`, `es6/spread/arrayLiteralSpread.ts`, `es6/spread/arrayLiteralSpreadES5iterable.ts`, `es6/templates/taggedTemplateStringsWithOverloadResolution3.ts`, `es6/templates/taggedTemplateStringsWithOverloadResolution3_ES6.ts`, `expressions/arrayLiterals/arrayLiterals.ts`, `expressions/binaryOperators/comparisonOperator/comparisonOperatorWithNoRelationshipPrimitiveType.ts`.
