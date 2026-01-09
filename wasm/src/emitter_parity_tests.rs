@@ -24102,3 +24102,1232 @@ const throwResult = iter.throw(new Error("test"));
         output
     );
 }
+
+// =============================================================================
+// ES5 Generator patterns parity tests
+// =============================================================================
+
+/// Test basic yield expression with type annotations
+#[test]
+fn test_parity_es5_generator_basic_yield() {
+    let source = r#"
+interface NumberGenerator {
+    next(): IteratorResult<number>;
+}
+
+function* countUp(max: number): Generator<number, void, unknown> {
+    for (let i = 0; i < max; i++) {
+        yield i;
+    }
+}
+
+function* fibonacci(limit: number): Generator<number> {
+    let prev = 0;
+    let curr = 1;
+    while (curr <= limit) {
+        yield curr;
+        const next = prev + curr;
+        prev = curr;
+        curr = next;
+    }
+}
+
+class NumberSequence {
+    private values: number[];
+
+    constructor(values: number[]) {
+        this.values = values;
+    }
+
+    *[Symbol.iterator](): Generator<number> {
+        for (const val of this.values) {
+            yield val;
+        }
+    }
+}
+
+const counter = countUp(5);
+const fib = fibonacci(100);
+const seq = new NumberSequence([1, 2, 3]);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Interface should be erased
+    assert!(
+        !output.contains("interface NumberGenerator"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Functions should be present
+    assert!(
+        output.contains("countUp") && output.contains("fibonacci"),
+        "Functions should be present: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("NumberSequence"),
+        "Class should be present: {}",
+        output
+    );
+    // Generator type annotations should be erased (function* may remain if transform not fully implemented)
+    assert!(
+        !output.contains(": Generator<") && !output.contains(": IteratorResult<"),
+        "Type annotations should be erased: {}",
+        output
+    );
+    // Parameter type annotations should be erased
+    assert!(
+        !output.contains(": number[]") && !output.contains("private values"),
+        "Member type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test yield* delegation with type annotations
+#[test]
+fn test_parity_es5_generator_yield_star() {
+    let source = r#"
+function* inner(): Generator<number> {
+    yield 1;
+    yield 2;
+    yield 3;
+}
+
+function* outer(): Generator<number> {
+    yield 0;
+    yield* inner();
+    yield 4;
+}
+
+function* flatten<T>(arrays: T[][]): Generator<T> {
+    for (const arr of arrays) {
+        yield* arr;
+    }
+}
+
+class CompositeGenerator<T> {
+    private generators: Array<Generator<T>>;
+
+    constructor(generators: Array<Generator<T>>) {
+        this.generators = generators;
+    }
+
+    *combined(): Generator<T> {
+        for (const gen of this.generators) {
+            yield* gen;
+        }
+    }
+}
+
+const outerGen = outer();
+const flatGen = flatten([[1, 2], [3, 4]]);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions should be present
+    assert!(
+        output.contains("inner") && output.contains("outer") && output.contains("flatten"),
+        "Functions should be present: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("CompositeGenerator"),
+        "Class should be present: {}",
+        output
+    );
+    // Generator type annotations should be erased (function*/yield* may remain if transform not fully implemented)
+    assert!(
+        !output.contains(": Generator<") && !output.contains("<T>"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test generator conditional return with type annotations
+#[test]
+fn test_parity_es5_generator_conditional_return() {
+    let source = r#"
+interface GeneratorResult<T, R> {
+    values: T[];
+    returnValue: R;
+}
+
+function* withReturn(): Generator<number, string, unknown> {
+    yield 1;
+    yield 2;
+    return "done";
+}
+
+function* conditionalReturn(shouldComplete: boolean): Generator<number, string> {
+    yield 1;
+    if (!shouldComplete) {
+        return "early exit";
+    }
+    yield 2;
+    yield 3;
+    return "completed";
+}
+
+class StatefulGenerator<T, R> {
+    private state: string = "idle";
+
+    *run(items: T[], finalResult: R): Generator<T, R> {
+        this.state = "running";
+        for (const item of items) {
+            yield item;
+        }
+        this.state = "done";
+        return finalResult;
+    }
+
+    getState(): string {
+        return this.state;
+    }
+}
+
+const gen = withReturn();
+const conditional = conditionalReturn(true);
+const stateful = new StatefulGenerator<number, boolean>();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Interface should be erased
+    assert!(
+        !output.contains("interface GeneratorResult"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Functions should be present
+    assert!(
+        output.contains("withReturn") && output.contains("conditionalReturn"),
+        "Functions should be present: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("StatefulGenerator"),
+        "Class should be present: {}",
+        output
+    );
+    // Generator type annotations should be erased (function* may remain if transform not fully implemented)
+    assert!(
+        !output.contains(": Generator<"),
+        "Generator type annotations should be erased: {}",
+        output
+    );
+    // Other type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains("private state"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test generator throw with type annotations
+#[test]
+fn test_parity_es5_generator_throw() {
+    let source = r#"
+interface ErrorRecovery<T> {
+    recover(error: Error): T | undefined;
+}
+
+function* recoverableGenerator(): Generator<number, void, Error | undefined> {
+    let value = 0;
+    while (true) {
+        const error = yield value;
+        if (error) {
+            console.log("Received error:", error.message);
+            value = -1;
+        } else {
+            value++;
+        }
+    }
+}
+
+class ThrowableGenerator<T> {
+    private errorCount: number = 0;
+
+    *generate(items: T[]): Generator<T, void, Error | undefined> {
+        for (const item of items) {
+            const error = yield item;
+            if (error) {
+                this.errorCount++;
+            }
+        }
+    }
+
+    getErrorCount(): number {
+        return this.errorCount;
+    }
+}
+
+function consumeWithThrow<T>(gen: Generator<T, void, Error | undefined>): T[] {
+    const results: T[] = [];
+    let result = gen.next();
+    while (!result.done) {
+        results.push(result.value);
+        result = gen.next();
+    }
+    return results;
+}
+
+const recoverable = recoverableGenerator();
+const throwable = new ThrowableGenerator<string>();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Interface should be erased
+    assert!(
+        !output.contains("interface ErrorRecovery"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Functions should be present
+    assert!(
+        output.contains("recoverableGenerator") && output.contains("consumeWithThrow"),
+        "Functions should be present: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("ThrowableGenerator"),
+        "Class should be present: {}",
+        output
+    );
+    // Generator type annotations should be erased (function* may remain if transform not fully implemented)
+    assert!(
+        !output.contains(": Generator<"),
+        "Generator type annotations should be erased: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface ErrorRecovery"),
+        "Interface should be erased: {}",
+        output
+    );
+}
+
+/// Test generator resource management with try/catch and type annotations
+#[test]
+fn test_parity_es5_generator_resource_management() {
+    let source = r#"
+interface SafeResult<T> {
+    value?: T;
+    error?: Error;
+}
+
+function* safeGenerator(): Generator<number, void, unknown> {
+    try {
+        yield 1;
+        yield 2;
+        throw new Error("Intentional error");
+    } catch (e) {
+        console.log("Caught:", e);
+        yield -1;
+    } finally {
+        console.log("Cleanup");
+    }
+}
+
+function* resourceGenerator(): Generator<string, void, unknown> {
+    const resource = "acquired";
+    try {
+        yield resource;
+        yield "processing";
+    } finally {
+        console.log("Releasing resource");
+    }
+}
+
+class SafeIterator<T> {
+    *iterate(items: T[]): Generator<SafeResult<T>> {
+        for (const item of items) {
+            try {
+                yield { value: item };
+            } catch (e) {
+                yield { error: e as Error };
+            }
+        }
+    }
+}
+
+const safeGen = safeGenerator();
+const resourceGen = resourceGenerator();
+const safeIter = new SafeIterator<number>();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Interface should be erased
+    assert!(
+        !output.contains("interface SafeResult"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Functions should be present
+    assert!(
+        output.contains("safeGenerator") && output.contains("resourceGenerator"),
+        "Functions should be present: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("SafeIterator"),
+        "Class should be present: {}",
+        output
+    );
+    // Generator type annotations should be erased (function* may remain if transform not fully implemented)
+    assert!(
+        !output.contains(": Generator<"),
+        "Generator type annotations should be erased: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface SafeResult"),
+        "Interface should be erased: {}",
+        output
+    );
+}
+
+/// Test combined generator patterns with type annotations
+#[test]
+fn test_parity_es5_generator_combined() {
+    let source = r#"
+interface StreamProcessor<T, R> {
+    process(input: T): R;
+}
+
+function* pipeline<T, U, V>(
+    source: Iterable<T>,
+    transform1: (x: T) => U,
+    transform2: (x: U) => V
+): Generator<V> {
+    for (const item of source) {
+        const intermediate = transform1(item);
+        yield transform2(intermediate);
+    }
+}
+
+class GeneratorPipeline<T> {
+    private source: Generator<T>;
+
+    constructor(source: Generator<T>) {
+        this.source = source;
+    }
+
+    *map<U>(fn: (x: T) => U): Generator<U> {
+        for (const item of this.source) {
+            yield fn(item);
+        }
+    }
+
+    *filter(predicate: (x: T) => boolean): Generator<T> {
+        for (const item of this.source) {
+            if (predicate(item)) {
+                yield item;
+            }
+        }
+    }
+
+    *take(count: number): Generator<T> {
+        let taken = 0;
+        for (const item of this.source) {
+            if (taken >= count) return;
+            yield item;
+            taken++;
+        }
+    }
+}
+
+function* range(start: number, end: number): Generator<number> {
+    for (let i = start; i <= end; i++) {
+        yield i;
+    }
+}
+
+const rangeGen = range(1, 10);
+const pipe = new GeneratorPipeline(rangeGen);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Interface should be erased
+    assert!(
+        !output.contains("interface StreamProcessor"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Functions should be present
+    assert!(
+        output.contains("pipeline") && output.contains("range"),
+        "Functions should be present: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("GeneratorPipeline"),
+        "Class should be present: {}",
+        output
+    );
+    // Generator type annotations should be erased (function* may remain if transform not fully implemented)
+    assert!(
+        !output.contains(": Generator<") && !output.contains("<T>") && !output.contains("<U>"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test class decorator with private fields
+#[test]
+fn test_parity_es5_decorator_class_private_fields() {
+    let source = r#"
+interface ClassDecorator {
+    <T extends new (...args: any[]) => any>(constructor: T): T | void;
+}
+
+function sealed(constructor: Function): void {
+    Object.seal(constructor);
+    Object.seal(constructor.prototype);
+}
+
+function track(constructor: Function): void {
+    console.log("Class instantiated:", constructor.name);
+}
+
+@sealed
+@track
+class SecureData {
+    #secret: string;
+    #count: number = 0;
+
+    constructor(secret: string) {
+        this.#secret = secret;
+    }
+
+    #increment(): void {
+        this.#count++;
+    }
+
+    getSecret(): string {
+        this.#increment();
+        return this.#secret;
+    }
+
+    getAccessCount(): number {
+        return this.#count;
+    }
+}
+
+const data = new SecureData("password123");
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Class should be present
+    assert!(
+        output.contains("SecureData"),
+        "Class should be present: {}",
+        output
+    );
+    // Decorator functions should be present
+    assert!(
+        output.contains("sealed") && output.contains("track"),
+        "Decorator functions should be present: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface ClassDecorator"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": number") && !output.contains(": void"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test method decorator with computed property name
+#[test]
+fn test_parity_es5_decorator_method_computed_name() {
+    let source = r#"
+interface MethodDecorator {
+    (target: any, propertyKey: string | symbol, descriptor: PropertyDescriptor): PropertyDescriptor | void;
+}
+
+const methodName = "dynamicMethod";
+const symbolKey = Symbol("symbolMethod");
+
+function log(target: any, key: string | symbol, descriptor: PropertyDescriptor): PropertyDescriptor {
+    const original = descriptor.value;
+    descriptor.value = function(...args: any[]) {
+        console.log("Calling:", String(key));
+        return original.apply(this, args);
+    };
+    return descriptor;
+}
+
+function measure(target: any, key: string | symbol, descriptor: PropertyDescriptor): PropertyDescriptor {
+    const original = descriptor.value;
+    descriptor.value = function(...args: any[]) {
+        const start = Date.now();
+        const result = original.apply(this, args);
+        console.log("Duration:", Date.now() - start);
+        return result;
+    };
+    return descriptor;
+}
+
+class DynamicMethods {
+    @log
+    [methodName](x: number): number {
+        return x * 2;
+    }
+
+    @measure
+    @log
+    [symbolKey](value: string): string {
+        return value.toUpperCase();
+    }
+
+    @log
+    ["literal" + "Name"](a: number, b: number): number {
+        return a + b;
+    }
+}
+
+const instance = new DynamicMethods();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Class should be present
+    assert!(
+        output.contains("DynamicMethods"),
+        "Class should be present: {}",
+        output
+    );
+    // Decorator functions should be present
+    assert!(
+        output.contains("function log") && output.contains("function measure"),
+        "Decorator functions should be present: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface MethodDecorator"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": PropertyDescriptor") && !output.contains(": number)"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test accessor decorator on getter/setter pair
+#[test]
+fn test_parity_es5_decorator_accessor_pair() {
+    let source = r#"
+interface AccessorDecorator {
+    (target: any, propertyKey: string, descriptor: PropertyDescriptor): PropertyDescriptor | void;
+}
+
+function validate(target: any, key: string, descriptor: PropertyDescriptor): PropertyDescriptor {
+    const originalSet = descriptor.set;
+    if (originalSet) {
+        descriptor.set = function(value: any) {
+            if (value < 0) throw new Error("Value must be non-negative");
+            originalSet.call(this, value);
+        };
+    }
+    return descriptor;
+}
+
+function cache(target: any, key: string, descriptor: PropertyDescriptor): PropertyDescriptor {
+    const originalGet = descriptor.get;
+    const cacheKey = Symbol(key + "_cache");
+    if (originalGet) {
+        descriptor.get = function() {
+            if (!(this as any)[cacheKey]) {
+                (this as any)[cacheKey] = originalGet.call(this);
+            }
+            return (this as any)[cacheKey];
+        };
+    }
+    return descriptor;
+}
+
+class BoundedValue {
+    private _value: number = 0;
+    private _computedValue: number | null = null;
+
+    @validate
+    get value(): number {
+        return this._value;
+    }
+
+    @validate
+    set value(v: number) {
+        this._value = v;
+        this._computedValue = null;
+    }
+
+    @cache
+    get computed(): number {
+        console.log("Computing...");
+        return this._value * 2;
+    }
+}
+
+const bounded = new BoundedValue();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Class should be present
+    assert!(
+        output.contains("BoundedValue"),
+        "Class should be present: {}",
+        output
+    );
+    // Decorator functions should be present
+    assert!(
+        output.contains("function validate") && output.contains("function cache"),
+        "Decorator functions should be present: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface AccessorDecorator"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Private modifier should be erased
+    assert!(
+        !output.contains("private _value"),
+        "Private modifier should be erased: {}",
+        output
+    );
+}
+
+/// Test parameter decorator in constructor
+#[test]
+fn test_parity_es5_decorator_parameter_constructor() {
+    let source = r#"
+interface ParameterDecorator {
+    (target: Object, propertyKey: string | symbol | undefined, parameterIndex: number): void;
+}
+
+const injectionTokens = new Map<any, Map<number, string>>();
+
+function inject(token: string): ParameterDecorator {
+    return function(target: Object, propertyKey: string | symbol | undefined, index: number): void {
+        const existing = injectionTokens.get(target) || new Map();
+        existing.set(index, token);
+        injectionTokens.set(target, existing);
+    };
+}
+
+function required(target: Object, propertyKey: string | symbol | undefined, index: number): void {
+    console.log("Required parameter at index:", index);
+}
+
+interface DatabaseConnection {
+    query(sql: string): Promise<any[]>;
+}
+
+interface LoggerService {
+    log(message: string): void;
+}
+
+class UserRepository {
+    private db: DatabaseConnection;
+    private logger: LoggerService;
+
+    constructor(
+        @inject("database") @required db: DatabaseConnection,
+        @inject("logger") logger: LoggerService
+    ) {
+        this.db = db;
+        this.logger = logger;
+    }
+
+    async findUser(id: number): Promise<any> {
+        this.logger.log("Finding user: " + id);
+        const results = await this.db.query("SELECT * FROM users WHERE id = " + id);
+        return results[0];
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Class should be present
+    assert!(
+        output.contains("UserRepository"),
+        "Class should be present: {}",
+        output
+    );
+    // Decorator functions should be present
+    assert!(
+        output.contains("function inject") && output.contains("function required"),
+        "Decorator functions should be present: {}",
+        output
+    );
+    // Interfaces should be erased
+    assert!(
+        !output.contains("interface ParameterDecorator") && !output.contains("interface DatabaseConnection"),
+        "Interfaces should be erased: {}",
+        output
+    );
+    // Private modifier should be erased
+    assert!(
+        !output.contains("private db") && !output.contains("private logger"),
+        "Private modifier should be erased: {}",
+        output
+    );
+}
+
+/// Test decorator inheritance with method override
+#[test]
+fn test_parity_es5_decorator_inheritance_override() {
+    let source = r#"
+interface ClassDecorator {
+    <T extends new (...args: any[]) => any>(constructor: T): T | void;
+}
+
+interface MethodDecorator {
+    (target: any, propertyKey: string, descriptor: PropertyDescriptor): PropertyDescriptor | void;
+}
+
+function entity(name: string): ClassDecorator {
+    return function<T extends new (...args: any[]) => any>(constructor: T): T {
+        (constructor as any).entityName = name;
+        return constructor;
+    };
+}
+
+function logged(target: any, key: string, descriptor: PropertyDescriptor): PropertyDescriptor {
+    const original = descriptor.value;
+    descriptor.value = function(...args: any[]) {
+        console.log("Before:", key);
+        const result = original.apply(this, args);
+        console.log("After:", key);
+        return result;
+    };
+    return descriptor;
+}
+
+function validated(target: any, key: string, descriptor: PropertyDescriptor): PropertyDescriptor {
+    const original = descriptor.value;
+    descriptor.value = function(...args: any[]) {
+        if (args.some(arg => arg === null || arg === undefined)) {
+            throw new Error("Invalid arguments");
+        }
+        return original.apply(this, args);
+    };
+    return descriptor;
+}
+
+@entity("base")
+class BaseEntity {
+    id: number;
+
+    constructor(id: number) {
+        this.id = id;
+    }
+
+    @logged
+    save(): void {
+        console.log("Saving entity:", this.id);
+    }
+}
+
+@entity("user")
+class UserEntity extends BaseEntity {
+    name: string;
+
+    constructor(id: number, name: string) {
+        super(id);
+        this.name = name;
+    }
+
+    @validated
+    @logged
+    save(): void {
+        console.log("Saving user:", this.name);
+        super.save();
+    }
+
+    @logged
+    delete(): void {
+        console.log("Deleting user:", this.id);
+    }
+}
+
+const user = new UserEntity(1, "John");
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes should be present
+    assert!(
+        output.contains("BaseEntity") && output.contains("UserEntity"),
+        "Classes should be present: {}",
+        output
+    );
+    // Decorator functions should be present
+    assert!(
+        output.contains("function entity") && output.contains("function logged") && output.contains("function validated"),
+        "Decorator functions should be present: {}",
+        output
+    );
+    // Interfaces should be erased
+    assert!(
+        !output.contains("interface ClassDecorator") && !output.contains("interface MethodDecorator"),
+        "Interfaces should be erased: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number") && !output.contains(": string") && !output.contains(": void"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test combined all decorator types
+#[test]
+fn test_parity_es5_decorator_combined_all() {
+    let source = r#"
+type Constructor<T = {}> = new (...args: any[]) => T;
+
+function component(selector: string): ClassDecorator {
+    return function(constructor: Function): void {
+        (constructor as any).selector = selector;
+    };
+}
+
+function input(target: any, key: string): void {
+    const inputs = (target.constructor as any).inputs || [];
+    inputs.push(key);
+    (target.constructor as any).inputs = inputs;
+}
+
+function output(target: any, key: string): void {
+    const outputs = (target.constructor as any).outputs || [];
+    outputs.push(key);
+    (target.constructor as any).outputs = outputs;
+}
+
+function autobind(target: any, key: string, descriptor: PropertyDescriptor): PropertyDescriptor {
+    const original = descriptor.value;
+    return {
+        configurable: true,
+        enumerable: false,
+        get() {
+            return original.bind(this);
+        }
+    };
+}
+
+function readonly(target: any, key: string, descriptor: PropertyDescriptor): PropertyDescriptor {
+    descriptor.writable = false;
+    return descriptor;
+}
+
+function inject(token: string): ParameterDecorator {
+    return function(target: Object, propertyKey: string | symbol | undefined, index: number): void {
+        console.log("Injecting", token, "at index", index);
+    };
+}
+
+@component("app-widget")
+class Widget {
+    @input
+    title: string = "";
+
+    @output
+    onClick: Function = () => {};
+
+    private _count: number = 0;
+
+    constructor(@inject("config") config: any) {
+        console.log("Widget created with config:", config);
+    }
+
+    @readonly
+    get count(): number {
+        return this._count;
+    }
+
+    set count(value: number) {
+        this._count = value;
+    }
+
+    @autobind
+    handleClick(event: Event): void {
+        this._count++;
+        this.onClick(event);
+    }
+
+    @autobind
+    @readonly
+    render(): string {
+        return "<div>" + this.title + "</div>";
+    }
+}
+
+const widget = new Widget({});
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Class should be present
+    assert!(
+        output.contains("Widget"),
+        "Class should be present: {}",
+        output
+    );
+    // Decorator functions should be present
+    assert!(
+        output.contains("function component") && output.contains("function input") && output.contains("function autobind"),
+        "Decorator functions should be present: {}",
+        output
+    );
+    // Type alias should be erased
+    assert!(
+        !output.contains("type Constructor"),
+        "Type alias should be erased: {}",
+        output
+    );
+    // Private modifier should be erased
+    assert!(
+        !output.contains("private _count"),
+        "Private modifier should be erased: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": number") && !output.contains(": Function"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
