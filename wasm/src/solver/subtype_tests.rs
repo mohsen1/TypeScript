@@ -18735,3 +18735,601 @@ fn test_this_in_overload_signature() {
     // No-this is compatible with with-this (no-this is more general)
     assert!(checker.is_subtype_of(overload_no_this, overload_with_this));
 }
+
+// =============================================================================
+// Literal Type Tests - String, Number, Boolean, Template Literal
+// =============================================================================
+
+#[test]
+fn test_string_literal_subtype_of_string() {
+    // "hello" is subtype of string
+    let interner = TypeInterner::new();
+
+    let hello_lit = interner.string_literal("hello");
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(hello_lit, TypeId::STRING));
+    assert!(!checker.is_subtype_of(TypeId::STRING, hello_lit));
+}
+
+#[test]
+fn test_string_literal_same_value() {
+    // "hello" is subtype of "hello"
+    let interner = TypeInterner::new();
+
+    let hello1 = interner.string_literal("hello");
+    let hello2 = interner.string_literal("hello");
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(hello1, hello2));
+    assert!(checker.is_subtype_of(hello2, hello1));
+}
+
+#[test]
+fn test_string_literal_different_values() {
+    // "hello" is not subtype of "world"
+    let interner = TypeInterner::new();
+
+    let hello = interner.string_literal("hello");
+    let world = interner.string_literal("world");
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(!checker.is_subtype_of(hello, world));
+    assert!(!checker.is_subtype_of(world, hello));
+}
+
+#[test]
+fn test_number_literal_subtype_of_number() {
+    // 42 is subtype of number
+    let interner = TypeInterner::new();
+
+    let forty_two = interner.number_literal(42.0);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(forty_two, TypeId::NUMBER));
+    assert!(!checker.is_subtype_of(TypeId::NUMBER, forty_two));
+}
+
+#[test]
+fn test_number_literal_same_value() {
+    // 42 is subtype of 42
+    let interner = TypeInterner::new();
+
+    let n1 = interner.number_literal(42.0);
+    let n2 = interner.number_literal(42.0);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(n1, n2));
+    assert!(checker.is_subtype_of(n2, n1));
+}
+
+#[test]
+fn test_number_literal_different_values() {
+    // 42 is not subtype of 43
+    let interner = TypeInterner::new();
+
+    let n42 = interner.number_literal(42.0);
+    let n43 = interner.number_literal(43.0);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(!checker.is_subtype_of(n42, n43));
+    assert!(!checker.is_subtype_of(n43, n42));
+}
+
+#[test]
+fn test_boolean_literal_true_subtype_of_boolean() {
+    // true is subtype of boolean
+    let interner = TypeInterner::new();
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(TypeId::TRUE, TypeId::BOOLEAN));
+    assert!(!checker.is_subtype_of(TypeId::BOOLEAN, TypeId::TRUE));
+}
+
+#[test]
+fn test_boolean_literal_false_subtype_of_boolean() {
+    // false is subtype of boolean
+    let interner = TypeInterner::new();
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(TypeId::FALSE, TypeId::BOOLEAN));
+    assert!(!checker.is_subtype_of(TypeId::BOOLEAN, TypeId::FALSE));
+}
+
+#[test]
+fn test_boolean_literal_true_not_subtype_of_false() {
+    // true is not subtype of false
+    let interner = TypeInterner::new();
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(!checker.is_subtype_of(TypeId::TRUE, TypeId::FALSE));
+    assert!(!checker.is_subtype_of(TypeId::FALSE, TypeId::TRUE));
+}
+
+#[test]
+fn test_string_literal_union() {
+    // type Status = "pending" | "active" | "done"
+    let interner = TypeInterner::new();
+
+    let pending = interner.string_literal("pending");
+    let active = interner.string_literal("active");
+    let done = interner.string_literal("done");
+
+    let status = interner.union(vec![pending, active, done]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    // Each literal is subtype of the union
+    assert!(checker.is_subtype_of(pending, status));
+    assert!(checker.is_subtype_of(active, status));
+    assert!(checker.is_subtype_of(done, status));
+    // Union is subtype of string
+    assert!(checker.is_subtype_of(status, TypeId::STRING));
+}
+
+#[test]
+fn test_number_literal_union() {
+    // type OneToThree = 1 | 2 | 3
+    let interner = TypeInterner::new();
+
+    let one = interner.number_literal(1.0);
+    let two = interner.number_literal(2.0);
+    let three = interner.number_literal(3.0);
+
+    let one_to_three = interner.union(vec![one, two, three]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(one, one_to_three));
+    assert!(checker.is_subtype_of(two, one_to_three));
+    assert!(checker.is_subtype_of(three, one_to_three));
+    assert!(checker.is_subtype_of(one_to_three, TypeId::NUMBER));
+}
+
+#[test]
+fn test_mixed_literal_union() {
+    // type Mixed = "a" | 1 | true
+    let interner = TypeInterner::new();
+
+    let a = interner.string_literal("a");
+    let one = interner.number_literal(1.0);
+
+    let mixed = interner.union(vec![a, one, TypeId::TRUE]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(a, mixed));
+    assert!(checker.is_subtype_of(one, mixed));
+    assert!(checker.is_subtype_of(TypeId::TRUE, mixed));
+}
+
+#[test]
+fn test_template_literal_simple() {
+    // type Greeting = `Hello, ${string}!`
+    let interner = TypeInterner::new();
+
+    let hello_prefix = interner.string_literal("Hello, ");
+    let suffix = interner.string_literal("!");
+
+    let template = interner.template_literal(TemplateLiteralType {
+        texts: vec![hello_prefix, suffix],
+        types: vec![TypeId::STRING],
+    });
+
+    assert!(template != TypeId::ERROR);
+}
+
+#[test]
+fn test_template_literal_subtype_of_string() {
+    // `prefix${string}` is subtype of string
+    let interner = TypeInterner::new();
+
+    let prefix = interner.string_literal("prefix");
+
+    let template = interner.template_literal(TemplateLiteralType {
+        texts: vec![prefix, interner.intern_string("")],
+        types: vec![TypeId::STRING],
+    });
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(template, TypeId::STRING));
+}
+
+#[test]
+fn test_string_literal_in_object_property() {
+    // const obj = { type: "success" } as const
+    let interner = TypeInterner::new();
+
+    let type_name = interner.intern_string("type");
+    let success = interner.string_literal("success");
+
+    let const_obj = interner.object(vec![PropertyInfo {
+        name: type_name,
+        type_id: success,
+        write_type: success,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let wide_obj = interner.object(vec![PropertyInfo {
+        name: type_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    // Const object with literal is subtype of wide object
+    assert!(checker.is_subtype_of(const_obj, wide_obj));
+}
+
+#[test]
+fn test_number_literal_in_tuple() {
+    // const tuple = [1, 2, 3] as const -> readonly [1, 2, 3]
+    let interner = TypeInterner::new();
+
+    let one = interner.number_literal(1.0);
+    let two = interner.number_literal(2.0);
+    let three = interner.number_literal(3.0);
+
+    let const_tuple = interner.tuple(vec![one, two, three]);
+    let wide_tuple = interner.tuple(vec![TypeId::NUMBER, TypeId::NUMBER, TypeId::NUMBER]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(const_tuple, wide_tuple));
+    assert!(!checker.is_subtype_of(wide_tuple, const_tuple));
+}
+
+#[test]
+fn test_literal_widening_string() {
+    // let x = "hello" -> string (widened)
+    // const y = "hello" -> "hello" (literal preserved)
+    let interner = TypeInterner::new();
+
+    let hello_lit = interner.string_literal("hello");
+
+    let mut checker = SubtypeChecker::new(&interner);
+    // Literal can be assigned to widened type
+    assert!(checker.is_subtype_of(hello_lit, TypeId::STRING));
+}
+
+#[test]
+fn test_literal_narrowing_discriminant() {
+    // type A = { kind: "a", x: number }
+    // type B = { kind: "b", y: string }
+    let interner = TypeInterner::new();
+
+    let kind_name = interner.intern_string("kind");
+    let x_name = interner.intern_string("x");
+    let y_name = interner.intern_string("y");
+
+    let kind_a = interner.string_literal("a");
+    let kind_b = interner.string_literal("b");
+
+    let type_a = interner.object(vec![
+        PropertyInfo {
+            name: kind_name,
+            type_id: kind_a,
+            write_type: kind_a,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: x_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let type_b = interner.object(vec![
+        PropertyInfo {
+            name: kind_name,
+            type_id: kind_b,
+            write_type: kind_b,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: y_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    // Neither is subtype of the other
+    assert!(!checker.is_subtype_of(type_a, type_b));
+    assert!(!checker.is_subtype_of(type_b, type_a));
+}
+
+#[test]
+fn test_template_literal_with_union() {
+    // type Event = `on${Capitalize<"click" | "hover">}`
+    // = "onClick" | "onHover"
+    let interner = TypeInterner::new();
+
+    let on_click = interner.string_literal("onClick");
+    let on_hover = interner.string_literal("onHover");
+
+    let event_union = interner.union(vec![on_click, on_hover]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(on_click, event_union));
+    assert!(checker.is_subtype_of(on_hover, event_union));
+    assert!(checker.is_subtype_of(event_union, TypeId::STRING));
+}
+
+#[test]
+fn test_number_literal_negative() {
+    // -42 as literal
+    let interner = TypeInterner::new();
+
+    let neg_42 = interner.number_literal(-42.0);
+    let pos_42 = interner.number_literal(42.0);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(neg_42, TypeId::NUMBER));
+    assert!(!checker.is_subtype_of(neg_42, pos_42));
+}
+
+#[test]
+fn test_number_literal_zero() {
+    // 0 as literal
+    let interner = TypeInterner::new();
+
+    let zero = interner.number_literal(0.0);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(zero, TypeId::NUMBER));
+}
+
+#[test]
+fn test_number_literal_float() {
+    // 3.14 as literal
+    let interner = TypeInterner::new();
+
+    let pi = interner.number_literal(3.14);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(pi, TypeId::NUMBER));
+}
+
+#[test]
+fn test_string_literal_empty() {
+    // "" as literal
+    let interner = TypeInterner::new();
+
+    let empty = interner.string_literal("");
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(empty, TypeId::STRING));
+}
+
+#[test]
+fn test_bigint_literal_subtype() {
+    // 100n as literal is subtype of bigint
+    let interner = TypeInterner::new();
+
+    let big = interner.bigint_literal(100);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(big, TypeId::BIGINT));
+    assert!(!checker.is_subtype_of(TypeId::BIGINT, big));
+}
+
+#[test]
+fn test_bigint_literal_different_values() {
+    // 100n is not subtype of 200n
+    let interner = TypeInterner::new();
+
+    let n100 = interner.bigint_literal(100);
+    let n200 = interner.bigint_literal(200);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(!checker.is_subtype_of(n100, n200));
+    assert!(!checker.is_subtype_of(n200, n100));
+}
+
+#[test]
+fn test_literal_union_subset() {
+    // "a" | "b" is subtype of "a" | "b" | "c"
+    let interner = TypeInterner::new();
+
+    let a = interner.string_literal("a");
+    let b = interner.string_literal("b");
+    let c = interner.string_literal("c");
+
+    let ab = interner.union(vec![a, b]);
+    let abc = interner.union(vec![a, b, c]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(ab, abc));
+    assert!(!checker.is_subtype_of(abc, ab));
+}
+
+#[test]
+fn test_template_literal_multiple_spans() {
+    // type Path = `/${string}/${string}`
+    let interner = TypeInterner::new();
+
+    let slash = interner.string_literal("/");
+
+    let template = interner.template_literal(TemplateLiteralType {
+        texts: vec![slash, slash, interner.intern_string("")],
+        types: vec![TypeId::STRING, TypeId::STRING],
+    });
+
+    assert!(template != TypeId::ERROR);
+}
+
+#[test]
+fn test_template_literal_with_number() {
+    // type Port = `port:${number}`
+    let interner = TypeInterner::new();
+
+    let port_prefix = interner.string_literal("port:");
+
+    let template = interner.template_literal(TemplateLiteralType {
+        texts: vec![port_prefix, interner.intern_string("")],
+        types: vec![TypeId::NUMBER],
+    });
+
+    assert!(template != TypeId::ERROR);
+}
+
+#[test]
+fn test_literal_in_function_param() {
+    // function f(x: "a" | "b"): void
+    let interner = TypeInterner::new();
+
+    let a = interner.string_literal("a");
+    let b = interner.string_literal("b");
+    let x_name = interner.intern_string("x");
+
+    let param_type = interner.union(vec![a, b]);
+
+    let fn_type = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(x_name),
+            type_id: param_type,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    assert!(fn_type != TypeId::ERROR);
+}
+
+#[test]
+fn test_literal_in_function_return() {
+    // function f(): "success" | "failure"
+    let interner = TypeInterner::new();
+
+    let success = interner.string_literal("success");
+    let failure = interner.string_literal("failure");
+
+    let return_type = interner.union(vec![success, failure]);
+
+    let fn_type = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    assert!(fn_type != TypeId::ERROR);
+}
+
+#[test]
+fn test_literal_as_index_type() {
+    // T["length"] where "length" is a literal key
+    let interner = TypeInterner::new();
+
+    let length_key = interner.string_literal("length");
+
+    let indexed = interner.indexed_access(TypeId::STRING, length_key);
+    assert!(indexed != TypeId::ERROR);
+}
+
+#[test]
+fn test_boolean_union_equals_boolean() {
+    // true | false should be equivalent to boolean
+    let interner = TypeInterner::new();
+
+    let bool_union = interner.union(vec![TypeId::TRUE, TypeId::FALSE]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    // true | false is subtype of boolean
+    assert!(checker.is_subtype_of(bool_union, TypeId::BOOLEAN));
+    // boolean is subtype of true | false
+    assert!(checker.is_subtype_of(TypeId::BOOLEAN, bool_union));
+}
+
+#[test]
+fn test_null_literal() {
+    // null is a literal type
+    let interner = TypeInterner::new();
+
+    let nullable = interner.union(vec![TypeId::STRING, TypeId::NULL]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(TypeId::NULL, nullable));
+    assert!(checker.is_subtype_of(TypeId::STRING, nullable));
+}
+
+#[test]
+fn test_undefined_literal() {
+    // undefined as literal in union
+    let interner = TypeInterner::new();
+
+    let optional_string = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(TypeId::UNDEFINED, optional_string));
+    assert!(checker.is_subtype_of(TypeId::STRING, optional_string));
+}
+
+#[test]
+fn test_unique_symbol() {
+    // unique symbol is a literal-like type
+    let interner = TypeInterner::new();
+
+    // unique symbols are distinct
+    let sym1 = interner.unique_symbol(SymbolRef(1));
+    let sym2 = interner.unique_symbol(SymbolRef(2));
+
+    let mut checker = SubtypeChecker::new(&interner);
+    // Unique symbols are subtypes of symbol
+    assert!(checker.is_subtype_of(sym1, TypeId::SYMBOL));
+    assert!(checker.is_subtype_of(sym2, TypeId::SYMBOL));
+    // But not of each other
+    assert!(!checker.is_subtype_of(sym1, sym2));
+}
+
+#[test]
+fn test_const_enum_member() {
+    // const enum Direction { Up = 0, Down = 1 }
+    // Direction.Up has literal type 0
+    let interner = TypeInterner::new();
+
+    let up = interner.number_literal(0.0);
+    let down = interner.number_literal(1.0);
+
+    let direction = interner.union(vec![up, down]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(up, direction));
+    assert!(checker.is_subtype_of(down, direction));
+    assert!(checker.is_subtype_of(direction, TypeId::NUMBER));
+}
+
+#[test]
+fn test_string_enum_member() {
+    // enum Status { Active = "active", Inactive = "inactive" }
+    let interner = TypeInterner::new();
+
+    let active = interner.string_literal("active");
+    let inactive = interner.string_literal("inactive");
+
+    let status = interner.union(vec![active, inactive]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(active, status));
+    assert!(checker.is_subtype_of(inactive, status));
+    assert!(checker.is_subtype_of(status, TypeId::STRING));
+}
