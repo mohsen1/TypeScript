@@ -7,10 +7,10 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-(awaiting assignment)
+- [ ] Add ES5 parity tests for generator function patterns: generator with typed yields, generator with delegation, async generator with await, generator in class methods, generator with try/finally, generator with return value. Tests: `./wasm/test.sh emitter_parity`
 
 ## Task Queue
-(empty)
+- [ ] Add ES5 parity tests for for-await-of patterns: async iteration with destructuring, async iteration in class, error handling
 
 ## Completed
 - [x] Added ES5 async/await complex patterns parity tests (try-finally, promise-all-destructure, iife, nested-arrows) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (257 tests).

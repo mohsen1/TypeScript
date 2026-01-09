@@ -7,10 +7,10 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- [ ] Add async ES5 tests for async/await in arrow function patterns (concise body await, block body await, nested arrows, arrow in class field) in `wasm/src/transforms/async_es5_tests.rs`. Run `./wasm/test.sh async_es5_tests`.
+- [ ] Add async ES5 tests for async method patterns: async getter simulation, async static methods, async with super calls, async with private field access, async class factory, async method chaining. Tests: `./wasm/test.sh async_es5_tests`
 
 ## Task Queue
-- [ ] (empty)
+- [ ] Add async ES5 tests for async error handling patterns: try/catch/finally, Promise rejection, async stack traces
 
 ## Completed
 - [x] Added 12 async arrow function pattern tests (with sync callback, nested async ignored, await before nested, await after nested, Promise.all, iife call, then chain, method call, spread, destructure, optional chain, nullish assign) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (556 tests PASS).
