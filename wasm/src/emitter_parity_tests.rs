@@ -17520,3 +17520,206 @@ Third line`;
         output
     );
 }
+
+/// Parity test for ES5 auto-accessor property.
+/// Auto-accessors using the accessor keyword should be transformed.
+#[test]
+fn test_parity_es5_auto_accessor() {
+    let source = r#"class Counter {
+    accessor count: number = 0;
+
+    increment(): void {
+        this.count++;
+    }
+
+    decrement(): void {
+        this.count--;
+    }
+}
+
+class Person {
+    accessor name: string;
+    accessor age: number;
+
+    constructor(name: string, age: number) {
+        this.name = name;
+        this.age = age;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes should be present
+    assert!(
+        output.contains("Counter") && output.contains("Person"),
+        "Output should contain classes: {}",
+        output
+    );
+    // Methods should be present
+    assert!(
+        output.contains("increment") && output.contains("decrement"),
+        "Output should contain methods: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number") && !output.contains(": string") && !output.contains(": void"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 computed accessor names.
+/// Accessors with computed property names from symbols or expressions.
+#[test]
+fn test_parity_es5_computed_accessor_symbol() {
+    let source = r#"const nameKey = Symbol('name');
+const ageKey = 'user_age';
+
+class User {
+    private _data: Record<symbol | string, any> = {};
+
+    get [nameKey](): string {
+        return this._data[nameKey];
+    }
+
+    set [nameKey](value: string) {
+        this._data[nameKey] = value;
+    }
+
+    get [ageKey](): number {
+        return this._data[ageKey];
+    }
+
+    set [ageKey](value: number) {
+        this._data[ageKey] = value;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Class and symbol should be present
+    assert!(
+        output.contains("User") && output.contains("nameKey") && output.contains("ageKey"),
+        "Output should contain class and keys: {}",
+        output
+    );
+    // Should have Symbol
+    assert!(
+        output.contains("Symbol"),
+        "Output should reference Symbol: {}",
+        output
+    );
+    // Private modifier should be erased
+    assert!(
+        !output.contains("private _data"),
+        "Private modifier should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 inherited accessor override.
+/// Derived class overriding base class accessors.
+#[test]
+fn test_parity_es5_inherited_accessor_override() {
+    let source = r#"class BaseConfig {
+    protected _value: string = '';
+
+    get value(): string {
+        return this._value;
+    }
+
+    set value(v: string) {
+        this._value = v;
+    }
+}
+
+class DerivedConfig extends BaseConfig {
+    get value(): string {
+        return `[Derived] ${super.value}`;
+    }
+
+    set value(v: string) {
+        super.value = v.toUpperCase();
+    }
+}
+
+class ReadOnlyConfig extends BaseConfig {
+    get value(): string {
+        return this._value;
+    }
+    // No setter - making it read-only in derived class
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // All classes should be present
+    assert!(
+        output.contains("BaseConfig") && output.contains("DerivedConfig") && output.contains("ReadOnlyConfig"),
+        "Output should contain all classes: {}",
+        output
+    );
+    // Should have prototype or __extends for inheritance
+    assert!(
+        output.contains("__extends") || output.contains(".prototype"),
+        "ES5 output should have inheritance mechanism: {}",
+        output
+    );
+    // Protected modifier should be erased
+    assert!(
+        !output.contains("protected _value"),
+        "Protected modifier should be erased: {}",
+        output
+    );
+}
