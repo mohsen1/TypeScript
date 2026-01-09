@@ -7,7 +7,14 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-(Waiting for next assignment from EM-Anvil)
+Fix TS2403 false positives ("Subsequent variable declarations must have the same type") from `wasm/specs/squads/anvil/GOALS.md`.
+
+Focus:
+1. Capture 5-10 TS2403 failing samples from conformance output.
+2. Inspect symbol merge / variable declaration compatibility in `wasm/src/thin_binder.rs` and `wasm/src/thin_checker.rs`.
+3. Implement the smallest fix that reduces TS2403 count without new errors.
+4. Add regression tests (prefer `wasm/src/thin_checker_tests.rs` or `wasm/src/thin_binder_tests.rs`).
+5. Run conformance before/after and record exact match + extra errors here.
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
@@ -203,3 +210,6 @@ Yes
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/anvil-2`
 - **NEVER edit**: `DIRECTOR_AGENT.md`, `SQUAD_LEAD_AGENT.md`, `MANAGER_AGENT.md`, `AGENTS.md`, `start_*.sh`
+## Resume
+- Remaining work: TS2403 extras still at 77 (process-pool scan); investigate remaining cases.
+- Sample files to inspect next: `ambient/ambientDeclarationsExternal.ts`, `classes/classDeclarations/classAbstractKeyword/classAbstractInstantiations2.ts`, `classes/constructorDeclarations/constructorParameters/constructorParameterProperties.ts`, `enums/enumBasics.ts`, `es6/spread/arrayLiteralSpread.ts`, `es6/spread/arrayLiteralSpreadES5iterable.ts`, `es6/templates/taggedTemplateStringsWithOverloadResolution3.ts`, `es6/templates/taggedTemplateStringsWithOverloadResolution3_ES6.ts`, `expressions/arrayLiterals/arrayLiterals.ts`, `expressions/binaryOperators/comparisonOperator/comparisonOperatorWithNoRelationshipPrimitiveType.ts`.
