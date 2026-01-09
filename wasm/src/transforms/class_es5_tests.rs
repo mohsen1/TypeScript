@@ -19885,3 +19885,665 @@ class ApiResponse<T> {
         output
     );
 }
+
+#[test]
+fn test_class_es5_class_decorator_basic() {
+    // Basic class decorator pattern
+    let source = r#"
+function sealed(constructor: Function) {
+    Object.seal(constructor);
+    Object.seal(constructor.prototype);
+}
+
+function frozen(constructor: Function) {
+    Object.freeze(constructor);
+    Object.freeze(constructor.prototype);
+}
+
+function log(constructor: Function) {
+    console.log(`Creating instance of ${constructor.name}`);
+}
+
+@sealed
+class SealedClass {
+    name: string;
+    constructor(name: string) {
+        this.name = name;
+    }
+}
+
+@frozen
+class FrozenClass {
+    value: number;
+    constructor(value: number) {
+        this.value = value;
+    }
+}
+
+@log
+class LoggedClass {
+    id: number;
+    constructor(id: number) {
+        this.id = id;
+    }
+
+    doSomething() {
+        return this.id * 2;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("SealedClass") && output.contains("FrozenClass") && output.contains("LoggedClass"),
+        "Expected decorated classes: {}",
+        output
+    );
+
+    // Decorator functions should be present
+    assert!(
+        output.contains("sealed") && output.contains("frozen") && output.contains("log"),
+        "Expected class decorators: {}",
+        output
+    );
+
+    // Class IIFE pattern should be present
+    assert!(
+        output.contains("(function ()") || output.contains("(function()"),
+        "Expected class IIFE pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_class_decorator_metadata() {
+    // Class decorator with metadata pattern
+    let source = r#"
+const METADATA_KEY = Symbol("metadata");
+
+function metadata(key: string, value: any) {
+    return function(target: Function) {
+        Reflect.defineMetadata(key, value, target);
+    };
+}
+
+function entity(tableName: string) {
+    return function(target: Function) {
+        Reflect.defineMetadata("entity:table", tableName, target);
+    };
+}
+
+function injectable(scope: string = "singleton") {
+    return function(target: Function) {
+        Reflect.defineMetadata("di:scope", scope, target);
+        Reflect.defineMetadata("di:injectable", true, target);
+    };
+}
+
+function controller(path: string) {
+    return function(target: Function) {
+        Reflect.defineMetadata("controller:path", path, target);
+        Reflect.defineMetadata("controller:type", "rest", target);
+    };
+}
+
+@metadata("version", "1.0.0")
+@metadata("author", "developer")
+class VersionedClass {
+    data: any;
+}
+
+@entity("users")
+class UserEntity {
+    id: number;
+    name: string;
+    email: string;
+}
+
+@injectable("transient")
+class TransientService {
+    process() { return "processed"; }
+}
+
+@controller("/api/users")
+class UserController {
+    getAll() { return []; }
+    getById(id: number) { return null; }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("VersionedClass") && output.contains("UserEntity"),
+        "Expected metadata decorated classes: {}",
+        output
+    );
+
+    // Metadata decorator functions should be present
+    assert!(
+        output.contains("metadata") && output.contains("entity"),
+        "Expected metadata decorators: {}",
+        output
+    );
+
+    // Class IIFE pattern should be present
+    assert!(
+        output.contains("(function ()") || output.contains("(function()"),
+        "Expected class IIFE pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_class_decorator_factory() {
+    // Class decorator factory pattern
+    let source = r#"
+function withOptions(options: { debug?: boolean; strict?: boolean }) {
+    return function<T extends { new(...args: any[]): {} }>(constructor: T) {
+        return class extends constructor {
+            __options = options;
+        };
+    };
+}
+
+function mixins(...mixinClasses: Function[]) {
+    return function(target: Function) {
+        mixinClasses.forEach(mixin => {
+            Object.getOwnPropertyNames(mixin.prototype).forEach(name => {
+                if (name !== 'constructor') {
+                    Object.defineProperty(
+                        target.prototype,
+                        name,
+                        Object.getOwnPropertyDescriptor(mixin.prototype, name) || Object.create(null)
+                    );
+                }
+            });
+        });
+    };
+}
+
+function singleton<T extends { new(...args: any[]): {} }>(constructor: T) {
+    let instance: InstanceType<T>;
+    return class extends constructor {
+        constructor(...args: any[]) {
+            if (instance) {
+                return instance;
+            }
+            super(...args);
+            instance = this as InstanceType<T>;
+        }
+    };
+}
+
+function registry(registryName: string, key?: string) {
+    return function(target: Function) {
+        const registry = (globalThis as any)[registryName] || {};
+        registry[key || target.name] = target;
+        (globalThis as any)[registryName] = registry;
+    };
+}
+
+@withOptions({ debug: true, strict: false })
+class ConfiguredService {
+    run() { console.log("running"); }
+}
+
+class Loggable {
+    log(msg: string) { console.log(msg); }
+}
+
+class Serializable {
+    serialize() { return JSON.stringify(this); }
+}
+
+@mixins(Loggable, Serializable)
+class MixedClass {
+    data: any;
+}
+
+@singleton
+class SingletonService {
+    private value: number = 0;
+    increment() { return ++this.value; }
+}
+
+@registry("services", "main")
+class MainService {
+    execute() { return "executed"; }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("ConfiguredService") && output.contains("SingletonService"),
+        "Expected factory decorated classes: {}",
+        output
+    );
+
+    // Factory decorator functions should be present
+    assert!(
+        output.contains("withOptions") && output.contains("singleton"),
+        "Expected factory decorators: {}",
+        output
+    );
+
+    // Class IIFE pattern should be present
+    assert!(
+        output.contains("(function ()") || output.contains("(function()"),
+        "Expected class IIFE pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_class_decorator_multiple() {
+    // Multiple class decorators pattern
+    let source = r#"
+function logged(constructor: Function) {
+    console.log(`Class ${constructor.name} defined`);
+}
+
+function sealed(constructor: Function) {
+    Object.seal(constructor);
+    Object.seal(constructor.prototype);
+}
+
+function tracked(constructor: Function) {
+    (constructor as any).__tracked = true;
+    (constructor as any).__createdAt = Date.now();
+}
+
+function validated(constructor: Function) {
+    (constructor as any).__validated = true;
+}
+
+function cached(constructor: Function) {
+    (constructor as any).__cache = new Map();
+}
+
+function deprecated(message: string) {
+    return function(constructor: Function) {
+        console.warn(`${constructor.name} is deprecated: ${message}`);
+    };
+}
+
+@logged
+@sealed
+@tracked
+class FullyDecoratedClass {
+    value: string;
+    constructor(value: string) {
+        this.value = value;
+    }
+}
+
+@validated
+@cached
+@logged
+class ServiceClass {
+    private data: Map<string, any> = new Map();
+
+    set(key: string, value: any) {
+        this.data.set(key, value);
+    }
+
+    get(key: string) {
+        return this.data.get(key);
+    }
+}
+
+@deprecated("Use NewComponent instead")
+@logged
+@tracked
+class OldComponent {
+    render() { return "<div>old</div>"; }
+}
+
+@sealed
+@validated
+@cached
+@tracked
+@logged
+class MaximallyDecoratedClass {
+    id: number;
+    name: string;
+
+    constructor(id: number, name: string) {
+        this.id = id;
+        this.name = name;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("FullyDecoratedClass") && output.contains("MaximallyDecoratedClass"),
+        "Expected multiply decorated classes: {}",
+        output
+    );
+
+    // Multiple decorator functions should be present
+    assert!(
+        output.contains("logged") && output.contains("sealed") && output.contains("tracked"),
+        "Expected multiple decorators: {}",
+        output
+    );
+
+    // Class IIFE pattern should be present
+    assert!(
+        output.contains("(function ()") || output.contains("(function()"),
+        "Expected class IIFE pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_class_decorator_inheritance() {
+    // Class decorator with inheritance pattern
+    let source = r#"
+function base(constructor: Function) {
+    (constructor as any).__isBase = true;
+}
+
+function derived(constructor: Function) {
+    (constructor as any).__isDerived = true;
+}
+
+function abstractClass(constructor: Function) {
+    (constructor as any).__isAbstract = true;
+}
+
+function final(constructor: Function) {
+    Object.freeze(constructor);
+}
+
+function registerType(typeName: string) {
+    return function(constructor: Function) {
+        const types = (globalThis as any).__registeredTypes || {};
+        types[typeName] = constructor;
+        (globalThis as any).__registeredTypes = types;
+    };
+}
+
+@base
+class Animal {
+    name: string;
+    constructor(name: string) {
+        this.name = name;
+    }
+    speak() { return "..."; }
+}
+
+@derived
+class Dog extends Animal {
+    breed: string;
+    constructor(name: string, breed: string) {
+        super(name);
+        this.breed = breed;
+    }
+    speak() { return "Woof!"; }
+}
+
+@derived
+class Cat extends Animal {
+    indoor: boolean;
+    constructor(name: string, indoor: boolean) {
+        super(name);
+        this.indoor = indoor;
+    }
+    speak() { return "Meow!"; }
+}
+
+@abstractClass
+@registerType("Shape")
+class Shape {
+    area(): number { return 0; }
+}
+
+@derived
+@registerType("Circle")
+class Circle extends Shape {
+    radius: number;
+    constructor(radius: number) {
+        super();
+        this.radius = radius;
+    }
+    area() { return Math.PI * this.radius ** 2; }
+}
+
+@final
+@derived
+@registerType("Square")
+class Square extends Shape {
+    side: number;
+    constructor(side: number) {
+        super();
+        this.side = side;
+    }
+    area() { return this.side ** 2; }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Base and derived classes should be present
+    assert!(
+        output.contains("Animal") && output.contains("Dog") && output.contains("Cat"),
+        "Expected inheritance classes: {}",
+        output
+    );
+
+    // Inheritance decorators should be present
+    assert!(
+        output.contains("base") && output.contains("derived"),
+        "Expected inheritance decorators: {}",
+        output
+    );
+
+    // ES5 extends helper should be present
+    assert!(
+        output.contains("__extends") || output.contains("_super"),
+        "Expected ES5 extends pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_class_decorator_static_members() {
+    // Class decorator with static members pattern
+    let source = r#"
+function staticCounter(constructor: Function) {
+    (constructor as any).instanceCount = 0;
+    const original = constructor;
+    const wrapped = function(...args: any[]) {
+        (constructor as any).instanceCount++;
+        return new (original as any)(...args);
+    };
+    wrapped.prototype = original.prototype;
+    return wrapped as any;
+}
+
+function staticRegistry(constructor: Function) {
+    (constructor as any).registry = new Map();
+    (constructor as any).register = function(key: string, instance: any) {
+        this.registry.set(key, instance);
+    };
+    (constructor as any).get = function(key: string) {
+        return this.registry.get(key);
+    };
+}
+
+function staticConfig(config: Record<string, any>) {
+    return function(constructor: Function) {
+        Object.keys(config).forEach(key => {
+            (constructor as any)[key] = config[key];
+        });
+    };
+}
+
+function addStaticMethod(methodName: string, fn: Function) {
+    return function(constructor: Function) {
+        (constructor as any)[methodName] = fn;
+    };
+}
+
+@staticCounter
+class CountedClass {
+    id: number;
+    constructor(id: number) {
+        this.id = id;
+    }
+}
+
+@staticRegistry
+class RegistryClass {
+    name: string;
+    constructor(name: string) {
+        this.name = name;
+    }
+}
+
+@staticConfig({
+    version: "2.0.0",
+    environment: "production",
+    maxInstances: 100
+})
+class ConfiguredClass {
+    data: any;
+
+    static getVersion() {
+        return (this as any).version;
+    }
+}
+
+@addStaticMethod("create", function(data: any) { return new (this as any)(data); })
+@addStaticMethod("validate", function(data: any) { return data != null; })
+class FactoryClass {
+    value: any;
+    constructor(value: any) {
+        this.value = value;
+    }
+
+    static defaultInstance: FactoryClass;
+}
+
+@staticCounter
+@staticRegistry
+class CombinedStaticClass {
+    id: string;
+
+    constructor(id: string) {
+        this.id = id;
+    }
+
+    static create(id: string) {
+        const instance = new CombinedStaticClass(id);
+        (CombinedStaticClass as any).register(id, instance);
+        return instance;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("CountedClass") && output.contains("RegistryClass"),
+        "Expected static decorated classes: {}",
+        output
+    );
+
+    // Static decorator functions should be present
+    assert!(
+        output.contains("staticCounter") && output.contains("staticRegistry"),
+        "Expected static decorators: {}",
+        output
+    );
+
+    // Class IIFE pattern should be present
+    assert!(
+        output.contains("(function ()") || output.contains("(function()"),
+        "Expected class IIFE pattern: {}",
+        output
+    );
+}
