@@ -8,12 +8,13 @@ Priority: 1
 Blocked: Awaiting next EM-Anvil assignment.
 
 ## Current Assignment
-- [ ] Add ES5 class tests for async methods with generators in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
+- [ ] (awaiting next EM-Anvil assignment)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 tests for async generator methods (6 tests): basic async generator, with await, static, with try/catch, in derived class, with yield delegation. Ran `./wasm/test.sh class_es5_tests` (all 164 pass).
 - [x] Added ES5 tests for const assertions (6 tests): object field, array field, static field, in method, in constructor, in derived class. Ran `./wasm/test.sh class_es5_tests` (all 153 pass).
 - [x] Added ES5 tests for satisfies expressions (6 tests): field initializer, in method, static field, in constructor, array literal, in derived class. Ran `./wasm/test.sh class_es5_tests` (all 147 pass).
 - [x] Added ES5 tests for override keyword (6 tests): basic override, accessor, multiple methods, multi-level inheritance, with super call, abstract method. Ran `./wasm/test.sh class_es5_tests` (all 141 pass).
