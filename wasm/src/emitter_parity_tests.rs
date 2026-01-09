@@ -19424,3 +19424,347 @@ async function asyncMapProcess<K, V>(
         output
     );
 }
+
+// =============================================================================
+// ES5 Class Field Patterns Parity Tests
+// =============================================================================
+
+/// Test: public fields with various initializers
+#[test]
+fn test_parity_es5_class_public_field_initializers() {
+    let source = r#"
+class DataModel<T> {
+    // Primitive initializers
+    name: string = "default";
+    count: number = 0;
+    enabled: boolean = true;
+
+    // Complex initializers
+    items: T[] = [];
+    metadata: Record<string, unknown> = {};
+    callback: ((value: T) => void) | null = null;
+
+    // Computed initializers
+    timestamp: number = Date.now();
+    id: string = Math.random().toString(36);
+
+    // Arrow function initializer
+    handler: (event: Event) => void = (e) => {
+        console.log(this.name, e);
+    };
+
+    // Method reference initializer
+    boundMethod = this.process.bind(this);
+
+    process(value: T): void {
+        this.items.push(value);
+    }
+}
+
+class ConfigurableService {
+    readonly apiUrl: string = "https://api.example.com";
+    private readonly timeout: number = 5000;
+    protected retryCount: number = 3;
+
+    constructor(public customUrl?: string) {
+        if (customUrl) {
+            // Custom URL provided
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes should be present
+    assert!(
+        output.contains("DataModel") && output.contains("ConfigurableService"),
+        "Output should contain classes: {}",
+        output
+    );
+    // Type parameters should be erased
+    assert!(
+        !output.contains("<T>") && !output.contains(": T[]"),
+        "Type parameters should be erased: {}",
+        output
+    );
+    // Access modifiers should be erased
+    assert!(
+        !output.contains("readonly ") && !output.contains("private ") && !output.contains("protected "),
+        "Access modifiers should be erased: {}",
+        output
+    );
+}
+
+/// Test: class fields with decorators
+#[test]
+fn test_parity_es5_class_field_with_decorators() {
+    let source = r#"
+function observable<T>(target: any, key: string): void {
+    // Decorator implementation
+}
+
+function validate(min: number, max: number) {
+    return function(target: any, key: string): void {
+        // Validation decorator factory
+    };
+}
+
+function inject(token: string) {
+    return function(target: any, key: string): void {
+        // DI decorator
+    };
+}
+
+class ObservableModel {
+    @observable
+    name: string = "";
+
+    @observable
+    @validate(0, 100)
+    age: number = 0;
+
+    @inject("logger")
+    private logger?: { log: (msg: string) => void };
+
+    @observable
+    items: string[] = [];
+}
+
+class FormModel {
+    @validate(1, 50)
+    username: string = "";
+
+    @validate(8, 128)
+    password: string = "";
+
+    @observable
+    isValid: boolean = false;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes should be present
+    assert!(
+        output.contains("ObservableModel") && output.contains("FormModel"),
+        "Output should contain classes: {}",
+        output
+    );
+    // Decorator functions should be present
+    assert!(
+        output.contains("observable") && output.contains("validate"),
+        "Output should contain decorator functions: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": number") && !output.contains(": boolean"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test: computed fields with dynamic expressions
+#[test]
+fn test_parity_es5_class_field_computed_dynamic() {
+    let source = r#"
+const FIELD_PREFIX = "data_";
+const fieldNames = {
+    first: "firstName",
+    last: "lastName"
+} as const;
+
+const symbolKey = Symbol("privateData");
+
+class DynamicFields {
+    [FIELD_PREFIX + "id"]: number = 1;
+    [fieldNames.first]: string = "";
+    [fieldNames.last]: string = "";
+    [symbolKey]: unknown = null;
+
+    static [FIELD_PREFIX + "version"]: string = "1.0.0";
+
+    ["computed" + "Method"](): void {
+        console.log(this[fieldNames.first]);
+    }
+}
+
+function createFieldName(base: string): string {
+    return `field_${base}`;
+}
+
+class ComputedFromFunction {
+    [createFieldName("a")]: number = 1;
+    [createFieldName("b")]: number = 2;
+
+    getField(name: string): number {
+        return (this as any)[createFieldName(name)];
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes should be present
+    assert!(
+        output.contains("DynamicFields") && output.contains("ComputedFromFunction"),
+        "Output should contain classes: {}",
+        output
+    );
+    // Functions should be present
+    assert!(
+        output.contains("createFieldName"),
+        "Output should contain helper functions: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number") && !output.contains(": string") && !output.contains(": unknown"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test: field inheritance across multiple classes
+#[test]
+fn test_parity_es5_class_field_inheritance_chain() {
+    let source = r#"
+abstract class BaseEntity {
+    id: number = 0;
+    createdAt: Date = new Date();
+    abstract validate(): boolean;
+}
+
+class TimestampedEntity extends BaseEntity {
+    updatedAt: Date = new Date();
+
+    validate(): boolean {
+        return this.id > 0;
+    }
+
+    touch(): void {
+        this.updatedAt = new Date();
+    }
+}
+
+class User extends TimestampedEntity {
+    name: string = "";
+    email: string = "";
+    private passwordHash: string = "";
+
+    override validate(): boolean {
+        return super.validate() && this.email.includes("@");
+    }
+
+    setPassword(password: string): void {
+        this.passwordHash = password; // simplified
+    }
+}
+
+class Admin extends User {
+    permissions: string[] = [];
+    static readonly SUPER_ADMIN = "super_admin";
+
+    override validate(): boolean {
+        return super.validate() && this.permissions.length > 0;
+    }
+
+    hasPermission(perm: string): boolean {
+        return this.permissions.includes(perm);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // All classes should be present
+    assert!(
+        output.contains("BaseEntity") && output.contains("TimestampedEntity")
+            && output.contains("User") && output.contains("Admin"),
+        "Output should contain all classes: {}",
+        output
+    );
+    // Methods should be present
+    assert!(
+        output.contains("validate") && output.contains("touch") && output.contains("hasPermission"),
+        "Output should contain methods: {}",
+        output
+    );
+    // Abstract and access modifiers should be erased
+    assert!(
+        !output.contains("abstract ") && !output.contains("private ") && !output.contains("override "),
+        "Modifiers should be erased: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": Date") && !output.contains(": string[]") && !output.contains(": boolean"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
