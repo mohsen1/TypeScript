@@ -141,6 +141,7 @@ pub mod diagnostic_messages {
     // Module/ambient errors
     pub const AMBIENT_MODULE_DECLARATION_CANNOT_SPECIFY_RELATIVE_MODULE_NAME: &str = "Ambient module declaration cannot specify relative module name.";
     pub const MODULE_HAS_NO_EXPORTED_MEMBER: &str = "Module '{0}' has no exported member '{1}'.";
+    pub const CANNOT_FIND_MODULE: &str = "Cannot find module '{0}' or its corresponding type declarations.";
 
     // Scanner/parser errors
     pub const NUMERIC_SEPARATORS_NOT_ALLOWED_HERE: &str = "Numeric separators are not allowed here.";
@@ -282,8 +283,9 @@ pub mod diagnostic_codes {
     pub const UNREACHABLE_CODE_DETECTED: u32 = 7027;
 
     // Module/import errors
-    pub const CANNOT_FIND_MODULE: u32 = 2307;
+    pub const CANNOT_FIND_MODULE_2307: u32 = 2307;  // Classic: Cannot find module 'x'.
     pub const MODULE_NOT_FOUND: u32 = 2307;
+    pub const CANNOT_FIND_MODULE: u32 = 2792;  // Cannot find module '{0}' or its corresponding type declarations.
     pub const EXPORT_ASSIGNMENT_WITH_OTHER_EXPORTS: u32 = 2309;  // An export assignment cannot be used in a module with other exported elements.
     pub const HAS_NO_DEFAULT_EXPORT: u32 = 2613;
     pub const EXPORT_ASSIGNMENT_CANNOT_BE_USED: u32 = 2714;
