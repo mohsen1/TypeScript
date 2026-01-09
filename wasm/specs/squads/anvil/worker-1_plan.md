@@ -6,10 +6,25 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-(awaiting assignment)
+Add ES5 class tests for state management patterns
+
+Per GOALS.md Objective 1: ES5 downleveling correctness
+
+Steps:
+1. Add 6 ES5 class tests for state management patterns to `wasm/src/transforms/class_es5_tests.rs`:
+   - Basic store pattern
+   - Redux-like reducer pattern
+   - Observable state pattern
+   - Immutable state updates
+   - State selectors
+   - Combined state management patterns
+2. Run `./wasm/test.sh class_es5_tests` to verify all tests pass
+3. Commit with message: `[wasm] transforms: add state management ES5 class tests`
+4. Push to `origin/worker/anvil-1`
+5. Update this plan file and push
 
 ## Task Queue
-(empty)
+(empty - will receive new tasks from EM after completing current assignment)
 
 ## Completed
 - [x] Added ES5 tests for dependency injection patterns (6 tests): constructor injection, property injection, factory pattern, singleton pattern, scoped injection, combined DI patterns. Ran `./wasm/test.sh class_es5_tests` (all 542 pass).
