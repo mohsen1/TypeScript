@@ -7294,7 +7294,7 @@ fn test_contextual_arrow_higher_order() {
 // =============================================================================
 
 #[test]
-fn test_circular_extends_three_way_cycle() {
+fn test_circular_extends_three_way_cycle_additional() {
     // Test: <T extends U, U extends V, V extends T>
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);
@@ -7509,7 +7509,7 @@ fn test_circular_extends_with_function_types() {
 }
 
 #[test]
-fn test_circular_extends_self_reference() {
+fn test_circular_extends_self_reference_additional() {
     // Test: <T extends T> - a type parameter that extends itself
     // This is degenerate but should be handled gracefully
     let interner = TypeInterner::new();
