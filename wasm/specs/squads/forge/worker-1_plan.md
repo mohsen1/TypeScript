@@ -47,6 +47,8 @@ Implement missing name diagnostics for unresolved identifiers.
 - Ran Docker conformance `run-conformance.sh --max=1000 --workers=6`: 879 tests run, 15.5% exact (136), 17.4% same count (153), 223 crashes, 121 skipped. Top missing: TS2705(37), TS2322(26), TS2339(22), TS1109(16), TS2524(15). Top extra: TS2304(192), TS2355(83), TS1005(64), TS7010(48), TS2339(31).
 - Docker conformance `run-conformance.sh --all --workers=14` OOM/exit 137 at 0% progress.
 - Ran Docker conformance `run-conformance.sh --all --workers=6`: 4928 tests run, 17.6% exact (869), 20.2% same count (994), 1936 crashes, 727 skipped. Top missing: TS2322(135), TS7010(84), TS2339(76), TS2304(66), TS2695(46). Top extra: TS2304(494), TS1005(288), TS1109(171), TS7011(165), TS7010(164).
+- Fixed compilation error in solver/subtype.rs (s_sym undefined in TypeQuery match arm).
+- Added built-in utility type handling to reduce false TS2304 errors (Partial, Required, Pick, Omit, Record, Exclude, Extract, NonNullable, ReturnType, Parameters, etc.).
 
 ## Ready for Merge
 Yes
@@ -67,3 +69,6 @@ Yes
 - Full run with 14 workers OOM/killed (exit 137). Sample run at 1000 tests with 6 workers logged above.
 - Known high-impact areas to consider next: TS2304 extra (missing lib/globals), TS2322 missing (assignability), TS1005/TS1109 parse errors, TS7010/TS7011/TS2355 return-path/implicit-any.
 - Local debug helpers present (untracked): `wasm/differential-test/test_debug.mjs`, `wasm/differential-test/test_debug2.mjs`.
+- Unit tests: 4913 total, 4840 passed, 73 failed (pre-existing failures), 1 skipped.
+- Pre-existing failing test: `cli::driver_tests::compile_class_with_generic_constructor` (TS2322 class instance type issue).
+- Added utility type handling to reduce false TS2304 - should reduce extra count in next conformance run.
