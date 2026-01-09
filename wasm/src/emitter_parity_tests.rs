@@ -21943,3 +21943,427 @@ const maxVal: bigint = BigIntWrapper.max(1n, 2n, 3n, 100n);
         output
     );
 }
+
+// =============================================================================
+// ES5 Symbol patterns parity tests
+// =============================================================================
+
+/// Test well-known symbols with type annotations
+#[test]
+fn test_parity_es5_symbol_well_known() {
+    let source = r#"
+interface Iterable<T> {
+    [Symbol.iterator](): Iterator<T>;
+}
+
+class CustomCollection<T> implements Iterable<T> {
+    private items: T[] = [];
+
+    constructor(items?: T[]) {
+        if (items) {
+            this.items = items;
+        }
+    }
+
+    add(item: T): void {
+        this.items.push(item);
+    }
+
+    [Symbol.iterator](): Iterator<T> {
+        let index = 0;
+        const items = this.items;
+        return {
+            next(): IteratorResult<T> {
+                if (index < items.length) {
+                    return { value: items[index++], done: false };
+                }
+                return { value: undefined as any, done: true };
+            }
+        };
+    }
+
+    [Symbol.toStringTag]: string = "CustomCollection";
+}
+
+class Matchable {
+    private pattern: RegExp;
+
+    constructor(pattern: RegExp) {
+        this.pattern = pattern;
+    }
+
+    [Symbol.match](str: string): RegExpMatchArray | null {
+        return str.match(this.pattern);
+    }
+
+    [Symbol.search](str: string): number {
+        return str.search(this.pattern);
+    }
+}
+
+const collection = new CustomCollection<number>([1, 2, 3]);
+const matchable = new Matchable(/test/);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Interface should be erased
+    assert!(
+        !output.contains("interface Iterable"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Implements clause should be erased
+    assert!(
+        !output.contains("implements"),
+        "Implements clause should be erased: {}",
+        output
+    );
+    // Classes should be present
+    assert!(
+        output.contains("CustomCollection") && output.contains("Matchable"),
+        "Classes should be present: {}",
+        output
+    );
+    // Symbol references should be preserved
+    assert!(
+        output.contains("Symbol.iterator") || output.contains("Symbol.toStringTag"),
+        "Symbol references should be preserved: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": T[]") && !output.contains(": Iterator<T>"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test Symbol.for with global symbol registry
+#[test]
+fn test_parity_es5_symbol_for() {
+    let source = r#"
+type SymbolKey = string | number;
+
+const globalSymbol: symbol = Symbol.for("app.global");
+const anotherGlobal: symbol = Symbol.for("app.another");
+
+class SymbolRegistry {
+    private static symbols: Map<string, symbol> = new Map();
+
+    static register(key: string): symbol {
+        if (!this.symbols.has(key)) {
+            this.symbols.set(key, Symbol.for(key));
+        }
+        return this.symbols.get(key)!;
+    }
+
+    static getOrCreate(key: string): symbol {
+        return Symbol.for(`registry.${key}`);
+    }
+}
+
+interface SymbolHolder {
+    readonly symbol: symbol;
+    key: string;
+}
+
+class GlobalSymbolUser implements SymbolHolder {
+    readonly symbol: symbol;
+    key: string;
+
+    constructor(key: string) {
+        this.key = key;
+        this.symbol = Symbol.for(key);
+    }
+
+    matches(other: symbol): boolean {
+        return this.symbol === other;
+    }
+}
+
+const registry = SymbolRegistry.register("test");
+const user = new GlobalSymbolUser("user.id");
+const isSame: boolean = Symbol.for("app.global") === globalSymbol;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Type alias should be erased
+    assert!(
+        !output.contains("type SymbolKey"),
+        "Type alias should be erased: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface SymbolHolder"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Classes should be present
+    assert!(
+        output.contains("SymbolRegistry") && output.contains("GlobalSymbolUser"),
+        "Classes should be present: {}",
+        output
+    );
+    // Symbol.for calls should be preserved
+    assert!(
+        output.contains("Symbol.for"),
+        "Symbol.for calls should be preserved: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": symbol") && !output.contains(": boolean"),
+        "Type annotations should be erased: {}",
+        output
+    );
+    // Readonly modifier should be erased
+    assert!(
+        !output.contains("readonly symbol"),
+        "Readonly modifier should be erased: {}",
+        output
+    );
+}
+
+/// Test Symbol.keyFor to retrieve global symbol keys
+#[test]
+fn test_parity_es5_symbol_key_for() {
+    let source = r#"
+interface SymbolInfo {
+    symbol: symbol;
+    key: string | undefined;
+    isGlobal: boolean;
+}
+
+function getSymbolInfo(sym: symbol): SymbolInfo {
+    const key: string | undefined = Symbol.keyFor(sym);
+    return {
+        symbol: sym,
+        key: key,
+        isGlobal: key !== undefined
+    };
+}
+
+class SymbolAnalyzer {
+    private cache: Map<symbol, string | undefined> = new Map();
+
+    analyze(sym: symbol): string | undefined {
+        if (!this.cache.has(sym)) {
+            this.cache.set(sym, Symbol.keyFor(sym));
+        }
+        return this.cache.get(sym);
+    }
+
+    isRegistered(sym: symbol): boolean {
+        return Symbol.keyFor(sym) !== undefined;
+    }
+
+    getKeyOrDefault(sym: symbol, defaultKey: string): string {
+        return Symbol.keyFor(sym) ?? defaultKey;
+    }
+}
+
+const globalSym: symbol = Symbol.for("global.test");
+const localSym: symbol = Symbol("local");
+const analyzer = new SymbolAnalyzer();
+
+const globalKey: string | undefined = Symbol.keyFor(globalSym);
+const localKey: string | undefined = Symbol.keyFor(localSym);
+const isGlobalRegistered: boolean = analyzer.isRegistered(globalSym);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Interface should be erased
+    assert!(
+        !output.contains("interface SymbolInfo"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Function should be present
+    assert!(
+        output.contains("getSymbolInfo"),
+        "Function should be present: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("SymbolAnalyzer"),
+        "Class should be present: {}",
+        output
+    );
+    // Symbol.keyFor calls should be preserved
+    assert!(
+        output.contains("Symbol.keyFor"),
+        "Symbol.keyFor calls should be preserved: {}",
+        output
+    );
+    // Symbol.for calls should be preserved
+    assert!(
+        output.contains("Symbol.for") || output.contains("Symbol("),
+        "Symbol calls should be preserved: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": symbol") && !output.contains(": SymbolInfo"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test Symbol in class computed properties and methods
+#[test]
+fn test_parity_es5_symbol_computed_class() {
+    let source = r#"
+const customMethod: unique symbol = Symbol("customMethod");
+const customProp: unique symbol = Symbol("customProp");
+
+interface HasCustomMethod {
+    [customMethod](): void;
+}
+
+class SymbolMethodClass implements HasCustomMethod {
+    private data: string;
+
+    constructor(data: string) {
+        this.data = data;
+    }
+
+    [customMethod](): void {
+        console.log(this.data);
+    }
+
+    get [customProp](): string {
+        return this.data;
+    }
+
+    set [customProp](value: string) {
+        this.data = value;
+    }
+}
+
+class SymbolFactory<T> {
+    private readonly id: symbol;
+
+    constructor(description: string) {
+        this.id = Symbol(description);
+    }
+
+    getId(): symbol {
+        return this.id;
+    }
+
+    createTagged(value: T): { value: T; tag: symbol } {
+        return { value, tag: this.id };
+    }
+}
+
+const instance = new SymbolMethodClass("test");
+const factory = new SymbolFactory<number>("factory");
+const tagged = factory.createTagged(42);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Interface should be erased
+    assert!(
+        !output.contains("interface HasCustomMethod"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Classes should be present
+    assert!(
+        output.contains("SymbolMethodClass") && output.contains("SymbolFactory"),
+        "Classes should be present: {}",
+        output
+    );
+    // Symbol constructor calls should be preserved
+    assert!(
+        output.contains("Symbol("),
+        "Symbol constructor calls should be preserved: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": unique symbol") && !output.contains(": symbol"),
+        "Type annotations should be erased: {}",
+        output
+    );
+    // Generic type parameters should be erased
+    assert!(
+        !output.contains("<T>") && !output.contains("<number>"),
+        "Generic type parameters should be erased: {}",
+        output
+    );
+}
