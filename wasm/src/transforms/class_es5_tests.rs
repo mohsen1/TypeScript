@@ -30271,61 +30271,61 @@ const stack = new ImmutableStack([] as const);
     );
 }
 
-/// Test ES5 class with JSON import assertions
+/// Test: keyof object type
+/// Verifies that classes using keyof for object key types transform correctly to ES5
 #[test]
-fn test_class_es5_import_assertion_json() {
+fn test_class_es5_keyof_object_type() {
     let source = r#"
-// JSON import with assert syntax
-import configData from "./config.json" assert { type: "json" };
+interface Person {
+    name: string;
+    age: number;
+    email: string;
+}
 
-// Class using imported JSON
-class ConfigLoader {
-    private config: typeof configData;
+class PropertyAccessor<T> {
+    private obj: T;
 
-    constructor() {
-        this.config = configData;
+    constructor(obj: T) {
+        this.obj = obj;
     }
 
-    get(key: string): unknown {
-        return (this.config as Record<string, unknown>)[key];
+    get<K extends keyof T>(key: K): T[K] {
+        return this.obj[key];
     }
 
-    getAll(): typeof configData {
-        return this.config;
+    set<K extends keyof T>(key: K, value: T[K]): void {
+        this.obj[key] = value;
+    }
+
+    has(key: keyof T): boolean {
+        return key in this.obj;
+    }
+
+    getKeys(): Array<keyof T> {
+        return Object.keys(this.obj) as Array<keyof T>;
     }
 }
 
-// Class with JSON schema
-class SchemaValidator {
-    private schema: object;
+class PersonEditor {
+    private person: Person;
 
-    constructor(schema: object) {
-        this.schema = schema;
+    constructor(person: Person) {
+        this.person = person;
     }
 
-    validate(data: unknown): boolean {
-        return typeof data === "object" && data !== null;
+    updateField(field: keyof Person, value: string | number): void {
+        this.person[field] = value as any;
     }
 
-    getSchema(): object {
-        return this.schema;
-    }
-}
-
-// Export class that uses JSON
-export class JsonConfigManager {
-    private loader: ConfigLoader;
-
-    constructor() {
-        this.loader = new ConfigLoader();
+    getField(field: keyof Person): string | number {
+        return this.person[field];
     }
 
-    getConfig(): unknown {
-        return this.loader.getAll();
+    getAllFields(): Array<keyof Person> {
+        return ["name", "age", "email"];
     }
 }
 "#;
-
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -30341,94 +30341,105 @@ export class JsonConfigManager {
 
     let output = printer.get_output().to_string();
 
-    // Classes should be converted
     assert!(
-        output.contains("ConfigLoader") && output.contains("SchemaValidator") && output.contains("JsonConfigManager"),
-        "Expected import assertion classes: {}",
+        output.contains("function PropertyAccessor"),
+        "Expected PropertyAccessor function: {}",
         output
     );
-
-    // Methods should be preserved
     assert!(
-        output.contains("getAll") && output.contains("validate") && output.contains("getConfig"),
-        "Expected methods: {}",
+        output.contains("PropertyAccessor.prototype.get") && output.contains("PropertyAccessor.prototype.set"),
+        "Expected get and set methods: {}",
+        output
+    );
+    assert!(
+        output.contains("PropertyAccessor.prototype.has") && output.contains("PropertyAccessor.prototype.getKeys"),
+        "Expected has and getKeys methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function PersonEditor"),
+        "Expected PersonEditor function: {}",
+        output
+    );
+    assert!(
+        output.contains("PersonEditor.prototype.updateField") && output.contains("PersonEditor.prototype.getField"),
+        "Expected updateField and getField methods: {}",
         output
     );
 }
 
-/// Test ES5 class with type-only imports
+/// Test: typeof value type
+/// Verifies that classes using typeof for value type extraction transform correctly to ES5
 #[test]
-fn test_class_es5_import_assertion_type_imports() {
+fn test_class_es5_typeof_value_type() {
     let source = r#"
-// Type-only import
-import type { User, Product, Order } from "./types";
+var defaultConfig = {
+    host: "localhost",
+    port: 8080,
+    debug: false
+};
 
-// Regular import with type modifier
-import { type Config, loadConfig } from "./config";
+type Config = typeof defaultConfig;
 
-// Class using type-only imports
-class UserService {
+class ConfigManager {
+    private config: Config;
+
+    constructor() {
+        this.config = {
+            host: defaultConfig.host,
+            port: defaultConfig.port,
+            debug: defaultConfig.debug
+        };
+    }
+
+    getConfig(): Config {
+        return this.config;
+    }
+
+    setHost(host: string): void {
+        this.config.host = host;
+    }
+
+    setPort(port: number): void {
+        this.config.port = port;
+    }
+
+    setDebug(debug: boolean): void {
+        this.config.debug = debug;
+    }
+}
+
+function createUser(name: string, age: number) {
+    return { name: name, age: age, active: true };
+}
+
+type User = ReturnType<typeof createUser>;
+
+class UserManager {
     private users: User[];
 
     constructor() {
         this.users = [];
     }
 
-    addUser(user: User): void {
+    add(user: User): void {
         this.users.push(user);
     }
 
-    getUsers(): User[] {
+    findByName(name: string): User | undefined {
+        for (var i = 0; i < this.users.length; i++) {
+            if (this.users[i].name === name) {
+                return this.users[i];
+            }
+        }
+        return undefined;
+    }
+
+    getAll(): User[] {
         return this.users;
     }
-
-    findById(id: string): User | undefined {
-        return this.users.find(u => u.id === id);
-    }
-}
-
-// Class using multiple type imports
-class OrderProcessor {
-    private orders: Order[];
-    private products: Map<string, Product>;
-
-    constructor() {
-        this.orders = [];
-        this.products = new Map();
-    }
-
-    addProduct(product: Product): void {
-        this.products.set(product.id, product);
-    }
-
-    createOrder(order: Order): void {
-        this.orders.push(order);
-    }
-
-    getOrderTotal(orderId: string): number {
-        const order = this.orders.find(o => o.id === orderId);
-        return order ? order.total : 0;
-    }
-}
-
-// Class with config type
-class ConfigManager {
-    private config: Config | null;
-
-    constructor() {
-        this.config = null;
-    }
-
-    async load(): Promise<void> {
-        this.config = await loadConfig();
-    }
-
-    getConfig(): Config | null {
-        return this.config;
-    }
 }
 "#;
-
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -30444,99 +30455,97 @@ class ConfigManager {
 
     let output = printer.get_output().to_string();
 
-    // Classes should be converted
     assert!(
-        output.contains("UserService") && output.contains("OrderProcessor") && output.contains("ConfigManager"),
-        "Expected type import classes: {}",
+        output.contains("function ConfigManager"),
+        "Expected ConfigManager function: {}",
         output
     );
-
-    // Type-only imports should be stripped
     assert!(
-        !output.contains("import type"),
-        "Expected type-only imports to be stripped: {}",
+        output.contains("ConfigManager.prototype.getConfig") && output.contains("ConfigManager.prototype.setHost"),
+        "Expected getConfig and setHost methods: {}",
         output
     );
-
-    // Methods should be preserved
     assert!(
-        output.contains("addUser") && output.contains("createOrder") && output.contains("getConfig"),
-        "Expected methods: {}",
+        output.contains("ConfigManager.prototype.setPort") && output.contains("ConfigManager.prototype.setDebug"),
+        "Expected setPort and setDebug methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function UserManager"),
+        "Expected UserManager function: {}",
+        output
+    );
+    assert!(
+        output.contains("UserManager.prototype.add") && output.contains("UserManager.prototype.findByName"),
+        "Expected add and findByName methods: {}",
         output
     );
 }
 
-/// Test ES5 class with import assertion syntax variations
+/// Test: indexed access types
+/// Verifies that classes using indexed access types transform correctly to ES5
 #[test]
-fn test_class_es5_import_assertion_syntax() {
+fn test_class_es5_indexed_access_types() {
     let source = r#"
-// Import with assert keyword
-import settings from "./settings.json" assert { type: "json" };
-
-// Import with with keyword (newer syntax)
-import translations from "./translations.json" with { type: "json" };
-
-// Dynamic import with assertion
-async function loadData() {
-    const data = await import("./data.json", { assert: { type: "json" } });
-    return data;
+interface ApiResponse {
+    data: {
+        users: Array<{ id: number; name: string }>;
+        meta: { total: number; page: number };
+    };
+    status: number;
+    message: string;
 }
 
-// Class using asserted imports
-class SettingsManager {
-    private settings: typeof settings;
-    private translations: typeof translations;
+type ResponseData = ApiResponse["data"];
+type UserArray = ApiResponse["data"]["users"];
+type MetaInfo = ApiResponse["data"]["meta"];
 
-    constructor() {
-        this.settings = settings;
-        this.translations = translations;
+class ResponseHandler {
+    private response: ApiResponse;
+
+    constructor(response: ApiResponse) {
+        this.response = response;
     }
 
-    getSetting(key: string): unknown {
-        return (this.settings as Record<string, unknown>)[key];
+    getData(): ResponseData {
+        return this.response.data;
     }
 
-    getTranslation(key: string): string {
-        return (this.translations as Record<string, string>)[key] || key;
-    }
-}
-
-// Class with dynamic JSON loading
-class DynamicLoader {
-    private cache: Map<string, unknown>;
-
-    constructor() {
-        this.cache = new Map();
+    getUsers(): UserArray {
+        return this.response.data.users;
     }
 
-    async load(path: string): Promise<unknown> {
-        if (this.cache.has(path)) {
-            return this.cache.get(path);
-        }
-        const data = await loadData();
-        this.cache.set(path, data);
-        return data;
+    getMeta(): MetaInfo {
+        return this.response.data.meta;
     }
 
-    clearCache(): void {
-        this.cache.clear();
+    getStatus(): ApiResponse["status"] {
+        return this.response.status;
     }
 }
 
-// Export with assertion reference
-export class LocaleManager {
-    private manager: SettingsManager;
+class IndexedAccessor<T, K extends keyof T> {
+    private obj: T;
+    private key: K;
 
-    constructor() {
-        this.manager = new SettingsManager();
+    constructor(obj: T, key: K) {
+        this.obj = obj;
+        this.key = key;
     }
 
-    translate(key: string): string {
-        return this.manager.getTranslation(key);
+    getValue(): T[K] {
+        return this.obj[this.key];
+    }
+
+    setValue(value: T[K]): void {
+        this.obj[this.key] = value;
+    }
+
+    getKey(): K {
+        return this.key;
     }
 }
 "#;
-
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -30552,24 +30561,373 @@ export class LocaleManager {
 
     let output = printer.get_output().to_string();
 
-    // Classes should be converted
     assert!(
-        output.contains("SettingsManager") && output.contains("DynamicLoader") && output.contains("LocaleManager"),
-        "Expected import assertion syntax classes: {}",
+        output.contains("function ResponseHandler"),
+        "Expected ResponseHandler function: {}",
         output
     );
-
-    // Methods should be preserved
     assert!(
-        output.contains("getSetting") && output.contains("getTranslation") && output.contains("translate"),
-        "Expected methods: {}",
+        output.contains("ResponseHandler.prototype.getData") && output.contains("ResponseHandler.prototype.getUsers"),
+        "Expected getData and getUsers methods: {}",
         output
     );
-
-    // Dynamic import function should be present
     assert!(
-        output.contains("loadData"),
-        "Expected loadData function: {}",
+        output.contains("ResponseHandler.prototype.getMeta") && output.contains("ResponseHandler.prototype.getStatus"),
+        "Expected getMeta and getStatus methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function IndexedAccessor"),
+        "Expected IndexedAccessor function: {}",
+        output
+    );
+    assert!(
+        output.contains("IndexedAccessor.prototype.getValue") && output.contains("IndexedAccessor.prototype.setValue"),
+        "Expected getValue and setValue methods: {}",
+        output
+    );
+}
+
+/// Test: keyof with generics
+/// Verifies that classes using keyof with generics transform correctly to ES5
+#[test]
+fn test_class_es5_keyof_generics() {
+    let source = r#"
+class ObjectMapper<T extends object> {
+    private source: T;
+
+    constructor(source: T) {
+        this.source = source;
+    }
+
+    pluck<K extends keyof T>(keys: K[]): Pick<T, K> {
+        var result = {} as Pick<T, K>;
+        for (var i = 0; i < keys.length; i++) {
+            result[keys[i]] = this.source[keys[i]];
+        }
+        return result;
+    }
+
+    omit<K extends keyof T>(keys: K[]): Omit<T, K> {
+        var result = {} as Omit<T, K>;
+        var allKeys = Object.keys(this.source) as Array<keyof T>;
+        for (var i = 0; i < allKeys.length; i++) {
+            var key = allKeys[i];
+            if (keys.indexOf(key as K) === -1) {
+                (result as any)[key] = this.source[key];
+            }
+        }
+        return result;
+    }
+
+    rename<K extends keyof T>(oldKey: K, newKey: string): object {
+        var result = {} as any;
+        var allKeys = Object.keys(this.source) as Array<keyof T>;
+        for (var i = 0; i < allKeys.length; i++) {
+            var key = allKeys[i];
+            if (key === oldKey) {
+                result[newKey] = this.source[key];
+            } else {
+                result[key] = this.source[key];
+            }
+        }
+        return result;
+    }
+
+    getSource(): T {
+        return this.source;
+    }
+}
+
+class KeyValidator<T extends object> {
+    isValidKey(obj: T, key: string): key is keyof T & string {
+        return key in obj;
+    }
+
+    getValidKeys(obj: T): Array<keyof T> {
+        return Object.keys(obj) as Array<keyof T>;
+    }
+
+    countKeys(obj: T): number {
+        return Object.keys(obj).length;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function ObjectMapper"),
+        "Expected ObjectMapper function: {}",
+        output
+    );
+    assert!(
+        output.contains("ObjectMapper.prototype.pluck") && output.contains("ObjectMapper.prototype.omit"),
+        "Expected pluck and omit methods: {}",
+        output
+    );
+    assert!(
+        output.contains("ObjectMapper.prototype.rename") && output.contains("ObjectMapper.prototype.getSource"),
+        "Expected rename and getSource methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function KeyValidator"),
+        "Expected KeyValidator function: {}",
+        output
+    );
+    assert!(
+        output.contains("KeyValidator.prototype.isValidKey") && output.contains("KeyValidator.prototype.getValidKeys"),
+        "Expected isValidKey and getValidKeys methods: {}",
+        output
+    );
+}
+
+/// Test: typeof with const assertions
+/// Verifies that classes using typeof with const assertions transform correctly to ES5
+#[test]
+fn test_class_es5_typeof_const_assertions() {
+    let source = r##"
+var COLORS = {
+    red: "#ff0000",
+    green: "#00ff00",
+    blue: "#0000ff"
+} as const;
+
+type ColorName = keyof typeof COLORS;
+type ColorValue = typeof COLORS[ColorName];
+
+class ColorPicker {
+    private currentColor: ColorName;
+
+    constructor() {
+        this.currentColor = "red";
+    }
+
+    setColor(name: ColorName): void {
+        this.currentColor = name;
+    }
+
+    getColorValue(): ColorValue {
+        return COLORS[this.currentColor];
+    }
+
+    getCurrentColor(): ColorName {
+        return this.currentColor;
+    }
+
+    getAllColors(): Array<ColorName> {
+        return Object.keys(COLORS) as Array<ColorName>;
+    }
+}
+
+var STATUS_CODES = [200, 201, 400, 404, 500] as const;
+
+type StatusCode = typeof STATUS_CODES[number];
+
+class StatusHandler {
+    private code: StatusCode;
+
+    constructor(code: StatusCode) {
+        this.code = code;
+    }
+
+    isSuccess(): boolean {
+        return this.code === 200 || this.code === 201;
+    }
+
+    isClientError(): boolean {
+        return this.code === 400 || this.code === 404;
+    }
+
+    isServerError(): boolean {
+        return this.code === 500;
+    }
+
+    getCode(): StatusCode {
+        return this.code;
+    }
+}
+"##;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function ColorPicker"),
+        "Expected ColorPicker function: {}",
+        output
+    );
+    assert!(
+        output.contains("ColorPicker.prototype.setColor") && output.contains("ColorPicker.prototype.getColorValue"),
+        "Expected setColor and getColorValue methods: {}",
+        output
+    );
+    assert!(
+        output.contains("ColorPicker.prototype.getCurrentColor") && output.contains("ColorPicker.prototype.getAllColors"),
+        "Expected getCurrentColor and getAllColors methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function StatusHandler"),
+        "Expected StatusHandler function: {}",
+        output
+    );
+    assert!(
+        output.contains("StatusHandler.prototype.isSuccess") && output.contains("StatusHandler.prototype.isClientError"),
+        "Expected isSuccess and isClientError methods: {}",
+        output
+    );
+}
+
+/// Test: combined keyof/typeof patterns
+/// Verifies that classes using combined keyof/typeof patterns transform correctly to ES5
+#[test]
+fn test_class_es5_combined_keyof_typeof() {
+    let source = r#"
+var schema = {
+    name: "string",
+    age: "number",
+    active: "boolean"
+};
+
+type Schema = typeof schema;
+type SchemaKey = keyof Schema;
+type SchemaValue = Schema[SchemaKey];
+
+class SchemaValidator {
+    private schema: Schema;
+
+    constructor() {
+        this.schema = schema;
+    }
+
+    getType(key: SchemaKey): SchemaValue {
+        return this.schema[key];
+    }
+
+    hasField(key: string): boolean {
+        return key in this.schema;
+    }
+
+    getFields(): SchemaKey[] {
+        return Object.keys(this.schema) as SchemaKey[];
+    }
+
+    validateType(key: SchemaKey, value: any): boolean {
+        return typeof value === this.schema[key];
+    }
+}
+
+class DynamicAccessor<T extends object> {
+    private data: T;
+
+    constructor(data: T) {
+        this.data = data;
+    }
+
+    access<K extends keyof T>(key: K): T[K] {
+        return this.data[key];
+    }
+
+    update<K extends keyof T>(key: K, value: T[K]): void {
+        this.data[key] = value;
+    }
+
+    keys(): Array<keyof T> {
+        return Object.keys(this.data) as Array<keyof T>;
+    }
+
+    values(): Array<T[keyof T]> {
+        var result = [];
+        var keys = Object.keys(this.data) as Array<keyof T>;
+        for (var i = 0; i < keys.length; i++) {
+            result.push(this.data[keys[i]]);
+        }
+        return result;
+    }
+
+    entries(): Array<[keyof T, T[keyof T]]> {
+        var result = [];
+        var keys = Object.keys(this.data) as Array<keyof T>;
+        for (var i = 0; i < keys.length; i++) {
+            result.push([keys[i], this.data[keys[i]]] as [keyof T, T[keyof T]]);
+        }
+        return result;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function SchemaValidator"),
+        "Expected SchemaValidator function: {}",
+        output
+    );
+    assert!(
+        output.contains("SchemaValidator.prototype.getType") && output.contains("SchemaValidator.prototype.hasField"),
+        "Expected getType and hasField methods: {}",
+        output
+    );
+    assert!(
+        output.contains("SchemaValidator.prototype.getFields") && output.contains("SchemaValidator.prototype.validateType"),
+        "Expected getFields and validateType methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function DynamicAccessor"),
+        "Expected DynamicAccessor function: {}",
+        output
+    );
+    assert!(
+        output.contains("DynamicAccessor.prototype.access") && output.contains("DynamicAccessor.prototype.update"),
+        "Expected access and update methods: {}",
+        output
+    );
+    assert!(
+        output.contains("DynamicAccessor.prototype.keys") && output.contains("DynamicAccessor.prototype.values"),
+        "Expected keys and values methods: {}",
+        output
+    );
+    assert!(
+        output.contains("DynamicAccessor.prototype.entries"),
+        "Expected entries method: {}",
         output
     );
 }
