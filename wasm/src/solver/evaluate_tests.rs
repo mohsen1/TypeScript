@@ -15730,3 +15730,323 @@ fn test_template_literal_prefix_infer_suffix_distributive() {
     ]);
     assert_eq!(result, expected);
 }
+
+// =========================================================================
+// Template Literal Type Inference - Number Extraction Pattern Tests
+// =========================================================================
+// Tests for template literal patterns that extract numeric strings
+
+#[test]
+fn test_template_literal_extract_numeric_id() {
+    let interner = TypeInterner::new();
+
+    // Pattern: T extends `user-${infer Id}` ? Id : never
+    // Input: "user-42" => Id = "42"
+    // Common pattern for extracting numeric IDs from string keys
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("Id");
+    let infer_id = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends `user-${infer Id}` ? Id : never
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("user-")),
+        TemplateSpan::Type(infer_id),
+    ]);
+
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_template,
+        true_type: infer_id,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, interner.literal_string("user-42"));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    // Extracts "42" as a string literal
+    let expected = interner.literal_string("42");
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_template_literal_extract_version_numbers() {
+    let interner = TypeInterner::new();
+
+    // Pattern: T extends `v${infer Major}.${infer Minor}` ? [Major, Minor] : never
+    // Input: "v1.2" => [Major, Minor] = ["1", "2"]
+    // Common pattern for parsing version strings
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_major = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("Major"),
+        constraint: None,
+        default: None,
+    }));
+    let infer_minor = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("Minor"),
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends `v${infer Major}.${infer Minor}` ? [Major, Minor] : never
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("v")),
+        TemplateSpan::Type(infer_major),
+        TemplateSpan::Text(interner.intern_string(".")),
+        TemplateSpan::Type(infer_minor),
+    ]);
+
+    let true_type = interner.tuple(vec![
+        TupleElement {
+            type_id: infer_major,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: infer_minor,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_template,
+        true_type,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, interner.literal_string("v1.2"));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    // Extracts ["1", "2"]
+    let expected = interner.tuple(vec![
+        TupleElement {
+            type_id: interner.literal_string("1"),
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: interner.literal_string("2"),
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_template_literal_extract_index_from_array_key() {
+    let interner = TypeInterner::new();
+
+    // Pattern: T extends `item[${infer Index}]` ? Index : never
+    // Input: "item[0]" | "item[1]" | "item[2]" => "0" | "1" | "2"
+    // Common pattern for extracting array indices from bracket notation
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("Index");
+    let infer_index = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends `item[${infer Index}]` ? Index : never
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("item[")),
+        TemplateSpan::Type(infer_index),
+        TemplateSpan::Text(interner.intern_string("]")),
+    ]);
+
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_template,
+        true_type: infer_index,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let lit_0 = interner.literal_string("item[0]");
+    let lit_1 = interner.literal_string("item[1]");
+    let lit_2 = interner.literal_string("item[2]");
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, interner.union(vec![lit_0, lit_1, lit_2]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    // Extracts "0" | "1" | "2"
+    let expected = interner.union(vec![
+        interner.literal_string("0"),
+        interner.literal_string("1"),
+        interner.literal_string("2"),
+    ]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_template_literal_extract_port_number() {
+    let interner = TypeInterner::new();
+
+    // Pattern: T extends `localhost:${infer Port}` ? Port : never
+    // Input: "localhost:3000" => Port = "3000"
+    // Common pattern for extracting port numbers from host strings
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("Port");
+    let infer_port = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends `localhost:${infer Port}` ? Port : never
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("localhost:")),
+        TemplateSpan::Type(infer_port),
+    ]);
+
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_template,
+        true_type: infer_port,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, interner.literal_string("localhost:3000"));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    let expected = interner.literal_string("3000");
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_template_literal_extract_coordinates() {
+    let interner = TypeInterner::new();
+
+    // Pattern: T extends `(${infer X},${infer Y})` ? [X, Y] : never
+    // Input: "(10,20)" => [X, Y] = ["10", "20"]
+    // Common pattern for parsing coordinate pairs
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_x = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("X"),
+        constraint: None,
+        default: None,
+    }));
+    let infer_y = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("Y"),
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends `(${infer X},${infer Y})` ? [X, Y] : never
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("(")),
+        TemplateSpan::Type(infer_x),
+        TemplateSpan::Text(interner.intern_string(",")),
+        TemplateSpan::Type(infer_y),
+        TemplateSpan::Text(interner.intern_string(")")),
+    ]);
+
+    let true_type = interner.tuple(vec![
+        TupleElement {
+            type_id: infer_x,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: infer_y,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_template,
+        true_type,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, interner.literal_string("(10,20)"));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    let expected = interner.tuple(vec![
+        TupleElement {
+            type_id: interner.literal_string("10"),
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: interner.literal_string("20"),
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+    assert_eq!(result, expected);
+}

@@ -5054,6 +5054,355 @@ fn test_circular_extends_unify_propagates() {
     assert_eq!(results[1], (u_name, TypeId::NUMBER));
 }
 
+#[test]
+fn test_circular_extends_conflicting_lower_bounds() {
+    // Test: <T extends U, U extends T> with T: string and U: number
+    // Cycle propagation causes both to get union of all lower bounds
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let u_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: u_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends U, U extends T
+    ctx.add_upper_bound(var_t, u_type);
+    ctx.add_upper_bound(var_u, t_type);
+
+    // Conflicting lower bounds
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+    ctx.add_lower_bound(var_u, TypeId::NUMBER);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+
+    assert_eq!(results.len(), 2);
+    // T gets union of string | number from cycle propagation
+    let expected_union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert_eq!(results[0], (t_name, expected_union));
+    // U gets its direct lower bound (number)
+    assert_eq!(results[1], (u_name, TypeId::NUMBER));
+}
+
+#[test]
+fn test_circular_extends_three_way_with_one_lower_bound() {
+    // Test: <T extends U, U extends V, V extends T> with V having lower bound
+    // Bounds propagate through adjacent connections in the cycle
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+    let v_name = interner.intern_string("V");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+    let var_v = ctx.fresh_type_param(v_name);
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let u_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: u_name,
+        constraint: None,
+        default: None,
+    }));
+    let v_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: v_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends U, U extends V, V extends T
+    ctx.add_upper_bound(var_t, u_type);
+    ctx.add_upper_bound(var_u, v_type);
+    ctx.add_upper_bound(var_v, t_type);
+
+    // Only V has a lower bound
+    ctx.add_lower_bound(var_v, TypeId::BOOLEAN);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+
+    assert_eq!(results.len(), 3);
+    // V resolves to boolean (its direct lower bound)
+    assert_eq!(results[2], (v_name, TypeId::BOOLEAN));
+    // U extends V, so U gets boolean through propagation
+    assert_eq!(results[1], (u_name, TypeId::BOOLEAN));
+    // T extends U, but propagation stops at one level in current impl
+    assert_eq!(results[0], (t_name, TypeId::UNKNOWN));
+}
+
+#[test]
+fn test_circular_extends_with_union_lower_bound() {
+    // Test: <T extends U, U extends T> with T having union type as lower bound
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let u_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: u_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends U, U extends T
+    ctx.add_upper_bound(var_t, u_type);
+    ctx.add_upper_bound(var_u, t_type);
+
+    // T has a union type as lower bound
+    let union_type = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    ctx.add_lower_bound(var_t, union_type);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+
+    assert_eq!(results.len(), 2);
+    // T resolves to the union type
+    assert_eq!(results[0], (t_name, union_type));
+    // U also resolves to the union through propagation
+    assert_eq!(results[1], (u_name, union_type));
+}
+
+#[test]
+fn test_circular_extends_with_literal_types() {
+    // Test: <T extends U, U extends T> with literal type lower bounds
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let u_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: u_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends U, U extends T
+    ctx.add_upper_bound(var_t, u_type);
+    ctx.add_upper_bound(var_u, t_type);
+
+    // Both have literal string lower bounds
+    let hello = interner.literal_string("hello");
+    let world = interner.literal_string("world");
+    ctx.add_lower_bound(var_t, hello);
+    ctx.add_lower_bound(var_u, world);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+
+    assert_eq!(results.len(), 2);
+    // T gets union of literals from cycle propagation
+    let expected_union = interner.union(vec![hello, world]);
+    assert_eq!(results[0], (t_name, expected_union));
+    // U gets its direct lower bound
+    assert_eq!(results[1], (u_name, world));
+}
+
+#[test]
+fn test_circular_extends_four_way_cycle() {
+    // Test: <T extends U, U extends V, V extends W, W extends T>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+    let v_name = interner.intern_string("V");
+    let w_name = interner.intern_string("W");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+    let var_v = ctx.fresh_type_param(v_name);
+    let var_w = ctx.fresh_type_param(w_name);
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let u_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: u_name,
+        constraint: None,
+        default: None,
+    }));
+    let v_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: v_name,
+        constraint: None,
+        default: None,
+    }));
+    let w_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: w_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends U, U extends V, V extends W, W extends T
+    ctx.add_upper_bound(var_t, u_type);
+    ctx.add_upper_bound(var_u, v_type);
+    ctx.add_upper_bound(var_v, w_type);
+    ctx.add_upper_bound(var_w, t_type);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+
+    // All four resolve to unknown with no lower bounds
+    assert_eq!(results.len(), 4);
+    assert_eq!(results[0], (t_name, TypeId::UNKNOWN));
+    assert_eq!(results[1], (u_name, TypeId::UNKNOWN));
+    assert_eq!(results[2], (v_name, TypeId::UNKNOWN));
+    assert_eq!(results[3], (w_name, TypeId::UNKNOWN));
+}
+
+#[test]
+fn test_circular_extends_with_concrete_upper_and_lower() {
+    // Test: <T extends U, U extends T> with T having both upper and lower bounds
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let u_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: u_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends U, U extends T
+    ctx.add_upper_bound(var_t, u_type);
+    ctx.add_upper_bound(var_u, t_type);
+
+    // T has both upper bound (string) and lower bound (literal)
+    let hello = interner.literal_string("hello");
+    ctx.add_lower_bound(var_t, hello);
+    ctx.add_upper_bound(var_t, TypeId::STRING);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+
+    assert_eq!(results.len(), 2);
+    // T resolves to its lower bound (hello literal)
+    assert_eq!(results[0], (t_name, hello));
+    // U gets hello through propagation
+    assert_eq!(results[1], (u_name, hello));
+}
+
+#[test]
+fn test_circular_extends_chain_with_endpoint_bound() {
+    // Test: <T extends U, U extends V> (not circular) with V having lower bound
+    // Chain propagation: upper bounds become resolved types when no lower bounds
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+    let v_name = interner.intern_string("V");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+    let var_v = ctx.fresh_type_param(v_name);
+
+    let u_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: u_name,
+        constraint: None,
+        default: None,
+    }));
+    let v_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: v_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends U, U extends V (chain, not cycle)
+    ctx.add_upper_bound(var_t, u_type);
+    ctx.add_upper_bound(var_u, v_type);
+
+    // V has a lower bound
+    ctx.add_lower_bound(var_v, TypeId::NUMBER);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+
+    assert_eq!(results.len(), 3);
+    // V resolves to number (its lower bound)
+    assert_eq!(results[2], (v_name, TypeId::NUMBER));
+    // U has upper bound V but no lower bound, so resolves to its upper bound (V type param)
+    assert_eq!(results[1].0, u_name);
+    assert!(matches!(interner.lookup(results[1].1), Some(TypeKey::TypeParameter(_))));
+    // T has upper bound U but no lower bound, resolves to its upper bound (U type param)
+    assert_eq!(results[0].0, t_name);
+    assert!(matches!(interner.lookup(results[0].1), Some(TypeKey::TypeParameter(_))));
+}
+
+#[test]
+fn test_circular_extends_multiple_lower_bounds_same_param() {
+    // Test: <T extends U, U extends T> with T having multiple lower bounds
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let u_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: u_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends U, U extends T
+    ctx.add_upper_bound(var_t, u_type);
+    ctx.add_upper_bound(var_u, t_type);
+
+    // T has multiple lower bounds
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+    ctx.add_lower_bound(var_t, TypeId::NUMBER);
+    ctx.add_lower_bound(var_t, TypeId::BOOLEAN);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+
+    assert_eq!(results.len(), 2);
+    // T resolves to union of all its lower bounds
+    let expected_union = interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::BOOLEAN]);
+    assert_eq!(results[0], (t_name, expected_union));
+    // U gets the union through propagation
+    assert_eq!(results[1], (u_name, expected_union));
+}
+
 // =============================================================================
 // Context-Sensitive Typing Tests
 // =============================================================================
@@ -5323,4 +5672,99 @@ fn test_callback_param_inferred_from_generic_higher_order() {
     let result = ctx.resolve_with_constraints(var_t).unwrap();
     // T inferred as string, so callback param is string
     assert_eq!(result, TypeId::STRING);
+}
+
+// =============================================================================
+// Generic Default Type Inference Tests
+// =============================================================================
+
+#[test]
+fn test_generic_default_used_when_no_inference() {
+    // Test: <T = string> with no inference constraints, T defaults to string
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // No constraints added - should use default if available
+    // Note: defaults are typically handled during type param registration,
+    // but here we test the inference context behavior with no constraints
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    // Without any constraints, resolves to unknown
+    assert_eq!(result, TypeId::UNKNOWN);
+}
+
+#[test]
+fn test_generic_default_overridden_by_lower_bound() {
+    // Test: <T = string> with lower bound number, inference overrides default
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Inferred lower bound takes precedence
+    ctx.add_lower_bound(var_t, TypeId::NUMBER);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    // Lower bound overrides any potential default
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_generic_default_with_constraint() {
+    // Test: <T extends object = {}> - constraint with default
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Upper bound from constraint
+    ctx.add_upper_bound(var_t, TypeId::OBJECT);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    // With only upper bound, resolves to the upper bound
+    assert_eq!(result, TypeId::OBJECT);
+}
+
+#[test]
+fn test_generic_default_with_literal_inference() {
+    // Test: <T = string> called with literal "hello", infers literal not default
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let hello = interner.literal_string("hello");
+    ctx.add_lower_bound(var_t, hello);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    // Inferred literal takes precedence over default
+    assert_eq!(result, hello);
+}
+
+#[test]
+fn test_generic_multiple_params_with_defaults() {
+    // Test: <T = string, U = number> with only U having lower bound
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    // Only U has a lower bound
+    ctx.add_lower_bound(var_u, TypeId::BOOLEAN);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+
+    assert_eq!(results.len(), 2);
+    // T has no constraints, resolves to unknown
+    assert_eq!(results[0], (t_name, TypeId::UNKNOWN));
+    // U has lower bound, resolves to boolean
+    assert_eq!(results[1], (u_name, TypeId::BOOLEAN));
 }
