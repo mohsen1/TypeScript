@@ -5040,3 +5040,196 @@ fn test_async_optional_chaining_conditional() {
         output
     );
 }
+
+// ============================================================================
+// ASYNC NULLISH COALESCING TESTS
+// ============================================================================
+
+fn parse_and_emit_async_nullish_coalescing(source: &str) -> String {
+    use crate::parser::syntax_kind_ext;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &stmt_idx in &source_file.statements.nodes {
+                if let Some(stmt_node) = parser.arena.get(stmt_idx) {
+                    if stmt_node.kind == syntax_kind_ext::FUNCTION_DECLARATION {
+                        if let Some(func_data) = parser.arena.get_function(stmt_node) {
+                            let emitter = AsyncES5Emitter::new(&parser.arena);
+                            let has_await = emitter.body_contains_await(func_data.body);
+                            let mut emitter = AsyncES5Emitter::new(&parser.arena);
+                            if has_await {
+                                return emitter.emit_generator_body_with_await(func_data.body);
+                            } else {
+                                return emitter.emit_simple_generator_body(func_data.body);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    String::new()
+}
+
+fn nullish_coalescing_contains_await(source: &str) -> bool {
+    use crate::parser::syntax_kind_ext;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &stmt_idx in &source_file.statements.nodes {
+                if let Some(stmt_node) = parser.arena.get(stmt_idx) {
+                    if stmt_node.kind == syntax_kind_ext::FUNCTION_DECLARATION {
+                        if let Some(func_data) = parser.arena.get_function(stmt_node) {
+                            let emitter = AsyncES5Emitter::new(&parser.arena);
+                            return emitter.body_contains_await(func_data.body);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+#[test]
+fn test_async_nullish_coalescing_basic() {
+    let output = parse_and_emit_async_nullish_coalescing(
+        "async function foo(value: any) { await init(); return value ?? 'default'; }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Nullish coalescing after await should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_nullish_coalescing_with_await_result() {
+    let output = parse_and_emit_async_nullish_coalescing(
+        "async function foo() { const result = await getData(); return result ?? 'fallback'; }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Nullish coalescing with await result should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_nullish_coalescing_no_await() {
+    let output = parse_and_emit_async_nullish_coalescing(
+        "async function foo(value: any) { return value ?? 'default'; }",
+    );
+    assert!(
+        output.contains("[2 /*return*/"),
+        "Sync nullish coalescing should have return: {}",
+        output
+    );
+    assert!(
+        !output.contains("switch"),
+        "No await should skip switch: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_nullish_coalescing_chained() {
+    let output = parse_and_emit_async_nullish_coalescing(
+        "async function foo(a: any, b: any) { await load(); return a ?? b ?? 'default'; }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Chained nullish coalescing should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_nullish_coalescing_body_contains_await() {
+    assert!(
+        nullish_coalescing_contains_await(
+            "async function foo(value: any) { await process(); return value ?? 0; }"
+        ),
+        "Should detect await with nullish coalescing"
+    );
+}
+
+#[test]
+fn test_async_nullish_coalescing_body_no_await() {
+    assert!(
+        !nullish_coalescing_contains_await(
+            "async function foo(value: any) { return value ?? 'default'; }"
+        ),
+        "Should not detect await when none present"
+    );
+}
+
+#[test]
+fn test_async_nullish_coalescing_ignores_nested_async() {
+    assert!(
+        !nullish_coalescing_contains_await(
+            "async function foo(value: any) { const fn = async () => { await x; return value ?? 0; }; return 1; }"
+        ),
+        "Should ignore await in nested async"
+    );
+}
+
+#[test]
+fn test_async_nullish_coalescing_in_assignment() {
+    let output = parse_and_emit_async_nullish_coalescing(
+        "async function foo(obj: any) { await setup(); obj.value ??= 'default'; return obj; }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Nullish assignment after await should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_nullish_coalescing_with_try_catch() {
+    assert!(
+        nullish_coalescing_contains_await(
+            "async function foo(value: any) { try { await riskyOp(); return value ?? 'safe'; } catch (e) { return 'error'; } }"
+        ),
+        "Should detect await in try block with nullish coalescing"
+    );
+}
+
+#[test]
+fn test_async_nullish_coalescing_with_function_call() {
+    let output = parse_and_emit_async_nullish_coalescing(
+        "async function foo(getValue: any) { await init(); return getValue() ?? getDefault(); }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Nullish coalescing with function calls should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_nullish_coalescing_with_object_literal() {
+    let output = parse_and_emit_async_nullish_coalescing(
+        "async function foo(config: any) { await load(); return config ?? { default: true }; }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Nullish coalescing with object literal should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_nullish_coalescing_conditional() {
+    let output = parse_and_emit_async_nullish_coalescing(
+        "async function foo(value: any, cond: boolean) { if (cond) { await process(); } return value ?? 0; }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Conditional nullish coalescing should have switch or yield: {}",
+        output
+    );
+}
