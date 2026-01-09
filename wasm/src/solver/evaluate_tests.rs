@@ -11428,6 +11428,457 @@ fn test_keyof_union_identical_keys() {
     assert_eq!(result, expected);
 }
 
+// =============================================================================
+// KEYOF EDGE CASE TESTS
+// =============================================================================
+
+#[test]
+fn test_keyof_nested_object_only_top_level() {
+    // keyof { a: { b: number } } = "a" (not "a" | "b")
+    let interner = TypeInterner::new();
+
+    let inner_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let outer_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: inner_obj,
+        write_type: inner_obj,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let result = evaluate_keyof(&interner, outer_obj);
+    let expected = interner.literal_string("a");
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_keyof_both_index_signatures() {
+    // keyof { [k: string]: any, [n: number]: any } = string | number
+    let interner = TypeInterner::new();
+
+    let obj = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::ANY,
+            readonly: false,
+        }),
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::ANY,
+            readonly: false,
+        }),
+    });
+
+    let result = evaluate_keyof(&interner, obj);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_keyof_numeric_literal_keys() {
+    // keyof { 0: string, 1: number } = "0" | "1"
+    let interner = TypeInterner::new();
+
+    let obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("0"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("1"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let result = evaluate_keyof(&interner, obj);
+    let key_0 = interner.literal_string("0");
+    let key_1 = interner.literal_string("1");
+    let expected = interner.union(vec![key_0, key_1]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_keyof_mixed_optional_required() {
+    // keyof { a: string, b?: number, c: boolean } = "a" | "b" | "c"
+    let interner = TypeInterner::new();
+
+    let obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: true,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("c"),
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let result = evaluate_keyof(&interner, obj);
+    let key_a = interner.literal_string("a");
+    let key_b = interner.literal_string("b");
+    let key_c = interner.literal_string("c");
+    let expected = interner.union(vec![key_a, key_b, key_c]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_keyof_function_type() {
+    // keyof (() => void) - function has standard Function members
+    let interner = TypeInterner::new();
+
+    let func = interner.function(FunctionShape {
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: vec![],
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let result = evaluate_keyof(&interner, func);
+    // Functions get apparent Function members (like "call", "apply", "bind", "length", etc.)
+    // Result should be never or string | number | symbol (depending on implementation)
+    // Just verify it doesn't panic and returns some type
+    assert_ne!(result, func);
+}
+
+#[test]
+fn test_keyof_deeply_nested_union() {
+    // keyof (A | (B | C)) = keyof (A | B | C) = common keys
+    let interner = TypeInterner::new();
+
+    let obj_a = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("shared"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let obj_b = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("shared"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let obj_c = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("shared"),
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("c"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let inner_union = interner.union(vec![obj_b, obj_c]);
+    let outer_union = interner.union(vec![obj_a, inner_union]);
+    let result = evaluate_keyof(&interner, outer_union);
+
+    // Only "shared" is common to all three
+    let expected = interner.literal_string("shared");
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_keyof_deeply_nested_intersection() {
+    // keyof (A & (B & C)) = keyof A | keyof B | keyof C
+    let interner = TypeInterner::new();
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_c = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("c"),
+        type_id: TypeId::BOOLEAN,
+        write_type: TypeId::BOOLEAN,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let inner_intersection = interner.intersection(vec![obj_b, obj_c]);
+    let outer_intersection = interner.intersection(vec![obj_a, inner_intersection]);
+    let result = evaluate_keyof(&interner, outer_intersection);
+
+    // All keys are included: "a" | "b" | "c"
+    let key_a = interner.literal_string("a");
+    let key_b = interner.literal_string("b");
+    let key_c = interner.literal_string("c");
+    let expected = interner.union(vec![key_a, key_b, key_c]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_keyof_with_method_property() {
+    // keyof { fn(): void, prop: string } = "fn" | "prop"
+    let interner = TypeInterner::new();
+
+    let method_type = interner.function(FunctionShape {
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: vec![],
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("fn"),
+            type_id: method_type,
+            write_type: method_type,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: interner.intern_string("prop"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let result = evaluate_keyof(&interner, obj);
+    let key_fn = interner.literal_string("fn");
+    let key_prop = interner.literal_string("prop");
+    let expected = interner.union(vec![key_fn, key_prop]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_keyof_union_with_index_signature_and_literal() {
+    // keyof ({ a: string } | { [k: string]: number }) = "a" & string = "a"
+    let interner = TypeInterner::new();
+
+    let obj_literal = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_indexed = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    let union = interner.union(vec![obj_literal, obj_indexed]);
+    let result = evaluate_keyof(&interner, union);
+
+    // Common keys: "a" is in first, and string covers "a" in second
+    // Result should be "a" (the intersection of "a" and string)
+    let expected = interner.literal_string("a");
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_keyof_intersection_with_index_signature() {
+    // keyof ({ a: string } & { [k: string]: number }) = "a" | string = string
+    let interner = TypeInterner::new();
+
+    let obj_literal = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_indexed = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    let intersection = interner.intersection(vec![obj_literal, obj_indexed]);
+    let result = evaluate_keyof(&interner, intersection);
+
+    // Keys: "a" | string | number = string | number (since "a" is subtype of string)
+    // Simplified: should contain string
+    let key = interner.lookup(result);
+    match key {
+        Some(TypeKey::Intrinsic(IntrinsicKind::String)) => (),
+        Some(TypeKey::Union(_)) => (),
+        _ => panic!("Expected string or union type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_keyof_single_property_equals_literal() {
+    // keyof { only: string } = "only" (not a union)
+    let interner = TypeInterner::new();
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("only"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let result = evaluate_keyof(&interner, obj);
+    let expected = interner.literal_string("only");
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_keyof_readonly_properties_included() {
+    // keyof { readonly a: string, b: number } = "a" | "b"
+    let interner = TypeInterner::new();
+
+    let obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: true,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let result = evaluate_keyof(&interner, obj);
+    let key_a = interner.literal_string("a");
+    let key_b = interner.literal_string("b");
+    let expected = interner.union(vec![key_a, key_b]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_keyof_bigint() {
+    // keyof bigint - should get apparent BigInt members
+    let interner = TypeInterner::new();
+    let result = evaluate_keyof(&interner, TypeId::BIGINT);
+    // bigint has apparent members like "toString", "valueOf", etc.
+    // Just verify it doesn't panic and returns some union
+    assert_ne!(result, TypeId::BIGINT);
+}
+
+#[test]
+fn test_keyof_symbol() {
+    // keyof symbol - should get apparent Symbol members
+    let interner = TypeInterner::new();
+    let result = evaluate_keyof(&interner, TypeId::SYMBOL);
+    // symbol has apparent members like "toString", "valueOf", "description"
+    assert_ne!(result, TypeId::SYMBOL);
+}
+
+#[test]
+fn test_keyof_boolean() {
+    // keyof boolean - should get apparent Boolean members
+    let interner = TypeInterner::new();
+    let result = evaluate_keyof(&interner, TypeId::BOOLEAN);
+    // boolean has apparent members from Boolean interface
+    assert_ne!(result, TypeId::BOOLEAN);
+}
+
 #[test]
 fn test_intersection_reduction_disjoint_discriminant_evaluates_never() {
     let interner = TypeInterner::new();
