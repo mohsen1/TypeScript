@@ -24989,3 +24989,490 @@ class DeepTransformer<T extends object> {
         output
     );
 }
+
+// ============================================================================
+// MIXIN FACTORY PATTERN TESTS
+// ============================================================================
+
+/// Test ES5 class with base class mixins
+#[test]
+fn test_class_es5_mixin_base_class() {
+    let source = r#"
+// Base class mixin pattern
+type Constructor<T = {}> = new (...args: any[]) => T;
+
+function Timestamped<TBase extends Constructor>(Base: TBase) {
+    return class extends Base {
+        createdAt = new Date();
+        updatedAt = new Date();
+
+        touch() {
+            this.updatedAt = new Date();
+        }
+    };
+}
+
+function Tagged<TBase extends Constructor>(Base: TBase) {
+    return class extends Base {
+        tags: string[] = [];
+
+        addTag(tag: string) {
+            this.tags.push(tag);
+        }
+
+        hasTag(tag: string): boolean {
+            return this.tags.includes(tag);
+        }
+    };
+}
+
+class Entity {
+    id: number;
+    constructor(id: number) {
+        this.id = id;
+    }
+}
+
+const TimestampedEntity = Timestamped(Entity);
+const TaggedTimestampedEntity = Tagged(Timestamped(Entity));
+
+class User extends TimestampedEntity {
+    name: string;
+    constructor(id: number, name: string) {
+        super(id);
+        this.name = name;
+    }
+}
+
+class Post extends TaggedTimestampedEntity {
+    title: string;
+    constructor(id: number, title: string) {
+        super(id);
+        this.title = title;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Functions and classes should be present
+    assert!(
+        output.contains("Timestamped") && output.contains("Tagged") && output.contains("Entity"),
+        "Expected mixin functions and base class: {}",
+        output
+    );
+
+    // Derived classes should be converted
+    assert!(
+        output.contains("User") && output.contains("Post"),
+        "Expected derived classes: {}",
+        output
+    );
+
+    // Type alias should be stripped
+    assert!(
+        !output.contains("type Constructor"),
+        "Expected type alias to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with trait composition mixins
+#[test]
+fn test_class_es5_mixin_trait_composition() {
+    let source = r#"
+// Trait composition using mixins
+type GConstructor<T = {}> = new (...args: any[]) => T;
+
+interface Disposable {
+    dispose(): void;
+}
+
+interface Activatable {
+    isActive: boolean;
+    activate(): void;
+    deactivate(): void;
+}
+
+function DisposableMixin<TBase extends GConstructor>(Base: TBase) {
+    return class extends Base implements Disposable {
+        isDisposed = false;
+
+        dispose() {
+            this.isDisposed = true;
+        }
+    };
+}
+
+function ActivatableMixin<TBase extends GConstructor>(Base: TBase) {
+    return class extends Base implements Activatable {
+        isActive = false;
+
+        activate() {
+            this.isActive = true;
+        }
+
+        deactivate() {
+            this.isActive = false;
+        }
+    };
+}
+
+function LoggableMixin<TBase extends GConstructor>(Base: TBase) {
+    return class extends Base {
+        private logs: string[] = [];
+
+        log(message: string) {
+            this.logs.push(`[${new Date().toISOString()}] ${message}`);
+        }
+
+        getLogs(): string[] {
+            return [...this.logs];
+        }
+    };
+}
+
+class BaseComponent {
+    name: string;
+    constructor(name: string) {
+        this.name = name;
+    }
+}
+
+// Compose multiple traits
+const FullComponent = LoggableMixin(ActivatableMixin(DisposableMixin(BaseComponent)));
+
+class Widget extends FullComponent {
+    render(): string {
+        this.log("Rendering widget");
+        return `<widget name="${this.name}" />`;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Mixin functions should be present
+    assert!(
+        output.contains("DisposableMixin") && output.contains("ActivatableMixin") && output.contains("LoggableMixin"),
+        "Expected mixin functions: {}",
+        output
+    );
+
+    // Classes should be converted
+    assert!(
+        output.contains("BaseComponent") && output.contains("Widget"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Interfaces should be stripped
+    assert!(
+        !output.contains("interface Disposable") && !output.contains("interface Activatable"),
+        "Expected interfaces to be stripped: {}",
+        output
+    );
+
+    // implements clause should be stripped
+    assert!(
+        !output.contains("implements Disposable") && !output.contains("implements Activatable"),
+        "Expected implements clauses to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with constrained mixins
+#[test]
+fn test_class_es5_mixin_constrained() {
+    let source = r#"
+// Constrained mixins requiring specific base class shape
+type Constructor<T = {}> = new (...args: any[]) => T;
+
+interface HasId {
+    id: string;
+}
+
+interface HasName {
+    name: string;
+}
+
+// Mixin that requires base class to have an id
+function Identifiable<TBase extends Constructor<HasId>>(Base: TBase) {
+    return class extends Base {
+        getIdentifier(): string {
+            return `entity-${this.id}`;
+        }
+    };
+}
+
+// Mixin that requires base class to have a name
+function Nameable<TBase extends Constructor<HasName>>(Base: TBase) {
+    return class extends Base {
+        getDisplayName(): string {
+            return this.name.toUpperCase();
+        }
+
+        setName(name: string): void {
+            this.name = name;
+        }
+    };
+}
+
+// Mixin requiring both id and name
+function Describable<TBase extends Constructor<HasId & HasName>>(Base: TBase) {
+    return class extends Base {
+        describe(): string {
+            return `${this.name} (${this.id})`;
+        }
+    };
+}
+
+class BaseEntity implements HasId, HasName {
+    id: string;
+    name: string;
+
+    constructor(id: string, name: string) {
+        this.id = id;
+        this.name = name;
+    }
+}
+
+const DescribableEntity = Describable(Nameable(Identifiable(BaseEntity)));
+
+class Product extends DescribableEntity {
+    price: number;
+
+    constructor(id: string, name: string, price: number) {
+        super(id, name);
+        this.price = price;
+    }
+
+    getFullDescription(): string {
+        return `${this.describe()} - $${this.price}`;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Mixin functions should be present
+    assert!(
+        output.contains("Identifiable") && output.contains("Nameable") && output.contains("Describable"),
+        "Expected constrained mixin functions: {}",
+        output
+    );
+
+    // Classes should be converted
+    assert!(
+        output.contains("BaseEntity") && output.contains("Product"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Interfaces should be stripped
+    assert!(
+        !output.contains("interface HasId") && !output.contains("interface HasName"),
+        "Expected interfaces to be stripped: {}",
+        output
+    );
+
+    // Type constraints in generics should be stripped
+    assert!(
+        !output.contains("Constructor<HasId>") && !output.contains("Constructor<HasName>"),
+        "Expected generic constraints to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with parameterized mixins
+#[test]
+fn test_class_es5_mixin_parameterized() {
+    let source = r#"
+// Parameterized mixins with configuration
+type Constructor<T = {}> = new (...args: any[]) => T;
+
+interface CacheConfig {
+    maxSize: number;
+    ttl: number;
+}
+
+interface RetryConfig {
+    maxRetries: number;
+    delay: number;
+}
+
+function Cacheable<TBase extends Constructor>(config: CacheConfig) {
+    return function(Base: TBase) {
+        return class extends Base {
+            private cache: Map<string, { value: any; expires: number }> = new Map();
+            private maxSize = config.maxSize;
+            private ttl = config.ttl;
+
+            getCached(key: string): any | undefined {
+                const entry = this.cache.get(key);
+                if (entry && entry.expires > Date.now()) {
+                    return entry.value;
+                }
+                this.cache.delete(key);
+                return undefined;
+            }
+
+            setCached(key: string, value: any): void {
+                if (this.cache.size >= this.maxSize) {
+                    const firstKey = this.cache.keys().next().value;
+                    this.cache.delete(firstKey);
+                }
+                this.cache.set(key, { value, expires: Date.now() + this.ttl });
+            }
+        };
+    };
+}
+
+function Retryable<TBase extends Constructor>(config: RetryConfig) {
+    return function(Base: TBase) {
+        return class extends Base {
+            private maxRetries = config.maxRetries;
+            private delay = config.delay;
+
+            async withRetry<T>(fn: () => Promise<T>): Promise<T> {
+                let lastError: Error | undefined;
+                for (let i = 0; i <= this.maxRetries; i++) {
+                    try {
+                        return await fn();
+                    } catch (e) {
+                        lastError = e as Error;
+                        if (i < this.maxRetries) {
+                            await new Promise(r => setTimeout(r, this.delay));
+                        }
+                    }
+                }
+                throw lastError;
+            }
+        };
+    };
+}
+
+function Throttled<TBase extends Constructor>(intervalMs: number) {
+    return function(Base: TBase) {
+        return class extends Base {
+            private lastCall = 0;
+            private interval = intervalMs;
+
+            canCall(): boolean {
+                return Date.now() - this.lastCall >= this.interval;
+            }
+
+            recordCall(): void {
+                this.lastCall = Date.now();
+            }
+        };
+    };
+}
+
+class ApiClient {
+    baseUrl: string;
+    constructor(baseUrl: string) {
+        this.baseUrl = baseUrl;
+    }
+}
+
+const CachedClient = Cacheable({ maxSize: 100, ttl: 60000 })(ApiClient);
+const RetryableClient = Retryable({ maxRetries: 3, delay: 1000 })(ApiClient);
+const ThrottledCachedClient = Throttled(100)(Cacheable({ maxSize: 50, ttl: 30000 })(ApiClient));
+
+class DataService extends ThrottledCachedClient {
+    async fetch(endpoint: string): Promise<any> {
+        const cached = this.getCached(endpoint);
+        if (cached) return cached;
+
+        if (!this.canCall()) {
+            throw new Error("Throttled");
+        }
+
+        this.recordCall();
+        const response = await fetch(`${this.baseUrl}${endpoint}`);
+        const data = await response.json();
+        this.setCached(endpoint, data);
+        return data;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Mixin factory functions should be present
+    assert!(
+        output.contains("Cacheable") && output.contains("Retryable") && output.contains("Throttled"),
+        "Expected parameterized mixin functions: {}",
+        output
+    );
+
+    // Classes should be converted
+    assert!(
+        output.contains("ApiClient") && output.contains("DataService"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Interfaces should be stripped
+    assert!(
+        !output.contains("interface CacheConfig") && !output.contains("interface RetryConfig"),
+        "Expected interfaces to be stripped: {}",
+        output
+    );
+
+    // Type alias should be stripped
+    assert!(
+        !output.contains("type Constructor"),
+        "Expected type alias to be stripped: {}",
+        output
+    );
+}
