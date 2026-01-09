@@ -22367,3 +22367,431 @@ const tagged = factory.createTagged(42);
         output
     );
 }
+
+// =============================================================================
+// ES5 Proxy patterns parity tests
+// =============================================================================
+
+/// Test Proxy handler traps with type annotations
+#[test]
+fn test_parity_es5_proxy_handler_traps() {
+    let source = r#"
+interface Target {
+    name: string;
+    value: number;
+}
+
+type PropertyKey = string | symbol;
+
+const handler: ProxyHandler<Target> = {
+    get(target: Target, prop: PropertyKey, receiver: any): any {
+        console.log(`Getting ${String(prop)}`);
+        return Reflect.get(target, prop, receiver);
+    },
+    set(target: Target, prop: PropertyKey, value: any, receiver: any): boolean {
+        console.log(`Setting ${String(prop)} to ${value}`);
+        return Reflect.set(target, prop, value, receiver);
+    },
+    has(target: Target, prop: PropertyKey): boolean {
+        return prop in target;
+    },
+    deleteProperty(target: Target, prop: PropertyKey): boolean {
+        return Reflect.deleteProperty(target, prop);
+    }
+};
+
+class ProxyFactory<T extends object> {
+    private handler: ProxyHandler<T>;
+
+    constructor(handler: ProxyHandler<T>) {
+        this.handler = handler;
+    }
+
+    create(target: T): T {
+        return new Proxy(target, this.handler);
+    }
+}
+
+const target: Target = { name: "test", value: 42 };
+const proxy = new Proxy(target, handler);
+const factory = new ProxyFactory<Target>(handler);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Interface should be erased
+    assert!(
+        !output.contains("interface Target"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Type alias should be erased
+    assert!(
+        !output.contains("type PropertyKey"),
+        "Type alias should be erased: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("ProxyFactory"),
+        "Class should be present: {}",
+        output
+    );
+    // Proxy constructor should be preserved
+    assert!(
+        output.contains("new Proxy"),
+        "Proxy constructor should be preserved: {}",
+        output
+    );
+    // Reflect calls should be preserved
+    assert!(
+        output.contains("Reflect.get") || output.contains("Reflect.set"),
+        "Reflect calls should be preserved: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": Target") && !output.contains(": ProxyHandler"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test Proxy.revocable with type annotations
+#[test]
+fn test_parity_es5_proxy_revocable() {
+    let source = r#"
+interface RevocableResult<T> {
+    proxy: T;
+    revoke: () => void;
+}
+
+interface DataObject {
+    id: number;
+    data: string;
+}
+
+function createRevocableProxy<T extends object>(target: T): RevocableResult<T> {
+    const handler: ProxyHandler<T> = {
+        get(target: T, prop: string | symbol): any {
+            return Reflect.get(target, prop);
+        }
+    };
+    return Proxy.revocable(target, handler);
+}
+
+class RevocableProxyManager<T extends object> {
+    private proxies: Map<string, { proxy: T; revoke: () => void }> = new Map();
+
+    create(id: string, target: T): T {
+        const { proxy, revoke } = Proxy.revocable(target, {
+            get: (t: T, p: string | symbol) => Reflect.get(t, p),
+            set: (t: T, p: string | symbol, v: any) => Reflect.set(t, p, v)
+        });
+        this.proxies.set(id, { proxy, revoke });
+        return proxy;
+    }
+
+    revoke(id: string): boolean {
+        const entry = this.proxies.get(id);
+        if (entry) {
+            entry.revoke();
+            this.proxies.delete(id);
+            return true;
+        }
+        return false;
+    }
+}
+
+const obj: DataObject = { id: 1, data: "test" };
+const { proxy, revoke } = Proxy.revocable(obj, {});
+const manager = new RevocableProxyManager<DataObject>();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Interfaces should be erased
+    assert!(
+        !output.contains("interface RevocableResult") && !output.contains("interface DataObject"),
+        "Interfaces should be erased: {}",
+        output
+    );
+    // Function should be present
+    assert!(
+        output.contains("createRevocableProxy"),
+        "Function should be present: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("RevocableProxyManager"),
+        "Class should be present: {}",
+        output
+    );
+    // Proxy.revocable should be preserved
+    assert!(
+        output.contains("Proxy.revocable"),
+        "Proxy.revocable should be preserved: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": RevocableResult") && !output.contains(": DataObject"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test Reflect API integration with type annotations
+#[test]
+fn test_parity_es5_reflect_integration() {
+    let source = r#"
+interface ReflectTarget {
+    prop: string;
+    method(): void;
+}
+
+type ReflectResult<T> = T | undefined;
+
+class ReflectWrapper {
+    static safeGet<T extends object, K extends keyof T>(
+        target: T,
+        key: K
+    ): T[K] | undefined {
+        return Reflect.get(target, key);
+    }
+
+    static safeSet<T extends object, K extends keyof T>(
+        target: T,
+        key: K,
+        value: T[K]
+    ): boolean {
+        return Reflect.set(target, key, value);
+    }
+
+    static hasOwn<T extends object>(target: T, key: PropertyKey): boolean {
+        return Reflect.has(target, key);
+    }
+
+    static getKeys<T extends object>(target: T): (string | symbol)[] {
+        return Reflect.ownKeys(target);
+    }
+}
+
+function applyWithReflect<T, A extends any[], R>(
+    fn: (this: T, ...args: A) => R,
+    thisArg: T,
+    args: A
+): R {
+    return Reflect.apply(fn, thisArg, args);
+}
+
+function constructWithReflect<T>(
+    ctor: new (...args: any[]) => T,
+    args: any[]
+): T {
+    return Reflect.construct(ctor, args);
+}
+
+const target: ReflectTarget = { prop: "value", method() {} };
+const value: string | undefined = ReflectWrapper.safeGet(target, "prop");
+const keys: (string | symbol)[] = ReflectWrapper.getKeys(target);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Interface should be erased
+    assert!(
+        !output.contains("interface ReflectTarget"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Type alias should be erased
+    assert!(
+        !output.contains("type ReflectResult"),
+        "Type alias should be erased: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("ReflectWrapper"),
+        "Class should be present: {}",
+        output
+    );
+    // Functions should be present
+    assert!(
+        output.contains("applyWithReflect") && output.contains("constructWithReflect"),
+        "Functions should be present: {}",
+        output
+    );
+    // Reflect methods should be preserved
+    assert!(
+        output.contains("Reflect.get") && output.contains("Reflect.set"),
+        "Reflect methods should be preserved: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": ReflectTarget") && !output.contains(": ReflectResult"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test Proxy with class instance wrapping
+#[test]
+fn test_parity_es5_proxy_class_wrapper() {
+    let source = r#"
+interface Observable<T> {
+    subscribe(callback: (value: T) => void): void;
+}
+
+class ReactiveObject<T extends object> {
+    private target: T;
+    private listeners: Set<Function> = new Set();
+
+    constructor(target: T) {
+        this.target = target;
+    }
+
+    createProxy(): T {
+        const self = this;
+        const handler = {
+            set: function(target: any, prop: any, value: any) {
+                const result = Reflect.set(target, prop, value);
+                self.notifyListeners(prop, value);
+                return result;
+            },
+            get: function(target: any, prop: any) {
+                return Reflect.get(target, prop);
+            }
+        };
+        return new Proxy(this.target, handler);
+    }
+
+    private notifyListeners(prop: any, value: any): void {
+        this.listeners.forEach(listener => listener(prop, value));
+    }
+
+    onChange(callback: Function): void {
+        this.listeners.add(callback);
+    }
+}
+
+interface User {
+    name: string;
+    age: number;
+}
+
+const user: User = { name: "John", age: 30 };
+const reactive = new ReactiveObject<User>(user);
+const proxy = reactive.createProxy();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Interfaces should be erased
+    assert!(
+        !output.contains("interface Observable") && !output.contains("interface User"),
+        "Interfaces should be erased: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("ReactiveObject"),
+        "Class should be present: {}",
+        output
+    );
+    // Proxy constructor should be preserved
+    assert!(
+        output.contains("new Proxy"),
+        "Proxy constructor should be preserved: {}",
+        output
+    );
+    // Reflect methods should be preserved
+    assert!(
+        output.contains("Reflect.set") && output.contains("Reflect.get"),
+        "Reflect methods should be preserved: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": User") && !output.contains(": T"),
+        "Type annotations should be erased: {}",
+        output
+    );
+    // Private modifier should be erased
+    assert!(
+        !output.contains("private target") && !output.contains("private listeners"),
+        "Private modifier should be erased: {}",
+        output
+    );
+}
