@@ -7,11 +7,11 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-Implement variable initialization tracking to detect use-before-assignment.
+Fix TS2339 false positives in property access checking.
 
-**Error Code:** TS2454 - "Variable 'X' is used before being assigned"
+**Error Code:** TS2339 - "Property 'X' does not exist on type 'Y'"
 
-**Impact:** 104 conformance tests affected
+**Impact:** 142 conformance tests affected (was 35 extra errors, now 14)
 
 ### Background
 TypeScript tracks whether variables are definitely assigned before use:
@@ -94,9 +94,14 @@ This requires control flow analysis to track variable state through branches.
 - [x] Fixed BindResult import in lib.rs
 
 ### Conformance Test Results (500 tests)
-- Exact Match: 89 (18.3%)
-- Same Error Count: 113 (23.2%)
+- Exact Match: 90 (18.5%)
+- Same Error Count: 104 (21.4%)
 - TS2454 false positives FIXED (no longer in top 10 extra errors)
+
+### TS2339 Work (NEW)
+- [x] Fixed property access on `any` type (returns `any` without error)
+- [x] Fixed property access on `error` type (suppresses cascading errors)
+- TS2339 extra errors reduced from 35 to 14
 
 ## Ready for Merge
 Yes
