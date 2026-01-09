@@ -7,12 +7,13 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] Add enum ES5 source map tests (const enum, string enum, computed members) in `wasm/src/source_map_tests.rs`. Run `./wasm/test.sh source_map`.
+- (awaiting assignment)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added extended enum ES5 source map tests (bitwise flags, explicit numeric, expression initializers, ambient declare, member as type, keyof typeof, nested in module, with interface, function parameter, advanced combined); 593 tests pass.
 - [x] Added more interface ES5 source map tests (nested types, tuple types, literal types, never/unknown types, this type, overloaded methods, async methods, accessor signatures, symbol properties, complex combined); `./wasm/test.sh source_map` passes.
 - [x] Added additional interface ES5 source map tests (optional properties, readonly properties, index signatures, call signatures, construct signatures, interface merging, function types, class implements, hybrid types, advanced combined); `./wasm/test.sh source_map` passes.
 - [x] Added interface/type alias ES5 source map tests (basic interface, basic type alias, interface with methods, interface extends, union/intersection types, generic interface, generic type alias, mapped types, conditional types, combined); `./wasm/test.sh source_map` passes.
