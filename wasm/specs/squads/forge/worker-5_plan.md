@@ -241,7 +241,7 @@ type Guard = (x: any) => x is Guard;  // Guard references itself in predicate
 - [x] Updated non-distributive union object inference expectation (tests not run).
 
 ## Ready for Merge
-No
+Yes
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize solver correctness (inference/conditional/subtype) before new features.
