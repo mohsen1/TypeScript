@@ -11147,3 +11147,104 @@ fn test_async_semaphore_ignores_nested_async() {
     );
     assert!(!result, "Should not detect await inside nested async in semaphore function");
 }
+
+// ============================================================================
+// ASYNC MUTEX PATTERN TESTS
+// Tests for mutex patterns: lock, unlock, try-lock, deadlock prevention
+// ============================================================================
+
+#[test]
+fn test_async_mutex_lock() {
+    let result = async_error_propagation_contains_await(
+        "async function lock() { await mutex.lock(); }",
+    );
+    assert!(result, "Should detect await in mutex lock");
+}
+
+#[test]
+fn test_async_mutex_unlock() {
+    let result = async_error_propagation_contains_await(
+        "async function unlock() { await mutex.unlock(); }",
+    );
+    assert!(result, "Should detect await in mutex unlock");
+}
+
+#[test]
+fn test_async_mutex_try_lock() {
+    let result = async_error_propagation_contains_await(
+        "async function tryLock() { return await mutex.tryLock(); }",
+    );
+    assert!(result, "Should detect await in mutex try lock");
+}
+
+#[test]
+fn test_async_mutex_deadlock_prevention() {
+    let result = async_error_propagation_contains_await(
+        "async function orderedLock() { await lockManager.acquireInOrder([mutex1, mutex2]); }",
+    );
+    assert!(result, "Should detect await in deadlock prevention");
+}
+
+#[test]
+fn test_async_mutex_with_timeout() {
+    let result = async_error_propagation_contains_await(
+        "async function lockTimeout() { return await mutex.lockWithTimeout(5000); }",
+    );
+    assert!(result, "Should detect await in mutex lock with timeout");
+}
+
+#[test]
+fn test_async_mutex_guard() {
+    let result = async_error_propagation_contains_await(
+        "async function withLock() { return await mutex.withLock(criticalSection); }",
+    );
+    assert!(result, "Should detect await in mutex guard pattern");
+}
+
+#[test]
+fn test_async_mutex_reentrant() {
+    let result = async_error_propagation_contains_await(
+        "async function reentrant() { await reentrantLock.acquire(); }",
+    );
+    assert!(result, "Should detect await in reentrant lock");
+}
+
+#[test]
+fn test_async_mutex_fair() {
+    let result = async_error_propagation_contains_await(
+        "async function fairLock() { await fairMutex.lock(); }",
+    );
+    assert!(result, "Should detect await in fair lock");
+}
+
+#[test]
+fn test_async_mutex_read_write() {
+    let result = async_error_propagation_contains_await(
+        "async function readLock() { await rwLock.readLock(); }",
+    );
+    assert!(result, "Should detect await in read-write lock");
+}
+
+#[test]
+fn test_async_mutex_upgrade() {
+    let result = async_error_propagation_contains_await(
+        "async function upgradeLock() { await rwLock.upgradeToWrite(); }",
+    );
+    assert!(result, "Should detect await in lock upgrade");
+}
+
+#[test]
+fn test_async_mutex_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function syncMutex() { return mutex.isLocked(); }",
+    );
+    assert!(!result, "Should not detect await when mutex access is sync");
+}
+
+#[test]
+fn test_async_mutex_ignores_nested_async() {
+    let result = async_error_propagation_contains_await(
+        "async function outer() { const locker = async () => await mutex.lock(); }",
+    );
+    assert!(!result, "Should not detect await inside nested async in mutex function");
+}
