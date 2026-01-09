@@ -1295,6 +1295,11 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ERROR;
         } else if let Some(name) = name_text {
             if is_identifier {
+                // Don't emit error for builtin global constructors like Promise, Array, Map, etc.
+                let is_builtin_value = matches!(name.as_str(), "Promise" | "Array" | "Map" | "Set" | "WeakMap" | "WeakSet" | "Object" | "String" | "Number" | "Boolean" | "Symbol" | "Function" | "RegExp" | "Error" | "Date" | "JSON" | "Math" | "console" | "Proxy" | "Reflect" | "BigInt" | "Intl" | "ArrayBuffer" | "DataView" | "Float32Array" | "Float64Array" | "Int8Array" | "Int16Array" | "Int32Array" | "Uint8Array" | "Uint8ClampedArray" | "Uint16Array" | "Uint32Array" | "BigInt64Array" | "BigUint64Array" | "SharedArrayBuffer" | "Atomics" | "Iterator" | "Generator" | "AsyncGenerator" | "FinalizationRegistry" | "WeakRef");
+                if is_builtin_value {
+                    return TypeId::UNKNOWN;
+                }
                 self.error_cannot_find_name_at(&name, type_query.expr_name);
                 return TypeId::ERROR;
             }
