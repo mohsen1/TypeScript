@@ -45889,3 +45889,825 @@ const eventStream = new EventStream<string>();
         output
     );
 }
+
+/// Test ES5 class with basic Reflect.metadata decorator pattern
+#[test]
+fn test_class_es5_reflect_metadata_basic_pattern() {
+    let source = r#"
+function metadata(key: string, value: any): ClassDecorator & MethodDecorator & PropertyDecorator {
+    return function(target: any, propertyKey?: string | symbol, descriptor?: PropertyDescriptor) {
+        if (propertyKey) {
+            Reflect.defineMetadata(key, value, target, propertyKey);
+        } else {
+            Reflect.defineMetadata(key, value, target);
+        }
+    };
+}
+
+@metadata("role", "admin")
+@metadata("version", "1.0.0")
+class UserService {
+    @metadata("cache", true)
+    private users: Map<string, any> = new Map();
+
+    @metadata("log", true)
+    @metadata("async", false)
+    getUser(id: string): any {
+        return this.users.get(id);
+    }
+
+    @metadata("validate", true)
+    setUser(id: string, user: any): void {
+        this.users.set(id, user);
+    }
+}
+
+@metadata("singleton", true)
+class ConfigService {
+    private config: Record<string, any> = {};
+
+    @metadata("readonly", true)
+    get(key: string): any {
+        return this.config[key];
+    }
+
+    @metadata("writeonly", false)
+    set(key: string, value: any): void {
+        this.config[key] = value;
+    }
+}
+
+const userService = new UserService();
+const configService = new ConfigService();
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("UserService") && output.contains("ConfigService"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("getUser") && output.contains("setUser"),
+        "Expected UserService methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("get") && output.contains("set"),
+        "Expected ConfigService methods: {}",
+        output
+    );
+
+    // Decorator function should exist
+    assert!(
+        output.contains("metadata"),
+        "Expected metadata function: {}",
+        output
+    );
+
+    // Type annotations should be stripped
+    assert!(
+        !output.contains(": ClassDecorator") && !output.contains(": MethodDecorator"),
+        "Expected type annotations to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with design type metadata pattern
+#[test]
+fn test_class_es5_reflect_metadata_design_type_pattern() {
+    let source = r#"
+function Type(type: Function): PropertyDecorator {
+    return function(target: Object, propertyKey: string | symbol) {
+        Reflect.defineMetadata("design:type", type, target, propertyKey);
+    };
+}
+
+function Injectable(): ClassDecorator {
+    return function(target: Function) {
+        const paramTypes = Reflect.getMetadata("design:paramtypes", target) || [];
+        Reflect.defineMetadata("injectable:params", paramTypes, target);
+    };
+}
+
+class Logger {
+    log(message: string): void {
+        console.log(message);
+    }
+}
+
+class Database {
+    query(sql: string): any[] {
+        return [];
+    }
+}
+
+@Injectable()
+class Repository {
+    @Type(Database)
+    private db: Database;
+
+    @Type(Logger)
+    private logger: Logger;
+
+    constructor(db: Database, logger: Logger) {
+        this.db = db;
+        this.logger = logger;
+    }
+
+    findAll(): any[] {
+        this.logger.log("Finding all");
+        return this.db.query("SELECT * FROM table");
+    }
+
+    findById(id: string): any {
+        this.logger.log("Finding by id: " + id);
+        return this.db.query("SELECT * FROM table WHERE id = " + id)[0];
+    }
+}
+
+@Injectable()
+class Service {
+    @Type(Repository)
+    private repo: Repository;
+
+    constructor(repo: Repository) {
+        this.repo = repo;
+    }
+
+    getAll(): any[] {
+        return this.repo.findAll();
+    }
+}
+
+const repo = new Repository(new Database(), new Logger());
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Logger") && output.contains("Database") && output.contains("Repository") && output.contains("Service"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("findAll") && output.contains("findById"),
+        "Expected Repository methods: {}",
+        output
+    );
+
+    // Decorator functions should exist
+    assert!(
+        output.contains("Type") && output.contains("Injectable"),
+        "Expected decorator functions: {}",
+        output
+    );
+
+    // Type annotations should be stripped
+    assert!(
+        !output.contains(": PropertyDecorator") && !output.contains(": ClassDecorator"),
+        "Expected type annotations to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with parameter type metadata pattern
+#[test]
+fn test_class_es5_reflect_metadata_param_type_pattern() {
+    let source = r#"
+function Inject(token: string): ParameterDecorator {
+    return function(target: Object, propertyKey: string | symbol | undefined, parameterIndex: number) {
+        const existingParams = Reflect.getMetadata("inject:params", target) || [];
+        existingParams[parameterIndex] = token;
+        Reflect.defineMetadata("inject:params", existingParams, target);
+    };
+}
+
+function Optional(): ParameterDecorator {
+    return function(target: Object, propertyKey: string | symbol | undefined, parameterIndex: number) {
+        const optionalParams = Reflect.getMetadata("optional:params", target) || [];
+        optionalParams[parameterIndex] = true;
+        Reflect.defineMetadata("optional:params", optionalParams, target);
+    };
+}
+
+function Validate(validator: (value: any) => boolean): ParameterDecorator {
+    return function(target: Object, propertyKey: string | symbol | undefined, parameterIndex: number) {
+        const validators = Reflect.getMetadata("validators", target, propertyKey!) || [];
+        validators[parameterIndex] = validator;
+        Reflect.defineMetadata("validators", validators, target, propertyKey!);
+    };
+}
+
+class AuthService {
+    authenticate(
+        @Inject("username") username: string,
+        @Inject("password") password: string,
+        @Optional() @Inject("rememberMe") rememberMe?: boolean
+    ): boolean {
+        return username.length > 0 && password.length > 0;
+    }
+
+    validateToken(
+        @Validate((v) => typeof v === "string") token: string
+    ): boolean {
+        return token.length > 0;
+    }
+}
+
+class UserController {
+    constructor(
+        @Inject("AuthService") private authService: AuthService,
+        @Inject("Logger") @Optional() private logger?: any
+    ) {}
+
+    login(
+        @Validate((v) => v.length >= 3) username: string,
+        @Validate((v) => v.length >= 8) password: string
+    ): boolean {
+        return this.authService.authenticate(username, password);
+    }
+}
+
+const authService = new AuthService();
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("AuthService") && output.contains("UserController"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("authenticate") && output.contains("validateToken"),
+        "Expected AuthService methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("login"),
+        "Expected UserController methods: {}",
+        output
+    );
+
+    // Decorator functions should exist
+    assert!(
+        output.contains("Inject") && output.contains("Optional") && output.contains("Validate"),
+        "Expected decorator functions: {}",
+        output
+    );
+
+    // Type annotations should be stripped
+    assert!(
+        !output.contains(": ParameterDecorator"),
+        "Expected type annotations to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with return type metadata pattern
+#[test]
+fn test_class_es5_reflect_metadata_return_type_pattern() {
+    let source = r#"
+function ReturnType(type: Function): MethodDecorator {
+    return function(target: Object, propertyKey: string | symbol, descriptor: PropertyDescriptor) {
+        Reflect.defineMetadata("design:returntype", type, target, propertyKey);
+        return descriptor;
+    };
+}
+
+function AsyncReturn(type: Function): MethodDecorator {
+    return function(target: Object, propertyKey: string | symbol, descriptor: PropertyDescriptor) {
+        Reflect.defineMetadata("async:returntype", type, target, propertyKey);
+        Reflect.defineMetadata("is:async", true, target, propertyKey);
+        return descriptor;
+    };
+}
+
+function Cacheable(ttl: number): MethodDecorator {
+    return function(target: Object, propertyKey: string | symbol, descriptor: PropertyDescriptor) {
+        const returnType = Reflect.getMetadata("design:returntype", target, propertyKey);
+        Reflect.defineMetadata("cache:ttl", ttl, target, propertyKey);
+        Reflect.defineMetadata("cache:type", returnType, target, propertyKey);
+        return descriptor;
+    };
+}
+
+class User {
+    id: string;
+    name: string;
+
+    constructor(id: string, name: string) {
+        this.id = id;
+        this.name = name;
+    }
+}
+
+class UserRepository {
+    private users: Map<string, User> = new Map();
+
+    @ReturnType(User)
+    @Cacheable(300)
+    findById(id: string): User | undefined {
+        return this.users.get(id);
+    }
+
+    @ReturnType(Array)
+    @Cacheable(600)
+    findAll(): User[] {
+        return Array.from(this.users.values());
+    }
+
+    @AsyncReturn(User)
+    async findByIdAsync(id: string): Promise<User | undefined> {
+        return this.users.get(id);
+    }
+
+    @ReturnType(Boolean)
+    save(user: User): boolean {
+        this.users.set(user.id, user);
+        return true;
+    }
+}
+
+const repo = new UserRepository();
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("User") && output.contains("UserRepository"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("findById") && output.contains("findAll") && output.contains("findByIdAsync") && output.contains("save"),
+        "Expected UserRepository methods: {}",
+        output
+    );
+
+    // Decorator functions should exist
+    assert!(
+        output.contains("ReturnType") && output.contains("AsyncReturn") && output.contains("Cacheable"),
+        "Expected decorator functions: {}",
+        output
+    );
+
+    // Type annotations should be stripped
+    assert!(
+        !output.contains(": MethodDecorator") && !output.contains(": PropertyDescriptor"),
+        "Expected type annotations to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with custom metadata keys pattern
+#[test]
+fn test_class_es5_reflect_metadata_custom_keys_pattern() {
+    let source = r#"
+const ROUTE_METADATA = Symbol("route");
+const METHOD_METADATA = Symbol("method");
+const MIDDLEWARE_METADATA = Symbol("middleware");
+const GUARD_METADATA = Symbol("guard");
+
+function Controller(path: string): ClassDecorator {
+    return function(target: Function) {
+        Reflect.defineMetadata(ROUTE_METADATA, path, target);
+    };
+}
+
+function Get(path: string): MethodDecorator {
+    return function(target: Object, propertyKey: string | symbol, descriptor: PropertyDescriptor) {
+        Reflect.defineMetadata(ROUTE_METADATA, path, target, propertyKey);
+        Reflect.defineMetadata(METHOD_METADATA, "GET", target, propertyKey);
+        return descriptor;
+    };
+}
+
+function Post(path: string): MethodDecorator {
+    return function(target: Object, propertyKey: string | symbol, descriptor: PropertyDescriptor) {
+        Reflect.defineMetadata(ROUTE_METADATA, path, target, propertyKey);
+        Reflect.defineMetadata(METHOD_METADATA, "POST", target, propertyKey);
+        return descriptor;
+    };
+}
+
+function UseMiddleware(...middlewares: Function[]): MethodDecorator {
+    return function(target: Object, propertyKey: string | symbol, descriptor: PropertyDescriptor) {
+        Reflect.defineMetadata(MIDDLEWARE_METADATA, middlewares, target, propertyKey);
+        return descriptor;
+    };
+}
+
+function UseGuard(guard: Function): MethodDecorator {
+    return function(target: Object, propertyKey: string | symbol, descriptor: PropertyDescriptor) {
+        const guards = Reflect.getMetadata(GUARD_METADATA, target, propertyKey) || [];
+        guards.push(guard);
+        Reflect.defineMetadata(GUARD_METADATA, guards, target, propertyKey);
+        return descriptor;
+    };
+}
+
+function authMiddleware(req: any, res: any, next: Function) {
+    next();
+}
+
+function logMiddleware(req: any, res: any, next: Function) {
+    console.log(req.url);
+    next();
+}
+
+function AdminGuard(req: any): boolean {
+    return req.user?.role === "admin";
+}
+
+@Controller("/users")
+class UserController {
+    @Get("/")
+    @UseMiddleware(logMiddleware)
+    getAll(): any[] {
+        return [];
+    }
+
+    @Get("/:id")
+    @UseMiddleware(authMiddleware, logMiddleware)
+    @UseGuard(AdminGuard)
+    getById(id: string): any {
+        return { id };
+    }
+
+    @Post("/")
+    @UseMiddleware(authMiddleware)
+    @UseGuard(AdminGuard)
+    create(data: any): any {
+        return data;
+    }
+}
+
+const controller = new UserController();
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("UserController"),
+        "Expected UserController class: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("getAll") && output.contains("getById") && output.contains("create"),
+        "Expected UserController methods: {}",
+        output
+    );
+
+    // Decorator functions should exist
+    assert!(
+        output.contains("Controller") && output.contains("Get") && output.contains("Post"),
+        "Expected route decorator functions: {}",
+        output
+    );
+
+    assert!(
+        output.contains("UseMiddleware") && output.contains("UseGuard"),
+        "Expected middleware decorator functions: {}",
+        output
+    );
+
+    // Symbol constants should exist
+    assert!(
+        output.contains("ROUTE_METADATA") && output.contains("METHOD_METADATA"),
+        "Expected metadata symbol constants: {}",
+        output
+    );
+
+    // Type annotations should be stripped
+    assert!(
+        !output.contains(": ClassDecorator") && !output.contains(": MethodDecorator"),
+        "Expected type annotations to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with combined reflect-metadata patterns
+#[test]
+fn test_class_es5_reflect_metadata_combined_pattern() {
+    let source = r#"
+const INJECTABLE = Symbol("injectable");
+const DEPENDENCIES = Symbol("dependencies");
+const SCOPE = Symbol("scope");
+
+type Scope = "singleton" | "transient" | "request";
+
+function Injectable(options?: { scope?: Scope }): ClassDecorator {
+    return function(target: Function) {
+        Reflect.defineMetadata(INJECTABLE, true, target);
+        Reflect.defineMetadata(SCOPE, options?.scope || "singleton", target);
+
+        const paramTypes = Reflect.getMetadata("design:paramtypes", target) || [];
+        Reflect.defineMetadata(DEPENDENCIES, paramTypes, target);
+    };
+}
+
+function Inject(token: string | symbol): ParameterDecorator {
+    return function(target: Object, propertyKey: string | symbol | undefined, parameterIndex: number) {
+        const injections = Reflect.getMetadata("custom:inject", target) || [];
+        injections[parameterIndex] = token;
+        Reflect.defineMetadata("custom:inject", injections, target);
+    };
+}
+
+function Property(options?: { required?: boolean; default?: any }): PropertyDecorator {
+    return function(target: Object, propertyKey: string | symbol) {
+        const type = Reflect.getMetadata("design:type", target, propertyKey);
+        Reflect.defineMetadata("property:type", type, target, propertyKey);
+        Reflect.defineMetadata("property:options", options || {}, target, propertyKey);
+    };
+}
+
+function Method(options?: { async?: boolean; cacheable?: boolean }): MethodDecorator {
+    return function(target: Object, propertyKey: string | symbol, descriptor: PropertyDescriptor) {
+        const returnType = Reflect.getMetadata("design:returntype", target, propertyKey);
+        const paramTypes = Reflect.getMetadata("design:paramtypes", target, propertyKey);
+
+        Reflect.defineMetadata("method:returntype", returnType, target, propertyKey);
+        Reflect.defineMetadata("method:paramtypes", paramTypes, target, propertyKey);
+        Reflect.defineMetadata("method:options", options || {}, target, propertyKey);
+
+        return descriptor;
+    };
+}
+
+interface ILogger {
+    log(message: string): void;
+    error(message: string): void;
+}
+
+interface IDatabase {
+    query(sql: string): Promise<any[]>;
+    execute(sql: string): Promise<void>;
+}
+
+@Injectable({ scope: "singleton" })
+class Logger implements ILogger {
+    @Property({ required: false, default: "INFO" })
+    level: string = "INFO";
+
+    @Method({ async: false })
+    log(message: string): void {
+        console.log(`[${this.level}] ${message}`);
+    }
+
+    @Method({ async: false })
+    error(message: string): void {
+        console.error(`[ERROR] ${message}`);
+    }
+}
+
+@Injectable({ scope: "singleton" })
+class Database implements IDatabase {
+    @Property({ required: true })
+    connectionString: string;
+
+    constructor(@Inject("CONNECTION_STRING") connectionString: string) {
+        this.connectionString = connectionString;
+    }
+
+    @Method({ async: true, cacheable: false })
+    async query(sql: string): Promise<any[]> {
+        return [];
+    }
+
+    @Method({ async: true })
+    async execute(sql: string): Promise<void> {
+        // Execute SQL
+    }
+}
+
+@Injectable({ scope: "transient" })
+class UserService {
+    @Property()
+    private logger: Logger;
+
+    @Property()
+    private db: Database;
+
+    constructor(
+        @Inject("Logger") logger: Logger,
+        @Inject("Database") db: Database
+    ) {
+        this.logger = logger;
+        this.db = db;
+    }
+
+    @Method({ async: true, cacheable: true })
+    async findAll(): Promise<any[]> {
+        this.logger.log("Finding all users");
+        return this.db.query("SELECT * FROM users");
+    }
+
+    @Method({ async: true })
+    async findById(id: string): Promise<any> {
+        this.logger.log("Finding user by id: " + id);
+        const results = await this.db.query("SELECT * FROM users WHERE id = " + id);
+        return results[0];
+    }
+
+    @Method({ async: true })
+    async create(data: any): Promise<any> {
+        this.logger.log("Creating user");
+        await this.db.execute("INSERT INTO users ...");
+        return data;
+    }
+}
+
+class Container {
+    private instances: Map<string | symbol, any> = new Map();
+    private factories: Map<string | symbol, Function> = new Map();
+
+    register<T>(token: string | symbol, factory: () => T): void {
+        this.factories.set(token, factory);
+    }
+
+    resolve<T>(token: string | symbol): T {
+        if (this.instances.has(token)) {
+            return this.instances.get(token);
+        }
+
+        const factory = this.factories.get(token);
+        if (!factory) {
+            throw new Error("No factory registered for token");
+        }
+
+        const instance = factory();
+        this.instances.set(token, instance);
+        return instance as T;
+    }
+
+    getMetadata(target: Function): any {
+        return {
+            injectable: Reflect.getMetadata(INJECTABLE, target),
+            scope: Reflect.getMetadata(SCOPE, target),
+            dependencies: Reflect.getMetadata(DEPENDENCIES, target)
+        };
+    }
+}
+
+const container = new Container();
+const logger = new Logger();
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Logger") && output.contains("Database") && output.contains("UserService") && output.contains("Container"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Logger methods
+    assert!(
+        output.contains("log") && output.contains("error"),
+        "Expected Logger methods: {}",
+        output
+    );
+
+    // Database methods
+    assert!(
+        output.contains("query") && output.contains("execute"),
+        "Expected Database methods: {}",
+        output
+    );
+
+    // UserService methods
+    assert!(
+        output.contains("findAll") && output.contains("findById") && output.contains("create"),
+        "Expected UserService methods: {}",
+        output
+    );
+
+    // Container methods
+    assert!(
+        output.contains("register") && output.contains("resolve") && output.contains("getMetadata"),
+        "Expected Container methods: {}",
+        output
+    );
+
+    // Decorator functions should exist
+    assert!(
+        output.contains("Injectable") && output.contains("Inject") && output.contains("Property") && output.contains("Method"),
+        "Expected decorator functions: {}",
+        output
+    );
+
+    // Symbol constants should exist
+    assert!(
+        output.contains("INJECTABLE") && output.contains("DEPENDENCIES") && output.contains("SCOPE"),
+        "Expected metadata symbol constants: {}",
+        output
+    );
+
+    // Interfaces should be stripped
+    assert!(
+        !output.contains("interface ILogger") && !output.contains("interface IDatabase"),
+        "Expected interfaces to be stripped: {}",
+        output
+    );
+
+    // Type alias should be stripped
+    assert!(
+        !output.contains("type Scope"),
+        "Expected type alias to be stripped: {}",
+        output
+    );
+}
