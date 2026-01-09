@@ -2214,6 +2214,9 @@ impl ThinParserState {
             return self.parse_index_signature_with_readonly(readonly, start_pos);
         }
 
+        // Handle generator methods: *foo() or async *#bar()
+        let asterisk_token = self.parse_optional(SyntaxKind::AsteriskToken);
+
         // Handle methods and properties
         // For now, just parse name and check for ( for methods
         // Note: Many reserved keywords can be used as property names (const, class, etc.)
@@ -2292,7 +2295,7 @@ impl ThinParserState {
                 end_pos,
                 crate::parser::thin_node::MethodDeclData {
                     modifiers,
-                    asterisk_token: false,
+                    asterisk_token,
                     name,
                     question_token,
                     type_parameters,
@@ -2369,8 +2372,9 @@ impl ThinParserState {
         // Skip 'get' or 'set'
         self.next_token();
 
-        // Check for property name (identifier, string, number, or computed)
+        // Check for property name (identifier, private identifier, string, number, or computed)
         let has_name = self.is_token(SyntaxKind::Identifier) ||
+                       self.is_token(SyntaxKind::PrivateIdentifier) ||
                        self.is_token(SyntaxKind::StringLiteral) ||
                        self.is_token(SyntaxKind::NumericLiteral) ||
                        self.is_token(SyntaxKind::OpenBracketToken);
@@ -6576,9 +6580,26 @@ impl ThinParserState {
     fn parse_primary_type(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
 
+        // Handle abstract constructor types: abstract new () => T
+        if self.is_token(SyntaxKind::AbstractKeyword) {
+            // Look ahead to see if this is "abstract new"
+            let snapshot = self.scanner.save_state();
+            let current = self.current_token;
+            self.next_token();
+            let is_abstract_new = self.is_token(SyntaxKind::NewKeyword);
+            self.scanner.restore_state(snapshot);
+            self.current_token = current;
+
+            if is_abstract_new {
+                // Consume 'abstract' and parse the constructor type
+                self.next_token();
+                return self.parse_constructor_type(true);
+            }
+        }
+
         // Handle constructor types: new () => T or new <T>() => T
         if self.is_token(SyntaxKind::NewKeyword) {
-            return self.parse_constructor_type();
+            return self.parse_constructor_type(false);
         }
 
         // Handle generic function types: <T>() => T or <T, U>(x: T) => U
@@ -7716,6 +7737,7 @@ impl ThinParserState {
                 type_parameters: None,
                 parameters,
                 type_annotation,
+                is_abstract: false,
             },
         )
     }
@@ -7748,12 +7770,14 @@ impl ThinParserState {
                 type_parameters: Some(type_parameters),
                 parameters,
                 type_annotation,
+                is_abstract: false,
             },
         )
     }
 
     /// Parse constructor type: new () => T or new <T>() => T
-    fn parse_constructor_type(&mut self) -> NodeIndex {
+    /// Also handles abstract constructor types: abstract new () => T
+    fn parse_constructor_type(&mut self, is_abstract: bool) -> NodeIndex {
         let start_pos = self.token_pos();
         self.parse_expected(SyntaxKind::NewKeyword);
 
@@ -7784,6 +7808,7 @@ impl ThinParserState {
                 type_parameters,
                 parameters,
                 type_annotation,
+                is_abstract,
             },
         )
     }

@@ -6138,6 +6138,144 @@ class RegularClass {
 }
 
 #[test]
+fn test_private_static_method_access_no_error() {
+    use crate::thin_parser::ThinParserState;
+
+    // Private static methods should be accessible within the class
+    let source = r#"
+class A {
+    static #foo(a: number) {}
+    constructor() {
+        A.#foo(30);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    // TS2339 = "Property 'X' does not exist on type 'Y'"
+    let error_2339_count = codes.iter().filter(|&&c| c == 2339).count();
+
+    assert_eq!(error_2339_count, 0,
+        "Expected no TS2339 error for private static method access, got errors: {:?}", codes);
+}
+
+#[test]
+fn test_non_private_static_accessor_access_works() {
+    use crate::thin_parser::ThinParserState;
+
+    // Non-private static accessors should be accessible from class reference
+    let source = r#"
+class A {
+    static get quux(): number {
+        return 42;
+    }
+}
+let x = A.quux;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    // TS2339 = "Property 'X' does not exist on type 'Y'"
+    let error_2339_count = codes.iter().filter(|&&c| c == 2339).count();
+
+    assert_eq!(error_2339_count, 0,
+        "Expected no TS2339 error for non-private static accessor access, got errors: {:?}", codes);
+}
+
+#[test]
+fn test_private_static_accessor_access_no_error() {
+    use crate::thin_parser::ThinParserState;
+
+    // Private static accessors should be accessible within the class
+    // Simplified test: just a getter without body references
+    let source = r#"
+class A {
+    static get #quux(): number {
+        return 42;
+    }
+    constructor() {
+        let x = A.#quux;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    // TS2339 = "Property 'X' does not exist on type 'Y'"
+    let error_2339_count = codes.iter().filter(|&&c| c == 2339).count();
+
+    assert_eq!(error_2339_count, 0,
+        "Expected no TS2339 error for private static accessor access, got errors: {:?}", codes);
+}
+
+#[test]
+fn test_private_static_generator_method_access_no_error() {
+    use crate::thin_parser::ThinParserState;
+
+    // Private static async generator methods should be accessible within the class
+    let source = r#"
+class A {
+    static async *#baz(a: number) {
+        return 3;
+    }
+    constructor() {
+        A.#baz(30);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    // TS1068 = "Unexpected token"
+    // TS2339 = "Property 'X' does not exist on type 'Y'"
+    let error_1068_count = codes.iter().filter(|&&c| c == 1068).count();
+    let error_2339_count = codes.iter().filter(|&&c| c == 2339).count();
+
+    assert_eq!(error_1068_count, 0,
+        "Expected no TS1068 (unexpected token) error for private static generator method, got errors: {:?}", codes);
+    assert_eq!(error_2339_count, 0,
+        "Expected no TS2339 error for private static generator method access, got errors: {:?}", codes);
+}
+
+#[test]
 fn test_namespace_with_relative_path_ok() {
     use crate::thin_parser::ThinParserState;
 
@@ -12973,6 +13111,36 @@ x.type;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
     assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+}
+
+#[test]
+fn test_abstract_constructor_type_parses() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test that abstract constructor types parse correctly (no TS1005/TS1109 errors)
+    let source = r#"
+function Mixin<TBaseClass extends abstract new (...args: any) => any>(baseClass: TBaseClass) {
+    return baseClass;
+}
+
+type AbstractConstructor<T> = abstract new (...args: any[]) => T;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    // Check for parser errors (TS1005 = ';' expected, TS1109 = Expression expected)
+    let parse_errors: Vec<_> = parser.get_diagnostics().iter()
+        .filter(|d| d.code == 1005 || d.code == 1109)
+        .collect();
+    assert!(parse_errors.is_empty(), "Should not have parse errors for abstract new syntax: {:?}", parse_errors);
 
     let mut binder = ThinBinderState::new();
     binder.bind_source_file(parser.get_arena(), root);
