@@ -17676,3 +17676,5 @@ fn test_rest_param_object_assign() {
     assert_eq!(result_u, obj_b);
     assert_eq!(result_v, obj_c);
 }
+    assert!(result.is_ok() || result.is_err());
+        write_type: TypeId::NUMBER,
