@@ -19333,3 +19333,3330 @@ fn test_string_enum_member() {
     assert!(checker.is_subtype_of(inactive, status));
     assert!(checker.is_subtype_of(status, TypeId::STRING));
 }
+// COVARIANCE / CONTRAVARIANCE EDGE CASE TESTS
+fn test_variance_nested_function_contravariance() {
+    // (f: (x: string) => void) => void  <:  (f: (x: string | number) => void) => void
+    // The callback parameter is contravariant, so callbacks with wider params are subtypes
+    // Callback with narrow param
+    let narrow_callback = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+    // Callback with wide param
+    let wide_param = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let wide_callback = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: wide_param,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+    // HOF taking narrow callback
+    let hof_narrow = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("f")),
+            type_id: narrow_callback,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // HOF taking wide callback
+    let hof_wide = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("f")),
+            type_id: wide_callback,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+    // HOF with wide callback <: HOF with narrow callback (double contravariance = covariance)
+    // In strict variance: hof_wide <: hof_narrow only
+    // Current behavior: bivariant for callback parameters - both directions work
+    assert!(!checker.is_subtype_of(hof_wide, hof_narrow));
+    assert!(checker.is_subtype_of(hof_narrow, hof_wide));
+fn test_variance_callback_return_type() {
+    // (f: () => string) => void  vs  (f: () => string | number) => void
+    // Callback return is covariant within callback, but callback is contravariant
+    // Callback returning narrow type
+    let narrow_returning = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+    // Callback returning wide type
+    let wide_return = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let wide_returning = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: wide_return,
+        type_predicate: None,
+        is_constructor: false,
+    });
+    // HOF taking narrow-returning callback
+    let hof_narrow_return = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("f")),
+            type_id: narrow_returning,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+    // HOF taking wide-returning callback
+    let hof_wide_return = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("f")),
+            type_id: wide_returning,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+    // HOF with narrow-returning <: HOF with wide-returning (contravariant flip of covariant)
+    // In strict variance: hof_narrow_return <: hof_wide_return only
+    // Current behavior: bivariant for callback parameters - both directions work
+    assert!(!checker.is_subtype_of(hof_narrow_return, hof_wide_return));
+    assert!(checker.is_subtype_of(hof_wide_return, hof_narrow_return));
+fn test_variance_readonly_property_covariant() {
+    // { readonly x: string } <: { readonly x: string | number }
+    // Readonly properties are covariant (only read, never written)
+    let wide_type = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let narrow_readonly = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        optional: false,
+    let wide_readonly = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: wide_type,
+        write_type: wide_type,
+        optional: false,
+    // Narrow readonly <: wide readonly (covariant)
+    assert!(checker.is_subtype_of(narrow_readonly, wide_readonly));
+fn test_variance_mutable_property_invariant() {
+    // { x: string } should not be subtype of { x: string | number } (invariant for mutable)
+    // In TypeScript this is unsound - arrays are covariant even when mutable
+    let wide_type = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let narrow_mutable = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+    let wide_mutable = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: wide_type,
+        write_type: wide_type,
+        readonly: false,
+    // TypeScript allows this (unsound covariance), so we match behavior
+    assert!(checker.is_subtype_of(narrow_mutable, wide_mutable));
+fn test_variance_tuple_element_covariant() {
+    // [string, number] <: [string | number, number | boolean]
+    // Tuple elements are covariant for reading
+    let wide_first = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let wide_second = interner.union(vec![TypeId::NUMBER, TypeId::BOOLEAN]);
+    let narrow_tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            optional: false,
+            name: None,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            optional: false,
+            name: None,
+            rest: false,
+        },
+    ]);
+    let wide_tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: wide_first,
+            optional: false,
+            name: None,
+            rest: false,
+        },
+        TupleElement {
+            type_id: wide_second,
+            optional: false,
+            name: None,
+            rest: false,
+        },
+    ]);
+    // Narrow tuple <: wide tuple (covariant elements)
+    assert!(checker.is_subtype_of(narrow_tuple, wide_tuple));
+    assert!(!checker.is_subtype_of(wide_tuple, narrow_tuple));
+fn test_variance_function_returning_function() {
+    // () => (x: string) => void  vs  () => (x: string | number) => void
+    // Outer return is covariant, inner callback param is contravariant
+    let wide_param = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    // Inner function with narrow param
+    let inner_narrow = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+    // Inner function with wide param
+    let inner_wide = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: wide_param,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+    // Factory returning narrow-param function
+    let factory_narrow = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: inner_narrow,
+        type_predicate: None,
+        is_constructor: false,
+    });
+    // Factory returning wide-param function
+    let factory_wide = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: inner_wide,
+        type_predicate: None,
+        is_constructor: false,
+    });
+    // Factory returning wide-param <: factory returning narrow-param
+    // Return is covariant, and wide-param callback <: narrow-param callback
+    assert!(checker.is_subtype_of(factory_wide, factory_narrow));
+    assert!(!checker.is_subtype_of(factory_narrow, factory_wide));
+fn test_variance_union_in_contravariant_position() {
+    // (x: A | B) => void  <:  (x: A) => void  (contravariance)
+    let union_ab = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let fn_union_param = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: union_ab,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    let fn_single_param = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    // Union param <: single param (contravariance)
+    assert!(checker.is_subtype_of(fn_union_param, fn_single_param));
+    // Single param should NOT be subtype of union param
+    assert!(!checker.is_subtype_of(fn_single_param, fn_union_param));
+fn test_variance_intersection_in_covariant_position() {
+    // () => A & B  <:  () => A  (covariance)
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        optional: false,
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+    let intersection_ab = interner.intersection(vec![obj_a, obj_b]);
+
+    let fn_returns_intersection = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: intersection_ab,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_returns_a = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: obj_a,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Returns A & B <: returns A (covariance, intersection subtype of member)
+    assert!(checker.is_subtype_of(fn_returns_intersection, fn_returns_a));
+fn test_variance_array_element_unsound_covariance() {
+    // string[] <: (string | number)[] - TypeScript's unsound covariance
+    let wide_element = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let narrow_array = interner.array(TypeId::STRING);
+    let wide_array = interner.array(wide_element);
+    // TypeScript allows this (unsound)
+    assert!(checker.is_subtype_of(narrow_array, wide_array));
+fn test_variance_method_bivariant_params() {
+    // Methods are bivariant in their parameters (TypeScript unsoundness)
+    let wide_type = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    // Object with method taking narrow param
+    let narrow_method_obj = interner.callable(CallableShape {
+        call_signatures: vec![],
+        construct_signatures: vec![],
+        properties: vec![PropertyInfo {
+            name: interner.intern_string("handle"),
+            type_id: interner.function(FunctionShape {
+                type_params: vec![],
+                params: vec![ParamInfo {
+                    name: Some(interner.intern_string("x")),
+                    type_id: TypeId::STRING,
+                    optional: false,
+                    rest: false,
+                }],
+                this_type: None,
+                return_type: TypeId::VOID,
+                type_predicate: None,
+                is_constructor: false,
+            }),
+            write_type: TypeId::VOID,
+            optional: false,
+            is_method: true,
+        }],
+    });
+    // Object with method taking wide param
+    let wide_method_obj = interner.callable(CallableShape {
+        call_signatures: vec![],
+        construct_signatures: vec![],
+        properties: vec![PropertyInfo {
+            name: interner.intern_string("handle"),
+            type_id: interner.function(FunctionShape {
+                type_params: vec![],
+                params: vec![ParamInfo {
+                    name: Some(interner.intern_string("x")),
+                    type_id: wide_type,
+                    optional: false,
+                    rest: false,
+                }],
+                this_type: None,
+                return_type: TypeId::VOID,
+                type_predicate: None,
+                is_constructor: false,
+            }),
+            write_type: TypeId::VOID,
+            optional: false,
+            is_method: true,
+        }],
+    });
+    // Methods are bivariant - both directions should work
+    assert!(checker.is_subtype_of(narrow_method_obj, wide_method_obj));
+    assert!(checker.is_subtype_of(wide_method_obj, narrow_method_obj));
+fn test_variance_function_property_contravariant() {
+    // Function properties are strictly contravariant (not bivariant like methods)
+    let wide_type = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    // Object with function property taking narrow param
+    let narrow_fn_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("handle"),
+        type_id: interner.function(FunctionShape {
+            type_params: vec![],
+            params: vec![ParamInfo {
+                name: Some(interner.intern_string("x")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            }],
+            this_type: None,
+            return_type: TypeId::VOID,
+            type_predicate: None,
+            is_constructor: false,
+        }),
+        write_type: TypeId::VOID,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    // Object with function property taking wide param
+    let wide_fn_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("handle"),
+        type_id: interner.function(FunctionShape {
+            type_params: vec![],
+            params: vec![ParamInfo {
+                name: Some(interner.intern_string("x")),
+                type_id: wide_type,
+                optional: false,
+                rest: false,
+            }],
+            this_type: None,
+            return_type: TypeId::VOID,
+            type_predicate: None,
+            is_constructor: false,
+        }),
+        write_type: TypeId::VOID,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    // Wide param function <: narrow param function (contravariant)
+    assert!(checker.is_subtype_of(wide_fn_obj, narrow_fn_obj));
+fn test_variance_promise_covariant() {
+    // Promise<string> <: Promise<string | number> (covariant)
+    let wide_type = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    // Simulate Promise<string> as { then: (cb: (value: string) => void) => void }
+    let then_narrow = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("cb")),
+            type_id: interner.function(FunctionShape {
+                type_params: vec![],
+                params: vec![ParamInfo {
+                    name: Some(interner.intern_string("value")),
+                    type_id: TypeId::STRING,
+                    optional: false,
+                    rest: false,
+                }],
+                this_type: None,
+                return_type: TypeId::VOID,
+                type_predicate: None,
+                is_constructor: false,
+            }),
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let then_wide = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("cb")),
+            type_id: interner.function(FunctionShape {
+                type_params: vec![],
+                params: vec![ParamInfo {
+                    name: Some(interner.intern_string("value")),
+                    type_id: wide_type,
+                    optional: false,
+                    rest: false,
+                }],
+                this_type: None,
+                return_type: TypeId::VOID,
+                type_predicate: None,
+                is_constructor: false,
+            }),
+            optional: false,
+            rest: false,
+        }],
+    let promise_narrow = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("then"),
+        type_id: then_narrow,
+        write_type: then_narrow,
+        readonly: false,
+        is_method: true,
+    let promise_wide = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("then"),
+        type_id: then_wide,
+        write_type: then_wide,
+        is_method: true,
+    // Promise<string> <: Promise<string | number> (covariant in T)
+    // then callback param is contravariant, then is contravariant in object = covariant overall
+    assert!(checker.is_subtype_of(promise_narrow, promise_wide));
+fn test_variance_triple_nested_contravariance() {
+    // Three levels of contravariance: ((f: (g: (x: T) => void) => void) => void)
+    // Three contravariants = contravariant overall
+    let wide_type = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    // Innermost: (x: T) => void
+    let inner_narrow = interner.function(FunctionShape {
+            name: Some(interner.intern_string("x")),
+            optional: false,
+    let inner_wide = interner.function(FunctionShape {
+            name: Some(interner.intern_string("x")),
+            type_id: wide_type,
+    // Middle: (g: innermost) => void
+    let middle_narrow = interner.function(FunctionShape {
+            name: Some(interner.intern_string("g")),
+            type_id: inner_narrow,
+    let middle_wide = interner.function(FunctionShape {
+            name: Some(interner.intern_string("g")),
+            type_id: inner_wide,
+    // Outermost: (f: middle) => void
+    let outer_narrow = interner.function(FunctionShape {
+            type_id: middle_narrow,
+    let outer_wide = interner.function(FunctionShape {
+            type_id: middle_wide,
+    // Three levels of contravariance = contravariant (in strict mode)
+    // outer_narrow <: outer_wide (narrow at innermost becomes wide at triple-contravariant)
+    // Current behavior: bivariant for callback parameters - only one direction works
+    assert!(!checker.is_subtype_of(outer_narrow, outer_wide));
+    assert!(checker.is_subtype_of(outer_wide, outer_narrow));
+fn test_variance_constructor_param_contravariant() {
+    // new (x: string | number) => T  <:  new (x: string) => T
+    let wide_type = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    // Instance type
+    let instance = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("value"),
+    let ctor_narrow = interner.callable(CallableShape {
+        call_signatures: vec![],
+        construct_signatures: vec![CallSignature {
+            type_params: vec![],
+            params: vec![ParamInfo {
+                name: Some(interner.intern_string("x")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            }],
+            this_type: None,
+            return_type: instance,
+            type_predicate: None,
+        }],
+        properties: vec![],
+    });
+    let ctor_wide = interner.callable(CallableShape {
+        call_signatures: vec![],
+        construct_signatures: vec![CallSignature {
+            type_params: vec![],
+            params: vec![ParamInfo {
+                name: Some(interner.intern_string("x")),
+                type_id: wide_type,
+                optional: false,
+                rest: false,
+            }],
+            this_type: None,
+            return_type: instance,
+            type_predicate: None,
+        }],
+        properties: vec![],
+    });
+    // Wide param constructor <: narrow param constructor (contravariant)
+    assert!(checker.is_subtype_of(ctor_wide, ctor_narrow));
+    assert!(!checker.is_subtype_of(ctor_narrow, ctor_wide));
+fn test_variance_rest_param_contravariant() {
+    // (...args: (string | number)[]) => void  <:  (...args: string[]) => void
+    let wide_type = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let narrow_array = interner.array(TypeId::STRING);
+    let wide_array = interner.array(wide_type);
+    let fn_narrow_rest = interner.function(FunctionShape {
+            name: Some(interner.intern_string("args")),
+            type_id: narrow_array,
+            rest: true,
+    let fn_wide_rest = interner.function(FunctionShape {
+            name: Some(interner.intern_string("args")),
+            type_id: wide_array,
+            rest: true,
+    // Wide rest param <: narrow rest param (contravariant)
+    assert!(checker.is_subtype_of(fn_wide_rest, fn_narrow_rest));
+fn test_variance_optional_param_covariant_optionality() {
+    // (x?: string) => void  <:  (x: string) => void
+    // Optional is more permissive, can be called with fewer args
+    let fn_optional = interner.function(FunctionShape {
+            type_id: TypeId::STRING,
+            optional: true,
+    let fn_required = interner.function(FunctionShape {
+    // Optional param function <: required param function
+    // If you can call with no args, you can certainly call with one
+    assert!(checker.is_subtype_of(fn_optional, fn_required));
+// =============================================================================
+// FUNCTION TYPE TESTS - OVERLOADS
+// =============================================================================
+fn test_overload_single_signature_subtype() {
+    // Function with one signature should be subtype of callable with same signature
+    let fn_type = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        return_type: TypeId::NUMBER,
+    let callable_type = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+            type_params: vec![],
+            params: vec![ParamInfo {
+                name: Some(interner.intern_string("x")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            }],
+            this_type: None,
+            return_type: TypeId::NUMBER,
+            type_predicate: None,
+        }],
+        construct_signatures: vec![],
+        properties: vec![],
+    // Function <: callable with same signature
+    assert!(checker.is_subtype_of(fn_type, callable_type));
+fn test_overload_multiple_to_single() {
+    // Callable with multiple overloads <: callable with one matching overload
+    let multi_overload = interner.callable(CallableShape {
+        call_signatures: vec![
+            CallSignature {
+                type_params: vec![],
+                params: vec![ParamInfo {
+                    name: Some(interner.intern_string("x")),
+                    type_id: TypeId::STRING,
+                    optional: false,
+                    rest: false,
+                }],
+                this_type: None,
+                return_type: TypeId::STRING,
+                type_predicate: None,
+            },
+            CallSignature {
+                type_params: vec![],
+                params: vec![ParamInfo {
+                    name: Some(interner.intern_string("x")),
+                    type_id: TypeId::NUMBER,
+                    optional: false,
+                    rest: false,
+                }],
+                this_type: None,
+                return_type: TypeId::NUMBER,
+                type_predicate: None,
+            },
+        ],
+        construct_signatures: vec![],
+        properties: vec![],
+    });
+    let single_overload = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+            type_params: vec![],
+            params: vec![ParamInfo {
+                name: Some(interner.intern_string("x")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            }],
+            this_type: None,
+            return_type: TypeId::STRING,
+            type_predicate: None,
+        }],
+        construct_signatures: vec![],
+        properties: vec![],
+    });
+    // Multi-overload <: single overload (has matching signature)
+    assert!(checker.is_subtype_of(multi_overload, single_overload));
+fn test_overload_order_independent_matching() {
+    // Overload matching should find the best match regardless of order
+    let overloads_ab = interner.callable(CallableShape {
+        call_signatures: vec![
+            CallSignature {
+                type_params: vec![],
+                params: vec![ParamInfo {
+                    name: Some(interner.intern_string("x")),
+                    type_id: TypeId::STRING,
+                    optional: false,
+                    rest: false,
+                }],
+                this_type: None,
+                return_type: TypeId::STRING,
+                type_predicate: None,
+            },
+            CallSignature {
+                type_params: vec![],
+                params: vec![ParamInfo {
+                    name: Some(interner.intern_string("x")),
+                    type_id: TypeId::NUMBER,
+                    optional: false,
+                    rest: false,
+                }],
+                this_type: None,
+                return_type: TypeId::NUMBER,
+                type_predicate: None,
+            },
+        ],
+        properties: vec![],
+    });
+
+    let overloads_ba = interner.callable(CallableShape {
+        call_signatures: vec![
+            CallSignature {
+                type_params: vec![],
+                params: vec![ParamInfo {
+                    name: Some(interner.intern_string("x")),
+                    type_id: TypeId::NUMBER,
+                    optional: false,
+                    rest: false,
+                }],
+                this_type: None,
+                return_type: TypeId::NUMBER,
+                type_predicate: None,
+            },
+            CallSignature {
+                return_type: TypeId::STRING,
+            },
+        ],
+        construct_signatures: vec![],
+        properties: vec![],
+    // Order shouldn't matter for subtype relationship
+    assert!(checker.is_subtype_of(overloads_ab, overloads_ba));
+    assert!(checker.is_subtype_of(overloads_ba, overloads_ab));
+}
+
+#[test]
+fn test_overload_missing_signature_not_subtype() {
+    // Callable missing a required overload is not a subtype
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let single_overload = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+            type_params: vec![],
+            params: vec![ParamInfo {
+                name: Some(interner.intern_string("x")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            }],
+            this_type: None,
+            return_type: TypeId::STRING,
+            type_predicate: None,
+        }],
+        properties: vec![],
+    });
+
+    let two_overloads = interner.callable(CallableShape {
+        call_signatures: vec![
+            CallSignature {
+                    type_id: TypeId::STRING,
+                return_type: TypeId::STRING,
+            },
+            CallSignature {
+                type_params: vec![],
+                params: vec![ParamInfo {
+                    name: Some(interner.intern_string("x")),
+                    type_id: TypeId::NUMBER,
+                    optional: false,
+                    rest: false,
+                }],
+                this_type: None,
+                return_type: TypeId::NUMBER,
+                type_predicate: None,
+            },
+        ],
+        construct_signatures: vec![],
+        properties: vec![],
+    // Single overload should not be subtype of callable requiring two overloads
+    assert!(!checker.is_subtype_of(single_overload, two_overloads));
+fn test_overload_wider_param_satisfies_target() {
+    // Overload with wider param type can satisfy narrower target overload
+    let wide_param = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let wide_overload = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+                type_id: wide_param,
+        }],
+        construct_signatures: vec![],
+        properties: vec![],
+    });
+    let narrow_overload = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+                type_id: TypeId::STRING,
+        }],
+        construct_signatures: vec![],
+        properties: vec![],
+    });
+    // Wide param <: narrow param (contravariance)
+    assert!(checker.is_subtype_of(wide_overload, narrow_overload));
+fn test_overload_constructor_subtype() {
+    // Constructor overloads should follow same rules as call overloads
+    let instance = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("value"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let multi_ctor = interner.callable(CallableShape {
+        call_signatures: vec![],
+        construct_signatures: vec![
+            CallSignature {
+                    name: Some(interner.intern_string("x")),
+                return_type: instance,
+            },
+            CallSignature {
+                type_params: vec![],
+                params: vec![],
+                this_type: None,
+                return_type: instance,
+                type_predicate: None,
+            },
+        ],
+        properties: vec![],
+    });
+
+    let single_ctor = interner.callable(CallableShape {
+        call_signatures: vec![],
+        construct_signatures: vec![CallSignature {
+            type_params: vec![],
+            params: vec![ParamInfo {
+                name: Some(interner.intern_string("x")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            }],
+            this_type: None,
+            return_type: instance,
+            type_predicate: None,
+        properties: vec![],
+    // Multi-constructor <: single constructor (has matching)
+    assert!(checker.is_subtype_of(multi_ctor, single_ctor));
+}
+
+#[test]
+fn test_overload_with_different_arity() {
+    // Overloads with different arities
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let multi_arity = interner.callable(CallableShape {
+        call_signatures: vec![
+            CallSignature {
+                type_params: vec![],
+                params: vec![],
+                this_type: None,
+                return_type: TypeId::STRING,
+                type_predicate: None,
+            },
+            CallSignature {
+                    name: Some(interner.intern_string("x")),
+                    type_id: TypeId::STRING,
+                return_type: TypeId::STRING,
+            },
+            CallSignature {
+                type_params: vec![],
+                params: vec![
+                    ParamInfo {
+                        name: Some(interner.intern_string("x")),
+                        type_id: TypeId::STRING,
+                        optional: false,
+                        rest: false,
+                    },
+                    ParamInfo {
+                        name: Some(interner.intern_string("y")),
+                        type_id: TypeId::NUMBER,
+                        optional: false,
+                        rest: false,
+                    },
+                ],
+                this_type: None,
+                return_type: TypeId::STRING,
+                type_predicate: None,
+            },
+        ],
+        construct_signatures: vec![],
+        properties: vec![],
+    let no_args = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+            type_params: vec![],
+            params: vec![],
+            this_type: None,
+            return_type: TypeId::STRING,
+            type_predicate: None,
+        }],
+        construct_signatures: vec![],
+        properties: vec![],
+    });
+    // Multi-arity should satisfy no-args target
+    assert!(checker.is_subtype_of(multi_arity, no_args));
+// =============================================================================
+// FUNCTION TYPE TESTS - THIS PARAMETER
+// =============================================================================
+
+fn test_this_parameter_explicit_type() {
+    // function(this: Foo, x: string): void
+    let foo_type = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("name"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let fn_with_this = interner.function(FunctionShape {
+        this_type: Some(foo_type),
+    let fn_without_this = interner.function(FunctionShape {
+            type_id: TypeId::STRING,
+    // Function without this requirement <: function with this requirement
+    // (less restrictive is subtype)
+    assert!(checker.is_subtype_of(fn_without_this, fn_with_this));
+}
+
+#[test]
+fn test_this_parameter_covariant_in_method() {
+    // For methods, this is covariant (subclass method can be assigned to superclass)
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let base_type = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("name"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let derived_type = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("name"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("age"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Method on derived type
+    let derived_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: Some(derived_type),
+    // Method on base type
+    let base_method = interner.function(FunctionShape {
+        params: vec![],
+        this_type: Some(base_type),
+    // Base method <: derived method (covariant this)
+    assert!(checker.is_subtype_of(base_method, derived_method));
+}
+
+#[test]
+fn test_this_parameter_void_this() {
+    // this: void means the function doesn't use this
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let fn_void_this = interner.function(FunctionShape {
+        params: vec![],
+        this_type: Some(TypeId::VOID),
+        return_type: TypeId::NUMBER,
+    let fn_any_this = interner.function(FunctionShape {
+        params: vec![],
+        this_type: Some(TypeId::ANY),
+        return_type: TypeId::NUMBER,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_no_this = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        return_type: TypeId::NUMBER,
+    // void this and no this should be compatible
+    assert!(checker.is_subtype_of(fn_void_this, fn_no_this));
+    assert!(checker.is_subtype_of(fn_no_this, fn_void_this));
+
+    // any this is more permissive
+    assert!(checker.is_subtype_of(fn_any_this, fn_no_this));
+fn test_this_parameter_in_callable_method() {
+    // Callable with method that has this parameter
+    let obj_type = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("data"),
+    // Method with this type
+    let method_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: Some(obj_type),
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let callable_with_method = interner.callable(CallableShape {
+        construct_signatures: vec![],
+        properties: vec![PropertyInfo {
+            name: interner.intern_string("getData"),
+            type_id: method_fn,
+            write_type: method_fn,
+            optional: false,
+            readonly: false,
+            is_method: true,
+    // Plain method without this
+    let plain_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let callable_plain = interner.callable(CallableShape {
+        call_signatures: vec![],
+        construct_signatures: vec![],
+        properties: vec![PropertyInfo {
+            name: interner.intern_string("getData"),
+            type_id: plain_method,
+            write_type: plain_method,
+            optional: false,
+            readonly: false,
+            is_method: true,
+    // Both should be compatible (methods are bivariant)
+    assert!(checker.is_subtype_of(callable_with_method, callable_plain));
+fn test_this_parameter_fluent_api_pattern() {
+    // Fluent API: method returns this type
+    // Builder type with set method returning this
+    let builder_type = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("value"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    // Method returning the builder (this type)
+    let set_method = interner.function(FunctionShape {
+            name: Some(interner.intern_string("value")),
+            type_id: TypeId::STRING,
+            rest: false,
+        this_type: Some(builder_type),
+        return_type: builder_type,
+    // Different builder that also returns self
+    let other_builder = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("value"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("extra"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let other_set_method = interner.function(FunctionShape {
+            name: Some(interner.intern_string("value")),
+            type_id: TypeId::STRING,
+            rest: false,
+        this_type: Some(other_builder),
+        return_type: other_builder,
+    // Methods with different this/return types are not subtypes
+    // (unless there's a structural relationship)
+    assert!(!checker.is_subtype_of(set_method, other_set_method));
+fn test_this_parameter_unknown_this() {
+    // this: unknown is maximally restrictive
+    let fn_unknown_this = interner.function(FunctionShape {
+        params: vec![],
+        this_type: Some(TypeId::UNKNOWN),
+    let fn_string_this = interner.function(FunctionShape {
+        params: vec![],
+        this_type: Some(TypeId::STRING),
+    // unknown this should work with any this type
+    assert!(checker.is_subtype_of(fn_unknown_this, fn_string_this));
+}
+
+#[test]
+fn test_overload_with_call_and_construct() {
+    // Callable that can be both called and constructed
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let instance = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("value"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let dual_callable = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+            type_params: vec![],
+            params: vec![ParamInfo {
+                name: Some(interner.intern_string("x")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            }],
+            this_type: None,
+            return_type: TypeId::STRING,
+            type_predicate: None,
+        }],
+        construct_signatures: vec![CallSignature {
+            type_params: vec![],
+            params: vec![ParamInfo {
+                name: Some(interner.intern_string("x")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            }],
+            this_type: None,
+            return_type: instance,
+            type_predicate: None,
+        }],
+        properties: vec![],
+    });
+
+    let call_only = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+            type_params: vec![],
+            params: vec![ParamInfo {
+                name: Some(interner.intern_string("x")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            }],
+            this_type: None,
+            return_type: TypeId::STRING,
+            type_predicate: None,
+        }],
+        construct_signatures: vec![],
+        properties: vec![],
+    });
+
+    // Dual callable <: call-only (has matching call signature)
+    assert!(checker.is_subtype_of(dual_callable, call_only));
+}
+
+#[test]
+fn test_overload_rest_vs_multiple_params() {
+    // (...args: string[]) should be compatible with (a: string, b: string)
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let string_array = interner.array(TypeId::STRING);
+
+    let rest_fn = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+            type_params: vec![],
+            params: vec![ParamInfo {
+                name: Some(interner.intern_string("args")),
+                type_id: string_array,
+                optional: false,
+                rest: true,
+            }],
+            this_type: None,
+            return_type: TypeId::VOID,
+            type_predicate: None,
+        }],
+        construct_signatures: vec![],
+        properties: vec![],
+    });
+
+    let two_params = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+            type_params: vec![],
+            params: vec![
+                ParamInfo {
+                    name: Some(interner.intern_string("a")),
+                    type_id: TypeId::STRING,
+                    optional: false,
+                    rest: false,
+                },
+                ParamInfo {
+                    name: Some(interner.intern_string("b")),
+                    type_id: TypeId::STRING,
+                    optional: false,
+                    rest: false,
+                },
+            ],
+            this_type: None,
+            return_type: TypeId::VOID,
+            type_predicate: None,
+        }],
+        construct_signatures: vec![],
+        properties: vec![],
+    });
+
+    // Rest params can satisfy fixed params
+    assert!(checker.is_subtype_of(rest_fn, two_params));
+}
+
+#[test]
+fn test_this_in_overload_signature() {
+    // Overload with this parameter
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let obj_type = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let overload_with_this = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+            type_params: vec![],
+            params: vec![],
+            this_type: Some(obj_type),
+            return_type: TypeId::NUMBER,
+            type_predicate: None,
+        }],
+        construct_signatures: vec![],
+        properties: vec![],
+    });
+
+    let overload_no_this = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+            type_params: vec![],
+            params: vec![],
+            this_type: None,
+            return_type: TypeId::NUMBER,
+            type_predicate: None,
+        }],
+        construct_signatures: vec![],
+        properties: vec![],
+    });
+
+    // No-this is compatible with with-this (no-this is more general)
+    assert!(checker.is_subtype_of(overload_no_this, overload_with_this));
+}
+
+// =============================================================================
+// Class Type Tests (extends, implements, protected)
+// =============================================================================
+
+#[test]
+fn test_class_extends_base_simple() {
+    // class Base { x: string }
+    // class Derived extends Base { y: number }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let x_name = interner.intern_string("x");
+    let y_name = interner.intern_string("y");
+
+    let base = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let derived = interner.object(vec![
+        PropertyInfo {
+            name: x_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: y_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Derived is subtype of Base
+    assert!(checker.is_subtype_of(derived, base));
+    // Base is not subtype of Derived
+    assert!(!checker.is_subtype_of(base, derived));
+}
+
+#[test]
+fn test_class_implements_interface() {
+    // interface Printable { print(): void }
+    // class Document implements Printable { print(): void; title: string }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let print_name = interner.intern_string("print");
+    let title_name = interner.intern_string("title");
+
+    let print_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let printable = interner.object(vec![PropertyInfo {
+        name: print_name,
+        type_id: print_fn,
+        write_type: print_fn,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let document = interner.object(vec![
+        PropertyInfo {
+            name: print_name,
+            type_id: print_fn,
+            write_type: print_fn,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: title_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Document implements Printable
+    assert!(checker.is_subtype_of(document, printable));
+}
+
+#[test]
+fn test_class_with_constructor() {
+    // class Point { constructor(x: number, y: number) }
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+    let y_name = interner.intern_string("y");
+
+    let ctor = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo {
+                name: Some(x_name),
+                type_id: TypeId::NUMBER,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(y_name),
+                type_id: TypeId::NUMBER,
+                optional: false,
+                rest: false,
+            },
+        ],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    assert!(ctor != TypeId::ERROR);
+}
+
+#[test]
+fn test_class_static_members() {
+    // class Counter { static count: number; static increment(): void }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let count_name = interner.intern_string("count");
+    let increment_name = interner.intern_string("increment");
+
+    let increment_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Static side of the class
+    let counter_static = interner.object(vec![
+        PropertyInfo {
+            name: count_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: increment_name,
+            type_id: increment_fn,
+            write_type: increment_fn,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+    ]);
+
+    assert!(counter_static != TypeId::ERROR);
+}
+
+#[test]
+fn test_class_method_override_covariant_return() {
+    // class Base { getValue(): object }
+    // class Derived extends Base { getValue(): { x: number } }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let get_value_name = interner.intern_string("getValue");
+    let x_name = interner.intern_string("x");
+
+    let base_return = TypeId::OBJECT;
+    let derived_return = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let base_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: base_return,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let derived_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: derived_return,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let base = interner.object(vec![PropertyInfo {
+        name: get_value_name,
+        type_id: base_method,
+        write_type: base_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let derived = interner.object(vec![PropertyInfo {
+        name: get_value_name,
+        type_id: derived_method,
+        write_type: derived_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    // Derived with narrower return type is subtype of Base
+    assert!(checker.is_subtype_of(derived, base));
+}
+
+#[test]
+fn test_class_multiple_implements() {
+    // interface A { a(): void }
+    // interface B { b(): void }
+    // class C implements A, B { a(): void; b(): void }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_name = interner.intern_string("a");
+    let b_name = interner.intern_string("b");
+
+    let void_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let interface_a = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: void_fn,
+        write_type: void_fn,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let interface_b = interner.object(vec![PropertyInfo {
+        name: b_name,
+        type_id: void_fn,
+        write_type: void_fn,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let class_c = interner.object(vec![
+        PropertyInfo {
+            name: a_name,
+            type_id: void_fn,
+            write_type: void_fn,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: b_name,
+            type_id: void_fn,
+            write_type: void_fn,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+    ]);
+
+    // C implements both A and B
+    assert!(checker.is_subtype_of(class_c, interface_a));
+    assert!(checker.is_subtype_of(class_c, interface_b));
+}
+
+#[test]
+fn test_class_generic_extends() {
+    // class Container<T> { value: T }
+    // class NumberContainer extends Container<number> { value: number }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let value_name = interner.intern_string("value");
+
+    let number_container = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let string_container = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Different type arguments are not subtypes of each other
+    assert!(!checker.is_subtype_of(number_container, string_container));
+    assert!(!checker.is_subtype_of(string_container, number_container));
+}
+
+#[test]
+fn test_class_with_readonly_property() {
+    // class Config { readonly setting: string }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let setting_name = interner.intern_string("setting");
+
+    let readonly_config = interner.object(vec![PropertyInfo {
+        name: setting_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let mutable_config = interner.object(vec![PropertyInfo {
+        name: setting_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Mutable can be assigned to readonly
+    assert!(checker.is_subtype_of(mutable_config, readonly_config));
+}
+
+#[test]
+fn test_class_diamond_inheritance() {
+    // interface A { a: string }
+    // interface B extends A { b: number }
+    // interface C extends A { c: boolean }
+    // class D implements B, C { a: string, b: number, c: boolean }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_name = interner.intern_string("a");
+    let b_name = interner.intern_string("b");
+    let c_name = interner.intern_string("c");
+
+    let interface_a = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let interface_b = interner.object(vec![
+        PropertyInfo {
+            name: a_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let interface_c = interner.object(vec![
+        PropertyInfo {
+            name: a_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: c_name,
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let class_d = interner.object(vec![
+        PropertyInfo {
+            name: a_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: c_name,
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // D implements all interfaces in the diamond
+    assert!(checker.is_subtype_of(class_d, interface_a));
+    assert!(checker.is_subtype_of(class_d, interface_b));
+    assert!(checker.is_subtype_of(class_d, interface_c));
+}
+
+#[test]
+fn test_class_abstract_pattern() {
+    // abstract class Shape { abstract area(): number }
+    // class Circle extends Shape { area(): number; radius: number }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let area_name = interner.intern_string("area");
+    let radius_name = interner.intern_string("radius");
+
+    let area_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::NUMBER,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let shape = interner.object(vec![PropertyInfo {
+        name: area_name,
+        type_id: area_fn,
+        write_type: area_fn,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let circle = interner.object(vec![
+        PropertyInfo {
+            name: area_name,
+            type_id: area_fn,
+            write_type: area_fn,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: radius_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Circle is subtype of Shape
+    assert!(checker.is_subtype_of(circle, shape));
+}
+
+#[test]
+fn test_class_with_optional_method() {
+    // class Handler { handle?(): void }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let handle_name = interner.intern_string("handle");
+
+    let handle_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let with_optional = interner.object(vec![PropertyInfo {
+        name: handle_name,
+        type_id: handle_fn,
+        write_type: handle_fn,
+        optional: true,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let with_required = interner.object(vec![PropertyInfo {
+        name: handle_name,
+        type_id: handle_fn,
+        write_type: handle_fn,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    // Required can satisfy optional
+    assert!(checker.is_subtype_of(with_required, with_optional));
+    // Optional cannot satisfy required
+    assert!(!checker.is_subtype_of(with_optional, with_required));
+}
+
+#[test]
+fn test_class_method_with_overloads() {
+    // class Parser { parse(input: string): AST; parse(input: Buffer): AST }
+    let interner = TypeInterner::new();
+
+    let parse_name = interner.intern_string("parse");
+    let input_name = interner.intern_string("input");
+    let ast_name = interner.intern_string("AST");
+
+    let ast_type = interner.object(vec![PropertyInfo {
+        name: ast_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let parse_string = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(input_name),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: ast_type,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let parser = interner.object(vec![PropertyInfo {
+        name: parse_name,
+        type_id: parse_string,
+        write_type: parse_string,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    assert!(parser != TypeId::ERROR);
+}
+
+#[test]
+fn test_class_getter_setter() {
+    // class Person { get name(): string; set name(v: string) }
+    let interner = TypeInterner::new();
+
+    let name_prop = interner.intern_string("name");
+
+    // Getter/setter modeled as property with read/write types
+    let person = interner.object(vec![PropertyInfo {
+        name: name_prop,
+        type_id: TypeId::STRING,       // getter return
+        write_type: TypeId::STRING,    // setter param
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(person != TypeId::ERROR);
+}
+
+#[test]
+fn test_class_extends_with_super_call() {
+    // class Animal { constructor(name: string) }
+    // class Dog extends Animal { constructor(name: string, breed: string) }
+    let interner = TypeInterner::new();
+
+    let name_name = interner.intern_string("name");
+    let breed_name = interner.intern_string("breed");
+
+    let animal_ctor = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(name_name),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    let dog_ctor = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo {
+                name: Some(name_name),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(breed_name),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+        ],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    assert!(animal_ctor != TypeId::ERROR);
+    assert!(dog_ctor != TypeId::ERROR);
+}
+
+#[test]
+fn test_class_implements_generic_interface() {
+    // interface Comparable<T> { compareTo(other: T): number }
+    // class Person implements Comparable<Person> { compareTo(other: Person): number }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let compare_to_name = interner.intern_string("compareTo");
+    let other_name = interner.intern_string("other");
+
+    let person_type = interner.object(vec![]);
+
+    let compare_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(other_name),
+            type_id: person_type,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::NUMBER,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let comparable = interner.object(vec![PropertyInfo {
+        name: compare_to_name,
+        type_id: compare_fn,
+        write_type: compare_fn,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let person_with_compare = interner.object(vec![PropertyInfo {
+        name: compare_to_name,
+        type_id: compare_fn,
+        write_type: compare_fn,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    assert!(checker.is_subtype_of(person_with_compare, comparable));
+}
+
+#[test]
+fn test_class_mixin_pattern() {
+    // Mixin: <T extends new(...args: any[]) => {}>(Base: T) => class extends Base { ... }
+    let interner = TypeInterner::new();
+
+    let mixin_name = interner.intern_string("mixin");
+    let args_name = interner.intern_string("args");
+
+    let any_array = interner.array(TypeId::ANY);
+    let empty_obj = interner.object(vec![]);
+
+    let base_ctor = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(args_name),
+            type_id: any_array,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: empty_obj,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    assert!(base_ctor != TypeId::ERROR);
+}
+
+#[test]
+fn test_class_interface_extends_multiple() {
+    // interface A { a: string }
+    // interface B { b: number }
+    // interface C extends A, B { c: boolean }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_name = interner.intern_string("a");
+    let b_name = interner.intern_string("b");
+    let c_name = interner.intern_string("c");
+
+    let interface_a = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let interface_b = interner.object(vec![PropertyInfo {
+        name: b_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let interface_c = interner.object(vec![
+        PropertyInfo {
+            name: a_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: c_name,
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // C extends both A and B
+    assert!(checker.is_subtype_of(interface_c, interface_a));
+    assert!(checker.is_subtype_of(interface_c, interface_b));
+}
+
+#[test]
+fn test_class_method_this_return() {
+    // class Builder { setValue(v: string): this }
+    let interner = TypeInterner::new();
+
+    let set_value_name = interner.intern_string("setValue");
+    let v_name = interner.intern_string("v");
+
+    // 'this' type represented as a type parameter or special marker
+    let this_type = interner.object(vec![]); // Simplified representation
+
+    let set_value_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(v_name),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: Some(this_type),
+        return_type: this_type,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let builder = interner.object(vec![PropertyInfo {
+        name: set_value_name,
+        type_id: set_value_fn,
+        write_type: set_value_fn,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    assert!(builder != TypeId::ERROR);
+}
+
+#[test]
+fn test_class_private_brand() {
+    // Private fields create nominal typing behavior
+    // class A { #private: string }
+    // class B { #private: string }
+    // A and B are not structurally compatible due to private brand
+    let interner = TypeInterner::new();
+
+    let private_a = interner.intern_string("#private_A");
+    let private_b = interner.intern_string("#private_B");
+
+    let class_a = interner.object(vec![PropertyInfo {
+        name: private_a,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let class_b = interner.object(vec![PropertyInfo {
+        name: private_b,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Different private fields - not subtypes of each other
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(!checker.is_subtype_of(class_a, class_b));
+    assert!(!checker.is_subtype_of(class_b, class_a));
+}
+
+#[test]
+fn test_class_index_signature() {
+    // class Dictionary { [key: string]: number }
+    let interner = TypeInterner::new();
+
+    let dict = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    assert!(dict != TypeId::ERROR);
+}
+
+#[test]
+fn test_class_hybrid_type() {
+    // interface Counter { (start: number): string; interval: number; reset(): void }
+    let interner = TypeInterner::new();
+
+    let interval_name = interner.intern_string("interval");
+    let reset_name = interner.intern_string("reset");
+    let start_name = interner.intern_string("start");
+
+    // Callable signature
+    let _call_sig = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(start_name),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let reset_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Object with properties (hybrid types combine callable + properties)
+    let counter = interner.object(vec![
+        PropertyInfo {
+            name: interval_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: reset_name,
+            type_id: reset_fn,
+            write_type: reset_fn,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+    ]);
+
+    assert!(counter != TypeId::ERROR);
+}
+
+// =============================================================================
+// Interface Type Tests - Extends, Merge Declarations, Excess Property Checks
+// =============================================================================
+
+#[test]
+fn test_interface_extends_single_v2() {
+    // interface Base { x: number }
+    // interface Derived extends Base { y: string }
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+    let y_name = interner.intern_string("y");
+
+    let base = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let derived = interner.object(vec![
+        PropertyInfo {
+            name: x_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: y_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(derived, base));
+    assert!(!checker.is_subtype_of(base, derived));
+}
+
+#[test]
+fn test_interface_extends_multiple_v2() {
+    // interface A { a: number }
+    // interface B { b: string }
+    // interface C extends A, B { c: boolean }
+    let interner = TypeInterner::new();
+
+    let a_name = interner.intern_string("a");
+    let b_name = interner.intern_string("b");
+    let c_name = interner.intern_string("c");
+
+    let iface_a = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let iface_b = interner.object(vec![PropertyInfo {
+        name: b_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let iface_c = interner.object(vec![
+        PropertyInfo {
+            name: a_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: c_name,
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(iface_c, iface_a));
+    assert!(checker.is_subtype_of(iface_c, iface_b));
+    assert!(!checker.is_subtype_of(iface_a, iface_c));
+    assert!(!checker.is_subtype_of(iface_b, iface_c));
+}
+
+#[test]
+fn test_interface_merge_declarations_simple() {
+    // interface Foo { x: number }
+    // interface Foo { y: string }
+    // Merged: { x: number; y: string }
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+    let y_name = interner.intern_string("y");
+
+    // Merged interface
+    let merged = interner.object(vec![
+        PropertyInfo {
+            name: x_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: y_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Each partial declaration
+    let decl1 = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let decl2 = interner.object(vec![PropertyInfo {
+        name: y_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    // Merged is subtype of each declaration
+    assert!(checker.is_subtype_of(merged, decl1));
+    assert!(checker.is_subtype_of(merged, decl2));
+}
+
+#[test]
+fn test_interface_merge_with_methods() {
+    // interface Foo { method(x: number): void }
+    // interface Foo { method(x: string): void }
+    // Merged: overloaded method
+    let interner = TypeInterner::new();
+
+    let method_name = interner.intern_string("method");
+    let x_name = interner.intern_string("x");
+
+    let method_number = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(x_name),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let method_string = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(x_name),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let iface_with_number = interner.object(vec![PropertyInfo {
+        name: method_name,
+        type_id: method_number,
+        write_type: method_number,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let iface_with_string = interner.object(vec![PropertyInfo {
+        name: method_name,
+        type_id: method_string,
+        write_type: method_string,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    assert!(iface_with_number != TypeId::ERROR);
+    assert!(iface_with_string != TypeId::ERROR);
+}
+
+#[test]
+fn test_excess_property_check_basic() {
+    // Target: { x: number }
+    // Source: { x: number, y: string } - excess property 'y'
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+    let y_name = interner.intern_string("y");
+
+    let target = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let source_with_excess = interner.object(vec![
+        PropertyInfo {
+            name: x_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: y_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Structurally, source is still subtype (excess props allowed in subtyping)
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(source_with_excess, target));
+}
+
+#[test]
+fn test_excess_property_check_with_index_signature() {
+    // Target: { x: number; [key: string]: any }
+    // Source: { x: number, y: string } - y is allowed due to index signature
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+    let y_name = interner.intern_string("y");
+
+    let target = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name: x_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::ANY,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    let source = interner.object(vec![
+        PropertyInfo {
+            name: x_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: y_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(source, target));
+}
+
+#[test]
+fn test_interface_with_optional_properties() {
+    // interface A { x: number; y?: string }
+    // interface B { x: number }
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+    let y_name = interner.intern_string("y");
+
+    let with_optional = interner.object(vec![
+        PropertyInfo {
+            name: x_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: y_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: true,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let without_optional = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    // Without optional is subtype of with optional (missing optional is ok)
+    assert!(checker.is_subtype_of(without_optional, with_optional));
+}
+
+#[test]
+fn test_interface_extends_with_narrower_type() {
+    // interface Base { x: number | string }
+    // interface Derived extends Base { x: number } // narrower
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+
+    let union_type = interner.union(vec![TypeId::NUMBER, TypeId::STRING]);
+
+    let base = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: union_type,
+        write_type: union_type,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let derived = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(derived, base));
+    assert!(!checker.is_subtype_of(base, derived));
+}
+
+#[test]
+fn test_interface_with_readonly_properties() {
+    // interface A { readonly x: number }
+    // interface B { x: number }
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+
+    let readonly_iface = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let mutable_iface = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    // Mutable can be assigned to readonly (covariant for reads)
+    assert!(checker.is_subtype_of(mutable_iface, readonly_iface));
+}
+
+#[test]
+fn test_interface_with_call_signature() {
+    // interface Callable { (x: number): string }
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+
+    let call_sig = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(x_name),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    assert!(call_sig != TypeId::ERROR);
+}
+
+#[test]
+fn test_interface_with_construct_signature() {
+    // interface Constructable { new(x: number): Object }
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+
+    let construct_sig = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(x_name),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::OBJECT,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    assert!(construct_sig != TypeId::ERROR);
+}
+
+#[test]
+fn test_interface_extends_generic() {
+    // interface Base<T> { value: T }
+    // interface Derived<T> extends Base<T> { extra: string }
+    let interner = TypeInterner::new();
+
+    let value_name = interner.intern_string("value");
+    let extra_name = interner.intern_string("extra");
+
+    // Instantiated with number
+    let base_number = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let derived_number = interner.object(vec![
+        PropertyInfo {
+            name: value_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: extra_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(derived_number, base_number));
+}
+
+#[test]
+fn test_interface_diamond_extends_v2() {
+    // interface A { a: number }
+    // interface B extends A { b: string }
+    // interface C extends A { c: boolean }
+    // interface D extends B, C { d: number }
+    let interner = TypeInterner::new();
+
+    let a_name = interner.intern_string("a");
+    let b_name = interner.intern_string("b");
+    let c_name = interner.intern_string("c");
+    let d_name = interner.intern_string("d");
+
+    let iface_a = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let iface_d = interner.object(vec![
+        PropertyInfo {
+            name: a_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: c_name,
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: d_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(iface_d, iface_a));
+}
+
+#[test]
+fn test_interface_merge_with_different_property_types_error() {
+    // interface Foo { x: number }
+    // interface Foo { x: string } // Error - incompatible types
+    // This should fail subtype check between declarations
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+
+    let decl1 = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let decl2 = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    // Neither is subtype of the other due to incompatible property types
+    assert!(!checker.is_subtype_of(decl1, decl2));
+    assert!(!checker.is_subtype_of(decl2, decl1));
+}
+
+#[test]
+fn test_interface_with_function_property() {
+    // interface A { fn: (x: number) => string }
+    let interner = TypeInterner::new();
+
+    let fn_name = interner.intern_string("fn");
+    let x_name = interner.intern_string("x");
+
+    let fn_type = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(x_name),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let iface = interner.object(vec![PropertyInfo {
+        name: fn_name,
+        type_id: fn_type,
+        write_type: fn_type,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(iface != TypeId::ERROR);
+}
+
+#[test]
+fn test_interface_covariant_method_return() {
+    // interface Base { method(): Animal }
+    // interface Derived extends Base { method(): Dog }
+    let interner = TypeInterner::new();
+
+    let method_name = interner.intern_string("method");
+    let name_prop = interner.intern_string("name");
+    let breed_prop = interner.intern_string("breed");
+
+    // Animal: { name: string }
+    let animal = interner.object(vec![PropertyInfo {
+        name: name_prop,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Dog: { name: string, breed: string }
+    let dog = interner.object(vec![
+        PropertyInfo {
+            name: name_prop,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: breed_prop,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let method_returns_animal = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: animal,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let method_returns_dog = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: dog,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let base_iface = interner.object(vec![PropertyInfo {
+        name: method_name,
+        type_id: method_returns_animal,
+        write_type: method_returns_animal,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let derived_iface = interner.object(vec![PropertyInfo {
+        name: method_name,
+        type_id: method_returns_dog,
+        write_type: method_returns_dog,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(derived_iface, base_iface));
+}
+
+#[test]
+fn test_interface_contravariant_method_params() {
+    // interface Base { method(x: Dog): void }
+    // interface Derived extends Base { method(x: Animal): void } // contravariant
+    let interner = TypeInterner::new();
+
+    let method_name = interner.intern_string("method");
+    let x_name = interner.intern_string("x");
+    let name_prop = interner.intern_string("name");
+    let breed_prop = interner.intern_string("breed");
+
+    // Animal: { name: string }
+    let animal = interner.object(vec![PropertyInfo {
+        name: name_prop,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Dog: { name: string, breed: string }
+    let dog = interner.object(vec![
+        PropertyInfo {
+            name: name_prop,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: breed_prop,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let method_takes_dog = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(x_name),
+            type_id: dog,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let method_takes_animal = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(x_name),
+            type_id: animal,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let base_iface = interner.object(vec![PropertyInfo {
+        name: method_name,
+        type_id: method_takes_dog,
+        write_type: method_takes_dog,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let derived_iface = interner.object(vec![PropertyInfo {
+        name: method_name,
+        type_id: method_takes_animal,
+        write_type: method_takes_animal,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    // Derived (takes Animal) is subtype of Base (takes Dog) due to contravariance
+    assert!(checker.is_subtype_of(derived_iface, base_iface));
+}
+
+#[test]
+fn test_interface_with_string_index() {
+    // interface StringMap { [key: string]: number }
+    let interner = TypeInterner::new();
+
+    let string_map = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    // Object with specific property should be subtype
+    let x_name = interner.intern_string("x");
+    let specific = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(specific, string_map));
+}
+
+#[test]
+fn test_interface_with_number_index() {
+    // interface NumberMap { [index: number]: string }
+    let interner = TypeInterner::new();
+
+    let number_map = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+    });
+
+    assert!(number_map != TypeId::ERROR);
+}
+
+#[test]
+fn test_interface_index_must_match_properties() {
+    // interface A { x: number; [key: string]: number }
+    // Property x must be compatible with index signature
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+
+    let compatible = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name: x_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    assert!(compatible != TypeId::ERROR);
+}
+
+#[test]
+fn test_interface_merge_adds_properties() {
+    // interface Window { name: string }
+    // interface Window { location: string }
+    // Merged has both
+    let interner = TypeInterner::new();
+
+    let name_prop = interner.intern_string("name");
+    let location_prop = interner.intern_string("location");
+
+    let merged_window = interner.object(vec![
+        PropertyInfo {
+            name: name_prop,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: location_prop,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let only_name = interner.object(vec![PropertyInfo {
+        name: name_prop,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(merged_window, only_name));
+}
+
+#[test]
+fn test_interface_empty() {
+    // interface Empty {}
+    let interner = TypeInterner::new();
+
+    let empty = interner.object(vec![]);
+
+    // Everything is subtype of empty interface
+    let x_name = interner.intern_string("x");
+    let with_props = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(with_props, empty));
+    assert!(checker.is_subtype_of(empty, empty));
+}
+
+#[test]
+fn test_interface_with_never_property() {
+    // interface A { x: never }
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+
+    let with_never = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NEVER,
+        write_type: TypeId::NEVER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(with_never != TypeId::ERROR);
+}
+
+#[test]
+fn test_interface_with_unknown_property() {
+    // interface A { x: unknown }
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+
+    let with_unknown = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::UNKNOWN,
+        write_type: TypeId::UNKNOWN,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let with_number = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    // number is subtype of unknown
+    assert!(checker.is_subtype_of(with_number, with_unknown));
+}
+
+#[test]
+fn test_interface_extends_with_additional_optional() {
+    // interface Base { x: number }
+    // interface Derived extends Base { y?: string }
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+    let y_name = interner.intern_string("y");
+
+    let base = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let derived = interner.object(vec![
+        PropertyInfo {
+            name: x_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: y_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: true,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(checker.is_subtype_of(derived, base));
+}
+
+#[test]
+fn test_interface_recursive_property() {
+    // interface Node { next?: Node }
+    use crate::solver::types::SymbolRef;
+
+    let interner = TypeInterner::new();
+
+    let next_name = interner.intern_string("next");
+    let node_ref = interner.reference(SymbolRef(1));
+
+    let node = interner.object(vec![PropertyInfo {
+        name: next_name,
+        type_id: node_ref,
+        write_type: node_ref,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(node != TypeId::ERROR);
+}
+
+#[test]
+fn test_interface_with_tuple_property() {
+    // interface A { pair: [number, string] }
+    let interner = TypeInterner::new();
+
+    let pair_name = interner.intern_string("pair");
+    let tuple = interner.tuple(vec![TypeId::NUMBER, TypeId::STRING]);
+
+    let iface = interner.object(vec![PropertyInfo {
+        name: pair_name,
+        type_id: tuple,
+        write_type: tuple,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(iface != TypeId::ERROR);
+}
+
+#[test]
+fn test_interface_with_array_property() {
+    // interface A { items: number[] }
+    let interner = TypeInterner::new();
+
+    let items_name = interner.intern_string("items");
+    let number_array = interner.array(TypeId::NUMBER);
+
+    let iface = interner.object(vec![PropertyInfo {
+        name: items_name,
+        type_id: number_array,
+        write_type: number_array,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(iface != TypeId::ERROR);
+}
+
+#[test]
+fn test_interface_intersection_merge() {
+    // type Merged = A & B (similar to merge)
+    let interner = TypeInterner::new();
+
+    let a_name = interner.intern_string("a");
+    let b_name = interner.intern_string("b");
+
+    let iface_a = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let iface_b = interner.object(vec![PropertyInfo {
+        name: b_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![iface_a, iface_b]);
+
+    assert!(intersection != TypeId::ERROR);
+}
+
+#[test]
+fn test_interface_with_symbol_property() {
+    // interface A { [Symbol.iterator]: () => Iterator }
+    let interner = TypeInterner::new();
+
+    let iterator_name = interner.intern_string("Symbol.iterator");
+
+    let iterator_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::OBJECT,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let iface = interner.object(vec![PropertyInfo {
+        name: iterator_name,
+        type_id: iterator_fn,
+        write_type: iterator_fn,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    assert!(iface != TypeId::ERROR);
