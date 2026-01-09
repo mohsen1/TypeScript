@@ -7,12 +7,13 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- [ ] Add async ES5 tests for async module patterns: dynamic import with await, top-level await simulation, module-scoped async. Tests: `./wasm/test.sh async_es5_tests`
+None - awaiting next task
 
 ## Task Queue
 - [ ] Add async ES5 tests for async resource management patterns: using declarations, async dispose
 
 ## Completed
+- [x] Added 12 async module pattern tests (dynamic import, dynamic import call, conditional import, top-level simulation, module init, lazy load, parallel imports, module factory, export async, import-then-use, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (628 tests PASS).
 - [x] Added 12 async decorator pattern tests (method basic, method multiple, method with params, static method, class with async method, property initializer, accessor simulation, composition, factory, validation, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (616 tests PASS).
 - [x] Added 12 async class pattern tests (constructor simulation, static init, factory method, singleton, dependency injection, lifecycle init, lifecycle destroy, builder, repository, service layer, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (604 tests PASS).
 - [x] Added 12 async iteration pattern tests (for-of await body, await expression, async generator, break, continue, nested, destructure, array destructure, try/catch, return, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (592 tests PASS).
