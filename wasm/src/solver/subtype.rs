@@ -609,6 +609,26 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 }
             }
 
+            // Source is Mapped, target is structural - try to expand and compare
+            (TypeKey::Mapped(mapped_id), _) => {
+                if let Some(expanded) = self.try_expand_mapped(*mapped_id) {
+                    self.check_subtype(expanded, target)
+                } else {
+                    // Can't expand - assume not a subtype
+                    SubtypeResult::False
+                }
+            }
+
+            // Target is Mapped, source is structural - try to expand and compare
+            (_, TypeKey::Mapped(mapped_id)) => {
+                if let Some(expanded) = self.try_expand_mapped(*mapped_id) {
+                    self.check_subtype(source, expanded)
+                } else {
+                    // Can't expand - assume not a subtype
+                    SubtypeResult::False
+                }
+            }
+
             // Reference types - try to resolve and compare structurally
             (TypeKey::Ref(s_sym), TypeKey::Ref(t_sym)) => {
                 // Same symbol reference - trivially equal
@@ -782,6 +802,100 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         } else {
             // Base is not a Ref - can't expand
             None
+        }
+    }
+
+    /// Try to expand a Mapped type to its structural form.
+    /// Returns None if the mapped type cannot be expanded (unresolvable constraint).
+    fn try_expand_mapped(&mut self, mapped_id: MappedTypeId) -> Option<TypeId> {
+        use crate::solver::{PropertyInfo, LiteralValue, instantiate_type, TypeSubstitution, MappedModifier};
+
+        let mapped = self.interner.mapped_type(mapped_id);
+
+        // Get concrete keys from the constraint
+        let keys = self.try_evaluate_mapped_constraint(mapped.constraint)?;
+        if keys.is_empty() {
+            return None;
+        }
+
+        // Build properties by instantiating template for each key
+        let mut properties = Vec::new();
+        for key_name in keys {
+            let key_literal = self.interner.intern(TypeKey::Literal(LiteralValue::String(key_name)));
+
+            let mut subst = TypeSubstitution::new();
+            subst.insert(mapped.type_param.name, key_literal);
+
+            let property_type = instantiate_type(self.interner, mapped.template, &subst);
+
+            let optional = matches!(mapped.optional_modifier, Some(MappedModifier::Add));
+            let readonly = matches!(mapped.readonly_modifier, Some(MappedModifier::Add));
+
+            properties.push(PropertyInfo {
+                name: key_name,
+                type_id: property_type,
+                write_type: property_type,
+                optional,
+                readonly,
+                is_method: false,
+            });
+        }
+
+        Some(self.interner.object(properties))
+    }
+
+    /// Try to evaluate a mapped type constraint to get concrete string keys.
+    /// Returns None if the constraint can't be resolved to concrete keys.
+    fn try_evaluate_mapped_constraint(&self, constraint: TypeId) -> Option<Vec<crate::interner::Atom>> {
+        use crate::solver::LiteralValue;
+
+        let key = self.interner.lookup(constraint)?;
+
+        match key {
+            TypeKey::KeyOf(operand) => {
+                // Try to resolve the operand to get concrete keys
+                self.try_get_keyof_keys(operand)
+            }
+            TypeKey::Literal(LiteralValue::String(name)) => {
+                Some(vec![name])
+            }
+            TypeKey::Union(list_id) => {
+                let members = self.interner.type_list(list_id);
+                let mut keys = Vec::new();
+                for &member in members.iter() {
+                    if let Some(TypeKey::Literal(LiteralValue::String(name))) = self.interner.lookup(member) {
+                        keys.push(name);
+                    }
+                }
+                if keys.is_empty() { None } else { Some(keys) }
+            }
+            _ => None,
+        }
+    }
+
+    /// Try to get keys from keyof an operand type.
+    fn try_get_keyof_keys(&self, operand: TypeId) -> Option<Vec<crate::interner::Atom>> {
+        use crate::solver::LiteralValue;
+
+        let key = self.interner.lookup(operand)?;
+
+        match key {
+            TypeKey::Object(shape_id) | TypeKey::ObjectWithIndex(shape_id) => {
+                let shape = self.interner.object_shape(shape_id);
+                if shape.properties.is_empty() {
+                    return None;
+                }
+                Some(shape.properties.iter().map(|p| p.name).collect())
+            }
+            TypeKey::Ref(symbol) => {
+                // Try to resolve the ref and get keys from the resolved type
+                let resolved = self.resolver.resolve_ref(symbol, self.interner)?;
+                if resolved == operand {
+                    return None; // Avoid infinite recursion
+                }
+                self.try_get_keyof_keys(resolved)
+            }
+            _ => None,
         }
     }
 

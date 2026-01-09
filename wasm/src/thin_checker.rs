@@ -5193,7 +5193,158 @@ impl<'a> ThinCheckerState<'a> {
         let instantiated = instantiate_type(self.ctx.types, body_type, &substitution);
 
         // Recursively evaluate in case the result contains more applications
-        self.evaluate_application_type(instantiated)
+        let result = self.evaluate_application_type(instantiated);
+
+        // If the result is a Mapped type, try to evaluate it with symbol resolution
+        self.evaluate_mapped_type_with_resolution(result)
+    }
+
+    /// Evaluate a mapped type with symbol resolution.
+    /// This handles cases like `{ [K in keyof Ref(sym)]: Template }` where the Ref
+    /// needs to be resolved to get concrete keys.
+    fn evaluate_mapped_type_with_resolution(&mut self, type_id: TypeId) -> TypeId {
+        use crate::solver::{TypeKey, MappedType, SymbolRef, PropertyInfo, LiteralValue, instantiate_type, TypeSubstitution};
+        use crate::binder::SymbolId;
+
+        let Some(TypeKey::Mapped(mapped_id)) = self.ctx.types.lookup(type_id) else {
+            return type_id;
+        };
+
+        let mapped = self.ctx.types.mapped_type(mapped_id);
+
+        // Evaluate the constraint to get concrete keys
+        let keys = self.evaluate_mapped_constraint_with_resolution(mapped.constraint);
+
+        // Extract string literal keys
+        let string_keys = self.extract_string_literal_keys(keys);
+        if string_keys.is_empty() {
+            // Can't evaluate - return original
+            return type_id;
+        }
+
+        // Build the resulting object properties
+        let mut properties = Vec::new();
+        for key_name in string_keys {
+            // Create the key literal type
+            let key_literal = self.ctx.types.intern(TypeKey::Literal(LiteralValue::String(key_name)));
+
+            // Substitute the type parameter with the key
+            let mut subst = TypeSubstitution::new();
+            subst.insert(mapped.type_param.name, key_literal);
+
+            // Instantiate the template
+            let property_type = instantiate_type(self.ctx.types, mapped.template, &subst);
+
+            // Recursively evaluate the property type (handles nested Applications)
+            let property_type = self.evaluate_application_type(property_type);
+
+            let optional = matches!(mapped.optional_modifier, Some(crate::solver::MappedModifier::Add));
+            let readonly = matches!(mapped.readonly_modifier, Some(crate::solver::MappedModifier::Add));
+
+            properties.push(PropertyInfo {
+                name: key_name,
+                type_id: property_type,
+                write_type: property_type,
+                optional,
+                readonly,
+                is_method: false,
+            });
+        }
+
+        self.ctx.types.object(properties)
+    }
+
+    /// Evaluate a mapped type constraint with symbol resolution.
+    /// Handles keyof Ref(sym) by resolving the Ref and getting its keys.
+    fn evaluate_mapped_constraint_with_resolution(&mut self, constraint: TypeId) -> TypeId {
+        use crate::solver::{TypeKey, SymbolRef, LiteralValue};
+        use crate::binder::SymbolId;
+
+        let Some(key) = self.ctx.types.lookup(constraint) else {
+            return constraint;
+        };
+
+        match key {
+            TypeKey::KeyOf(operand) => {
+                // Evaluate the operand with symbol resolution
+                let evaluated = self.evaluate_type_with_resolution(operand);
+                self.get_keyof_type(evaluated)
+            }
+            TypeKey::Union(_) | TypeKey::Literal(_) => constraint,
+            _ => constraint,
+        }
+    }
+
+    /// Evaluate a type with symbol resolution (Refs resolved to their concrete types).
+    fn evaluate_type_with_resolution(&mut self, type_id: TypeId) -> TypeId {
+        use crate::solver::{TypeKey, SymbolRef};
+        use crate::binder::SymbolId;
+
+        let Some(key) = self.ctx.types.lookup(type_id) else {
+            return type_id;
+        };
+
+        match key {
+            TypeKey::Ref(SymbolRef(sym_id)) => {
+                self.get_type_of_symbol(SymbolId(sym_id))
+            }
+            TypeKey::Application(_) => {
+                self.evaluate_application_type(type_id)
+            }
+            _ => type_id,
+        }
+    }
+
+    /// Get keyof a type - extract the keys of an object type.
+    fn get_keyof_type(&self, operand: TypeId) -> TypeId {
+        use crate::solver::{TypeKey, LiteralValue};
+
+        let Some(key) = self.ctx.types.lookup(operand) else {
+            return TypeId::NEVER;
+        };
+
+        match key {
+            TypeKey::Object(shape_id) | TypeKey::ObjectWithIndex(shape_id) => {
+                let shape = self.ctx.types.object_shape(shape_id);
+                if shape.properties.is_empty() {
+                    return TypeId::NEVER;
+                }
+                let key_types: Vec<TypeId> = shape
+                    .properties
+                    .iter()
+                    .map(|p| self.ctx.types.intern(TypeKey::Literal(LiteralValue::String(p.name))))
+                    .collect();
+                self.ctx.types.union(key_types)
+            }
+            _ => TypeId::NEVER,
+        }
+    }
+
+    /// Extract string literal keys from a union or single literal type.
+    fn extract_string_literal_keys(&self, type_id: TypeId) -> Vec<crate::interner::Atom> {
+        use crate::solver::{TypeKey, LiteralValue};
+
+        let Some(key) = self.ctx.types.lookup(type_id) else {
+            return Vec::new();
+        };
+
+        match key {
+            TypeKey::Literal(LiteralValue::String(name)) => vec![name],
+            TypeKey::Union(list_id) => {
+                let members = self.ctx.types.type_list(list_id);
+                members
+                    .iter()
+                    .filter_map(|&member| {
+                        if let Some(TypeKey::Literal(LiteralValue::String(name))) = self.ctx.types.lookup(member) {
+                            Some(name)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect()
+            }
+            _ => Vec::new(),
+        }
     }
 
     /// Ensure all symbols referenced in Application types are resolved in the type_env.
