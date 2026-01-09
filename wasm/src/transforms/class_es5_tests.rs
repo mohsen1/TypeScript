@@ -13482,3 +13482,333 @@ class TemplateReplacer {
         output
     );
 }
+
+// ============================================================================
+// Symbol.search Tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_symbol_search_basic() {
+    // Basic Symbol.search implementation for custom searcher
+    let source = r#"
+class SubstringSearcher {
+    private needle: string;
+
+    constructor(needle: string) {
+        this.needle = needle;
+    }
+
+    [Symbol.search](str: string): number {
+        return str.indexOf(this.needle);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function SubstringSearcher"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Symbol.search should be referenced
+    assert!(
+        output.contains("search") || output.contains("Symbol"),
+        "Expected Symbol.search reference: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_search_case_insensitive() {
+    // Symbol.search with case-insensitive matching
+    let source = r#"
+class CaseInsensitiveSearcher {
+    private pattern: string;
+    readonly flags: string = "i";
+
+    constructor(pattern: string) {
+        this.pattern = pattern.toLowerCase();
+    }
+
+    [Symbol.search](str: string): number {
+        return str.toLowerCase().indexOf(this.pattern);
+    }
+
+    get source(): string {
+        return this.pattern;
+    }
+
+    get ignoreCase(): boolean {
+        return true;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function CaseInsensitiveSearcher"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Flags property should be present
+    assert!(
+        output.contains("flags"),
+        "Expected flags property: {}",
+        output
+    );
+
+    // Getters should be present
+    assert!(
+        output.contains("source") && output.contains("ignoreCase"),
+        "Expected source and ignoreCase getters: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_search_last_index() {
+    // Symbol.search returning last occurrence
+    let source = r#"
+class LastIndexSearcher {
+    private pattern: string;
+
+    constructor(pattern: string) {
+        this.pattern = pattern;
+    }
+
+    [Symbol.search](str: string): number {
+        return str.lastIndexOf(this.pattern);
+    }
+
+    searchFirst(str: string): number {
+        return str.indexOf(this.pattern);
+    }
+
+    searchAll(str: string): number[] {
+        const indices: number[] = [];
+        let idx = 0;
+        while ((idx = str.indexOf(this.pattern, idx)) !== -1) {
+            indices.push(idx);
+            idx += 1;
+        }
+        return indices;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function LastIndexSearcher"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Helper methods should be present
+    assert!(
+        output.contains("searchFirst") && output.contains("searchAll"),
+        "Expected helper methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_search_with_inheritance() {
+    // Symbol.search with class inheritance
+    let source = r#"
+abstract class BaseSearcher {
+    abstract readonly pattern: string;
+
+    abstract [Symbol.search](str: string): number;
+
+    contains(str: string): boolean {
+        return this[Symbol.search](str) !== -1;
+    }
+
+    startsWith(str: string): boolean {
+        return this[Symbol.search](str) === 0;
+    }
+}
+
+class WordBoundarySearcher extends BaseSearcher {
+    readonly pattern: string;
+
+    constructor(word: string) {
+        super();
+        this.pattern = word;
+    }
+
+    [Symbol.search](str: string): number {
+        const words = str.split(/\s+/);
+        let position = 0;
+        for (const word of words) {
+            if (word === this.pattern) {
+                return position;
+            }
+            position += word.length + 1;
+        }
+        return -1;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Both classes should be converted
+    assert!(
+        output.contains("function BaseSearcher"),
+        "Expected BaseSearcher function: {}",
+        output
+    );
+    assert!(
+        output.contains("function WordBoundarySearcher"),
+        "Expected WordBoundarySearcher function: {}",
+        output
+    );
+
+    // Inheritance should be set up
+    assert!(
+        output.contains("__extends") || output.contains("extends"),
+        "Expected inheritance: {}",
+        output
+    );
+
+    // Helper methods should be present
+    assert!(
+        output.contains("contains") && output.contains("startsWith"),
+        "Expected helper methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_search_multiple_patterns() {
+    // Symbol.search with multiple pattern support
+    let source = r#"
+class MultiPatternSearcher {
+    private patterns: string[];
+
+    constructor(...patterns: string[]) {
+        this.patterns = patterns;
+    }
+
+    [Symbol.search](str: string): number {
+        let earliest = -1;
+        for (const pattern of this.patterns) {
+            const idx = str.indexOf(pattern);
+            if (idx !== -1 && (earliest === -1 || idx < earliest)) {
+                earliest = idx;
+            }
+        }
+        return earliest;
+    }
+
+    addPattern(pattern: string): void {
+        this.patterns.push(pattern);
+    }
+
+    removePattern(pattern: string): boolean {
+        const idx = this.patterns.indexOf(pattern);
+        if (idx !== -1) {
+            this.patterns.splice(idx, 1);
+            return true;
+        }
+        return false;
+    }
+
+    get patternCount(): number {
+        return this.patterns.length;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function MultiPatternSearcher"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Helper methods should be present
+    assert!(
+        output.contains("addPattern") && output.contains("removePattern"),
+        "Expected pattern management methods: {}",
+        output
+    );
+
+    // patternCount getter should be present
+    assert!(
+        output.contains("patternCount"),
+        "Expected patternCount getter: {}",
+        output
+    );
+}
