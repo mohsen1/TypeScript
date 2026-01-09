@@ -14830,27 +14830,25 @@ fn test_interface_vs_type_alias_index_signature() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
 
-    let interface_i = interner.intern(TypeKey::ObjectWithIndex(
-        interner.object_shape_with_index(
-            vec![],
-            Some(crate::solver::types::IndexSignature {
-                key_type: TypeId::STRING,
-                value_type: TypeId::NUMBER,
-                readonly: false,
-            }),
-        ),
-    ));
+    let interface_i = interner.object_with_index(crate::solver::types::ObjectShape {
+        properties: vec![],
+        string_index: Some(crate::solver::types::IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
+    });
 
-    let type_t = interner.intern(TypeKey::ObjectWithIndex(
-        interner.object_shape_with_index(
-            vec![],
-            Some(crate::solver::types::IndexSignature {
-                key_type: TypeId::STRING,
-                value_type: TypeId::NUMBER,
-                readonly: false,
-            }),
-        ),
-    ));
+    let type_t = interner.object_with_index(crate::solver::types::ObjectShape {
+        properties: vec![],
+        string_index: Some(crate::solver::types::IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
+    });
 
     // Same structure
     assert!(checker.is_subtype_of(interface_i, type_t));
