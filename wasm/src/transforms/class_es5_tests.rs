@@ -11708,3 +11708,364 @@ class Deferred<T> {
         output
     );
 }
+
+// ============================================================================
+// Array.from Pattern Tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_array_from_basic() {
+    // Basic Array.from with iterable
+    let source = r#"
+class ArrayConverter<T> {
+    fromIterable(iterable: Iterable<T>): T[] {
+        return Array.from(iterable);
+    }
+
+    fromString(str: string): string[] {
+        return Array.from(str);
+    }
+
+    fromSet(set: Set<T>): T[] {
+        return Array.from(set);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("ArrayConverter"),
+        "Expected ArrayConverter class: {}",
+        output
+    );
+
+    // Array.from should be present
+    assert!(
+        output.contains("Array.from"),
+        "Expected Array.from: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("fromIterable") && output.contains("fromString") && output.contains("fromSet"),
+        "Expected fromIterable, fromString, fromSet methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_array_from_map_function() {
+    // Array.from with map function
+    let source = r#"
+class ArrayMapper<T, U> {
+    mapFrom(iterable: Iterable<T>, mapFn: (item: T, index: number) => U): U[] {
+        return Array.from(iterable, mapFn);
+    }
+
+    doubleNumbers(numbers: Iterable<number>): number[] {
+        return Array.from(numbers, x => x * 2);
+    }
+
+    indexedMap<R>(items: Iterable<T>, transform: (item: T, idx: number) => R): R[] {
+        return Array.from(items, (item, idx) => transform(item, idx));
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("ArrayMapper"),
+        "Expected ArrayMapper class: {}",
+        output
+    );
+
+    // Array.from should be present
+    assert!(
+        output.contains("Array.from"),
+        "Expected Array.from: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("mapFrom") && output.contains("doubleNumbers") && output.contains("indexedMap"),
+        "Expected mapFrom, doubleNumbers, indexedMap methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_array_from_array_like() {
+    // Array.from with array-like objects
+    let source = r#"
+interface ArrayLike<T> {
+    length: number;
+    [index: number]: T;
+}
+
+class ArrayLikeConverter {
+    fromArrayLike<T>(arrayLike: ArrayLike<T>): T[] {
+        return Array.from(arrayLike);
+    }
+
+    fromArguments(args: IArguments): any[] {
+        return Array.from(args);
+    }
+
+    fromNodeList(nodeList: { length: number; item(index: number): any }): any[] {
+        return Array.from({ length: nodeList.length }, (_, i) => nodeList.item(i));
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("ArrayLikeConverter"),
+        "Expected ArrayLikeConverter class: {}",
+        output
+    );
+
+    // Array.from should be present
+    assert!(
+        output.contains("Array.from"),
+        "Expected Array.from: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("fromArrayLike") && output.contains("fromArguments") && output.contains("fromNodeList"),
+        "Expected fromArrayLike, fromArguments, fromNodeList methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_array_from_collections() {
+    // Array.from with Set and Map
+    let source = r#"
+class CollectionConverter<K, V> {
+    setToArray(set: Set<V>): V[] {
+        return Array.from(set);
+    }
+
+    mapKeysToArray(map: Map<K, V>): K[] {
+        return Array.from(map.keys());
+    }
+
+    mapValuesToArray(map: Map<K, V>): V[] {
+        return Array.from(map.values());
+    }
+
+    mapEntriesToArray(map: Map<K, V>): [K, V][] {
+        return Array.from(map.entries());
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("CollectionConverter"),
+        "Expected CollectionConverter class: {}",
+        output
+    );
+
+    // Array.from should be present
+    assert!(
+        output.contains("Array.from"),
+        "Expected Array.from: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("setToArray") && output.contains("mapKeysToArray") && output.contains("mapValuesToArray"),
+        "Expected setToArray, mapKeysToArray, mapValuesToArray methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_array_from_generator() {
+    // Array.from with generator
+    let source = r#"
+class GeneratorConverter {
+    *range(start: number, end: number): Generator<number> {
+        for (let i = start; i < end; i++) {
+            yield i;
+        }
+    }
+
+    rangeToArray(start: number, end: number): number[] {
+        return Array.from(this.range(start, end));
+    }
+
+    generatorToArray<T>(gen: Generator<T>): T[] {
+        return Array.from(gen);
+    }
+
+    iteratorToArray<T>(iterator: Iterator<T>): T[] {
+        const result: T[] = [];
+        let next = iterator.next();
+        while (!next.done) {
+            result.push(next.value);
+            next = iterator.next();
+        }
+        return result;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("GeneratorConverter"),
+        "Expected GeneratorConverter class: {}",
+        output
+    );
+
+    // Array.from should be present
+    assert!(
+        output.contains("Array.from"),
+        "Expected Array.from: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("range") && output.contains("rangeToArray") && output.contains("generatorToArray"),
+        "Expected range, rangeToArray, generatorToArray methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_array_from_length() {
+    // Array.from with length property for creating arrays
+    let source = r#"
+class ArrayFactory {
+    createWithLength(length: number): undefined[] {
+        return Array.from({ length });
+    }
+
+    createSequence(length: number): number[] {
+        return Array.from({ length }, (_, i) => i);
+    }
+
+    createFilled<T>(length: number, value: T): T[] {
+        return Array.from({ length }, () => value);
+    }
+
+    createMatrix(rows: number, cols: number): number[][] {
+        return Array.from({ length: rows }, () =>
+            Array.from({ length: cols }, () => 0)
+        );
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("ArrayFactory"),
+        "Expected ArrayFactory class: {}",
+        output
+    );
+
+    // Array.from should be present
+    assert!(
+        output.contains("Array.from"),
+        "Expected Array.from: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("createWithLength") && output.contains("createSequence") && output.contains("createFilled"),
+        "Expected createWithLength, createSequence, createFilled methods: {}",
+        output
+    );
+}
