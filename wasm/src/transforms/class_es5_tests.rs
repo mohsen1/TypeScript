@@ -13814,27 +13814,22 @@ class MultiPatternSearcher {
 }
 
 // ============================================================================
-// Array.isArray/Array.of pattern tests
+// Symbol.split Tests
 // ============================================================================
 
 #[test]
-fn test_class_es5_array_isarray_basic() {
-    // Basic Array.isArray usage
+fn test_class_es5_symbol_split_basic() {
+    // Basic Symbol.split implementation for custom splitter
     let source = r#"
-class TypeChecker {
-    isArray(value: unknown): boolean {
-        return Array.isArray(value);
+class SimpleSplitter {
+    private delimiter: string;
+
+    constructor(delimiter: string) {
+        this.delimiter = delimiter;
     }
 
-    ensureArray<T>(value: T | T[]): T[] {
-        return Array.isArray(value) ? value : [value];
-    }
-
-    flattenIfArray<T>(value: T | T[]): T[] {
-        if (Array.isArray(value)) {
-            return value;
-        }
-        return [value];
+    [Symbol.split](str: string, limit?: number): string[] {
+        return str.split(this.delimiter, limit);
     }
 }
 "#;
@@ -13853,47 +13848,43 @@ class TypeChecker {
 
     let output = printer.get_output().to_string();
 
-    // Class should be emitted
+    // Class should be converted
     assert!(
-        output.contains("TypeChecker"),
-        "Expected TypeChecker class: {}",
+        output.contains("function SimpleSplitter"),
+        "Expected function declaration: {}",
         output
     );
 
-    // Array.isArray should be present
+    // Symbol.split should be referenced
     assert!(
-        output.contains("Array.isArray"),
-        "Expected Array.isArray: {}",
-        output
-    );
-
-    // Methods should be present
-    assert!(
-        output.contains("isArray") && output.contains("ensureArray"),
-        "Expected isArray, ensureArray methods: {}",
+        output.contains("split") || output.contains("Symbol"),
+        "Expected Symbol.split reference: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_array_of_basic() {
-    // Basic Array.of usage
+fn test_class_es5_symbol_split_with_limit() {
+    // Symbol.split respecting limit parameter
     let source = r#"
-class ArrayFactory {
-    createFromValues<T>(...values: T[]): T[] {
-        return Array.of(...values);
+class LimitedSplitter {
+    private separator: string;
+    readonly flags: string = "";
+
+    constructor(separator: string) {
+        this.separator = separator;
     }
 
-    createSingletonArray<T>(value: T): T[] {
-        return Array.of(value);
+    [Symbol.split](str: string, limit?: number): string[] {
+        const parts = str.split(this.separator);
+        if (limit !== undefined && limit >= 0) {
+            return parts.slice(0, limit);
+        }
+        return parts;
     }
 
-    createNumberArray(): number[] {
-        return Array.of(1, 2, 3, 4, 5);
-    }
-
-    createStringArray(): string[] {
-        return Array.of('a', 'b', 'c');
+    get source(): string {
+        return this.separator;
     }
 }
 "#;
@@ -13912,258 +13903,57 @@ class ArrayFactory {
 
     let output = printer.get_output().to_string();
 
-    // Class should be emitted
+    // Class should be converted
     assert!(
-        output.contains("ArrayFactory"),
-        "Expected ArrayFactory class: {}",
+        output.contains("function LimitedSplitter"),
+        "Expected function declaration: {}",
         output
     );
 
-    // Array.of should be present
+    // Flags and source should be present
     assert!(
-        output.contains("Array.of"),
-        "Expected Array.of: {}",
-        output
-    );
-
-    // Methods should be present
-    assert!(
-        output.contains("createFromValues") && output.contains("createSingletonArray"),
-        "Expected createFromValues, createSingletonArray methods: {}",
+        output.contains("flags") && output.contains("source"),
+        "Expected flags and source properties: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_array_isarray_guard() {
-    // Array.isArray as type guard
+fn test_class_es5_symbol_split_preserve_separators() {
+    // Symbol.split that preserves separators in output
     let source = r#"
-class DataProcessor {
-    private data: unknown[] = [];
+class PreservingSplitter {
+    private separator: string;
 
-    add(item: unknown): void {
-        if (Array.isArray(item)) {
-            this.data.push(...item);
-        } else {
-            this.data.push(item);
-        }
+    constructor(separator: string) {
+        this.separator = separator;
     }
 
-    processInput(input: string | string[]): string[] {
-        if (Array.isArray(input)) {
-            return input.map(s => s.trim());
-        }
-        return [input.trim()];
-    }
+    [Symbol.split](str: string, limit?: number): string[] {
+        const result: string[] = [];
+        let lastIndex = 0;
+        let idx = 0;
 
-    normalizeToArray<T>(value: T | readonly T[]): T[] {
-        return Array.isArray(value) ? [...value] : [value];
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
+        while ((idx = str.indexOf(this.separator, lastIndex)) !== -1) {
+            result.push(str.substring(lastIndex, idx));
+            result.push(this.separator);
+            lastIndex = idx + this.separator.length;
 
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Class should be emitted
-    assert!(
-        output.contains("DataProcessor"),
-        "Expected DataProcessor class: {}",
-        output
-    );
-
-    // Array.isArray should be present
-    assert!(
-        output.contains("Array.isArray"),
-        "Expected Array.isArray: {}",
-        output
-    );
-
-    // Methods should be present
-    assert!(
-        output.contains("add") && output.contains("processInput"),
-        "Expected add, processInput methods: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_array_static_methods() {
-    // Static methods using Array utilities
-    let source = r#"
-class ArrayUtils {
-    static isArrayLike(value: unknown): boolean {
-        return Array.isArray(value) ||
-               (typeof value === 'object' && value !== null && 'length' in value);
-    }
-
-    static toArray<T>(value: T | T[]): T[] {
-        if (Array.isArray(value)) {
-            return value;
-        }
-        return Array.of(value);
-    }
-
-    static wrap<T>(...items: T[]): T[] {
-        return Array.of(...items);
-    }
-
-    static isEmpty(value: unknown): boolean {
-        return Array.isArray(value) && value.length === 0;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Class should be emitted
-    assert!(
-        output.contains("ArrayUtils"),
-        "Expected ArrayUtils class: {}",
-        output
-    );
-
-    // Array.isArray and Array.of should be present
-    assert!(
-        output.contains("Array.isArray") && output.contains("Array.of"),
-        "Expected Array.isArray and Array.of: {}",
-        output
-    );
-
-    // Static methods should be present
-    assert!(
-        output.contains("isArrayLike") && output.contains("toArray"),
-        "Expected isArrayLike, toArray methods: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_array_in_constructor() {
-    // Array methods used in constructor
-    let source = r#"
-class CollectionWrapper<T> {
-    private items: T[];
-
-    constructor(input: T | T[]) {
-        this.items = Array.isArray(input) ? [...input] : Array.of(input);
-    }
-
-    add(item: T | T[]): void {
-        if (Array.isArray(item)) {
-            this.items.push(...item);
-        } else {
-            this.items.push(item);
-        }
-    }
-
-    toArray(): T[] {
-        return [...this.items];
-    }
-
-    static from<T>(value: T | T[]): CollectionWrapper<T> {
-        return new CollectionWrapper(value);
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Class should be emitted
-    assert!(
-        output.contains("CollectionWrapper"),
-        "Expected CollectionWrapper class: {}",
-        output
-    );
-
-    // Array methods should be present
-    assert!(
-        output.contains("Array.isArray") || output.contains("Array.of"),
-        "Expected Array methods: {}",
-        output
-    );
-
-    // Constructor should be present
-    assert!(
-        output.contains("function CollectionWrapper"),
-        "Expected CollectionWrapper constructor: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_array_combined_patterns() {
-    // Combined Array.isArray and Array.of patterns
-    let source = r#"
-class SafeArrayHandler {
-    private readonly data: unknown[];
-
-    constructor() {
-        this.data = Array.of<unknown>();
-    }
-
-    push(value: unknown): number {
-        if (Array.isArray(value)) {
-            return this.data.push(...value);
-        }
-        return this.data.push(value);
-    }
-
-    concat(other: unknown | unknown[]): unknown[] {
-        const otherArray = Array.isArray(other) ? other : Array.of(other);
-        return [...this.data, ...otherArray];
-    }
-
-    filter(predicate: (item: unknown) => boolean): unknown[] {
-        return this.data.filter(item => {
-            if (Array.isArray(item)) {
-                return item.some(predicate);
+            if (limit !== undefined && result.length >= limit) {
+                return result.slice(0, limit);
             }
-            return predicate(item);
-        });
+        }
+
+        result.push(str.substring(lastIndex));
+        return limit !== undefined ? result.slice(0, limit) : result;
     }
 
-    static empty<T>(): T[] {
-        return Array.of<T>();
+    getSeparator(): string {
+        return this.separator;
     }
 
-    static single<T>(value: T): T[] {
-        return Array.of(value);
+    setSeparator(sep: string): void {
+        this.separator = sep;
     }
 }
 "#;
@@ -14182,24 +13972,174 @@ class SafeArrayHandler {
 
     let output = printer.get_output().to_string();
 
-    // Class should be emitted
+    // Class should be converted
     assert!(
-        output.contains("SafeArrayHandler"),
-        "Expected SafeArrayHandler class: {}",
+        output.contains("function PreservingSplitter"),
+        "Expected function declaration: {}",
         output
     );
 
-    // Array.isArray and Array.of should be present
+    // Helper methods should be present
     assert!(
-        output.contains("Array.isArray") && output.contains("Array.of"),
-        "Expected Array.isArray and Array.of: {}",
+        output.contains("getSeparator") && output.contains("setSeparator"),
+        "Expected getter and setter methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_split_with_inheritance() {
+    // Symbol.split with class inheritance
+    let source = r#"
+abstract class BaseSplitter {
+    abstract readonly separator: string;
+
+    abstract [Symbol.split](str: string, limit?: number): string[];
+
+    splitAndTrim(str: string): string[] {
+        return this[Symbol.split](str).map(s => s.trim());
+    }
+
+    splitAndFilter(str: string): string[] {
+        return this[Symbol.split](str).filter(s => s.length > 0);
+    }
+}
+
+class WhitespaceSplitter extends BaseSplitter {
+    readonly separator: string = " ";
+
+    [Symbol.split](str: string, limit?: number): string[] {
+        const parts = str.split(/\s+/);
+        return limit !== undefined ? parts.slice(0, limit) : parts;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Both classes should be converted
+    assert!(
+        output.contains("function BaseSplitter"),
+        "Expected BaseSplitter function: {}",
+        output
+    );
+    assert!(
+        output.contains("function WhitespaceSplitter"),
+        "Expected WhitespaceSplitter function: {}",
         output
     );
 
-    // Methods should be present
+    // Inheritance should be set up
     assert!(
-        output.contains("push") && output.contains("concat") && output.contains("filter"),
-        "Expected push, concat, filter methods: {}",
+        output.contains("__extends") || output.contains("extends"),
+        "Expected inheritance: {}",
+        output
+    );
+
+    // Helper methods should be present
+    assert!(
+        output.contains("splitAndTrim") && output.contains("splitAndFilter"),
+        "Expected helper methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_split_csv_parser() {
+    // Symbol.split for CSV-like parsing
+    let source = r#"
+class CSVSplitter {
+    private delimiter: string;
+    private quote: string;
+
+    constructor(delimiter: string = ",", quote: string = "\"") {
+        this.delimiter = delimiter;
+        this.quote = quote;
+    }
+
+    [Symbol.split](str: string, limit?: number): string[] {
+        const result: string[] = [];
+        let current = "";
+        let inQuotes = false;
+
+        for (let i = 0; i < str.length; i++) {
+            const char = str[i];
+
+            if (char === this.quote) {
+                inQuotes = !inQuotes;
+            } else if (char === this.delimiter && !inQuotes) {
+                result.push(current);
+                current = "";
+                if (limit !== undefined && result.length >= limit) {
+                    return result;
+                }
+            } else {
+                current += char;
+            }
+        }
+
+        result.push(current);
+        return limit !== undefined ? result.slice(0, limit) : result;
+    }
+
+    get delimiterChar(): string {
+        return this.delimiter;
+    }
+
+    get quoteChar(): string {
+        return this.quote;
+    }
+
+    parseRow(row: string): string[] {
+        return this[Symbol.split](row);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function CSVSplitter"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Getters should be present
+    assert!(
+        output.contains("delimiterChar") && output.contains("quoteChar"),
+        "Expected delimiter and quote getters: {}",
+        output
+    );
+
+    // parseRow method should be present
+    assert!(
+        output.contains("parseRow"),
+        "Expected parseRow method: {}",
         output
     );
 }
