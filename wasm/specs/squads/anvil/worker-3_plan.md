@@ -7,7 +7,22 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-(awaiting next task from EM-Anvil)
+Add ES5 import/export alias source map tests
+
+Per GOALS.md Objective 2: Source map validation
+
+Steps:
+1. Add 6 ES5 import/export alias source map tests to `wasm/src/source_map_tests.rs`:
+   - Named import with alias
+   - Named export with alias
+   - Re-export with alias
+   - Default import alias
+   - Namespace import alias
+   - Combined alias patterns
+2. Run `./wasm/test.sh source_map` to verify all tests pass
+3. Commit with message: `[wasm] source_map: add import/export alias tests`
+4. Push to `origin/worker/anvil-3`
+5. Update this plan file and push
 
 **Sync instructions**: Use squad/anvil (not origin/rust):
 ```

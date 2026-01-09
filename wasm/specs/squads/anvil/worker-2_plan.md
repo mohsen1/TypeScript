@@ -7,7 +7,22 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-(none - awaiting new assignment from EM-Anvil)
+Add ES5 generic class patterns parity tests
+
+Per GOALS.md Objective 1: ES5 downleveling correctness
+
+Steps:
+1. Add 6 ES5 generic class parity tests to `wasm/src/thin_emitter/emitter_parity_tests.rs`:
+   - Generic class with single type parameter
+   - Generic class with multiple type parameters
+   - Generic class with constraints
+   - Generic class extending generic base
+   - Generic class with default type parameters
+   - Combined generic class patterns
+2. Run `./wasm/test.sh emitter_parity` to verify all tests pass
+3. Commit with message: `[wasm] emitter: add generic class parity tests`
+4. Push to `origin/worker/anvil-2`
+5. Update this plan file and push
 
 ## Task Queue
 (empty)
