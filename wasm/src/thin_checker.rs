@@ -1828,8 +1828,8 @@ impl<'a> ThinCheckerState<'a> {
                 call_signatures,
                 construct_signatures,
                 properties,
-                string_index: None,
-                number_index: None,
+                string_index,
+                number_index,
             });
         }
 
@@ -2054,8 +2054,8 @@ impl<'a> ThinCheckerState<'a> {
                 call_signatures,
                 construct_signatures,
                 properties,
-                string_index: None,
-                number_index: None,
+                string_index,
+                number_index,
             };
             self.ctx.types.callable(shape)
         } else if string_index.is_some() || number_index.is_some() {
