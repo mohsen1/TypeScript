@@ -7,10 +7,10 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-(awaiting assignment)
+- [ ] Add ES5 class expression patterns parity tests: anonymous class, named class, class in return statement, class extending expression, class with static members, class as argument. Tests: `./wasm/test.sh emitter_parity`
 
 ## Task Queue
-(empty)
+- [ ] Add ES5 computed property patterns parity tests: symbol keys, template literals, method calls
 
 ## Completed
 - [x] Added ES5 private method patterns parity tests (async-method-complex, generator-method, accessor-complex) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (273 tests).
