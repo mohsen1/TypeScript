@@ -16018,3 +16018,393 @@ class ReflectUtilities {
         output
     );
 }
+
+// ============================================================================
+// Async/Await in Derived Constructor Tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_async_derived_constructor_basic() {
+    // Basic derived class with async method pattern
+    let source = r#"
+class BaseService {
+    protected name: string;
+
+    constructor(name: string) {
+        this.name = name;
+    }
+}
+
+class AsyncService extends BaseService {
+    private data: any = null;
+
+    constructor(name: string) {
+        super(name);
+    }
+
+    async initialize(): Promise<void> {
+        this.data = await this.fetchData();
+    }
+
+    private async fetchData(): Promise<any> {
+        return await Promise.resolve({ initialized: true });
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted to functions
+    assert!(
+        output.contains("function BaseService"),
+        "Expected BaseService function: {}",
+        output
+    );
+    assert!(
+        output.contains("function AsyncService"),
+        "Expected AsyncService function: {}",
+        output
+    );
+
+    // Async methods should use generator pattern
+    assert!(
+        output.contains("__awaiter") || output.contains("__generator") || output.contains("return"),
+        "Expected async transform: {}",
+        output
+    );
+
+    // super() call should be present (using _super.call pattern)
+    assert!(
+        output.contains("_super.call") || output.contains("BaseService.call") || output.contains(".call(this"),
+        "Expected super call: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_async_derived_constructor_factory() {
+    // Derived class with async static factory method
+    let source = r#"
+class Entity {
+    id: string;
+
+    constructor(id: string) {
+        this.id = id;
+    }
+}
+
+class AsyncEntity extends Entity {
+    private loaded: boolean = false;
+    private metadata: any;
+
+    constructor(id: string) {
+        super(id);
+    }
+
+    static async create(id: string): Promise<AsyncEntity> {
+        const entity = new AsyncEntity(id);
+        await entity.load();
+        return entity;
+    }
+
+    private async load(): Promise<void> {
+        this.metadata = await this.fetchMetadata();
+        this.loaded = true;
+    }
+
+    private async fetchMetadata(): Promise<any> {
+        return await Promise.resolve({ type: "entity", version: 1 });
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("function Entity") && output.contains("function AsyncEntity"),
+        "Expected class functions: {}",
+        output
+    );
+
+    // Static method should be present
+    assert!(
+        output.contains("create") || output.contains("AsyncEntity.create"),
+        "Expected static create method: {}",
+        output
+    );
+
+    // Async patterns should be present
+    assert!(
+        output.contains("load") && output.contains("fetchMetadata"),
+        "Expected async methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_async_derived_constructor_chain() {
+    // Multi-level inheritance with async patterns
+    let source = r#"
+class BaseComponent {
+    protected element: any;
+
+    constructor(tag: string) {
+        this.element = { tag };
+    }
+}
+
+class InteractiveComponent extends BaseComponent {
+    protected handlers: Map<string, Function> = new Map();
+
+    constructor(tag: string) {
+        super(tag);
+    }
+
+    async bindEvents(): Promise<void> {
+        const config = await this.loadEventConfig();
+        for (const [event, handler] of Object.entries(config)) {
+            this.handlers.set(event, handler as Function);
+        }
+    }
+
+    private async loadEventConfig(): Promise<Record<string, Function>> {
+        return await Promise.resolve({});
+    }
+}
+
+class AsyncWidget extends InteractiveComponent {
+    private state: any = {};
+
+    constructor(tag: string) {
+        super(tag);
+    }
+
+    async initialize(): Promise<void> {
+        await super.bindEvents();
+        this.state = await this.loadInitialState();
+    }
+
+    private async loadInitialState(): Promise<any> {
+        return await Promise.resolve({ ready: true });
+    }
+
+    async updateState(newState: any): Promise<void> {
+        const validated = await this.validateState(newState);
+        this.state = { ...this.state, ...validated };
+    }
+
+    private async validateState(state: any): Promise<any> {
+        return await Promise.resolve(state);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // All classes should be converted
+    assert!(
+        output.contains("function BaseComponent"),
+        "Expected BaseComponent function: {}",
+        output
+    );
+    assert!(
+        output.contains("function InteractiveComponent"),
+        "Expected InteractiveComponent function: {}",
+        output
+    );
+    assert!(
+        output.contains("function AsyncWidget"),
+        "Expected AsyncWidget function: {}",
+        output
+    );
+
+    // Inheritance chain should be established (using _super.call pattern)
+    assert!(
+        output.contains("_super.call") || output.contains("BaseComponent.call") || output.contains("InteractiveComponent.call"),
+        "Expected super calls in chain: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_async_derived_constructor_with_field_init() {
+    // Derived class with async field initializers pattern
+    let source = r#"
+class DataStore {
+    protected cache: Map<string, any> = new Map();
+
+    constructor(name: string) {}
+}
+
+class AsyncDataStore extends DataStore {
+    private pending: Promise<void>[] = [];
+    private syncInterval: number = 1000;
+
+    constructor(name: string) {
+        super(name);
+    }
+
+    async set(key: string, value: any): Promise<void> {
+        const operation = this.performSet(key, value);
+        this.pending.push(operation);
+        await operation;
+    }
+
+    private async performSet(key: string, value: any): Promise<void> {
+        await this.validate(key, value);
+        this.cache.set(key, value);
+    }
+
+    private async validate(key: string, value: any): Promise<void> {
+        if (!key) {
+            throw new Error("Invalid key");
+        }
+        await Promise.resolve();
+    }
+
+    async flush(): Promise<void> {
+        await Promise.all(this.pending);
+        this.pending = [];
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("function DataStore") && output.contains("function AsyncDataStore"),
+        "Expected class functions: {}",
+        output
+    );
+
+    // Field initializers should be present
+    assert!(
+        output.contains("pending") && output.contains("syncInterval"),
+        "Expected field initializers: {}",
+        output
+    );
+
+    // Async methods
+    assert!(
+        output.contains("set") && output.contains("flush"),
+        "Expected async methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_async_derived_constructor_protected() {
+    // Derived class with protected async methods
+    let source = r#"
+abstract class AbstractRepository<T> {
+    protected items: T[] = [];
+
+    constructor() {}
+
+    protected abstract fetchAll(): Promise<T[]>;
+}
+
+class UserRepository extends AbstractRepository<{ id: string; name: string }> {
+    constructor() {
+        super();
+    }
+
+    protected async fetchAll(): Promise<{ id: string; name: string }[]> {
+        const response = await this.makeRequest("/users");
+        return response.data;
+    }
+
+    private async makeRequest(url: string): Promise<{ data: any[] }> {
+        return await Promise.resolve({ data: [] });
+    }
+
+    async getById(id: string): Promise<{ id: string; name: string } | undefined> {
+        const all = await this.fetchAll();
+        return all.find(item => item.id === id);
+    }
+
+    async save(user: { id: string; name: string }): Promise<void> {
+        await this.makeRequest("/users/" + user.id);
+        this.items.push(user);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("AbstractRepository") || output.contains("function UserRepository"),
+        "Expected class functions: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("fetchAll") && output.contains("getById"),
+        "Expected repository methods: {}",
+        output
+    );
+}
