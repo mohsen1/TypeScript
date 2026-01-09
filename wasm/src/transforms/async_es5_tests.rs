@@ -13965,3 +13965,53 @@ fn test_async_mapset_combined() {
     );
     assert!(result, "Should detect await in combined async Map/Set patterns");
 }
+
+// ASYNC GENERATOR DELEGATION PATTERN TESTS
+
+#[test]
+fn test_async_gendeleg_pat_basic() {
+    let result = async_error_propagation_contains_await(
+        "async function delegate() { await setup(); return items; }",
+    );
+    assert!(result, "Should detect await in basic yield* delegation");
+}
+
+#[test]
+fn test_async_gendeleg_pat_sync_iterator() {
+    let result = async_error_propagation_contains_await(
+        "async function toSync() { return await convertToSync(asyncIter); }",
+    );
+    assert!(result, "Should detect await in async yield* to sync iterator");
+}
+
+#[test]
+fn test_async_gendeleg_pat_return_value() {
+    let result = async_error_propagation_contains_await(
+        "async function withReturn() { return await generator.return(value); }",
+    );
+    assert!(result, "Should detect await in yield* with return value");
+}
+
+#[test]
+fn test_async_gendeleg_pat_try_finally() {
+    let result = async_error_propagation_contains_await(
+        "async function withFinally() { try { return await iterate(); } finally { await cleanup(); } }",
+    );
+    assert!(result, "Should detect await in yield* in try/finally");
+}
+
+#[test]
+fn test_async_gendeleg_pat_nested() {
+    let result = async_error_propagation_contains_await(
+        "async function nested() { await outer(); return await inner(); }",
+    );
+    assert!(result, "Should detect await in nested yield* delegation");
+}
+
+#[test]
+fn test_async_gendeleg_pat_combined() {
+    let result = async_error_propagation_contains_await(
+        "async function combined() { try { await first(); return await second(); } catch (e) { return await fallback(); } }",
+    );
+    assert!(result, "Should detect await in combined delegation patterns");
+}

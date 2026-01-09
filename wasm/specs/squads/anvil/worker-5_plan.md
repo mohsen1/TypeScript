@@ -7,28 +7,14 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-Add ES5 async tests for async generator delegation patterns
-
-Per GOALS.md Objective 1: ES5 downleveling correctness
-
-Steps:
-1. Add 6 ES5 async tests for async generator delegation patterns to `wasm/src/transforms/async_es5_tests.rs`:
-   - Basic yield* delegation
-   - Async yield* to sync iterator
-   - Yield* with return value
-   - Yield* in try/finally
-   - Nested yield* delegation
-   - Combined delegation patterns
-2. Run `./wasm/test.sh async_es5_tests` to verify all tests pass
-3. Commit with message: `[wasm] async_es5: add async generator delegation pattern tests`
-4. Push to `origin/worker/anvil-5`
-5. Update this plan file and push
+(none - awaiting new task from EM)
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
 
 
 ## Completed
+- [x] Added 6 async generator delegation pattern tests (basic, sync_iterator, return_value, try_finally, nested, combined) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (1078 tests PASS).
 - [x] Added 6 async Map/Set pattern tests (map_operations, set_operations, map_iteration, set_callbacks, weakmap_patterns, combined) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (1072 tests PASS).
 - [x] Added 6 async Proxy/Reflect pattern tests (proxy_handler, reflect_apply, proxy_revocable, reflect_construct, trap_chain, combined) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (1066 tests PASS).
 - [x] Added 6 async WeakRef pattern tests (deref, cache, finalization, retry, cleanup, combined) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (1060 tests PASS).
