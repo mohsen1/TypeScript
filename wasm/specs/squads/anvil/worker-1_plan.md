@@ -6,12 +6,13 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-- [ ] Add ES5 class tests for module pattern variations: CommonJS class exports, ESM default class, re-export patterns. Tests: `./wasm/test.sh class_es5_tests`
+(none)
 
 ## Task Queue
 (empty)
 
 ## Completed
+- [x] Added ES5 tests for module pattern variations (6 tests): CommonJS class exports, ESM default class, ESM named exports, re-export patterns, barrel export pattern, mixed module patterns. Ran `./wasm/test.sh class_es5_tests` (all 341 pass).
 - [x] Added ES5 tests for namespace merging patterns (6 tests): class with namespace augmentation, namespace with interface, namespace with enum, namespace with function, nested namespaces, namespace exports. Ran `./wasm/test.sh class_es5_tests` (all 330 pass).
 - [x] Added ES5 tests for abstract class patterns (6 tests): abstract method inheritance, abstract with decorators, abstract static methods, abstract getters/setters, multi-level inheritance, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 324 pass).
 - [x] Added ES5 tests for super() call patterns (6 tests): super with conditional expressions, super in try/catch, super with Promise.resolve, super with async/await context, super with spread in derived constructor, super with complex argument expressions. Ran `./wasm/test.sh class_es5_tests` (all 318 pass).

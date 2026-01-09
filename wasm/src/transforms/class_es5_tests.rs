@@ -22200,175 +22200,144 @@ class DataProcessor {
     );
 }
 
+// ============================================================================
+// module pattern variation tests
+// ============================================================================
+
 #[test]
-fn test_class_es5_typescript_namespace_merging() {
-    // Namespace merging with class pattern
+fn test_class_es5_commonjs_class_exports() {
+    // Test CommonJS module pattern with class exports
     let source = r#"
-class Album {
-    label: Album.AlbumLabel;
-    title: string;
+class DatabaseConnection {
+    private host: string;
+    private port: number;
 
-    constructor(title: string, label: Album.AlbumLabel) {
-        this.title = title;
-        this.label = label;
+    constructor(host: string, port: number = 5432) {
+        this.host = host;
+        this.port = port;
     }
 
-    getInfo(): string {
-        return `${this.title} (${this.label.name})`;
+    connect(): Promise<void> {
+        return Promise.resolve();
+    }
+
+    disconnect(): void {
+        console.log("Disconnected");
     }
 }
 
-namespace Album {
-    export class AlbumLabel {
-        name: string;
-        constructor(name: string) {
-            this.name = name;
-        }
+class QueryBuilder {
+    private query: string = "";
+
+    select(...columns: string[]): this {
+        this.query = `SELECT ${columns.join(", ")}`;
+        return this;
     }
 
-    export function createDefault(): Album {
-        return new Album("Untitled", new AlbumLabel("Unknown"));
+    from(table: string): this {
+        this.query += ` FROM ${table}`;
+        return this;
     }
 
-    export const DEFAULT_LABEL = "Independent";
+    build(): string {
+        return this.query;
+    }
 }
 
-class Building {
-    name: string;
-    floors: Building.Floor[];
+// CommonJS exports
+module.exports = { DatabaseConnection, QueryBuilder };
+module.exports.DatabaseConnection = DatabaseConnection;
+module.exports.QueryBuilder = QueryBuilder;
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
 
-    constructor(name: string) {
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function DatabaseConnection"),
+        "Expected DatabaseConnection function: {}",
+        output
+    );
+    assert!(
+        output.contains("DatabaseConnection.prototype.connect") && output.contains("DatabaseConnection.prototype.disconnect"),
+        "Expected DatabaseConnection methods on prototype: {}",
+        output
+    );
+    assert!(
+        output.contains("function QueryBuilder"),
+        "Expected QueryBuilder function: {}",
+        output
+    );
+    assert!(
+        output.contains("QueryBuilder.prototype.select") && output.contains("QueryBuilder.prototype.from"),
+        "Expected QueryBuilder methods on prototype: {}",
+        output
+    );
+    assert!(
+        output.contains("module.exports"),
+        "Expected module.exports: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_esm_default_class() {
+    // Test ESM default export with class
+    let source = r#"
+export default class Application {
+    private name: string;
+    private version: string;
+
+    constructor(name: string, version: string = "1.0.0") {
         this.name = name;
-        this.floors = [];
+        this.version = version;
     }
 
-    addFloor(floor: Building.Floor): void {
-        this.floors.push(floor);
-    }
-}
-
-namespace Building {
-    export interface Floor {
-        number: number;
-        area: number;
+    getName(): string {
+        return this.name;
     }
 
-    export class Office implements Floor {
-        number: number;
-        area: number;
-        desks: number;
-
-        constructor(floorNumber: number, area: number, desks: number) {
-            this.number = floorNumber;
-            this.area = area;
-            this.desks = desks;
-        }
+    getVersion(): string {
+        return this.version;
     }
 
-    export function calculateTotalArea(building: Building): number {
-        return building.floors.reduce((sum, floor) => sum + floor.area, 0);
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Classes should be converted
-    assert!(
-        output.contains("Album") && output.contains("Building"),
-        "Expected namespace merged classes: {}",
-        output
-    );
-
-    // Namespace members should be present
-    assert!(
-        output.contains("AlbumLabel") || output.contains("createDefault"),
-        "Expected namespace members: {}",
-        output
-    );
-
-    // Class IIFE pattern should be present
-    assert!(
-        output.contains("(function ()") || output.contains("(function()") || output.contains("function Album"),
-        "Expected class IIFE pattern: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_typescript_module_augmentation() {
-    // Module augmentation pattern
-    let source = r#"
-// Original module
-namespace MyModule {
-    export class BaseService {
-        name: string = "base";
-
-        execute(): void {
-            console.log("Base execute");
-        }
-    }
-
-    export interface Config {
-        debug: boolean;
+    static create(name: string): Application {
+        return new Application(name);
     }
 }
 
-// Augmentation
-namespace MyModule {
-    export class ExtendedService extends BaseService {
-        version: string = "1.0";
+export class Plugin {
+    constructor(public id: string, public enabled: boolean = true) {}
 
-        execute(): void {
-            super.execute();
-            console.log("Extended execute");
-        }
+    enable(): void {
+        this.enabled = true;
     }
 
-    export function createService(): BaseService {
-        return new ExtendedService();
-    }
-
-    export const VERSION = "2.0.0";
-}
-
-// Another augmentation
-namespace MyModule {
-    export class AdvancedService extends ExtendedService {
-        features: string[] = [];
-
-        addFeature(feature: string): void {
-            this.features.push(feature);
-        }
-    }
-
-    export interface Config {
-        verbose: boolean;
+    disable(): void {
+        this.enabled = false;
     }
 }
 
-// Usage
-class Consumer {
-    private service: MyModule.BaseService;
+export class Config {
+    private settings: Map<string, any> = new Map();
 
-    constructor() {
-        this.service = MyModule.createService();
+    set(key: string, value: any): void {
+        this.settings.set(key, value);
     }
 
-    run(): void {
-        this.service.execute();
+    get(key: string): any {
+        return this.settings.get(key);
     }
 }
 "#;
@@ -22387,104 +22356,86 @@ class Consumer {
 
     let output = printer.get_output().to_string();
 
-    // Module namespace should be present
     assert!(
-        output.contains("MyModule"),
-        "Expected module namespace: {}",
+        output.contains("function Application"),
+        "Expected Application function: {}",
         output
     );
-
-    // Classes should be present
     assert!(
-        output.contains("BaseService") && output.contains("Consumer"),
-        "Expected module classes: {}",
+        output.contains("Application.prototype.getName") && output.contains("Application.prototype.getVersion"),
+        "Expected Application methods on prototype: {}",
         output
     );
-
-    // Class IIFE pattern should be present
     assert!(
-        output.contains("(function ()") || output.contains("(function()") || output.contains("function BaseService"),
-        "Expected class IIFE pattern: {}",
+        output.contains("Application.create"),
+        "Expected Application static method: {}",
+        output
+    );
+    assert!(
+        output.contains("function Plugin") && output.contains("function Config"),
+        "Expected Plugin and Config functions: {}",
+        output
+    );
+    assert!(
+        output.contains("export") || output.contains("exports"),
+        "Expected export statements: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_typescript_declaration_merging() {
-    // Declaration merging pattern
+fn test_class_es5_esm_named_exports() {
+    // Test ESM named exports with classes
     let source = r#"
-// Interface declaration
-interface Box {
-    height: number;
-    width: number;
-}
+export class Logger {
+    private prefix: string;
 
-// Interface merging
-interface Box {
-    depth: number;
-    scale(factor: number): Box;
-}
-
-// Class implementing merged interface
-class BoxImpl implements Box {
-    height: number;
-    width: number;
-    depth: number;
-
-    constructor(h: number, w: number, d: number) {
-        this.height = h;
-        this.width = w;
-        this.depth = d;
+    constructor(prefix: string = "") {
+        this.prefix = prefix;
     }
 
-    scale(factor: number): Box {
-        return new BoxImpl(
-            this.height * factor,
-            this.width * factor,
-            this.depth * factor
-        );
+    log(message: string): void {
+        console.log(`${this.prefix}${message}`);
     }
 
-    volume(): number {
-        return this.height * this.width * this.depth;
+    error(message: string): void {
+        console.error(`${this.prefix}ERROR: ${message}`);
+    }
+
+    warn(message: string): void {
+        console.warn(`${this.prefix}WARN: ${message}`);
     }
 }
 
-// Function with merged overloads
-function createBox(size: number): Box;
-function createBox(height: number, width: number, depth: number): Box;
-function createBox(a: number, b?: number, c?: number): Box {
-    if (b !== undefined && c !== undefined) {
-        return new BoxImpl(a, b, c);
-    }
-    return new BoxImpl(a, a, a);
-}
-
-// Class merging with namespace
-class Point {
-    x: number;
-    y: number;
-
-    constructor(x: number, y: number) {
-        this.x = x;
-        this.y = y;
+export class Formatter {
+    static formatDate(date: Date): string {
+        return date.toISOString();
     }
 
-    distanceTo(other: Point): number {
-        return Math.sqrt(
-            Math.pow(other.x - this.x, 2) +
-            Math.pow(other.y - this.y, 2)
-        );
+    static formatCurrency(amount: number, currency: string = "USD"): string {
+        return `${currency} ${amount.toFixed(2)}`;
+    }
+
+    static formatPercentage(value: number): string {
+        return `${(value * 100).toFixed(1)}%`;
     }
 }
 
-namespace Point {
-    export const ORIGIN = new Point(0, 0);
+export class Validator {
+    static isEmail(value: string): boolean {
+        return value.includes("@") && value.includes(".");
+    }
 
-    export function fromArray(arr: [number, number]): Point {
-        return new Point(arr[0], arr[1]);
+    static isUrl(value: string): boolean {
+        return value.startsWith("http://") || value.startsWith("https://");
+    }
+
+    static isPhone(value: string): boolean {
+        return /^\d{10,}$/.test(value.replace(/\D/g, ""));
     }
 }
+
+export { Logger as DefaultLogger };
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
@@ -22501,89 +22452,189 @@ namespace Point {
 
     let output = printer.get_output().to_string();
 
-    // Classes should be converted
     assert!(
-        output.contains("BoxImpl") && output.contains("Point"),
-        "Expected declaration merged classes: {}",
+        output.contains("function Logger"),
+        "Expected Logger function: {}",
         output
     );
-
-    // Functions should be present
     assert!(
-        output.contains("createBox"),
-        "Expected merged function: {}",
+        output.contains("Logger.prototype.log") && output.contains("Logger.prototype.error"),
+        "Expected Logger methods on prototype: {}",
         output
     );
-
-    // Class IIFE pattern should be present
     assert!(
-        output.contains("(function ()") || output.contains("(function()") || output.contains("function BoxImpl"),
-        "Expected class IIFE pattern: {}",
+        output.contains("function Formatter") || output.contains("Formatter.formatDate"),
+        "Expected Formatter with static methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function Validator") || output.contains("Validator.isEmail"),
+        "Expected Validator with static methods: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_typescript_ambient_declarations() {
-    // Ambient declarations pattern
+fn test_class_es5_re_export_patterns() {
+    // Test re-export patterns with classes
     let source = r#"
-declare const GLOBAL_CONFIG: {
-    apiUrl: string;
-    timeout: number;
+// Original classes
+class BaseEntity {
+    constructor(public id: string) {}
+
+    getId(): string {
+        return this.id;
+    }
+}
+
+class User extends BaseEntity {
+    constructor(id: string, public name: string, public email: string) {
+        super(id);
+    }
+
+    getDisplayName(): string {
+        return this.name;
+    }
+}
+
+class Product extends BaseEntity {
+    constructor(id: string, public sku: string, public price: number) {
+        super(id);
+    }
+
+    getFormattedPrice(): string {
+        return `$${this.price.toFixed(2)}`;
+    }
+}
+
+class Order extends BaseEntity {
+    private items: Product[] = [];
+
+    constructor(id: string, public userId: string) {
+        super(id);
+    }
+
+    addItem(product: Product): void {
+        this.items.push(product);
+    }
+
+    getTotal(): number {
+        return this.items.reduce((sum, p) => sum + p.price, 0);
+    }
+}
+
+// Re-export patterns
+export { BaseEntity, User, Product, Order };
+export { User as Customer };
+export { Product as Item };
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function BaseEntity"),
+        "Expected BaseEntity function: {}",
+        output
+    );
+    assert!(
+        output.contains("function User") && output.contains("__extends(User, _super)"),
+        "Expected User extending BaseEntity: {}",
+        output
+    );
+    assert!(
+        output.contains("function Product") && output.contains("__extends(Product, _super)"),
+        "Expected Product extending BaseEntity: {}",
+        output
+    );
+    assert!(
+        output.contains("function Order") && output.contains("__extends(Order, _super)"),
+        "Expected Order extending BaseEntity: {}",
+        output
+    );
+    assert!(
+        output.contains("export") || output.contains("exports"),
+        "Expected export statements: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_barrel_export_pattern() {
+    // Test barrel export pattern (index file pattern)
+    let source = r#"
+// Service classes
+class AuthService {
+    private token: string | null = null;
+
+    login(username: string, password: string): Promise<boolean> {
+        return Promise.resolve(true);
+    }
+
+    logout(): void {
+        this.token = null;
+    }
+
+    isAuthenticated(): boolean {
+        return this.token !== null;
+    }
+}
+
+class ApiService {
+    private baseUrl: string;
+
+    constructor(baseUrl: string) {
+        this.baseUrl = baseUrl;
+    }
+
+    get<T>(endpoint: string): Promise<T> {
+        return fetch(`${this.baseUrl}${endpoint}`).then(r => r.json());
+    }
+
+    post<T>(endpoint: string, data: any): Promise<T> {
+        return fetch(`${this.baseUrl}${endpoint}`, {
+            method: "POST",
+            body: JSON.stringify(data)
+        }).then(r => r.json());
+    }
+}
+
+class StorageService {
+    get(key: string): string | null {
+        return localStorage.getItem(key);
+    }
+
+    set(key: string, value: string): void {
+        localStorage.setItem(key, value);
+    }
+
+    remove(key: string): void {
+        localStorage.removeItem(key);
+    }
+}
+
+// Barrel exports
+export { AuthService, ApiService, StorageService };
+export type { AuthService as IAuthService };
+
+// Default export
+const services = {
+    auth: new AuthService(),
+    storage: new StorageService()
 };
 
-declare function externalLog(message: string): void;
-
-declare class ExternalService {
-    constructor(url: string);
-    fetch(path: string): Promise<any>;
-}
-
-declare namespace ExternalLib {
-    interface Options {
-        debug: boolean;
-    }
-
-    function init(options: Options): void;
-    const version: string;
-}
-
-// Class using ambient declarations
-class ApiClient {
-    private baseUrl: string;
-    private service: ExternalService;
-
-    constructor() {
-        this.baseUrl = GLOBAL_CONFIG.apiUrl;
-        this.service = new ExternalService(this.baseUrl);
-    }
-
-    async getData(path: string): Promise<any> {
-        externalLog(`Fetching: ${path}`);
-        return this.service.fetch(path);
-    }
-
-    init(): void {
-        ExternalLib.init({ debug: true });
-        console.log(`Using lib version: ${ExternalLib.version}`);
-    }
-}
-
-class ConfigManager {
-    private config: typeof GLOBAL_CONFIG;
-
-    constructor() {
-        this.config = GLOBAL_CONFIG;
-    }
-
-    getTimeout(): number {
-        return this.config.timeout;
-    }
-
-    getApiUrl(): string {
-        return this.config.apiUrl;
-    }
-}
+export default services;
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
@@ -22600,102 +22651,97 @@ class ConfigManager {
 
     let output = printer.get_output().to_string();
 
-    // Implementation classes should be converted
     assert!(
-        output.contains("ApiClient") && output.contains("ConfigManager"),
-        "Expected implementation classes: {}",
+        output.contains("function AuthService"),
+        "Expected AuthService function: {}",
         output
     );
-
-    // Ambient declarations should not emit runtime code
     assert!(
-        !output.contains("declare const") && !output.contains("declare function"),
-        "Expected ambient declarations to be stripped: {}",
+        output.contains("AuthService.prototype.login") && output.contains("AuthService.prototype.logout"),
+        "Expected AuthService methods: {}",
         output
     );
-
-    // Class IIFE pattern should be present
     assert!(
-        output.contains("(function ()") || output.contains("(function()") || output.contains("function ApiClient"),
-        "Expected class IIFE pattern: {}",
+        output.contains("function ApiService"),
+        "Expected ApiService function: {}",
+        output
+    );
+    assert!(
+        output.contains("function StorageService"),
+        "Expected StorageService function: {}",
+        output
+    );
+    assert!(
+        output.contains("services") || output.contains("default"),
+        "Expected services object or default export: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_typescript_const_assertions() {
-    // Const assertions pattern
+fn test_class_es5_mixed_module_patterns() {
+    // Test mixed module patterns combining CommonJS and ESM
     let source = r#"
-const CONFIG = {
-    api: {
-        url: "https://api.example.com",
-        timeout: 5000
-    },
-    features: ["auth", "logging", "caching"]
-} as const;
+// Classes with various export patterns
+export class EventEmitter {
+    private listeners: Map<string, Function[]> = new Map();
 
-const COLORS = ["red", "green", "blue"] as const;
+    on(event: string, callback: Function): void {
+        if (!this.listeners.has(event)) {
+            this.listeners.set(event, []);
+        }
+        this.listeners.get(event)!.push(callback);
+    }
 
-const ACTIONS = {
-    INCREMENT: "INCREMENT",
-    DECREMENT: "DECREMENT",
-    RESET: "RESET"
-} as const;
-
-type ActionType = typeof ACTIONS[keyof typeof ACTIONS];
-
-class Store {
-    private state: { count: number } = { count: 0 };
-
-    dispatch(action: ActionType): void {
-        switch (action) {
-            case ACTIONS.INCREMENT:
-                this.state.count++;
-                break;
-            case ACTIONS.DECREMENT:
-                this.state.count--;
-                break;
-            case ACTIONS.RESET:
-                this.state.count = 0;
-                break;
+    emit(event: string, ...args: any[]): void {
+        const callbacks = this.listeners.get(event);
+        if (callbacks) {
+            callbacks.forEach(cb => cb(...args));
         }
     }
 
-    getState(): { count: number } {
-        return { ...this.state };
+    off(event: string, callback: Function): void {
+        const callbacks = this.listeners.get(event);
+        if (callbacks) {
+            const index = callbacks.indexOf(callback);
+            if (index > -1) {
+                callbacks.splice(index, 1);
+            }
+        }
     }
 }
 
-class ThemeManager {
-    private readonly colors = COLORS;
-    private currentIndex: number = 0;
-
-    nextColor(): typeof COLORS[number] {
-        const color = this.colors[this.currentIndex];
-        this.currentIndex = (this.currentIndex + 1) % this.colors.length;
-        return color;
-    }
-
-    getAllColors(): readonly string[] {
-        return this.colors;
+class InternalProcessor {
+    process(data: any): any {
+        return data;
     }
 }
 
-class ConfigService {
-    private readonly config = CONFIG;
+export class DataPipeline extends EventEmitter {
+    private processor = new InternalProcessor();
+    private stages: Function[] = [];
 
-    getApiUrl(): string {
-        return this.config.api.url;
+    addStage(stage: Function): this {
+        this.stages.push(stage);
+        return this;
     }
 
-    getTimeout(): number {
-        return this.config.api.timeout;
-    }
-
-    hasFeature(feature: string): boolean {
-        return (this.config.features as readonly string[]).includes(feature);
+    async run(input: any): Promise<any> {
+        let result = input;
+        for (const stage of this.stages) {
+            result = await stage(result);
+            this.emit("stage-complete", result);
+        }
+        return this.processor.process(result);
     }
 }
+
+// Mixed exports
+export { EventEmitter as Emitter };
+export default DataPipeline;
+
+// Type-only export (should be erased)
+export type PipelineStage = (input: any) => any | Promise<any>;
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
@@ -22712,135 +22758,29 @@ class ConfigService {
 
     let output = printer.get_output().to_string();
 
-    // Classes should be converted
     assert!(
-        output.contains("Store") && output.contains("ThemeManager") && output.contains("ConfigService"),
-        "Expected const assertion classes: {}",
+        output.contains("function EventEmitter"),
+        "Expected EventEmitter function: {}",
         output
     );
-
-    // Const values should be present
     assert!(
-        output.contains("CONFIG") || output.contains("COLORS") || output.contains("ACTIONS"),
-        "Expected const values: {}",
+        output.contains("EventEmitter.prototype.on") && output.contains("EventEmitter.prototype.emit"),
+        "Expected EventEmitter methods: {}",
         output
     );
-
-    // Class IIFE pattern should be present
     assert!(
-        output.contains("(function ()") || output.contains("(function()") || output.contains("function Store"),
-        "Expected class IIFE pattern: {}",
+        output.contains("function InternalProcessor"),
+        "Expected InternalProcessor function: {}",
         output
     );
-}
-
-#[test]
-fn test_class_es5_typescript_type_only_imports() {
-    // Type-only imports and exports pattern
-    let source = r#"
-// Type definitions (simulated)
-interface User {
-    id: number;
-    name: string;
-    email: string;
-}
-
-interface Product {
-    id: number;
-    title: string;
-    price: number;
-}
-
-type UserId = User["id"];
-type ProductId = Product["id"];
-
-// Class using type imports
-class UserRepository {
-    private users: Map<UserId, User> = new Map();
-
-    add(user: User): void {
-        this.users.set(user.id, user);
-    }
-
-    findById(id: UserId): User | undefined {
-        return this.users.get(id);
-    }
-
-    findAll(): User[] {
-        return Array.from(this.users.values());
-    }
-}
-
-class ProductRepository {
-    private products: Map<ProductId, Product> = new Map();
-
-    add(product: Product): void {
-        this.products.set(product.id, product);
-    }
-
-    findById(id: ProductId): Product | undefined {
-        return this.products.get(id);
-    }
-
-    findByPriceRange(min: number, max: number): Product[] {
-        return Array.from(this.products.values())
-            .filter(p => p.price >= min && p.price <= max);
-    }
-}
-
-class OrderService {
-    constructor(
-        private userRepo: UserRepository,
-        private productRepo: ProductRepository
-    ) {}
-
-    createOrder(userId: UserId, productIds: ProductId[]): object {
-        const user = this.userRepo.findById(userId);
-        const products = productIds
-            .map(id => this.productRepo.findById(id))
-            .filter((p): p is Product => p !== undefined);
-
-        return {
-            user,
-            products,
-            total: products.reduce((sum, p) => sum + p.price, 0)
-        };
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Classes should be converted
     assert!(
-        output.contains("UserRepository") && output.contains("ProductRepository") && output.contains("OrderService"),
-        "Expected type-using classes: {}",
+        output.contains("function DataPipeline") && output.contains("__extends(DataPipeline, _super)"),
+        "Expected DataPipeline extending EventEmitter: {}",
         output
     );
-
-    // Type-only constructs should be stripped
     assert!(
-        !output.contains("interface User") && !output.contains("type UserId"),
-        "Expected type-only constructs to be stripped: {}",
-        output
-    );
-
-    // Class IIFE pattern should be present
-    assert!(
-        output.contains("(function ()") || output.contains("(function()") || output.contains("function UserRepository"),
-        "Expected class IIFE pattern: {}",
+        output.contains("DataPipeline.prototype.addStage") && output.contains("DataPipeline.prototype.run"),
+        "Expected DataPipeline methods: {}",
         output
     );
 }
