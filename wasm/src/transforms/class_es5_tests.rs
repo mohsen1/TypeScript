@@ -12069,3 +12069,420 @@ class ArrayFactory {
         output
     );
 }
+
+// ============================================================================
+// Map/Set Collection Pattern Tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_map_basic() {
+    // Basic Map operations
+    let source = r#"
+class MapWrapper<K, V> {
+    private map: Map<K, V> = new Map();
+
+    set(key: K, value: V): this {
+        this.map.set(key, value);
+        return this;
+    }
+
+    get(key: K): V | undefined {
+        return this.map.get(key);
+    }
+
+    has(key: K): boolean {
+        return this.map.has(key);
+    }
+
+    delete(key: K): boolean {
+        return this.map.delete(key);
+    }
+
+    clear(): void {
+        this.map.clear();
+    }
+
+    get size(): number {
+        return this.map.size;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("MapWrapper"),
+        "Expected MapWrapper class: {}",
+        output
+    );
+
+    // Map should be present
+    assert!(
+        output.contains("Map"),
+        "Expected Map: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("set") && output.contains("get") && output.contains("has"),
+        "Expected set, get, has methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_map_iteration() {
+    // Map iteration patterns
+    let source = r#"
+class MapIterator<K, V> {
+    private data: Map<K, V> = new Map();
+
+    keys(): K[] {
+        return Array.from(this.data.keys());
+    }
+
+    values(): V[] {
+        return Array.from(this.data.values());
+    }
+
+    entries(): [K, V][] {
+        return Array.from(this.data.entries());
+    }
+
+    forEach(callback: (value: V, key: K) => void): void {
+        this.data.forEach((v, k) => callback(v, k));
+    }
+
+    map<R>(transform: (value: V, key: K) => R): R[] {
+        const result: R[] = [];
+        this.data.forEach((v, k) => result.push(transform(v, k)));
+        return result;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("MapIterator"),
+        "Expected MapIterator class: {}",
+        output
+    );
+
+    // Map should be present
+    assert!(
+        output.contains("Map"),
+        "Expected Map: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("keys") && output.contains("values") && output.contains("entries"),
+        "Expected keys, values, entries methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_set_basic() {
+    // Basic Set operations
+    let source = r#"
+class SetWrapper<T> {
+    private set: Set<T> = new Set();
+
+    add(value: T): this {
+        this.set.add(value);
+        return this;
+    }
+
+    has(value: T): boolean {
+        return this.set.has(value);
+    }
+
+    delete(value: T): boolean {
+        return this.set.delete(value);
+    }
+
+    clear(): void {
+        this.set.clear();
+    }
+
+    toArray(): T[] {
+        return Array.from(this.set);
+    }
+
+    get size(): number {
+        return this.set.size;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("SetWrapper"),
+        "Expected SetWrapper class: {}",
+        output
+    );
+
+    // Set should be present
+    assert!(
+        output.contains("Set"),
+        "Expected Set: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("add") && output.contains("has") && output.contains("toArray"),
+        "Expected add, has, toArray methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_weakmap_usage() {
+    // WeakMap for private data pattern
+    let source = r#"
+const privateData = new WeakMap<object, Record<string, any>>();
+
+class PrivateStore {
+    constructor() {
+        privateData.set(this, {});
+    }
+
+    setPrivate(key: string, value: any): void {
+        const data = privateData.get(this);
+        if (data) {
+            data[key] = value;
+        }
+    }
+
+    getPrivate(key: string): any {
+        const data = privateData.get(this);
+        return data ? data[key] : undefined;
+    }
+
+    hasPrivate(key: string): boolean {
+        const data = privateData.get(this);
+        return data ? key in data : false;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("PrivateStore"),
+        "Expected PrivateStore class: {}",
+        output
+    );
+
+    // WeakMap should be present
+    assert!(
+        output.contains("WeakMap"),
+        "Expected WeakMap: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("setPrivate") && output.contains("getPrivate") && output.contains("hasPrivate"),
+        "Expected setPrivate, getPrivate, hasPrivate methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_weakset_usage() {
+    // WeakSet for tracking objects
+    let source = r#"
+class ObjectTracker {
+    private tracked: WeakSet<object> = new WeakSet();
+
+    track(obj: object): void {
+        this.tracked.add(obj);
+    }
+
+    isTracked(obj: object): boolean {
+        return this.tracked.has(obj);
+    }
+
+    untrack(obj: object): boolean {
+        return this.tracked.delete(obj);
+    }
+
+    trackMultiple(...objects: object[]): void {
+        for (const obj of objects) {
+            this.tracked.add(obj);
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("ObjectTracker"),
+        "Expected ObjectTracker class: {}",
+        output
+    );
+
+    // WeakSet should be present
+    assert!(
+        output.contains("WeakSet"),
+        "Expected WeakSet: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("track") && output.contains("isTracked") && output.contains("untrack"),
+        "Expected track, isTracked, untrack methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_map_set_combined() {
+    // Combined Map and Set patterns
+    let source = r#"
+class Graph<T> {
+    private nodes: Set<T> = new Set();
+    private edges: Map<T, Set<T>> = new Map();
+
+    addNode(node: T): void {
+        this.nodes.add(node);
+        if (!this.edges.has(node)) {
+            this.edges.set(node, new Set());
+        }
+    }
+
+    addEdge(from: T, to: T): void {
+        this.addNode(from);
+        this.addNode(to);
+        this.edges.get(from)!.add(to);
+    }
+
+    getNeighbors(node: T): T[] {
+        const neighbors = this.edges.get(node);
+        return neighbors ? Array.from(neighbors) : [];
+    }
+
+    hasNode(node: T): boolean {
+        return this.nodes.has(node);
+    }
+
+    hasEdge(from: T, to: T): boolean {
+        const neighbors = this.edges.get(from);
+        return neighbors ? neighbors.has(to) : false;
+    }
+
+    getNodeCount(): number {
+        return this.nodes.size;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("Graph"),
+        "Expected Graph class: {}",
+        output
+    );
+
+    // Map and Set should be present
+    assert!(
+        output.contains("Map") && output.contains("Set"),
+        "Expected Map and Set: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("addNode") && output.contains("addEdge") && output.contains("getNeighbors"),
+        "Expected addNode, addEdge, getNeighbors methods: {}",
+        output
+    );
+}
