@@ -31,6 +31,9 @@ const CONFIG = {
   outputDir: resolve(__dirname, 'output'),
   reportPath: resolve(__dirname, 'output/report.json'),
 };
+const DEFAULT_LIB_PATH = resolve(__dirname, '../../tests/lib/lib.d.ts');
+const DEFAULT_LIB_SOURCE = readFileSync(DEFAULT_LIB_PATH, 'utf-8');
+const DEFAULT_LIB_NAME = 'lib.d.ts';
 
 // ANSI colors
 const colors = {
@@ -265,13 +268,16 @@ async function runTsc(code, fileName = 'test.ts') {
 // WASM Runner - Invokes the Rust/WASM compiler
 // ============================================================================
 
-async function runWasm(code, fileName = 'test.ts') {
+async function runWasm(code, fileName = 'test.ts', testOptions = {}) {
   try {
     // Dynamic import of the WASM module
     const wasm = await import(join(CONFIG.wasmPkgPath, 'wasm.js'));
 
     // Create parser and check
     const parser = new wasm.ThinParser(fileName, code);
+    if (!testOptions.nolib) {
+      parser.addLibFile(DEFAULT_LIB_NAME, DEFAULT_LIB_SOURCE);
+    }
     parser.parseSourceFile();
 
     // Get parse diagnostics

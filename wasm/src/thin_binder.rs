@@ -644,7 +644,7 @@ impl ThinBinderState {
                     for &stmt_idx in &block.statements.nodes {
                         self.bind_node(arena, stmt_idx);
                     }
-                    self.exit_scope();
+                    self.exit_scope(arena);
                 }
             }
 
@@ -801,7 +801,7 @@ impl ThinBinderState {
                         self.add_antecedent(merge_label, self.current_flow);
                         self.current_flow = merge_label;
                     }
-                    self.exit_scope();
+                    self.exit_scope(arena);
                 }
             }
 
@@ -828,7 +828,7 @@ impl ThinBinderState {
                     self.add_antecedent(merge_label, loop_label);
                     self.add_antecedent(merge_label, self.current_flow);
                     self.current_flow = merge_label;
-                    self.exit_scope();
+                    self.exit_scope(arena);
                 }
             }
 
@@ -1581,6 +1581,22 @@ impl ThinBinderState {
         false
     }
 
+    /// Check if modifiers list contains the 'declare' keyword.
+    fn has_declare_modifier(&self, arena: &ThinNodeArena, modifiers: &Option<NodeList>) -> bool {
+        use crate::scanner::SyntaxKind;
+
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(mod_node) = arena.get(mod_idx) {
+                    if mod_node.kind == SyntaxKind::DeclareKeyword as u16 {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
     /// Check if a node is exported.
     /// Handles walking up the tree for VariableDeclaration -> VariableStatement.
     fn is_node_exported(&self, arena: &ThinNodeArena, idx: NodeIndex) -> bool {
@@ -1687,6 +1703,14 @@ impl ThinBinderState {
             return true;
         }
 
+        if (existing_flags & symbol_flags::CLASS != 0
+            && (new_flags & symbol_flags::INTERFACE) != 0)
+            || (existing_flags & symbol_flags::INTERFACE != 0
+                && (new_flags & symbol_flags::CLASS) != 0)
+        {
+            return true;
+        }
+
         if (existing_flags & symbol_flags::MODULE) != 0
             && (new_flags & symbol_flags::MODULE) != 0
         {
@@ -1726,19 +1750,39 @@ impl ThinBinderState {
         self.enter_persistent_scope(kind, node);
     }
 
-    fn exit_scope(&mut self) {
+    fn exit_scope(&mut self, arena: &ThinNodeArena) {
         // Capture exports before popping if this is a module/namespace
         if let Some(ctx) = self.scope_chain.get(self.current_scope_idx) {
             match ctx.container_kind {
                 ContainerKind::Module => {
                     // Find the symbol for this module/namespace
                     if let Some(sym_id) = self.node_symbols.get(&ctx.container_node.0) {
+                        let export_all = self
+                            .scope_chain
+                            .get(self.current_scope_idx)
+                            .and_then(|ctx| arena.get(ctx.container_node))
+                            .and_then(|node| arena.get_module(node))
+                            .map(|module| {
+                                let is_external = arena
+                                    .get(module.name)
+                                    .map(|name_node| {
+                                        name_node.kind == SyntaxKind::StringLiteral as u16
+                                            || name_node.kind == SyntaxKind::NoSubstitutionTemplateLiteral as u16
+                                    })
+                                    .unwrap_or(false);
+                                self.has_declare_modifier(arena, &module.modifiers) || is_external
+                            })
+                            .unwrap_or(false);
+
                         // Filter exports: only include symbols with is_exported = true or EXPORT_VALUE flag
                         let mut exports = SymbolTable::new();
                         for (name, &child_id) in self.current_scope.iter() {
                             if let Some(child) = self.symbols.get(child_id) {
                                 // Check explicit export flag OR if it's an EXPORT_VALUE (from export {})
-                                if child.is_exported || (child.flags & symbol_flags::EXPORT_VALUE) != 0 {
+                                if export_all
+                                    || child.is_exported
+                                    || (child.flags & symbol_flags::EXPORT_VALUE) != 0
+                                {
                                     exports.set(name.clone(), child_id);
                                 }
                             }
@@ -1870,7 +1914,7 @@ impl ThinBinderState {
                 binder.bind_node(arena, func.body);
             });
 
-            self.exit_scope();
+            self.exit_scope(arena);
         }
     }
 
@@ -1915,7 +1959,7 @@ impl ThinBinderState {
                 binder.bind_node(arena, func.body);
             });
 
-            self.exit_scope();
+            self.exit_scope(arena);
         }
     }
 
@@ -1936,7 +1980,7 @@ impl ThinBinderState {
                 binder.bind_node(arena, func.body);
             });
 
-            self.exit_scope();
+            self.exit_scope(arena);
         }
     }
 
@@ -1959,7 +2003,7 @@ impl ThinBinderState {
             }
         });
 
-        self.exit_scope();
+        self.exit_scope(arena);
     }
 
     fn bind_modifiers(&mut self, arena: &ThinNodeArena, modifiers: &Option<NodeList>) {
@@ -1995,7 +2039,7 @@ impl ThinBinderState {
                 self.bind_class_member(arena, member_idx);
             }
 
-            self.exit_scope();
+            self.exit_scope(arena);
         }
     }
 
@@ -2017,7 +2061,7 @@ impl ThinBinderState {
                 self.bind_class_member(arena, member_idx);
             }
 
-            self.exit_scope();
+            self.exit_scope(arena);
         }
     }
 
@@ -2095,7 +2139,7 @@ impl ThinBinderState {
                         for &stmt_idx in &block.statements.nodes {
                             self.bind_node(arena, stmt_idx);
                         }
-                        self.exit_scope();
+                        self.exit_scope(arena);
                     }
                 }
                 _ => {}
@@ -2147,7 +2191,7 @@ impl ThinBinderState {
                     }
                 }
             }
-            self.exit_scope();
+            self.exit_scope(arena);
         }
     }
 
@@ -2254,7 +2298,7 @@ impl ThinBinderState {
                         self.bind_node(arena, catch.block);
                         self.add_antecedent(end_label, self.current_flow);
 
-                        self.exit_scope();
+                        self.exit_scope(arena);
                     }
                 }
             }
@@ -2466,10 +2510,17 @@ impl ThinBinderState {
 
     fn bind_module_declaration(&mut self, arena: &ThinNodeArena, node: &ThinNode, idx: NodeIndex) {
         if let Some(module) = arena.get_module(node) {
-            if let Some(name) = self.get_identifier_name(arena, module.name) {
+            let name = self.get_identifier_name(arena, module.name)
+                .map(str::to_string)
+                .or_else(|| {
+                    arena.get(module.name)
+                        .and_then(|name_node| arena.get_literal(name_node))
+                        .map(|lit| lit.text.clone())
+                });
+            if let Some(name) = name {
                 let is_exported = self.has_export_modifier(arena, &module.modifiers);
                 let flags = symbol_flags::VALUE_MODULE | symbol_flags::NAMESPACE_MODULE;
-                self.declare_symbol(name, flags, idx, is_exported);
+                self.declare_symbol(&name, flags, idx, is_exported);
             }
 
             // Enter module scope
@@ -2483,7 +2534,7 @@ impl ThinBinderState {
             }
 
             self.bind_node(arena, module.body);
-            self.exit_scope();
+            self.exit_scope(arena);
         }
     }
 

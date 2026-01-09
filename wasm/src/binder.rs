@@ -10,6 +10,7 @@ use serde::Serialize;
 use rustc_hash::FxHashMap;
 use crate::parser::NodeIndex;
 use crate::parser::node_flags;
+use crate::parser::thin_node::NodeAccess;
 use crate::scanner::SyntaxKind;
 
 // =============================================================================
@@ -1077,6 +1078,15 @@ impl BinderState {
             return true;
         }
 
+        // Class and interface can merge (declaration merging)
+        if (existing_flags & symbol_flags::CLASS != 0
+            && (new_flags & symbol_flags::INTERFACE) != 0)
+            || (existing_flags & symbol_flags::INTERFACE != 0
+                && (new_flags & symbol_flags::CLASS) != 0)
+        {
+            return true;
+        }
+
         // Namespace/module can merge with namespace/module
         if (existing_flags & symbol_flags::MODULE) != 0
             && (new_flags & symbol_flags::MODULE) != 0
@@ -1440,12 +1450,18 @@ impl BinderState {
         module: &crate::parser::ModuleDeclaration,
         module_idx: NodeIndex,
     ) {
-        // Get module name
-        if let Some(name) = self.get_identifier_name(arena, module.name) {
+        // Get module name (identifier or string literal for external modules)
+        let name = self.get_identifier_name(arena, module.name)
+            .map(|n| n.to_string())
+            .or_else(|| {
+                arena.get_literal_text(module.name)
+                    .map(str::to_string)
+            });
+        if let Some(name) = name {
             // Determine if this is a namespace (value) or module (ambient)
             // For simplicity, treat as namespace module (can contain values)
             let flags = symbol_flags::NAMESPACE_MODULE | symbol_flags::VALUE_MODULE;
-            self.declare_symbol(name.to_string(), flags, module_idx);
+            self.declare_symbol(name, flags, module_idx);
         }
 
         // Bind module body in new scope
