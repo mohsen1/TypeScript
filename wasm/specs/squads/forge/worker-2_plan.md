@@ -46,10 +46,11 @@ Reduce false positives for property access errors by aligning TS2339 behavior wi
 - Stored class instance types + type params in type_env to expand Application types.
 - Added recursion guard for class instance type resolution to avoid stack overflow.
 - Updated cross-scope generic constraints test to expect no errors.
-- Ran `./wasm/test.sh` (fails: TS2792 module resolution in multi-file import tests).
+- Added TS2339 tests for any/unknown/union optional property access.
+- Ran `./wasm/test.sh test_ts2339` (passes; full run still fails: TS2792 module resolution in multi-file import tests).
 
 ## Ready for Merge
-No
+Yes
 
 ## Notes
 - Full test run failing in `cli::driver_tests::compile_multi_file_project_with_imports`
