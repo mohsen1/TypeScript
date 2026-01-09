@@ -18349,4 +18349,796 @@ fn test_type_guard_assert_never_utility() {
         panic!("Expected function type");
     }
 }
-use crate::solver::{AssignabilityChecker, CompatChecker, infer_generic_function, evaluate_conditional, ConditionalType};
+
+// =============================================================================
+// Generic Constraint Tests (extends, keyof constraints)
+// =============================================================================
+
+#[test]
+fn test_generic_constraint_k_extends_keyof_t() {
+    // Test: <T, K extends keyof T> - K must be a key of T
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let k_name = interner.intern_string("K");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_k = ctx.fresh_type_param(k_name);
+
+    // T is { name: string, age: number }
+    let name_prop = interner.intern_string("name");
+    let age_prop = interner.intern_string("age");
+    let obj = interner.object(vec![
+        PropertyInfo {
+            name: name_prop,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: age_prop,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+    ctx.add_lower_bound(var_t, obj);
+
+    // K extends keyof T = "name" | "age"
+    let name_lit = interner.literal_string("name");
+    let age_lit = interner.literal_string("age");
+    let keys = interner.union(vec![name_lit, age_lit]);
+    ctx.add_upper_bound(var_k, keys);
+
+    // K is inferred as "name"
+    ctx.add_lower_bound(var_k, name_lit);
+
+    let result_k = ctx.resolve_with_constraints(var_k).unwrap();
+    assert_eq!(result_k, name_lit);
+}
+
+#[test]
+fn test_generic_constraint_v_extends_t_k() {
+    // Test: <T, K extends keyof T, V extends T[K]>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let k_name = interner.intern_string("K");
+    let v_name = interner.intern_string("V");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_k = ctx.fresh_type_param(k_name);
+    let var_v = ctx.fresh_type_param(v_name);
+
+    // T is { name: string, age: number }
+    let name_prop = interner.intern_string("name");
+    let obj = interner.object(vec![PropertyInfo {
+        name: name_prop,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    ctx.add_lower_bound(var_t, obj);
+
+    // K is "name"
+    let name_lit = interner.literal_string("name");
+    ctx.add_lower_bound(var_k, name_lit);
+
+    // V extends T[K] = string (when K = "name")
+    ctx.add_upper_bound(var_v, TypeId::STRING);
+
+    // V is inferred as string
+    ctx.add_lower_bound(var_v, TypeId::STRING);
+
+    let result_v = ctx.resolve_with_constraints(var_v).unwrap();
+    assert_eq!(result_v, TypeId::STRING);
+}
+
+#[test]
+fn test_generic_constraint_propagation_through_call() {
+    // Test: function get<T, K extends keyof T>(obj: T, key: K): T[K]
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let k_name = interner.intern_string("K");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_k = ctx.fresh_type_param(k_name);
+
+    // Calling get({ name: "test" }, "name")
+    let name_prop = interner.intern_string("name");
+    let obj = interner.object(vec![PropertyInfo {
+        name: name_prop,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // T inferred from first arg
+    ctx.add_lower_bound(var_t, obj);
+
+    // K inferred from second arg
+    let name_lit = interner.literal_string("name");
+    ctx.add_lower_bound(var_k, name_lit);
+
+    // K has constraint keyof T
+    ctx.add_upper_bound(var_k, name_lit);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results.len(), 2);
+}
+
+#[test]
+fn test_generic_constraint_dependent_params() {
+    // Test: <T extends U, U> - T depends on U
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    // T extends U
+    ctx.add_upper_bound(var_t, var_u);
+
+    // U is number
+    ctx.add_lower_bound(var_u, TypeId::NUMBER);
+
+    // T is number (satisfies T extends number)
+    ctx.add_lower_bound(var_t, TypeId::NUMBER);
+
+    let result_t = ctx.resolve_with_constraints(var_t).unwrap();
+    let result_u = ctx.resolve_with_constraints(var_u).unwrap();
+    assert_eq!(result_t, TypeId::NUMBER);
+    assert_eq!(result_u, TypeId::NUMBER);
+}
+
+#[test]
+fn test_generic_constraint_array_element() {
+    // Test: <T extends Array<U>, U> - T is array of U
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    // U is string
+    ctx.add_lower_bound(var_u, TypeId::STRING);
+
+    // T is string[]
+    let string_array = interner.array(TypeId::STRING);
+    ctx.add_lower_bound(var_t, string_array);
+
+    // Constraint: T extends Array<string>
+    ctx.add_upper_bound(var_t, string_array);
+
+    let result_t = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result_t, string_array);
+}
+
+#[test]
+fn test_generic_constraint_function_return() {
+    // Test: <T extends () => U, U> - T is function returning U
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    // Function returning string
+    let fn_type = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    ctx.add_lower_bound(var_t, fn_type);
+    ctx.add_upper_bound(var_t, fn_type);
+
+    // U should be string
+    ctx.add_lower_bound(var_u, TypeId::STRING);
+
+    let result_u = ctx.resolve_with_constraints(var_u).unwrap();
+    assert_eq!(result_u, TypeId::STRING);
+}
+
+#[test]
+fn test_generic_constraint_union_extends() {
+    // Test: <T extends string | number>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // T extends string | number
+    let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    ctx.add_upper_bound(var_t, union);
+
+    // T is inferred as string
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_generic_constraint_intersection_extends() {
+    // Test: <T extends A & B>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let name_prop = interner.intern_string("name");
+    let age_prop = interner.intern_string("age");
+
+    let a = interner.object(vec![PropertyInfo {
+        name: name_prop,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let b = interner.object(vec![PropertyInfo {
+        name: age_prop,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // T extends { name: string } & { age: number }
+    let intersection = interner.intersection(vec![a, b]);
+    ctx.add_upper_bound(var_t, intersection);
+
+    // T is the intersection itself
+    ctx.add_lower_bound(var_t, intersection);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, intersection);
+}
+
+#[test]
+fn test_generic_constraint_literal_string_extends() {
+    // Test: <T extends "a" | "b" | "c">
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+    let lit_c = interner.literal_string("c");
+    let union = interner.union(vec![lit_a, lit_b, lit_c]);
+
+    // T extends "a" | "b" | "c"
+    ctx.add_upper_bound(var_t, union);
+
+    // T is "a"
+    ctx.add_lower_bound(var_t, lit_a);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, lit_a);
+}
+
+#[test]
+fn test_generic_constraint_literal_number_extends() {
+    // Test: <T extends 1 | 2 | 3>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let lit_1 = interner.literal_number(1.0);
+    let lit_2 = interner.literal_number(2.0);
+    let lit_3 = interner.literal_number(3.0);
+    let union = interner.union(vec![lit_1, lit_2, lit_3]);
+
+    // T extends 1 | 2 | 3
+    ctx.add_upper_bound(var_t, union);
+
+    // T is 2
+    ctx.add_lower_bound(var_t, lit_2);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, lit_2);
+}
+
+#[test]
+fn test_generic_constraint_nullable_extends() {
+    // Test: <T extends string | null | undefined>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let union = interner.union(vec![TypeId::STRING, TypeId::NULL, TypeId::UNDEFINED]);
+    ctx.add_upper_bound(var_t, union);
+
+    // T is null
+    ctx.add_lower_bound(var_t, TypeId::NULL);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::NULL);
+}
+
+#[test]
+fn test_generic_constraint_record_extends() {
+    // Test: <T extends Record<string, number>>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Record<string, number> = { [key: string]: number }
+    let record = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    ctx.add_upper_bound(var_t, record);
+
+    // T is { count: number }
+    let count_prop = interner.intern_string("count");
+    let obj = interner.object(vec![PropertyInfo {
+        name: count_prop,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    ctx.add_lower_bound(var_t, obj);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, obj);
+}
+
+#[test]
+fn test_generic_constraint_promise_extends() {
+    // Test: <T extends Promise<U>, U>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    // Promise<string> represented as object with then method
+    let then_name = interner.intern_string("then");
+    let promise_string = interner.object(vec![PropertyInfo {
+        name: then_name,
+        type_id: TypeId::FUNCTION,
+        write_type: TypeId::FUNCTION,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    ctx.add_lower_bound(var_t, promise_string);
+    ctx.add_upper_bound(var_t, promise_string);
+
+    ctx.add_lower_bound(var_u, TypeId::STRING);
+
+    let result_u = ctx.resolve_with_constraints(var_u).unwrap();
+    assert_eq!(result_u, TypeId::STRING);
+}
+
+#[test]
+fn test_generic_constraint_tuple_extends() {
+    // Test: <T extends [U, V], U, V>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+    let v_name = interner.intern_string("V");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+    let var_v = ctx.fresh_type_param(v_name);
+
+    // T is [string, number]
+    let tuple = interner.tuple_with_info(vec![
+        TupleElementInfo {
+            type_id: TypeId::STRING,
+            optional: false,
+            label: None,
+        },
+        TupleElementInfo {
+            type_id: TypeId::NUMBER,
+            optional: false,
+            label: None,
+        },
+    ]);
+
+    ctx.add_lower_bound(var_t, tuple);
+    ctx.add_upper_bound(var_t, tuple);
+
+    ctx.add_lower_bound(var_u, TypeId::STRING);
+    ctx.add_lower_bound(var_v, TypeId::NUMBER);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results.len(), 3);
+}
+
+#[test]
+fn test_generic_constraint_multiple_keyof() {
+    // Test: <T, K1 extends keyof T, K2 extends keyof T>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let k1_name = interner.intern_string("K1");
+    let k2_name = interner.intern_string("K2");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_k1 = ctx.fresh_type_param(k1_name);
+    let var_k2 = ctx.fresh_type_param(k2_name);
+
+    // T = { a: string, b: number, c: boolean }
+    let a_name = interner.intern_string("a");
+    let b_name = interner.intern_string("b");
+    let c_name = interner.intern_string("c");
+    let obj = interner.object(vec![
+        PropertyInfo {
+            name: a_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: c_name,
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+    ctx.add_lower_bound(var_t, obj);
+
+    // keyof T = "a" | "b" | "c"
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+    let lit_c = interner.literal_string("c");
+    let keys = interner.union(vec![lit_a, lit_b, lit_c]);
+
+    ctx.add_upper_bound(var_k1, keys);
+    ctx.add_upper_bound(var_k2, keys);
+
+    // K1 = "a", K2 = "b"
+    ctx.add_lower_bound(var_k1, lit_a);
+    ctx.add_lower_bound(var_k2, lit_b);
+
+    let result_k1 = ctx.resolve_with_constraints(var_k1).unwrap();
+    let result_k2 = ctx.resolve_with_constraints(var_k2).unwrap();
+    assert_eq!(result_k1, lit_a);
+    assert_eq!(result_k2, lit_b);
+}
+
+#[test]
+fn test_generic_constraint_keyof_union() {
+    // Test: <T extends A | B, K extends keyof T>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let k_name = interner.intern_string("K");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_k = ctx.fresh_type_param(k_name);
+
+    // A = { x: number }, B = { x: number, y: string }
+    let x_name = interner.intern_string("x");
+    let y_name = interner.intern_string("y");
+    let a = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let b = interner.object(vec![
+        PropertyInfo {
+            name: x_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: y_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+    let union = interner.union(vec![a, b]);
+    ctx.add_upper_bound(var_t, union);
+    ctx.add_lower_bound(var_t, a);
+
+    // keyof (A | B) = "x" (common keys only)
+    let lit_x = interner.literal_string("x");
+    ctx.add_upper_bound(var_k, lit_x);
+    ctx.add_lower_bound(var_k, lit_x);
+
+    let result_k = ctx.resolve_with_constraints(var_k).unwrap();
+    assert_eq!(result_k, lit_x);
+}
+
+#[test]
+fn test_generic_constraint_keyof_intersection() {
+    // Test: <T extends A & B, K extends keyof T>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let k_name = interner.intern_string("K");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_k = ctx.fresh_type_param(k_name);
+
+    // A = { x: number }, B = { y: string }
+    let x_name = interner.intern_string("x");
+    let y_name = interner.intern_string("y");
+    let a = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let b = interner.object(vec![PropertyInfo {
+        name: y_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let intersection = interner.intersection(vec![a, b]);
+    ctx.add_upper_bound(var_t, intersection);
+    ctx.add_lower_bound(var_t, intersection);
+
+    // keyof (A & B) = "x" | "y" (all keys)
+    let lit_x = interner.literal_string("x");
+    let lit_y = interner.literal_string("y");
+    let keys = interner.union(vec![lit_x, lit_y]);
+    ctx.add_upper_bound(var_k, keys);
+
+    // K = "x"
+    ctx.add_lower_bound(var_k, lit_x);
+
+    let result_k = ctx.resolve_with_constraints(var_k).unwrap();
+    assert_eq!(result_k, lit_x);
+}
+
+#[test]
+fn test_generic_constraint_extends_object() {
+    // Test: <T extends object>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // T extends object
+    ctx.add_upper_bound(var_t, TypeId::OBJECT);
+
+    // T is { x: number }
+    let x_name = interner.intern_string("x");
+    let obj = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    ctx.add_lower_bound(var_t, obj);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, obj);
+}
+
+#[test]
+fn test_generic_constraint_extends_function() {
+    // Test: <T extends Function>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // T extends Function
+    ctx.add_upper_bound(var_t, TypeId::FUNCTION);
+
+    // T is () => void
+    let fn_type = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+    ctx.add_lower_bound(var_t, fn_type);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, fn_type);
+}
+
+#[test]
+fn test_generic_constraint_extends_constructor() {
+    // Test: <T extends new (...args: any[]) => any>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Constructor type
+    let args_name = interner.intern_string("args");
+    let any_array = interner.array(TypeId::ANY);
+    let ctor = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(args_name),
+            type_id: any_array,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: TypeId::ANY,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    ctx.add_upper_bound(var_t, ctor);
+    ctx.add_lower_bound(var_t, ctor);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, ctor);
+}
+
+#[test]
+fn test_generic_constraint_chain_three_params() {
+    // Test: <T extends U, U extends V, V>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+    let v_name = interner.intern_string("V");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+    let var_v = ctx.fresh_type_param(v_name);
+
+    // T extends U
+    ctx.add_upper_bound(var_t, var_u);
+    // U extends V
+    ctx.add_upper_bound(var_u, var_v);
+
+    // V is { x: number }
+    let x_name = interner.intern_string("x");
+    let obj = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    ctx.add_lower_bound(var_v, obj);
+    ctx.add_lower_bound(var_u, obj);
+    ctx.add_lower_bound(var_t, obj);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results.len(), 3);
+}
+
+#[test]
+fn test_generic_constraint_with_default_satisfies() {
+    // Test: <T extends string = "default">
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // T extends string
+    ctx.add_upper_bound(var_t, TypeId::STRING);
+
+    // No inference - should use constraint
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_generic_constraint_readonly_array_extends() {
+    // Test: <T extends readonly any[]>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // T is readonly number[]
+    let num_array = interner.array(TypeId::NUMBER);
+    ctx.add_lower_bound(var_t, num_array);
+    ctx.add_upper_bound(var_t, num_array);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, num_array);
+}
+
+#[test]
+fn test_generic_constraint_mapped_type_key() {
+    // Test: <K extends string, V> for Record<K, V>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let k_name = interner.intern_string("K");
+    let v_name = interner.intern_string("V");
+
+    let var_k = ctx.fresh_type_param(k_name);
+    let var_v = ctx.fresh_type_param(v_name);
+
+    // K extends string
+    ctx.add_upper_bound(var_k, TypeId::STRING);
+
+    // K is "a" | "b"
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+    let keys = interner.union(vec![lit_a, lit_b]);
+    ctx.add_lower_bound(var_k, keys);
+
+    // V is number
+    ctx.add_lower_bound(var_v, TypeId::NUMBER);
+
+    let result_k = ctx.resolve_with_constraints(var_k).unwrap();
+    let result_v = ctx.resolve_with_constraints(var_v).unwrap();
+    assert_eq!(result_k, keys);
+    assert_eq!(result_v, TypeId::NUMBER);
+}
