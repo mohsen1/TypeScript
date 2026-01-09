@@ -10022,3 +10022,107 @@ fn test_async_class_pattern_ignores_nested_async() {
     );
     assert!(!result, "Should not detect await inside nested async in class");
 }
+
+// ============================================================================
+// ASYNC DECORATOR PATTERN TESTS
+// ============================================================================
+
+// Tests for async decorator patterns: async method decorators, async class
+// decorators, async property decorators, decorator composition with async.
+
+#[test]
+fn test_async_decorator_pattern_method_basic() {
+    let result = async_method_decorator_contains_await(
+        "class Foo { @log async getData() { return await fetch('/api'); } }",
+    );
+    assert!(result, "Should detect await in decorated async method");
+}
+
+#[test]
+fn test_async_decorator_pattern_method_multiple() {
+    let result = async_method_decorator_contains_await(
+        "class Foo { @log @cache async getData() { return await fetch('/api'); } }",
+    );
+    assert!(result, "Should detect await in method with multiple decorators");
+}
+
+#[test]
+fn test_async_decorator_pattern_method_with_params() {
+    let result = async_method_decorator_contains_await(
+        "class Foo { @timeout async fetchData(id: string) { return await api.get(id); } }",
+    );
+    assert!(result, "Should detect await in decorated method with params");
+}
+
+#[test]
+fn test_async_decorator_pattern_static_method() {
+    let result = async_method_decorator_contains_await(
+        "class Foo { @memoize static async getInstance() { return await Foo.create(); } }",
+    );
+    assert!(result, "Should detect await in decorated static async method");
+}
+
+#[test]
+fn test_async_decorator_pattern_class_with_async_method() {
+    let result = async_method_decorator_contains_await(
+        "@injectable class Service { async init() { await this.configure(); } }",
+    );
+    assert!(result, "Should detect await in async method of decorated class");
+}
+
+#[test]
+fn test_async_decorator_pattern_property_initializer() {
+    let result = async_field_initializer_contains_await(
+        "class Foo { @observable data = async () => await loadData(); }",
+    );
+    assert!(result, "Should detect await in decorated property with async initializer");
+}
+
+#[test]
+fn test_async_decorator_pattern_accessor_simulation() {
+    // Getters can't be async, but we can simulate with a method
+    let result = async_method_decorator_contains_await(
+        "class Foo { @computed async getValue() { return await this.compute(); } }",
+    );
+    assert!(result, "Should detect await in decorated getter simulation method");
+}
+
+#[test]
+fn test_async_decorator_pattern_composition() {
+    let result = async_method_decorator_contains_await(
+        "class Foo { @retry @timeout @log async fetchWithRetry() { return await fetch('/api'); } }",
+    );
+    assert!(result, "Should detect await with decorator composition");
+}
+
+#[test]
+fn test_async_decorator_pattern_factory() {
+    let result = async_method_decorator_contains_await(
+        "class Foo { @inject async process() { return await this.service.run(); } }",
+    );
+    assert!(result, "Should detect await in method with factory decorator");
+}
+
+#[test]
+fn test_async_decorator_pattern_validation() {
+    let result = async_method_decorator_contains_await(
+        "class Foo { @validate async save(data: any) { await this.repo.save(data); } }",
+    );
+    assert!(result, "Should detect await in method with validation decorator");
+}
+
+#[test]
+fn test_async_decorator_pattern_no_await() {
+    let result = async_method_decorator_contains_await(
+        "class Foo { @log async getValue() { return this.cached; } }",
+    );
+    assert!(!result, "Should not detect await when decorated method has no await");
+}
+
+#[test]
+fn test_async_decorator_pattern_ignores_nested_async() {
+    let result = async_method_decorator_contains_await(
+        "class Foo { @log async setup() { const loader = async () => await inner(); } }",
+    );
+    assert!(!result, "Should not detect await inside nested async in decorated method");
+}
