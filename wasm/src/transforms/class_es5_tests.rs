@@ -27452,3 +27452,384 @@ function intervalDemo(callback: () => void) {
         output
     );
 }
+
+// ============================================================================
+// ACCESSOR KEYWORD PATTERN TESTS
+// ============================================================================
+
+/// Test ES5 class with auto-accessor fields
+#[test]
+fn test_class_es5_accessor_auto_accessor() {
+    let source = r#"
+// Auto-accessor fields
+class Person {
+    accessor name: string;
+    accessor age: number;
+    accessor email: string = "default@example.com";
+
+    constructor(name: string, age: number) {
+        this.name = name;
+        this.age = age;
+    }
+}
+
+class Counter {
+    accessor value: number = 0;
+    accessor min: number = 0;
+    accessor max: number = 100;
+
+    increment(): void {
+        if (this.value < this.max) {
+            this.value++;
+        }
+    }
+
+    decrement(): void {
+        if (this.value > this.min) {
+            this.value--;
+        }
+    }
+
+    reset(): void {
+        this.value = this.min;
+    }
+}
+
+class ConfigurableWidget {
+    accessor width: number = 100;
+    accessor height: number = 100;
+    accessor visible: boolean = true;
+    accessor opacity: number = 1.0;
+
+    resize(width: number, height: number): void {
+        this.width = width;
+        this.height = height;
+    }
+
+    hide(): void {
+        this.visible = false;
+        this.opacity = 0;
+    }
+
+    show(): void {
+        this.visible = true;
+        this.opacity = 1.0;
+    }
+}
+
+class UserProfile {
+    accessor firstName: string;
+    accessor lastName: string;
+    accessor bio: string = "";
+    accessor avatarUrl: string = "/default-avatar.png";
+
+    constructor(firstName: string, lastName: string) {
+        this.firstName = firstName;
+        this.lastName = lastName;
+    }
+
+    get fullName(): string {
+        return `${this.firstName} ${this.lastName}`;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Person") && output.contains("Counter") && output.contains("ConfigurableWidget"),
+        "Expected auto-accessor classes: {}",
+        output
+    );
+
+    // UserProfile should be present
+    assert!(
+        output.contains("UserProfile"),
+        "Expected UserProfile class: {}",
+        output
+    );
+
+    // accessor keyword should be transformed (not present in output)
+    assert!(
+        !output.contains("accessor name") && !output.contains("accessor value"),
+        "Expected accessor keyword to be transformed: {}",
+        output
+    );
+}
+
+/// Test ES5 class with accessor decorators
+#[test]
+fn test_class_es5_accessor_decorators() {
+    let source = r#"
+// Accessor decorators
+function logged(target: any, context: ClassAccessorDecoratorContext) {
+    return {
+        get(this: any) {
+            console.log(`Getting ${String(context.name)}`);
+            return target.get.call(this);
+        },
+        set(this: any, value: any) {
+            console.log(`Setting ${String(context.name)} to ${value}`);
+            target.set.call(this, value);
+        }
+    };
+}
+
+function validated(min: number, max: number) {
+    return function(target: any, context: ClassAccessorDecoratorContext) {
+        return {
+            get(this: any) {
+                return target.get.call(this);
+            },
+            set(this: any, value: number) {
+                if (value < min || value > max) {
+                    throw new RangeError(`Value must be between ${min} and ${max}`);
+                }
+                target.set.call(this, value);
+            }
+        };
+    };
+}
+
+function cached(target: any, context: ClassAccessorDecoratorContext) {
+    const cache = new WeakMap<object, any>();
+    return {
+        get(this: any) {
+            if (cache.has(this)) {
+                return cache.get(this);
+            }
+            const value = target.get.call(this);
+            cache.set(this, value);
+            return value;
+        },
+        set(this: any, value: any) {
+            cache.delete(this);
+            target.set.call(this, value);
+        }
+    };
+}
+
+class TrackedValue {
+    @logged
+    accessor value: number = 0;
+
+    @logged
+    accessor name: string = "default";
+}
+
+class BoundedNumber {
+    @validated(0, 100)
+    accessor percentage: number = 0;
+
+    @validated(-273.15, Infinity)
+    accessor temperature: number = 20;
+}
+
+class CachedComputation {
+    @cached
+    accessor result: number = 0;
+
+    @cached
+    accessor data: string = "";
+
+    compute(input: number): void {
+        this.result = input * input;
+    }
+}
+
+class MixedDecorators {
+    @logged
+    @validated(0, 1000)
+    accessor quantity: number = 0;
+
+    @cached
+    @logged
+    accessor expensiveValue: string = "";
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Decorator functions should be present
+    assert!(
+        output.contains("logged") && output.contains("validated") && output.contains("cached"),
+        "Expected decorator functions: {}",
+        output
+    );
+
+    // Classes should be converted
+    assert!(
+        output.contains("TrackedValue") && output.contains("BoundedNumber") && output.contains("CachedComputation"),
+        "Expected accessor decorator classes: {}",
+        output
+    );
+
+    // MixedDecorators should be present
+    assert!(
+        output.contains("MixedDecorators"),
+        "Expected MixedDecorators class: {}",
+        output
+    );
+}
+
+/// Test ES5 class with static accessors
+#[test]
+fn test_class_es5_accessor_static_patterns() {
+    let source = r#"
+// Static accessors
+class Configuration {
+    static accessor debug: boolean = false;
+    static accessor logLevel: string = "info";
+    static accessor maxRetries: number = 3;
+    static accessor timeout: number = 30000;
+
+    static enableDebug(): void {
+        Configuration.debug = true;
+        Configuration.logLevel = "debug";
+    }
+
+    static disableDebug(): void {
+        Configuration.debug = false;
+        Configuration.logLevel = "info";
+    }
+}
+
+class Singleton {
+    private static _instance: Singleton | null = null;
+    static accessor instanceCount: number = 0;
+
+    private constructor() {
+        Singleton.instanceCount++;
+    }
+
+    static getInstance(): Singleton {
+        if (!Singleton._instance) {
+            Singleton._instance = new Singleton();
+        }
+        return Singleton._instance;
+    }
+
+    static resetInstance(): void {
+        Singleton._instance = null;
+    }
+}
+
+class Registry<T> {
+    private static items: Map<string, any> = new Map();
+    static accessor count: number = 0;
+
+    static register<U>(key: string, item: U): void {
+        Registry.items.set(key, item);
+        Registry.count++;
+    }
+
+    static get<U>(key: string): U | undefined {
+        return Registry.items.get(key);
+    }
+
+    static unregister(key: string): boolean {
+        const deleted = Registry.items.delete(key);
+        if (deleted) {
+            Registry.count--;
+        }
+        return deleted;
+    }
+
+    static clear(): void {
+        Registry.items.clear();
+        Registry.count = 0;
+    }
+}
+
+class FeatureFlags {
+    static accessor enableNewUI: boolean = false;
+    static accessor enableDarkMode: boolean = true;
+    static accessor enableAnalytics: boolean = true;
+    static accessor betaFeatures: boolean = false;
+
+    static isEnabled(flag: keyof typeof FeatureFlags): boolean {
+        return (FeatureFlags as any)[flag] === true;
+    }
+
+    static setFlag(flag: keyof typeof FeatureFlags, value: boolean): void {
+        (FeatureFlags as any)[flag] = value;
+    }
+
+    static getAllFlags(): Record<string, boolean> {
+        return {
+            enableNewUI: FeatureFlags.enableNewUI,
+            enableDarkMode: FeatureFlags.enableDarkMode,
+            enableAnalytics: FeatureFlags.enableAnalytics,
+            betaFeatures: FeatureFlags.betaFeatures
+        };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Configuration") && output.contains("Singleton") && output.contains("Registry"),
+        "Expected static accessor classes: {}",
+        output
+    );
+
+    // FeatureFlags should be present
+    assert!(
+        output.contains("FeatureFlags"),
+        "Expected FeatureFlags class: {}",
+        output
+    );
+
+    // Static methods should be preserved
+    assert!(
+        output.contains("enableDebug") && output.contains("getInstance") && output.contains("register"),
+        "Expected static methods: {}",
+        output
+    );
+
+    // static accessor keyword should be transformed
+    assert!(
+        !output.contains("static accessor debug") && !output.contains("static accessor count"),
+        "Expected static accessor keyword to be transformed: {}",
+        output
+    );
+}
