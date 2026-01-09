@@ -7,10 +7,10 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-(awaiting assignment)
+- [ ] Add ES5 optional chaining patterns parity tests: property access, method call, element access. Tests: `./wasm/test.sh emitter_parity`
 
 ## Task Queue
-(empty)
+- [ ] Add ES5 nullish coalescing patterns parity tests: assignment, defaults, nested
 
 ## Completed
 - [x] Added ES5 spread/rest patterns parity tests (object-literal-methods, async-error-handling, custom-iterables, generic-signatures) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (351 tests).
