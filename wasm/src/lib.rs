@@ -61,6 +61,7 @@ mod emitter_parity_tests;
 
 // Parallel processing with Rayon (Phase 0.4)
 pub mod parallel;
+use parallel::BindResult;
 
 // Comment preservation (Phase 6.3)
 pub mod comments;
