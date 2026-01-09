@@ -6,10 +6,10 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-(none)
+- [ ] Add ES5 class tests for type guard patterns: user-defined type guards, in operator, typeof guards, instanceof guards, discriminated unions, assertion functions. Tests: `./wasm/test.sh class_es5_tests`
 
 ## Task Queue
-(empty)
+- [ ] Add ES5 class tests for control flow analysis patterns: narrowing, exhaustiveness checks, never type
 
 ## Completed
 - [x] Added ES5 tests for module pattern variations (6 tests): CommonJS class exports, ESM default class, ESM named exports, re-export patterns, barrel export pattern, mixed module patterns. Ran `./wasm/test.sh class_es5_tests` (all 341 pass).

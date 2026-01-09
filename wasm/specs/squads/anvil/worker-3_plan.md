@@ -7,10 +7,10 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] (awaiting assignment)
+- [ ] Add ES5 source map tests for module bundling patterns: CommonJS require, dynamic import, re-exports, barrel exports, circular imports, conditional imports. Tests: `./wasm/test.sh source_map`
 
 ## Task Queue
-- [ ] Add ES5 source map tests for module bundling patterns: CommonJS require, dynamic import, re-exports
+- [ ] Add ES5 source map tests for JSX transform patterns: JSX elements, fragments, spread attributes
 
 ## Completed
 - [x] Added decorator metadata ES5 source map tests (reflect-metadata, parameter decorators, property descriptors, method descriptors, accessor descriptors, class constructor metadata, design type metadata, comprehensive); 669 tests pass.

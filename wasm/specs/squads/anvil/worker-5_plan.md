@@ -7,10 +7,10 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-None - awaiting next task
+- [ ] Add async ES5 tests for async iteration patterns: for-await-of with generators, async from sync iterables, async iterator protocol, for-await-of with break/continue, nested async iteration. Tests: `./wasm/test.sh async_es5_tests`
 
 ## Task Queue
-- [ ] Add async ES5 tests for async iteration patterns: for-await-of with generators, async from sync iterables
+- [ ] Add async ES5 tests for async class patterns: async constructor simulation, async static initialization
 
 ## Completed
 - [x] Added 12 async error handling pattern tests (try/catch basic, try/finally basic, try/catch/finally, await in catch, await in finally, nested try, rethrow, rethrow wrapped, finally with return, promise reject, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (580 tests PASS).
