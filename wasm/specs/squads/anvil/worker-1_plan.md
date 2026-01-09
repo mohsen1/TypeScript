@@ -6,12 +6,13 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-Add ES5 class tests for declaration merging patterns: interface, namespace, function. Tests: `./wasm/test.sh class_es5_tests`
+None - awaiting task from EM-Anvil
 
 ## Task Queue
 - [ ] Add ES5 class tests for ambient module patterns: declare module, global augmentation
 
 ## Completed
+- [x] Added ES5 tests for declaration merging patterns (6 tests): interface merging, function-namespace merging, class-namespace merging, enum-namespace merging, interface extension, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 461 pass).
 - [x] Added ES5 tests for namespace patterns (6 tests): merged namespace, exported namespace, nested namespace, repository pattern, utilities namespace, combined namespace patterns. Ran `./wasm/test.sh class_es5_tests` (all 452 pass).
 - [x] Added ES5 tests for enum patterns (6 tests): const enum, string enum, numeric enum, computed enum values, enum class properties, combined enum patterns. Ran `./wasm/test.sh class_es5_tests` (all 446 pass).
 - [x] Added ES5 tests for module augmentation patterns (6 tests): basic declare module, interface augmentation, global augmentation, namespace augmentation, class augmentation, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 446 pass).
