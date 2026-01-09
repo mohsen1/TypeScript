@@ -63716,3 +63716,563 @@ console.log(BankAccount.getAccountCount());"#;
         "expected mappings to reference source file"
     );
 }
+
+// =============================================================================
+// ES5 SOURCE MAP TESTS: TYPE PARAMETER CONSTRAINTS
+// =============================================================================
+
+/// Test source map generation for generic function with type parameter constraint in ES5 output.
+/// Validates that generic functions with extends constraints generate proper source mappings.
+#[test]
+fn test_source_map_type_constraint_generic_function_es5() {
+    let source = r#"interface HasLength {
+    length: number;
+}
+
+function getLength<T extends HasLength>(item: T): number {
+    return item.length;
+}
+
+function first<T extends any[]>(arr: T): T[0] {
+    return arr[0];
+}
+
+const strLen = getLength("hello");
+const arrLen = getLength([1, 2, 3]);
+const firstItem = first([1, 2, 3]);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("getLength"),
+        "expected getLength function in output. output: {output}"
+    );
+    assert!(
+        output.contains("first"),
+        "expected first function in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for generic function with constraint"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+/// Test source map generation for generic class with type parameter constraint in ES5 output.
+/// Validates that generic classes with extends constraints generate proper source mappings.
+#[test]
+fn test_source_map_type_constraint_generic_class_es5() {
+    let source = r#"interface Comparable<T> {
+    compareTo(other: T): number;
+}
+
+class SortedList<T extends Comparable<T>> {
+    private items: T[] = [];
+
+    add(item: T): void {
+        this.items.push(item);
+        this.items.sort((a, b) => a.compareTo(b));
+    }
+
+    get(index: number): T {
+        return this.items[index];
+    }
+
+    getAll(): T[] {
+        return [...this.items];
+    }
+}
+
+class NumberWrapper implements Comparable<NumberWrapper> {
+    constructor(public value: number) {}
+
+    compareTo(other: NumberWrapper): number {
+        return this.value - other.value;
+    }
+}
+
+const list = new SortedList<NumberWrapper>();
+list.add(new NumberWrapper(5));
+list.add(new NumberWrapper(2));"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("SortedList"),
+        "expected SortedList class in output. output: {output}"
+    );
+    assert!(
+        output.contains("NumberWrapper"),
+        "expected NumberWrapper class in output. output: {output}"
+    );
+    assert!(
+        output.contains("compareTo"),
+        "expected compareTo method in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for generic class with constraint"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+/// Test source map generation for generic interface with type parameter constraint in ES5 output.
+/// Validates that generic interfaces with extends constraints generate proper source mappings.
+#[test]
+fn test_source_map_type_constraint_generic_interface_es5() {
+    let source = r#"interface Entity {
+    id: number;
+    createdAt: Date;
+}
+
+interface Repository<T extends Entity> {
+    findById(id: number): T | undefined;
+    findAll(): T[];
+    save(entity: T): T;
+    delete(id: number): boolean;
+}
+
+interface User extends Entity {
+    name: string;
+    email: string;
+}
+
+class UserRepository implements Repository<User> {
+    private users: User[] = [];
+
+    findById(id: number): User | undefined {
+        return this.users.find(u => u.id === id);
+    }
+
+    findAll(): User[] {
+        return [...this.users];
+    }
+
+    save(user: User): User {
+        this.users.push(user);
+        return user;
+    }
+
+    delete(id: number): boolean {
+        const index = this.users.findIndex(u => u.id === id);
+        if (index >= 0) {
+            this.users.splice(index, 1);
+            return true;
+        }
+        return false;
+    }
+}
+
+const repo = new UserRepository();"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("UserRepository"),
+        "expected UserRepository class in output. output: {output}"
+    );
+    assert!(
+        output.contains("findById"),
+        "expected findById method in output. output: {output}"
+    );
+    assert!(
+        output.contains("findAll"),
+        "expected findAll method in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for generic interface with constraint"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+/// Test source map generation for multiple type parameters with constraints in ES5 output.
+/// Validates that functions with multiple constrained type parameters generate proper source mappings.
+#[test]
+fn test_source_map_type_constraint_multiple_params_es5() {
+    let source = r#"interface Serializable {
+    serialize(): string;
+}
+
+interface Deserializable<T> {
+    deserialize(data: string): T;
+}
+
+function transform<
+    TInput extends Serializable,
+    TOutput,
+    TTransformer extends { transform(input: TInput): TOutput }
+>(input: TInput, transformer: TTransformer): TOutput {
+    return transformer.transform(input);
+}
+
+function merge<T extends object, U extends object>(first: T, second: U): T & U {
+    return { ...first, ...second };
+}
+
+function pick<T extends object, K extends keyof T>(obj: T, keys: K[]): Pick<T, K> {
+    const result = {} as Pick<T, K>;
+    for (const key of keys) {
+        result[key] = obj[key];
+    }
+    return result;
+}
+
+const merged = merge({ a: 1 }, { b: 2 });
+const picked = pick({ x: 1, y: 2, z: 3 }, ["x", "z"]);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("transform"),
+        "expected transform function in output. output: {output}"
+    );
+    assert!(
+        output.contains("merge"),
+        "expected merge function in output. output: {output}"
+    );
+    assert!(
+        output.contains("pick"),
+        "expected pick function in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for multiple type parameter constraints"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+/// Test source map generation for constraint extends union type in ES5 output.
+/// Validates that type parameters constrained by union types generate proper source mappings.
+#[test]
+fn test_source_map_type_constraint_union_es5() {
+    let source = r#"type Primitive = string | number | boolean;
+
+function formatPrimitive<T extends Primitive>(value: T): string {
+    return String(value);
+}
+
+type JsonValue = string | number | boolean | null | JsonArray | JsonObject;
+interface JsonArray extends Array<JsonValue> {}
+interface JsonObject { [key: string]: JsonValue; }
+
+function stringify<T extends JsonValue>(value: T): string {
+    return JSON.stringify(value);
+}
+
+type EventType = "click" | "hover" | "focus" | "blur";
+
+function addEventListener<T extends EventType>(
+    type: T,
+    handler: (event: T) => void
+): void {
+    console.log(`Adding listener for ${type}`);
+}
+
+const formatted = formatPrimitive(42);
+const json = stringify({ key: "value" });
+addEventListener("click", (e) => console.log(e));"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("formatPrimitive"),
+        "expected formatPrimitive function in output. output: {output}"
+    );
+    assert!(
+        output.contains("stringify"),
+        "expected stringify function in output. output: {output}"
+    );
+    assert!(
+        output.contains("addEventListener"),
+        "expected addEventListener function in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for union type constraints"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+/// Comprehensive test combining multiple type parameter constraint patterns.
+/// Tests generic functions, classes, interfaces with various constraint types.
+#[test]
+fn test_source_map_type_constraint_es5_comprehensive() {
+    let source = r#"// Base interfaces for constraints
+interface Identifiable {
+    id: string;
+}
+
+interface Timestamped {
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+interface Validatable {
+    validate(): boolean;
+}
+
+// Generic class with multiple constraints
+class DataStore<T extends Identifiable & Timestamped> {
+    private data: Map<string, T> = new Map();
+
+    save(item: T): void {
+        this.data.set(item.id, item);
+    }
+
+    find(id: string): T | undefined {
+        return this.data.get(id);
+    }
+
+    findRecent(since: Date): T[] {
+        return Array.from(this.data.values())
+            .filter(item => item.updatedAt > since);
+    }
+}
+
+// Generic function with constraint referencing another type parameter
+function createValidator<
+    T extends Validatable,
+    TResult extends { valid: boolean; errors: string[] }
+>(item: T, resultFactory: () => TResult): TResult {
+    const result = resultFactory();
+    result.valid = item.validate();
+    return result;
+}
+
+// Class with constrained method type parameters
+class Mapper<TSource extends object> {
+    map<TTarget extends object>(
+        source: TSource,
+        mapper: (s: TSource) => TTarget
+    ): TTarget {
+        return mapper(source);
+    }
+
+    mapArray<TTarget extends object>(
+        sources: TSource[],
+        mapper: (s: TSource) => TTarget
+    ): TTarget[] {
+        return sources.map(mapper);
+    }
+}
+
+// Conditional constraint pattern
+type Constructor<T> = new (...args: any[]) => T;
+
+function mixin<TBase extends Constructor<{}>>(Base: TBase) {
+    return class extends Base {
+        mixinProp = "mixed";
+    };
+}
+
+// Usage
+interface User extends Identifiable, Timestamped {
+    name: string;
+    email: string;
+}
+
+const store = new DataStore<User>();
+const mapper = new Mapper<{ x: number }>();
+const result = mapper.map({ x: 1 }, (s) => ({ y: s.x * 2 }));"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("DataStore"),
+        "expected DataStore class in output. output: {output}"
+    );
+    assert!(
+        output.contains("createValidator"),
+        "expected createValidator function in output. output: {output}"
+    );
+    assert!(
+        output.contains("Mapper"),
+        "expected Mapper class in output. output: {output}"
+    );
+    assert!(
+        output.contains("mixin"),
+        "expected mixin function in output. output: {output}"
+    );
+    assert!(
+        output.contains("findRecent"),
+        "expected findRecent method in output. output: {output}"
+    );
+    assert!(
+        output.contains("mapArray"),
+        "expected mapArray method in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for comprehensive type constraints"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
