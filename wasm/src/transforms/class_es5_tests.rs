@@ -14528,3 +14528,491 @@ class ObjectCloner {
         output
     );
 }
+
+#[test]
+fn test_class_es5_object_defineproperty_basic() {
+    // Basic Object.defineProperty usage with value descriptor
+    let source = r#"
+class PropertyDefiner {
+    private target: object;
+
+    constructor(target: object) {
+        this.target = target;
+    }
+
+    defineValue(name: string, value: unknown): void {
+        Object.defineProperty(this.target, name, {
+            value: value,
+            writable: true,
+            enumerable: true,
+            configurable: true
+        });
+    }
+
+    defineConstant(name: string, value: unknown): void {
+        Object.defineProperty(this.target, name, {
+            value: value,
+            writable: false,
+            enumerable: true,
+            configurable: false
+        });
+    }
+
+    defineHidden(name: string, value: unknown): void {
+        Object.defineProperty(this.target, name, {
+            value: value,
+            writable: true,
+            enumerable: false,
+            configurable: true
+        });
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("PropertyDefiner"),
+        "Expected PropertyDefiner class: {}",
+        output
+    );
+    assert!(
+        output.contains("Object.defineProperty"),
+        "Expected Object.defineProperty: {}",
+        output
+    );
+    assert!(
+        output.contains("defineValue") && output.contains("defineConstant"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_object_defineproperty_accessor() {
+    // Object.defineProperty with getter/setter descriptors
+    let source = r#"
+class AccessorBuilder {
+    static addGetter<T, K extends keyof T>(obj: T, prop: K, getter: () => T[K]): void {
+        Object.defineProperty(obj, prop, {
+            get: getter,
+            enumerable: true,
+            configurable: true
+        });
+    }
+
+    static addSetter<T, K extends keyof T>(obj: T, prop: K, setter: (v: T[K]) => void): void {
+        Object.defineProperty(obj, prop, {
+            set: setter,
+            enumerable: true,
+            configurable: true
+        });
+    }
+
+    static addAccessor<T, K extends keyof T>(
+        obj: T,
+        prop: K,
+        getter: () => T[K],
+        setter: (v: T[K]) => void
+    ): void {
+        Object.defineProperty(obj, prop, {
+            get: getter,
+            set: setter,
+            enumerable: true,
+            configurable: true
+        });
+    }
+
+    createObservable<T extends object>(target: T): T {
+        const self = this;
+        Object.keys(target).forEach(key => {
+            let value = (target as any)[key];
+            Object.defineProperty(target, key, {
+                get: () => value,
+                set: (newValue) => {
+                    value = newValue;
+                },
+                enumerable: true,
+                configurable: true
+            });
+        });
+        return target;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("AccessorBuilder"),
+        "Expected AccessorBuilder class: {}",
+        output
+    );
+    assert!(
+        output.contains("Object.defineProperty"),
+        "Expected Object.defineProperty: {}",
+        output
+    );
+    assert!(
+        output.contains("addGetter") && output.contains("addSetter") && output.contains("addAccessor"),
+        "Expected accessor methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_object_defineproperties_multiple() {
+    // Object.defineProperties for multiple properties
+    let source = r#"
+class MultiPropertyDefiner {
+    static defineMultiple(target: object, props: Record<string, unknown>): void {
+        const descriptors: PropertyDescriptorMap = {};
+        Object.keys(props).forEach(key => {
+            descriptors[key] = {
+                value: props[key],
+                writable: true,
+                enumerable: true,
+                configurable: true
+            };
+        });
+        Object.defineProperties(target, descriptors);
+    }
+
+    static makeReadonly<T extends object>(target: T): Readonly<T> {
+        const descriptors: PropertyDescriptorMap = {};
+        Object.keys(target).forEach(key => {
+            descriptors[key] = {
+                value: (target as any)[key],
+                writable: false,
+                enumerable: true,
+                configurable: false
+            };
+        });
+        return Object.defineProperties({} as T, descriptors);
+    }
+
+    createWithDefaults<T extends object>(defaults: T, overrides: Partial<T>): T {
+        const result = {} as T;
+        const descriptors: PropertyDescriptorMap = {};
+
+        Object.keys(defaults).forEach(key => {
+            const value = key in overrides ? (overrides as any)[key] : (defaults as any)[key];
+            descriptors[key] = {
+                value: value,
+                writable: true,
+                enumerable: true,
+                configurable: true
+            };
+        });
+
+        return Object.defineProperties(result, descriptors);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("MultiPropertyDefiner"),
+        "Expected MultiPropertyDefiner class: {}",
+        output
+    );
+    assert!(
+        output.contains("Object.defineProperties"),
+        "Expected Object.defineProperties: {}",
+        output
+    );
+    assert!(
+        output.contains("defineMultiple") && output.contains("makeReadonly"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_object_defineproperty_readonly() {
+    // Object.defineProperty for creating readonly properties
+    let source = r#"
+class ImmutablePropertyManager {
+    private _values: Map<string, unknown> = new Map();
+
+    defineImmutable(target: object, name: string, value: unknown): void {
+        Object.defineProperty(target, name, {
+            value: value,
+            writable: false,
+            enumerable: true,
+            configurable: false
+        });
+        this._values.set(name, value);
+    }
+
+    static freeze<T extends object>(target: T): Readonly<T> {
+        Object.keys(target).forEach(key => {
+            Object.defineProperty(target, key, {
+                writable: false,
+                configurable: false
+            });
+        });
+        return target;
+    }
+
+    static seal<T extends object>(target: T): T {
+        Object.keys(target).forEach(key => {
+            Object.defineProperty(target, key, {
+                configurable: false
+            });
+        });
+        return target;
+    }
+
+    getStoredValue(name: string): unknown {
+        return this._values.get(name);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("ImmutablePropertyManager"),
+        "Expected ImmutablePropertyManager class: {}",
+        output
+    );
+    assert!(
+        output.contains("Object.defineProperty"),
+        "Expected Object.defineProperty: {}",
+        output
+    );
+    assert!(
+        output.contains("defineImmutable") && output.contains("getStoredValue"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_object_defineproperty_in_constructor() {
+    // Object.defineProperty in constructor
+    let source = r#"
+class ComputedPropertyClass {
+    constructor(private _value: number) {
+        Object.defineProperty(this, 'doubled', {
+            get: () => this._value * 2,
+            enumerable: true,
+            configurable: false
+        });
+
+        Object.defineProperty(this, 'squared', {
+            get: () => this._value * this._value,
+            enumerable: true,
+            configurable: false
+        });
+
+        Object.defineProperty(this, 'value', {
+            get: () => this._value,
+            set: (v: number) => { this._value = v; },
+            enumerable: true,
+            configurable: true
+        });
+    }
+
+    increment(): void {
+        this._value++;
+    }
+
+    decrement(): void {
+        this._value--;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("ComputedPropertyClass"),
+        "Expected ComputedPropertyClass class: {}",
+        output
+    );
+    assert!(
+        output.contains("Object.defineProperty"),
+        "Expected Object.defineProperty: {}",
+        output
+    );
+    assert!(
+        output.contains("increment") && output.contains("decrement"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_object_defineproperty_combined() {
+    // Combined Object.defineProperty patterns with other Object methods
+    let source = r#"
+class PropertyMixinBuilder {
+    static mixin<T extends object, U extends object>(target: T, source: U): T & U {
+        const result = Object.create(Object.getPrototypeOf(target)) as T & U;
+
+        // Copy target properties
+        Object.keys(target).forEach(key => {
+            const descriptor = Object.getOwnPropertyDescriptor(target, key);
+            if (descriptor) {
+                Object.defineProperty(result, key, descriptor);
+            }
+        });
+
+        // Copy source properties
+        Object.keys(source).forEach(key => {
+            const descriptor = Object.getOwnPropertyDescriptor(source, key);
+            if (descriptor) {
+                Object.defineProperty(result, key, descriptor);
+            }
+        });
+
+        return result;
+    }
+
+    static extend<T extends object>(target: T, extensions: PropertyDescriptorMap): T {
+        Object.keys(extensions).forEach(key => {
+            Object.defineProperty(target, key, extensions[key]);
+        });
+        return target;
+    }
+
+    static proxy<T extends object>(target: T, handler: {
+        get?: (prop: string, value: unknown) => unknown;
+        set?: (prop: string, value: unknown, newValue: unknown) => boolean;
+    }): T {
+        const result = Object.create(Object.getPrototypeOf(target)) as T;
+
+        Object.keys(target).forEach(key => {
+            let value = (target as any)[key];
+            Object.defineProperty(result, key, {
+                get: () => handler.get ? handler.get(key, value) : value,
+                set: (newValue) => {
+                    if (!handler.set || handler.set(key, value, newValue)) {
+                        value = newValue;
+                    }
+                },
+                enumerable: true,
+                configurable: true
+            });
+        });
+
+        return result;
+    }
+
+    static bindMethods<T extends object>(instance: T): T {
+        Object.getOwnPropertyNames(Object.getPrototypeOf(instance))
+            .filter(name => name !== 'constructor')
+            .forEach(name => {
+                const method = (instance as any)[name];
+                if (typeof method === 'function') {
+                    Object.defineProperty(instance, name, {
+                        value: method.bind(instance),
+                        writable: true,
+                        enumerable: false,
+                        configurable: true
+                    });
+                }
+            });
+        return instance;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("PropertyMixinBuilder"),
+        "Expected PropertyMixinBuilder class: {}",
+        output
+    );
+    assert!(
+        output.contains("Object.defineProperty"),
+        "Expected Object.defineProperty: {}",
+        output
+    );
+    assert!(
+        output.contains("Object.getOwnPropertyDescriptor"),
+        "Expected Object.getOwnPropertyDescriptor: {}",
+        output
+    );
+    assert!(
+        output.contains("mixin") && output.contains("extend") && output.contains("proxy"),
+        "Expected utility methods: {}",
+        output
+    );
+}
