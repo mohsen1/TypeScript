@@ -55,10 +55,10 @@ Phase 8 - Conformance, Convergence, and Hardening: Type-system correctness in th
    - Distributive conditional types over unions
    - Key Files: `solver/evaluate.rs`, `solver/evaluate_tests.rs`
 
-3. **Fix Failing Tests**
-   - `test_conditional_infer_function_optional_param_distributive` - FAILING
-   - `test_conditional_infer_function_optional_param_non_distributive_union_input` - FAILING
-   - `compile_class_with_generic_constructor` - FAILING
+3. **Fix Failing Tests** - ALL FIXED ✅
+   - `test_conditional_infer_function_optional_param_distributive` - ✅ FIXED
+   - `test_conditional_infer_function_optional_param_non_distributive_union_input` - ✅ FIXED
+   - `compile_class_with_generic_constructor` - ✅ FIXED
 
 4. **Template Literal Types**
    - Context: Template literal inference and pattern matching
@@ -86,13 +86,21 @@ Per Project Direction: **Autocratic Scheduling + Bisect-on-Merge**
 - PRs that regress ANY existing baseline are auto-rejected
 
 ## Squad Status
-- Last EM Report: 2026-01-09 - Reassigned from Redux blocker
+- Last EM Report: 2026-01-09 - EM session active
+- Redux Baseline: **2 diagnostics** (improved from 4, target: 0)
 - Workers Active: 5/5
 - Current Focus: Generic Inference + Conditional Types
-- Direction: Solver hardening (NOT Redux)
+- Direction: Solver hardening per directive
+- Session Merges:
+  - forge-3: try_expand_type_arg fix
+  - forge-3: generic class type expansion fix
+  - forge-3: InferSubstitutor Function type support (Redux 4→2!)
+- Blocked Commits:
+  - forge-2: Removes Ref/TypeQuery handling (regression)
+  - forge-5: Large diff with merge conflicts
 - Worker Assignments:
-  - W1: Generic inference from usage (`solver/infer.rs`)
-  - W2: Context-sensitive typing edge cases
-  - W3: Circular constraints in `extends` clauses
-  - W4: Distributive conditional types over unions
-  - W5: Fix failing conditional infer tests
+  - W1/Pane3: Template literal type inference
+  - W2/Pane4: ReturnType/Parameters edge cases
+  - W3/Pane5: Function parameter inference tests
+  - W4/Pane6: Circular constraints in extends clauses
+  - W5/Pane7: Distributive conditional stress tests
