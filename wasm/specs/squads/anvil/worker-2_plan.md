@@ -7,10 +7,10 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-(awaiting assignment)
+- [ ] Add ES5 namespace patterns parity tests: nested namespaces, namespace merging, namespace with class/enum/interface. Tests: `./wasm/test.sh emitter_parity`
 
 ## Task Queue
-(empty)
+- [ ] Add ES5 enum patterns parity tests: const enums, computed members, reverse mappings
 
 ## Completed
 - [x] Added ES5 computed property patterns parity tests (method-call, function-call, typed) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (282 tests).
