@@ -7,12 +7,15 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [ ] Add ES5 class tests for class static initialization block patterns in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
+- [ ] Add ES5 tests for parameter decorator patterns (constructor params, method params, accessor params, decorator factories with params) in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Add ES5 class tests for method decorator patterns. Tests: `./wasm/test.sh class_es5_tests`
+- [x] Add ES5 class tests for class field decorators patterns. Tests: `./wasm/test.sh class_es5_tests`
+- [x] Add ES5 class tests for class static initialization block patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for using declarations (resource management) patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for accessor keyword (auto-accessors) patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for private static field patterns. Tests: `./wasm/test.sh class_es5_tests`

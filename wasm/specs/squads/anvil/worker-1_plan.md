@@ -5,15 +5,18 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 
 Status: Active
 Priority: 1
-Blocked: Awaiting next EM-Anvil assignment.
-
 ## Current Assignment
-- [ ] Add ES5 class tests for WeakMap/WeakSet patterns in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
+- [ ] Add ES5 tests for Promise patterns (Promise.all, Promise.race, Promise.allSettled, Promise.any, promise chaining in class methods) in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 tests for Generator/yield patterns (6 tests): generator basic, yield expressions, yield delegation, generator with state, async generator class, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 314 pass).
+- [x] Added ES5 tests for AsyncIterator/AsyncIterable patterns (6 tests): async iterator basic, for-await-of pattern, async generator iterable, async iterator protocol, in constructor, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 309 pass).
+- [x] Added ES5 tests for Iterator/Iterable patterns (6 tests): custom iterator basic, iterable class pattern, iterator with state, for-of with iterator, in constructor, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 304 pass).
+- [x] Added ES5 tests for Map/Set patterns (6 tests): Map basic operations, Set basic operations, Map iteration pattern, Set operations pattern, in constructor, EventBus pattern. Ran `./wasm/test.sh class_es5_tests` (all 298 pass).
+- [x] Added ES5 tests for WeakMap/WeakSet patterns (6 tests): WeakMap cache pattern, WeakSet membership pattern, WeakMap metadata pattern, WeakSet visited pattern, in constructor, combined. Ran `./wasm/test.sh class_es5_tests` (all 293 pass).
 - [x] Added ES5 tests for Object.getOwnPropertyNames/getOwnPropertySymbols patterns (6 tests): getOwnPropertyNames basic, getOwnPropertySymbols basic, get all property keys, property reflection, in constructor, combined. Ran `./wasm/test.sh class_es5_tests` (all 288 pass).
 - [x] Added ES5 tests for Array.find/findIndex/fill/copyWithin patterns (6 tests): find basic, findIndex basic, fill basic, copyWithin basic, in constructor, combined. Ran `./wasm/test.sh class_es5_tests` (all 283 pass).
 - [x] Added ES5 tests for String.fromCodePoint/codePointAt/includes/startsWith/endsWith patterns (6 tests): fromCodePoint basic, codePointAt basic, includes basic, startsWith/endsWith basic, in constructor, combined. Ran `./wasm/test.sh class_es5_tests` (all 278 pass).

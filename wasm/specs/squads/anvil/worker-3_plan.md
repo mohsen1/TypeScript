@@ -7,12 +7,16 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- (awaiting assignment)
+- [ ] Add generator ES5 source map tests (yield expressions, yield delegation, generator methods, async generators, generator with return) in `wasm/src/source_map_tests.rs`. Run `./wasm/test.sh source_map`.
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added async/await ES5 source map tests (Promise.all, Promise.race, error handling, sequential vs parallel, closure capture, inheritance, factory pattern, queue processing, event emitter, comprehensive); 623 tests pass.
+- [x] Added decorator ES5 source map tests (class with metadata, method with descriptor, property validation, parameter injection, factory chain, accessor readonly, abstract class, static members, conditional, comprehensive); 613 tests pass.
+- [x] Added class field ES5 source map tests (public basic, public initializers, static basic, static initializers, computed, private ES5, static private, readonly, with accessors, combined); 603 tests pass.
+- [x] Added extended enum ES5 source map tests (bitwise flags, explicit numeric, expression initializers, ambient declare, member as type, keyof typeof, nested in module, with interface, function parameter, advanced combined); 593 tests pass.
 - [x] Added more interface ES5 source map tests (nested types, tuple types, literal types, never/unknown types, this type, overloaded methods, async methods, accessor signatures, symbol properties, complex combined); `./wasm/test.sh source_map` passes.
 - [x] Added additional interface ES5 source map tests (optional properties, readonly properties, index signatures, call signatures, construct signatures, interface merging, function types, class implements, hybrid types, advanced combined); `./wasm/test.sh source_map` passes.
 - [x] Added interface/type alias ES5 source map tests (basic interface, basic type alias, interface with methods, interface extends, union/intersection types, generic interface, generic type alias, mapped types, conditional types, combined); `./wasm/test.sh source_map` passes.
@@ -121,6 +125,7 @@ Priority: 3
 - [x] Added declaration emitter source map tests (type alias, function, class, enum, multiple declarations); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 - [x] Added comprehensive helpers tests (16 new tests for remaining helpers: decorate, param, metadata, generator, values, read, spread_array, import_default, import_star, export_star, make_template_object, class_private_field_get/set/in, create_binding, plus all-helpers test); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
 - [x] Added JSX source map tests (element, fragment, expression, component); `./wasm/test.sh` fails at `parallel::tests::test_check_redux_lodash_style_generics`.
+- [x] Added extended interface ES5 source map tests (multiple extends, recursive types, discriminated unions, type guards, rest elements, callback patterns, utility patterns, module patterns, builder patterns, state machine); 583 tests pass.
 
 ## Ready for Merge
 Yes
