@@ -6,12 +6,13 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-- [ ] Add ES5 tests for Promise patterns (Promise.all, Promise.race, Promise.allSettled, Promise.any, promise chaining in class methods) in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
+- [ ] (empty - awaiting next task)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 tests for Promise patterns (6 tests): Promise.all, Promise.race, Promise.allSettled, Promise.any, promise chaining pipeline, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 320 pass).
 - [x] Added ES5 tests for Generator/yield patterns (6 tests): generator basic, yield expressions, yield delegation, generator with state, async generator class, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 314 pass).
 - [x] Added ES5 tests for AsyncIterator/AsyncIterable patterns (6 tests): async iterator basic, for-await-of pattern, async generator iterable, async iterator protocol, in constructor, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 309 pass).
 - [x] Added ES5 tests for Iterator/Iterable patterns (6 tests): custom iterator basic, iterable class pattern, iterator with state, for-of with iterator, in constructor, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 304 pass).
