@@ -7,12 +7,13 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- [ ] Add async ES5 tests for async queue patterns: task queue, priority queue, rate limiting, backpressure. Tests: `./wasm/test.sh async_es5_tests`
+- [ ] Add async ES5 tests for async state machine patterns: state transitions, event-driven updates. Tests: `./wasm/test.sh async_es5_tests`
 
 ## Task Queue
-- [ ] Add async ES5 tests for async retry patterns: exponential backoff, circuit breaker, retry with jitter
+
 
 ## Completed
+- [x] Added 12 async retry pattern tests (exponential backoff, linear backoff, fixed delay, circuit breaker, jitter, timeout, max retries, conditional, fallback, abort, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (688 tests PASS).
 - [x] Added 12 async stream pattern tests (read basic, write basic, pipe, transform, reader, writer, getReader, cancel, abort, tee, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (664 tests PASS).
 - [x] Added 12 async context pattern tests (run basic, get store, enter/exit, propagation, wrap, fork, bind, scheduler, trace, scope, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (652 tests PASS).
 - [x] Added 12 async resource management pattern tests (dispose basic, try-finally cleanup, acquire-release, connection close, file handle, transaction, pool return, stream close, multiple cleanup, conditional cleanup, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (640 tests PASS).

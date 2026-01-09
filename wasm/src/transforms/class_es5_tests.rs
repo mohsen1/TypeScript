@@ -26893,96 +26893,789 @@ class PipelineBuilder<T extends unknown[]> {
     );
 }
 
-// ============================================================================
-// USING DECLARATIONS PATTERN TESTS
-// ============================================================================
+// =============================================================================
+// RECURSIVE TYPE PATTERNS - ES5 TRANSFORMATION TESTS
+// =============================================================================
 
-/// Test ES5 class with sync using declarations
+/// Test: recursive type aliases
+/// Verifies that classes using recursive type aliases transform correctly to ES5
 #[test]
-fn test_class_es5_using_sync() {
+fn test_class_es5_recursive_type_aliases() {
     let source = r#"
-// Sync using declarations
-class FileHandle {
-    private path: string;
-    private isOpen = true;
+type NestedArray<T> = T | NestedArray<T>[];
+type DeepPartial<T> = T extends object ? { [P in keyof T]?: DeepPartial<T[P]> } : T;
+type DeepReadonly<T> = T extends object ? { readonly [P in keyof T]: DeepReadonly<T[P]> } : T;
 
-    constructor(path: string) {
-        this.path = path;
-        console.log(`Opening file: ${path}`);
+class NestedArrayHandler<T> {
+    flatten(nested: NestedArray<T>): T[] {
+        if (Array.isArray(nested)) {
+            return nested.flatMap(item => this.flatten(item));
+        }
+        return [nested];
     }
 
-    read(): string {
-        if (!this.isOpen) throw new Error("File is closed");
-        return `Contents of ${this.path}`;
+    depth(nested: NestedArray<T>): number {
+        if (Array.isArray(nested)) {
+            if (nested.length === 0) return 1;
+            return 1 + Math.max(...nested.map(item => this.depth(item)));
+        }
+        return 0;
     }
 
-    write(content: string): void {
-        if (!this.isOpen) throw new Error("File is closed");
-        console.log(`Writing to ${this.path}: ${content}`);
+    wrap(value: T, levels: number): NestedArray<T> {
+        let result: NestedArray<T> = value;
+        for (let i = 0; i < levels; i++) {
+            result = [result];
+        }
+        return result;
+    }
+}
+
+class DeepTransformHandler {
+    makeDeepPartial<T extends object>(obj: T): DeepPartial<T> {
+        const result: any = {};
+        for (const key of Object.keys(obj)) {
+            const value = (obj as any)[key];
+            if (value && typeof value === "object" && !Array.isArray(value)) {
+                result[key] = this.makeDeepPartial(value);
+            } else {
+                result[key] = value;
+            }
+        }
+        return result;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function NestedArrayHandler"),
+        "Expected NestedArrayHandler function: {}",
+        output
+    );
+    assert!(
+        output.contains("NestedArrayHandler.prototype.flatten"),
+        "Expected flatten method: {}",
+        output
+    );
+    assert!(
+        output.contains("NestedArrayHandler.prototype.depth") && output.contains("NestedArrayHandler.prototype.wrap"),
+        "Expected depth and wrap methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function DeepTransformHandler"),
+        "Expected DeepTransformHandler function: {}",
+        output
+    );
+    assert!(
+        output.contains("DeepTransformHandler.prototype.makeDeepPartial"),
+        "Expected makeDeepPartial method: {}",
+        output
+    );
+}
+
+/// Test: tree structure types
+/// Verifies that classes using tree structure types transform correctly to ES5
+#[test]
+fn test_class_es5_tree_structure_types() {
+    let source = r#"
+interface TreeNode<T> {
+    value: T;
+    children: TreeNode<T>[];
+}
+
+interface BinaryNode<T> {
+    value: T;
+    left: BinaryNode<T> | null;
+    right: BinaryNode<T> | null;
+}
+
+class TreeBuilder<T> {
+    createNode(value: T, children: TreeNode<T>[] = []): TreeNode<T> {
+        return { value, children };
     }
 
-    [Symbol.dispose](): void {
-        if (this.isOpen) {
-            console.log(`Closing file: ${this.path}`);
-            this.isOpen = false;
+    addChild(parent: TreeNode<T>, child: TreeNode<T>): void {
+        parent.children.push(child);
+    }
+
+    traverse(node: TreeNode<T>, callback: (value: T) => void): void {
+        callback(node.value);
+        for (const child of node.children) {
+            this.traverse(child, callback);
         }
     }
+
+    find(node: TreeNode<T>, predicate: (value: T) => boolean): TreeNode<T> | null {
+        if (predicate(node.value)) {
+            return node;
+        }
+        for (const child of node.children) {
+            const found = this.find(child, predicate);
+            if (found) return found;
+        }
+        return null;
+    }
 }
 
-class DatabaseConnection {
-    private connectionString: string;
-    private connected = true;
-
-    constructor(connectionString: string) {
-        this.connectionString = connectionString;
-        console.log(`Connecting to: ${connectionString}`);
+class BinaryTreeBuilder<T> {
+    createNode(value: T): BinaryNode<T> {
+        return { value, left: null, right: null };
     }
 
-    query(sql: string): any[] {
-        if (!this.connected) throw new Error("Not connected");
-        return [{ result: sql }];
-    }
-
-    [Symbol.dispose](): void {
-        if (this.connected) {
-            console.log(`Disconnecting from: ${this.connectionString}`);
-            this.connected = false;
+    insert(root: BinaryNode<number>, value: number): void {
+        if (value < root.value) {
+            if (root.left === null) {
+                root.left = this.createNode(value) as any;
+            } else {
+                this.insert(root.left as any, value);
+            }
+        } else {
+            if (root.right === null) {
+                root.right = this.createNode(value) as any;
+            } else {
+                this.insert(root.right as any, value);
+            }
         }
     }
+
+    inOrder(node: BinaryNode<T> | null, result: T[] = []): T[] {
+        if (node === null) return result;
+        this.inOrder(node.left, result);
+        result.push(node.value);
+        this.inOrder(node.right, result);
+        return result;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function TreeBuilder"),
+        "Expected TreeBuilder function: {}",
+        output
+    );
+    assert!(
+        output.contains("TreeBuilder.prototype.createNode") && output.contains("TreeBuilder.prototype.addChild"),
+        "Expected createNode and addChild methods: {}",
+        output
+    );
+    assert!(
+        output.contains("TreeBuilder.prototype.traverse") && output.contains("TreeBuilder.prototype.find"),
+        "Expected traverse and find methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function BinaryTreeBuilder"),
+        "Expected BinaryTreeBuilder function: {}",
+        output
+    );
+    assert!(
+        output.contains("BinaryTreeBuilder.prototype.insert") && output.contains("BinaryTreeBuilder.prototype.inOrder"),
+        "Expected insert and inOrder methods: {}",
+        output
+    );
 }
 
-class LockManager {
-    private resource: string;
-    private locked = true;
+/// Test: linked list types
+/// Verifies that classes using linked list types transform correctly to ES5
+#[test]
+fn test_class_es5_linked_list_types() {
+    let source = r#"
+interface ListNode<T> {
+    value: T;
+    next: ListNode<T> | null;
+}
 
-    constructor(resource: string) {
-        this.resource = resource;
-        console.log(`Acquiring lock on: ${resource}`);
-    }
+interface DoublyLinkedNode<T> {
+    value: T;
+    prev: DoublyLinkedNode<T> | null;
+    next: DoublyLinkedNode<T> | null;
+}
 
-    execute<T>(fn: () => T): T {
-        if (!this.locked) throw new Error("Lock released");
-        return fn();
-    }
+class LinkedList<T> {
+    private head: ListNode<T> | null = null;
+    private tail: ListNode<T> | null = null;
 
-    [Symbol.dispose](): void {
-        if (this.locked) {
-            console.log(`Releasing lock on: ${this.resource}`);
-            this.locked = false;
+    append(value: T): void {
+        const node: ListNode<T> = { value, next: null };
+        if (this.tail === null) {
+            this.head = node;
+            this.tail = node;
+        } else {
+            this.tail.next = node;
+            this.tail = node;
         }
     }
+
+    prepend(value: T): void {
+        const node: ListNode<T> = { value, next: this.head };
+        this.head = node;
+        if (this.tail === null) {
+            this.tail = node;
+        }
+    }
+
+    toArray(): T[] {
+        const result: T[] = [];
+        let current = this.head;
+        while (current !== null) {
+            result.push(current.value);
+            current = current.next;
+        }
+        return result;
+    }
+
+    find(predicate: (value: T) => boolean): T | undefined {
+        let current = this.head;
+        while (current !== null) {
+            if (predicate(current.value)) {
+                return current.value;
+            }
+            current = current.next;
+        }
+        return undefined;
+    }
 }
 
-function processFiles() {
-    using file = new FileHandle("/tmp/test.txt");
-    file.write("Hello");
-    return file.read();
+class DoublyLinkedList<T> {
+    private head: DoublyLinkedNode<T> | null = null;
+    private tail: DoublyLinkedNode<T> | null = null;
+
+    append(value: T): void {
+        const node: DoublyLinkedNode<T> = { value, prev: this.tail, next: null };
+        if (this.tail !== null) {
+            this.tail.next = node;
+        }
+        this.tail = node;
+        if (this.head === null) {
+            this.head = node;
+        }
+    }
+
+    reverse(): T[] {
+        const result: T[] = [];
+        let current = this.tail;
+        while (current !== null) {
+            result.push(current.value);
+            current = current.prev;
+        }
+        return result;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function LinkedList"),
+        "Expected LinkedList function: {}",
+        output
+    );
+    assert!(
+        output.contains("LinkedList.prototype.append") && output.contains("LinkedList.prototype.prepend"),
+        "Expected append and prepend methods: {}",
+        output
+    );
+    assert!(
+        output.contains("LinkedList.prototype.toArray") && output.contains("LinkedList.prototype.find"),
+        "Expected toArray and find methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function DoublyLinkedList"),
+        "Expected DoublyLinkedList function: {}",
+        output
+    );
+    assert!(
+        output.contains("DoublyLinkedList.prototype.append") && output.contains("DoublyLinkedList.prototype.reverse"),
+        "Expected DoublyLinkedList methods: {}",
+        output
+    );
 }
 
-function transactionalQuery() {
-    using db = new DatabaseConnection("postgres://localhost/test");
-    using lock = new LockManager("users_table");
-    return lock.execute(() => db.query("SELECT * FROM users"));
+/// Test: JSON-like recursive types
+/// Verifies that classes using JSON-like recursive types transform correctly to ES5
+#[test]
+fn test_class_es5_json_recursive_types() {
+    let source = r#"
+type JSONValue = string | number | boolean | null | JSONObject | JSONArray;
+interface JSONObject { [key: string]: JSONValue }
+interface JSONArray extends Array<JSONValue> {}
+
+type DeepJSON<T> = T extends object
+    ? { [K in keyof T]: DeepJSON<T[K]> }
+    : T;
+
+class JSONProcessor {
+    stringify(value: JSONValue): string {
+        return JSON.stringify(value);
+    }
+
+    parse(text: string): JSONValue {
+        return JSON.parse(text);
+    }
+
+    deepClone(value: JSONValue): JSONValue {
+        if (value === null || typeof value !== "object") {
+            return value;
+        }
+        if (Array.isArray(value)) {
+            return value.map(item => this.deepClone(item));
+        }
+        const result: JSONObject = {};
+        for (const key of Object.keys(value)) {
+            result[key] = this.deepClone(value[key]);
+        }
+        return result;
+    }
+
+    merge(target: JSONObject, source: JSONObject): JSONObject {
+        const result: JSONObject = { ...target };
+        for (const key of Object.keys(source)) {
+            const targetVal = target[key];
+            const sourceVal = source[key];
+            if (
+                targetVal && typeof targetVal === "object" && !Array.isArray(targetVal) &&
+                sourceVal && typeof sourceVal === "object" && !Array.isArray(sourceVal)
+            ) {
+                result[key] = this.merge(targetVal as JSONObject, sourceVal as JSONObject);
+            } else {
+                result[key] = sourceVal;
+            }
+        }
+        return result;
+    }
+}
+
+class JSONValidator {
+    isValidJSON(value: unknown): value is JSONValue {
+        if (value === null) return true;
+        const type = typeof value;
+        if (type === "string" || type === "number" || type === "boolean") return true;
+        if (Array.isArray(value)) {
+            return value.every(item => this.isValidJSON(item));
+        }
+        if (type === "object") {
+            return Object.values(value as object).every(v => this.isValidJSON(v));
+        }
+        return false;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function JSONProcessor"),
+        "Expected JSONProcessor function: {}",
+        output
+    );
+    assert!(
+        output.contains("JSONProcessor.prototype.stringify") && output.contains("JSONProcessor.prototype.parse"),
+        "Expected stringify and parse methods: {}",
+        output
+    );
+    assert!(
+        output.contains("JSONProcessor.prototype.deepClone") && output.contains("JSONProcessor.prototype.merge"),
+        "Expected deepClone and merge methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function JSONValidator"),
+        "Expected JSONValidator function: {}",
+        output
+    );
+    assert!(
+        output.contains("JSONValidator.prototype.isValidJSON"),
+        "Expected isValidJSON method: {}",
+        output
+    );
+}
+
+/// Test: nested object recursive types
+/// Verifies that classes using nested object types transform correctly to ES5
+#[test]
+fn test_class_es5_nested_object_types() {
+    let source = r#"
+type NestedRecord<T> = {
+    [key: string]: T | NestedRecord<T>;
+};
+
+type PathValue<T, P extends string> = P extends `${infer K}.${infer R}`
+    ? K extends keyof T
+        ? PathValue<T[K], R>
+        : never
+    : P extends keyof T
+        ? T[P]
+        : never;
+
+class NestedObjectHandler<T> {
+    private data: NestedRecord<T>;
+
+    constructor(data: NestedRecord<T>) {
+        this.data = data;
+    }
+
+    get(path: string): T | NestedRecord<T> | undefined {
+        const parts = path.split(".");
+        let current: any = this.data;
+        for (const part of parts) {
+            if (current === undefined || current === null) return undefined;
+            current = current[part];
+        }
+        return current;
+    }
+
+    set(path: string, value: T): void {
+        const parts = path.split(".");
+        let current: any = this.data;
+        for (let i = 0; i < parts.length - 1; i++) {
+            const part = parts[i];
+            if (!(part in current)) {
+                current[part] = {};
+            }
+            current = current[part];
+        }
+        current[parts[parts.length - 1]] = value;
+    }
+
+    flatten(prefix: string = ""): Record<string, T> {
+        const result: Record<string, T> = {};
+        const flatten = (obj: NestedRecord<T>, path: string) => {
+            for (const key of Object.keys(obj)) {
+                const fullPath = path ? path + "." + key : key;
+                const value = obj[key];
+                if (value && typeof value === "object" && !Array.isArray(value)) {
+                    flatten(value as NestedRecord<T>, fullPath);
+                } else {
+                    result[fullPath] = value as T;
+                }
+            }
+        };
+        flatten(this.data, prefix);
+        return result;
+    }
+}
+
+class PathAccessor {
+    getPath<T, P extends string>(obj: T, path: P): unknown {
+        const parts = (path as string).split(".");
+        let current: any = obj;
+        for (const part of parts) {
+            if (current === undefined) return undefined;
+            current = current[part];
+        }
+        return current;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function NestedObjectHandler"),
+        "Expected NestedObjectHandler function: {}",
+        output
+    );
+    assert!(
+        output.contains("this.data = data"),
+        "Expected constructor assignment: {}",
+        output
+    );
+    assert!(
+        output.contains("NestedObjectHandler.prototype.get") && output.contains("NestedObjectHandler.prototype.set"),
+        "Expected get and set methods: {}",
+        output
+    );
+    assert!(
+        output.contains("NestedObjectHandler.prototype.flatten"),
+        "Expected flatten method: {}",
+        output
+    );
+    assert!(
+        output.contains("function PathAccessor"),
+        "Expected PathAccessor function: {}",
+        output
+    );
+    assert!(
+        output.contains("PathAccessor.prototype.getPath"),
+        "Expected getPath method: {}",
+        output
+    );
+}
+
+/// Test: combined recursive type patterns
+/// Verifies that classes using multiple recursive type patterns together transform correctly to ES5
+#[test]
+fn test_class_es5_combined_recursive_patterns() {
+    let source = r#"
+interface FileSystemNode {
+    name: string;
+    type: "file" | "directory";
+    children?: FileSystemNode[];
+    size?: number;
+}
+
+type DeepMutable<T> = {
+    -readonly [P in keyof T]: DeepMutable<T[P]>;
+};
+
+type Flatten<T> = T extends Array<infer U> ? Flatten<U> : T;
+
+class FileSystem {
+    private root: FileSystemNode;
+
+    constructor() {
+        this.root = { name: "/", type: "directory", children: [] };
+    }
+
+    createFile(path: string, size: number): void {
+        const parts = path.split("/").filter(p => p);
+        let current = this.root;
+        for (let i = 0; i < parts.length - 1; i++) {
+            const dir = current.children?.find(c => c.name === parts[i] && c.type === "directory");
+            if (!dir) throw new Error("Directory not found");
+            current = dir;
+        }
+        current.children = current.children || [];
+        current.children.push({ name: parts[parts.length - 1], type: "file", size });
+    }
+
+    createDirectory(path: string): void {
+        const parts = path.split("/").filter(p => p);
+        let current = this.root;
+        for (const part of parts) {
+            let dir = current.children?.find(c => c.name === part && c.type === "directory");
+            if (!dir) {
+                dir = { name: part, type: "directory", children: [] };
+                current.children = current.children || [];
+                current.children.push(dir);
+            }
+            current = dir;
+        }
+    }
+
+    getTotalSize(node: FileSystemNode = this.root): number {
+        if (node.type === "file") {
+            return node.size || 0;
+        }
+        return (node.children || []).reduce((sum, child) => sum + this.getTotalSize(child), 0);
+    }
+
+    listAll(node: FileSystemNode = this.root, path: string = ""): string[] {
+        const currentPath = path + "/" + node.name;
+        if (node.type === "file") {
+            return [currentPath];
+        }
+        const files: string[] = [];
+        for (const child of node.children || []) {
+            files.push(...this.listAll(child, currentPath));
+        }
+        return files;
+    }
+}
+
+class RecursiveFlattener {
+    flattenDeep<T>(arr: T[]): Flatten<T>[] {
+        const result: any[] = [];
+        const flatten = (items: any[]) => {
+            for (const item of items) {
+                if (Array.isArray(item)) {
+                    flatten(item);
+                } else {
+                    result.push(item);
+                }
+            }
+        };
+        flatten(arr);
+        return result;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function FileSystem"),
+        "Expected FileSystem function: {}",
+        output
+    );
+    assert!(
+        output.contains("FileSystem.prototype.createFile") && output.contains("FileSystem.prototype.createDirectory"),
+        "Expected createFile and createDirectory methods: {}",
+        output
+    );
+    assert!(
+        output.contains("FileSystem.prototype.getTotalSize") && output.contains("FileSystem.prototype.listAll"),
+        "Expected getTotalSize and listAll methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function RecursiveFlattener"),
+        "Expected RecursiveFlattener function: {}",
+        output
+    );
+    assert!(
+        output.contains("RecursiveFlattener.prototype.flattenDeep"),
+        "Expected flattenDeep method: {}",
+        output
+    );
+}
+
+// ============================================================================
+// ACCESSOR KEYWORD PATTERN TESTS
+// ============================================================================
+
+/// Test ES5 class with auto-accessor fields
+#[test]
+fn test_class_es5_accessor_auto_accessor() {
+    let source = r#"
+// Auto-accessor fields
+class Person {
+    accessor name: string;
+    accessor age: number;
+    accessor email: string = "default@example.com";
+
+    constructor(name: string, age: number) {
+        this.name = name;
+        this.age = age;
+    }
+}
+
+class Counter {
+    accessor value: number = 0;
+    accessor min: number = 0;
+    accessor max: number = 100;
+
+    increment(): void {
+        if (this.value < this.max) {
+            this.value++;
+        }
+    }
+
+    decrement(): void {
+        if (this.value > this.min) {
+            this.value--;
+        }
+    }
+
+    reset(): void {
+        this.value = this.min;
+    }
+}
+
+class ConfigurableWidget {
+    accessor width: number = 100;
+    accessor height: number = 100;
+    accessor visible: boolean = true;
+    accessor opacity: number = 1.0;
+
+    resize(width: number, height: number): void {
+        this.width = width;
+        this.height = height;
+    }
+
+    hide(): void {
+        this.visible = false;
+        this.opacity = 0;
+    }
+
+    show(): void {
+        this.visible = true;
+        this.opacity = 1.0;
+    }
+}
+
+class UserProfile {
+    accessor firstName: string;
+    accessor lastName: string;
+    accessor bio: string = "";
+    accessor avatarUrl: string = "/default-avatar.png";
+
+    constructor(firstName: string, lastName: string) {
+        this.firstName = firstName;
+        this.lastName = lastName;
+    }
+
+    get fullName(): string {
+        return `${this.firstName} ${this.lastName}`;
+    }
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -27002,137 +27695,376 @@ function transactionalQuery() {
 
     // Classes should be converted
     assert!(
-        output.contains("FileHandle") && output.contains("DatabaseConnection") && output.contains("LockManager"),
-        "Expected sync using declaration classes: {}",
+        output.contains("Person") && output.contains("Counter") && output.contains("ConfigurableWidget"),
+        "Expected auto-accessor classes: {}",
         output
     );
 
-    // Functions with using should be present
+    // UserProfile should be present
     assert!(
-        output.contains("processFiles") && output.contains("transactionalQuery"),
-        "Expected functions with using declarations: {}",
+        output.contains("UserProfile"),
+        "Expected UserProfile class: {}",
         output
     );
 
-    // Symbol.dispose should be present in output
+    // accessor keyword should be transformed (not present in output)
     assert!(
-        output.contains("Symbol.dispose") || output.contains("dispose"),
-        "Expected Symbol.dispose pattern: {}",
+        !output.contains("accessor name") && !output.contains("accessor value"),
+        "Expected accessor keyword to be transformed: {}",
         output
     );
 }
 
-/// Test ES5 class with async using declarations
+/// Test ES5 class with accessor decorators
 #[test]
-fn test_class_es5_using_async() {
+fn test_class_es5_accessor_decorators() {
     let source = r#"
-// Async using declarations
-class AsyncFileHandle {
-    private path: string;
-    private isOpen = true;
+// Accessor decorators
+function logged(target: any, context: ClassAccessorDecoratorContext) {
+    return {
+        get(this: any) {
+            console.log(`Getting ${String(context.name)}`);
+            return target.get.call(this);
+        },
+        set(this: any, value: any) {
+            console.log(`Setting ${String(context.name)} to ${value}`);
+            target.set.call(this, value);
+        }
+    };
+}
 
-    constructor(path: string) {
-        this.path = path;
+function validated(min: number, max: number) {
+    return function(target: any, context: ClassAccessorDecoratorContext) {
+        return {
+            get(this: any) {
+                return target.get.call(this);
+            },
+            set(this: any, value: number) {
+                if (value < min || value > max) {
+                    throw new RangeError(`Value must be between ${min} and ${max}`);
+                }
+                target.set.call(this, value);
+            }
+        };
+    };
+}
+
+function cached(target: any, context: ClassAccessorDecoratorContext) {
+    const cache = new WeakMap<object, any>();
+    return {
+        get(this: any) {
+            if (cache.has(this)) {
+                return cache.get(this);
+            }
+            const value = target.get.call(this);
+            cache.set(this, value);
+            return value;
+        },
+        set(this: any, value: any) {
+            cache.delete(this);
+            target.set.call(this, value);
+        }
+    };
+}
+
+class TrackedValue {
+    @logged
+    accessor value: number = 0;
+
+    @logged
+    accessor name: string = "default";
+}
+
+class BoundedNumber {
+    @validated(0, 100)
+    accessor percentage: number = 0;
+
+    @validated(-273.15, Infinity)
+    accessor temperature: number = 20;
+}
+
+class CachedComputation {
+    @cached
+    accessor result: number = 0;
+
+    @cached
+    accessor data: string = "";
+
+    compute(input: number): void {
+        this.result = input * input;
+    }
+}
+
+class MixedDecorators {
+    @logged
+    @validated(0, 1000)
+    accessor quantity: number = 0;
+
+    @cached
+    @logged
+    accessor expensiveValue: string = "";
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Decorator functions should be present
+    assert!(
+        output.contains("logged") && output.contains("validated") && output.contains("cached"),
+        "Expected decorator functions: {}",
+        output
+    );
+
+    // Classes should be converted
+    assert!(
+        output.contains("TrackedValue") && output.contains("BoundedNumber") && output.contains("CachedComputation"),
+        "Expected accessor decorator classes: {}",
+        output
+    );
+
+    // MixedDecorators should be present
+    assert!(
+        output.contains("MixedDecorators"),
+        "Expected MixedDecorators class: {}",
+        output
+    );
+}
+
+/// Test ES5 class with static accessors
+#[test]
+fn test_class_es5_accessor_static_patterns() {
+    let source = r#"
+// Static accessors
+class Configuration {
+    static accessor debug: boolean = false;
+    static accessor logLevel: string = "info";
+    static accessor maxRetries: number = 3;
+    static accessor timeout: number = 30000;
+
+    static enableDebug(): void {
+        Configuration.debug = true;
+        Configuration.logLevel = "debug";
     }
 
-    static async open(path: string): Promise<AsyncFileHandle> {
-        await new Promise(r => setTimeout(r, 10));
-        console.log(`Async opening file: ${path}`);
-        return new AsyncFileHandle(path);
+    static disableDebug(): void {
+        Configuration.debug = false;
+        Configuration.logLevel = "info";
+    }
+}
+
+class Singleton {
+    private static _instance: Singleton | null = null;
+    static accessor instanceCount: number = 0;
+
+    private constructor() {
+        Singleton.instanceCount++;
+    }
+
+    static getInstance(): Singleton {
+        if (!Singleton._instance) {
+            Singleton._instance = new Singleton();
+        }
+        return Singleton._instance;
+    }
+
+    static resetInstance(): void {
+        Singleton._instance = null;
+    }
+}
+
+class Registry<T> {
+    private static items: Map<string, any> = new Map();
+    static accessor count: number = 0;
+
+    static register<U>(key: string, item: U): void {
+        Registry.items.set(key, item);
+        Registry.count++;
+    }
+
+    static get<U>(key: string): U | undefined {
+        return Registry.items.get(key);
+    }
+
+    static unregister(key: string): boolean {
+        const deleted = Registry.items.delete(key);
+        if (deleted) {
+            Registry.count--;
+        }
+        return deleted;
+    }
+
+    static clear(): void {
+        Registry.items.clear();
+        Registry.count = 0;
+    }
+}
+
+class FeatureFlags {
+    static accessor enableNewUI: boolean = false;
+    static accessor enableDarkMode: boolean = true;
+    static accessor enableAnalytics: boolean = true;
+    static accessor betaFeatures: boolean = false;
+
+    static isEnabled(flag: keyof typeof FeatureFlags): boolean {
+        return (FeatureFlags as any)[flag] === true;
+    }
+
+    static setFlag(flag: keyof typeof FeatureFlags, value: boolean): void {
+        (FeatureFlags as any)[flag] = value;
+    }
+
+    static getAllFlags(): Record<string, boolean> {
+        return {
+            enableNewUI: FeatureFlags.enableNewUI,
+            enableDarkMode: FeatureFlags.enableDarkMode,
+            enableAnalytics: FeatureFlags.enableAnalytics,
+            betaFeatures: FeatureFlags.betaFeatures
+        };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Configuration") && output.contains("Singleton") && output.contains("Registry"),
+        "Expected static accessor classes: {}",
+        output
+    );
+
+    // FeatureFlags should be present
+    assert!(
+        output.contains("FeatureFlags"),
+        "Expected FeatureFlags class: {}",
+        output
+    );
+
+    // Static methods should be preserved
+    assert!(
+        output.contains("enableDebug") && output.contains("getInstance") && output.contains("register"),
+        "Expected static methods: {}",
+        output
+    );
+
+    // static accessor keyword should be transformed
+    assert!(
+        !output.contains("static accessor debug") && !output.contains("static accessor count"),
+        "Expected static accessor keyword to be transformed: {}",
+        output
+    );
+}
+
+/// Test ES5 class with await using declarations
+#[test]
+fn test_class_es5_explicit_resource_await_using() {
+    let source = r#"
+// Async disposable resource
+class AsyncFileHandle {
+    private handle: number;
+
+    constructor(path: string) {
+        this.handle = 0;
+    }
+
+    async [Symbol.asyncDispose](): Promise<void> {
+        await this.close();
+    }
+
+    async close(): Promise<void> {
+        console.log("Closing async handle");
     }
 
     async read(): Promise<string> {
-        if (!this.isOpen) throw new Error("File is closed");
-        await new Promise(r => setTimeout(r, 10));
-        return `Contents of ${this.path}`;
+        return "data";
     }
+}
 
-    async write(content: string): Promise<void> {
-        if (!this.isOpen) throw new Error("File is closed");
-        await new Promise(r => setTimeout(r, 10));
-        console.log(`Async writing to ${this.path}: ${content}`);
+// Database connection with async dispose
+class DatabaseConnection {
+    private connectionString: string;
+    private isOpen: boolean = false;
+
+    constructor(connectionString: string) {
+        this.connectionString = connectionString;
     }
 
     async [Symbol.asyncDispose](): Promise<void> {
         if (this.isOpen) {
-            await new Promise(r => setTimeout(r, 10));
-            console.log(`Async closing file: ${this.path}`);
-            this.isOpen = false;
+            await this.disconnect();
         }
     }
-}
 
-class AsyncDatabaseConnection {
-    private connectionString: string;
-    private connected = true;
-
-    private constructor(connectionString: string) {
-        this.connectionString = connectionString;
+    async connect(): Promise<void> {
+        this.isOpen = true;
     }
 
-    static async connect(connectionString: string): Promise<AsyncDatabaseConnection> {
-        await new Promise(r => setTimeout(r, 50));
-        console.log(`Async connecting to: ${connectionString}`);
-        return new AsyncDatabaseConnection(connectionString);
+    async disconnect(): Promise<void> {
+        this.isOpen = false;
     }
 
     async query(sql: string): Promise<any[]> {
-        if (!this.connected) throw new Error("Not connected");
-        await new Promise(r => setTimeout(r, 20));
-        return [{ result: sql }];
+        return [];
     }
+}
+
+// Stream with async disposal
+class AsyncStream {
+    private buffer: Uint8Array[] = [];
 
     async [Symbol.asyncDispose](): Promise<void> {
-        if (this.connected) {
-            await new Promise(r => setTimeout(r, 30));
-            console.log(`Async disconnecting from: ${this.connectionString}`);
-            this.connected = false;
-        }
+        await this.flush();
+        this.buffer = [];
+    }
+
+    async write(data: Uint8Array): Promise<void> {
+        this.buffer.push(data);
+    }
+
+    async flush(): Promise<void> {
+        console.log("Flushing buffer");
     }
 }
 
-class AsyncTransaction {
-    private db: AsyncDatabaseConnection;
-    private committed = false;
-    private rolledBack = false;
-
-    constructor(db: AsyncDatabaseConnection) {
-        this.db = db;
-    }
-
-    async commit(): Promise<void> {
-        await new Promise(r => setTimeout(r, 10));
-        this.committed = true;
-        console.log("Transaction committed");
-    }
-
-    async rollback(): Promise<void> {
-        await new Promise(r => setTimeout(r, 10));
-        this.rolledBack = true;
-        console.log("Transaction rolled back");
-    }
-
-    async [Symbol.asyncDispose](): Promise<void> {
-        if (!this.committed && !this.rolledBack) {
-            await this.rollback();
-        }
-    }
+// Usage with await using
+async function processFiles() {
+    await using file = new AsyncFileHandle("/path/to/file");
+    const data = await file.read();
+    return data;
 }
 
-async function asyncProcessFiles() {
-    await using file = await AsyncFileHandle.open("/tmp/async.txt");
-    await file.write("Async Hello");
-    return await file.read();
-}
-
-async function asyncTransactionalQuery() {
-    await using db = await AsyncDatabaseConnection.connect("postgres://localhost/test");
-    await using tx = new AsyncTransaction(db);
-    const result = await db.query("SELECT * FROM users");
-    await tx.commit();
-    return result;
+async function queryDatabase() {
+    await using db = new DatabaseConnection("postgres://localhost");
+    await db.connect();
+    const results = await db.query("SELECT * FROM users");
+    return results;
 }
 "#;
+
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -27150,272 +28082,123 @@ async function asyncTransactionalQuery() {
 
     // Classes should be converted
     assert!(
-        output.contains("AsyncFileHandle") && output.contains("AsyncDatabaseConnection") && output.contains("AsyncTransaction"),
-        "Expected async using declaration classes: {}",
+        output.contains("AsyncFileHandle") && output.contains("DatabaseConnection") && output.contains("AsyncStream"),
+        "Expected async disposable classes: {}",
         output
     );
 
-    // Async functions should be present
+    // Symbol.asyncDispose methods should be present
     assert!(
-        output.contains("asyncProcessFiles") && output.contains("asyncTransactionalQuery"),
+        output.contains("Symbol.asyncDispose"),
+        "Expected Symbol.asyncDispose: {}",
+        output
+    );
+
+    // Async functions should be preserved
+    assert!(
+        output.contains("processFiles") && output.contains("queryDatabase"),
         "Expected async functions: {}",
         output
     );
 }
 
-/// Test ES5 class with dispose patterns
+/// Test ES5 class with Symbol.dispose (sync disposal)
 #[test]
-fn test_class_es5_using_dispose_patterns() {
+fn test_class_es5_explicit_resource_symbol_dispose() {
     let source = r#"
-// Dispose patterns
-interface Disposable {
-    [Symbol.dispose](): void;
-}
+// Sync disposable resource
+class FileHandle {
+    private fd: number;
 
-interface AsyncDisposable {
-    [Symbol.asyncDispose](): Promise<void>;
-}
-
-class ResourcePool<T extends Disposable> {
-    private resources: T[] = [];
-    private available: T[] = [];
-
-    constructor(private factory: () => T, private maxSize: number) {
-        for (let i = 0; i < maxSize; i++) {
-            const resource = factory();
-            this.resources.push(resource);
-            this.available.push(resource);
-        }
-    }
-
-    acquire(): T {
-        const resource = this.available.pop();
-        if (!resource) throw new Error("No available resources");
-        return resource;
-    }
-
-    release(resource: T): void {
-        if (this.resources.includes(resource)) {
-            this.available.push(resource);
-        }
+    constructor(path: string) {
+        this.fd = 0;
     }
 
     [Symbol.dispose](): void {
-        for (const resource of this.resources) {
-            resource[Symbol.dispose]();
-        }
-        this.resources = [];
-        this.available = [];
+        this.close();
+    }
+
+    close(): void {
+        console.log("Closing handle");
+    }
+
+    read(): string {
+        return "data";
     }
 }
 
-class DisposableStack {
-    private stack: Disposable[] = [];
-
-    use<T extends Disposable>(resource: T): T {
-        this.stack.push(resource);
-        return resource;
-    }
-
-    defer(fn: () => void): void {
-        this.stack.push({ [Symbol.dispose]: fn });
-    }
-
-    [Symbol.dispose](): void {
-        while (this.stack.length > 0) {
-            const resource = this.stack.pop()!;
-            try {
-                resource[Symbol.dispose]();
-            } catch (e) {
-                console.error("Error during disposal:", e);
-            }
-        }
-    }
-}
-
-class Timer implements Disposable {
-    private startTime: number;
+// Lock with dispose
+class Lock {
+    private isLocked: boolean = false;
     private name: string;
 
     constructor(name: string) {
         this.name = name;
-        this.startTime = Date.now();
-        console.log(`Timer '${name}' started`);
-    }
-
-    elapsed(): number {
-        return Date.now() - this.startTime;
     }
 
     [Symbol.dispose](): void {
-        console.log(`Timer '${this.name}' stopped: ${this.elapsed()}ms`);
+        this.unlock();
+    }
+
+    acquire(): void {
+        this.isLocked = true;
+    }
+
+    unlock(): void {
+        this.isLocked = false;
     }
 }
 
-function timedOperation() {
-    using timer = new Timer("operation");
-    using stack = new DisposableStack();
+// Timer with dispose
+class Timer {
+    private id: number | null = null;
 
-    stack.defer(() => console.log("Cleanup 1"));
-    stack.defer(() => console.log("Cleanup 2"));
-
-    // Do some work
-    let sum = 0;
-    for (let i = 0; i < 1000; i++) {
-        sum += i;
+    [Symbol.dispose](): void {
+        if (this.id !== null) {
+            clearInterval(this.id);
+            this.id = null;
+        }
     }
 
-    console.log(`Operation completed: ${timer.elapsed()}ms`);
-    return sum;
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Classes should be converted
-    assert!(
-        output.contains("ResourcePool") && output.contains("DisposableStack") && output.contains("Timer"),
-        "Expected dispose pattern classes: {}",
-        output
-    );
-
-    // Function should be present
-    assert!(
-        output.contains("timedOperation"),
-        "Expected timedOperation function: {}",
-        output
-    );
-
-    // Interfaces should be stripped
-    assert!(
-        !output.contains("interface Disposable") && !output.contains("interface AsyncDisposable"),
-        "Expected interfaces to be stripped: {}",
-        output
-    );
+    start(callback: () => void, interval: number): void {
+        this.id = setInterval(callback, interval) as any;
+    }
 }
 
-/// Test ES5 class with Symbol.dispose implementation
-#[test]
-fn test_class_es5_using_symbol_dispose() {
-    let source = r#"
-// Symbol.dispose implementation patterns
-class ManagedBuffer {
-    private buffer: ArrayBuffer;
-    private view: DataView;
-    private disposed = false;
+// Memory pool with dispose
+class MemoryPool {
+    private blocks: ArrayBuffer[] = [];
+    private size: number;
 
     constructor(size: number) {
-        this.buffer = new ArrayBuffer(size);
-        this.view = new DataView(this.buffer);
-        console.log(`Allocated ${size} bytes`);
-    }
-
-    write(offset: number, value: number): void {
-        if (this.disposed) throw new Error("Buffer disposed");
-        this.view.setInt32(offset, value);
-    }
-
-    read(offset: number): number {
-        if (this.disposed) throw new Error("Buffer disposed");
-        return this.view.getInt32(offset);
-    }
-
-    get size(): number {
-        return this.buffer.byteLength;
+        this.size = size;
     }
 
     [Symbol.dispose](): void {
-        if (!this.disposed) {
-            console.log(`Freeing ${this.size} bytes`);
-            this.disposed = true;
-        }
+        this.blocks = [];
+    }
+
+    allocate(): ArrayBuffer {
+        const block = new ArrayBuffer(this.size);
+        this.blocks.push(block);
+        return block;
     }
 }
 
-class EventSubscription {
-    private target: EventTarget;
-    private type: string;
-    private handler: EventListener;
-    private active = true;
-
-    constructor(target: EventTarget, type: string, handler: EventListener) {
-        this.target = target;
-        this.type = type;
-        this.handler = handler;
-        target.addEventListener(type, handler);
-    }
-
-    [Symbol.dispose](): void {
-        if (this.active) {
-            this.target.removeEventListener(this.type, this.handler);
-            this.active = false;
-        }
-    }
+// Usage with using
+function processFile() {
+    using file = new FileHandle("/path/to/file");
+    const data = file.read();
+    return data;
 }
 
-class IntervalHandle {
-    private id: number;
-    private active = true;
-
-    constructor(callback: () => void, ms: number) {
-        this.id = setInterval(callback, ms) as unknown as number;
-    }
-
-    [Symbol.dispose](): void {
-        if (this.active) {
-            clearInterval(this.id);
-            this.active = false;
-        }
-    }
-}
-
-class TimeoutHandle {
-    private id: number;
-    private active = true;
-
-    constructor(callback: () => void, ms: number) {
-        this.id = setTimeout(callback, ms) as unknown as number;
-    }
-
-    cancel(): void {
-        if (this.active) {
-            clearTimeout(this.id);
-            this.active = false;
-        }
-    }
-
-    [Symbol.dispose](): void {
-        this.cancel();
-    }
-}
-
-function managedBufferDemo() {
-    using buffer = new ManagedBuffer(1024);
-    buffer.write(0, 42);
-    buffer.write(4, 100);
-    return buffer.read(0) + buffer.read(4);
-}
-
-function intervalDemo(callback: () => void) {
-    using interval = new IntervalHandle(callback, 100);
-    using timeout = new TimeoutHandle(() => {
-        console.log("Timeout completed");
-    }, 500);
-    // The handles will be disposed when the function returns
+function withLock() {
+    using lock = new Lock("resource");
+    lock.acquire();
+    // Do work
 }
 "#;
+
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -27433,22 +28216,189 @@ function intervalDemo(callback: () => void) {
 
     // Classes should be converted
     assert!(
-        output.contains("ManagedBuffer") && output.contains("EventSubscription") && output.contains("IntervalHandle"),
-        "Expected Symbol.dispose classes: {}",
+        output.contains("FileHandle") && output.contains("Lock") && output.contains("Timer"),
+        "Expected disposable classes: {}",
         output
     );
 
-    // TimeoutHandle should be present
+    // Symbol.dispose should be present
     assert!(
-        output.contains("TimeoutHandle"),
-        "Expected TimeoutHandle class: {}",
+        output.contains("Symbol.dispose"),
+        "Expected Symbol.dispose: {}",
         output
     );
 
-    // Functions should be present
+    // MemoryPool should be present
     assert!(
-        output.contains("managedBufferDemo") && output.contains("intervalDemo"),
-        "Expected demo functions: {}",
+        output.contains("MemoryPool"),
+        "Expected MemoryPool class: {}",
+        output
+    );
+
+    // Functions should be preserved
+    assert!(
+        output.contains("processFile") && output.contains("withLock"),
+        "Expected usage functions: {}",
+        output
+    );
+}
+
+/// Test ES5 class with mixed disposal patterns
+#[test]
+fn test_class_es5_explicit_resource_mixed_disposal() {
+    let source = r#"
+// Class with both sync and async dispose
+class DualDisposable {
+    private syncResource: string;
+    private asyncResource: Promise<string>;
+
+    constructor() {
+        this.syncResource = "sync";
+        this.asyncResource = Promise.resolve("async");
+    }
+
+    [Symbol.dispose](): void {
+        console.log("Sync cleanup");
+    }
+
+    async [Symbol.asyncDispose](): Promise<void> {
+        await this.asyncResource;
+        console.log("Async cleanup");
+    }
+}
+
+// Disposable with inheritance
+class BaseResource {
+    protected name: string;
+
+    constructor(name: string) {
+        this.name = name;
+    }
+
+    [Symbol.dispose](): void {
+        console.log(`Disposing ${this.name}`);
+    }
+}
+
+class DerivedResource extends BaseResource {
+    private extra: number;
+
+    constructor(name: string, extra: number) {
+        super(name);
+        this.extra = extra;
+    }
+
+    [Symbol.dispose](): void {
+        console.log(`Extra cleanup: ${this.extra}`);
+        super[Symbol.dispose]();
+    }
+}
+
+// Generic disposable
+class DisposableContainer<T> {
+    private value: T;
+    private disposed: boolean = false;
+
+    constructor(value: T) {
+        this.value = value;
+    }
+
+    [Symbol.dispose](): void {
+        this.disposed = true;
+    }
+
+    get(): T {
+        if (this.disposed) {
+            throw new Error("Already disposed");
+        }
+        return this.value;
+    }
+}
+
+// Static dispose method
+class StaticDisposable {
+    private static instances: StaticDisposable[] = [];
+
+    constructor() {
+        StaticDisposable.instances.push(this);
+    }
+
+    [Symbol.dispose](): void {
+        const index = StaticDisposable.instances.indexOf(this);
+        if (index > -1) {
+            StaticDisposable.instances.splice(index, 1);
+        }
+    }
+
+    static disposeAll(): void {
+        for (const instance of StaticDisposable.instances) {
+            instance[Symbol.dispose]();
+        }
+    }
+}
+
+// Multiple resources in one block
+function multipleResources() {
+    using a = new BaseResource("a");
+    using b = new DerivedResource("b", 42);
+    using c = new DisposableContainer<number>(100);
+    return c.get();
+}
+
+async function mixedResources() {
+    using sync = new BaseResource("sync");
+    await using dual = new DualDisposable();
+    return "done";
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("DualDisposable") && output.contains("BaseResource") && output.contains("DerivedResource"),
+        "Expected mixed disposal classes: {}",
+        output
+    );
+
+    // Generic disposable should be present
+    assert!(
+        output.contains("DisposableContainer"),
+        "Expected DisposableContainer class: {}",
+        output
+    );
+
+    // Static disposable should be present
+    assert!(
+        output.contains("StaticDisposable") && output.contains("disposeAll"),
+        "Expected StaticDisposable with disposeAll: {}",
+        output
+    );
+
+    // Both Symbol.dispose and Symbol.asyncDispose should be present
+    assert!(
+        output.contains("Symbol.dispose") && output.contains("Symbol.asyncDispose"),
+        "Expected both dispose symbols: {}",
+        output
+    );
+
+    // Functions should be preserved
+    assert!(
+        output.contains("multipleResources") && output.contains("mixedResources"),
+        "Expected usage functions: {}",
         output
     );
 }

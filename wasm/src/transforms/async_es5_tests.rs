@@ -10539,3 +10539,207 @@ fn test_async_stream_pattern_ignores_nested_async() {
     );
     assert!(!result, "Should not detect await inside nested async in stream function");
 }
+
+// ============================================================================
+// ASYNC QUEUE PATTERN TESTS
+// ============================================================================
+
+// Tests for async queue patterns: task queue, priority queue, rate limiting,
+// backpressure.
+
+#[test]
+fn test_async_queue_pattern_enqueue() {
+    let result = async_error_propagation_contains_await(
+        "async function enqueue() { await queue.add(task); }",
+    );
+    assert!(result, "Should detect await in queue enqueue");
+}
+
+#[test]
+fn test_async_queue_pattern_dequeue() {
+    let result = async_error_propagation_contains_await(
+        "async function dequeue() { return await queue.take(); }",
+    );
+    assert!(result, "Should detect await in queue dequeue");
+}
+
+#[test]
+fn test_async_queue_pattern_process() {
+    let result = async_error_propagation_contains_await(
+        "async function process() { await queue.process(handler); }",
+    );
+    assert!(result, "Should detect await in queue process");
+}
+
+#[test]
+fn test_async_queue_pattern_priority() {
+    let result = async_error_propagation_contains_await(
+        "async function addPriority() { await priorityQueue.add(task, priority); }",
+    );
+    assert!(result, "Should detect await in priority queue");
+}
+
+#[test]
+fn test_async_queue_pattern_rate_limit() {
+    let result = async_error_propagation_contains_await(
+        "async function rateLimited() { await limiter.acquire(); }",
+    );
+    assert!(result, "Should detect await in rate limiter");
+}
+
+#[test]
+fn test_async_queue_pattern_throttle() {
+    let result = async_error_propagation_contains_await(
+        "async function throttled() { await throttle.wait(); }",
+    );
+    assert!(result, "Should detect await in throttle");
+}
+
+#[test]
+fn test_async_queue_pattern_backpressure() {
+    let result = async_error_propagation_contains_await(
+        "async function withBackpressure() { await queue.waitForSpace(); }",
+    );
+    assert!(result, "Should detect await in backpressure wait");
+}
+
+#[test]
+fn test_async_queue_pattern_drain() {
+    let result = async_error_propagation_contains_await(
+        "async function drain() { await queue.drain(); }",
+    );
+    assert!(result, "Should detect await in queue drain");
+}
+
+#[test]
+fn test_async_queue_pattern_flush() {
+    let result = async_error_propagation_contains_await(
+        "async function flush() { await queue.flush(); }",
+    );
+    assert!(result, "Should detect await in queue flush");
+}
+
+#[test]
+fn test_async_queue_pattern_batch() {
+    let result = async_error_propagation_contains_await(
+        "async function batch() { await queue.processBatch(items); }",
+    );
+    assert!(result, "Should detect await in batch process");
+}
+
+#[test]
+fn test_async_queue_pattern_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function syncQueue() { return queue.size(); }",
+    );
+    assert!(!result, "Should not detect await when queue access is sync");
+}
+
+#[test]
+fn test_async_queue_pattern_ignores_nested_async() {
+    let result = async_error_propagation_contains_await(
+        "async function outer() { const worker = async () => await queue.take(); }",
+    );
+    assert!(!result, "Should not detect await inside nested async in queue function");
+}
+
+// ============================================================================
+// ASYNC RETRY PATTERN TESTS
+// Tests for retry patterns: exponential backoff, circuit breaker, jitter, timeout
+// ============================================================================
+
+#[test]
+fn test_async_retry_pattern_exponential_backoff() {
+    let result = async_error_propagation_contains_await(
+        "async function retryWithBackoff() { await delay(Math.pow(2, attempt) * 1000); }",
+    );
+    assert!(result, "Should detect await in exponential backoff delay");
+}
+
+#[test]
+fn test_async_retry_pattern_linear_backoff() {
+    let result = async_error_propagation_contains_await(
+        "async function retryLinear() { await delay(attempt * 1000); }",
+    );
+    assert!(result, "Should detect await in linear backoff delay");
+}
+
+#[test]
+fn test_async_retry_pattern_fixed_delay() {
+    let result = async_error_propagation_contains_await(
+        "async function retryFixed() { await sleep(1000); return await fetchData(); }",
+    );
+    assert!(result, "Should detect await in fixed delay retry");
+}
+
+#[test]
+fn test_async_retry_pattern_circuit_breaker() {
+    let result = async_error_propagation_contains_await(
+        "async function withCircuitBreaker() { return await circuitBreaker.execute(operation); }",
+    );
+    assert!(result, "Should detect await in circuit breaker execution");
+}
+
+#[test]
+fn test_async_retry_pattern_jitter() {
+    let result = async_error_propagation_contains_await(
+        "async function retryWithJitter() { await delay(baseDelay + Math.random() * jitter); }",
+    );
+    assert!(result, "Should detect await in retry with jitter");
+}
+
+#[test]
+fn test_async_retry_pattern_timeout() {
+    let result = async_error_propagation_contains_await(
+        "async function withTimeout() { return await Promise.race([operation(), timeout(5000)]); }",
+    );
+    assert!(result, "Should detect await in timeout pattern");
+}
+
+#[test]
+fn test_async_retry_pattern_max_retries() {
+    let result = async_error_propagation_contains_await(
+        "async function retryMax() { for (let i = 0; i < maxRetries; i++) { return await attempt(); } }",
+    );
+    assert!(result, "Should detect await in max retries loop");
+}
+
+#[test]
+fn test_async_retry_pattern_conditional() {
+    let result = async_error_propagation_contains_await(
+        "async function conditionalRetry() { if (shouldRetry(error)) { return await retry(); } }",
+    );
+    assert!(result, "Should detect await in conditional retry");
+}
+
+#[test]
+fn test_async_retry_pattern_fallback() {
+    let result = async_error_propagation_contains_await(
+        "async function withFallback() { return await fallbackService.handle(request); }",
+    );
+    assert!(result, "Should detect await in fallback after retry failure");
+}
+
+#[test]
+fn test_async_retry_pattern_abort() {
+    let result = async_error_propagation_contains_await(
+        "async function abortableRetry() { return await abortController.signal; }",
+    );
+    assert!(result, "Should detect await in abort signal check");
+}
+
+#[test]
+fn test_async_retry_pattern_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function syncRetry() { return retryCount < maxRetries; }",
+    );
+    assert!(!result, "Should not detect await when retry logic is sync");
+}
+
+#[test]
+fn test_async_retry_pattern_ignores_nested_async() {
+    let result = async_error_propagation_contains_await(
+        "async function outer() { const retry = async () => await backoff(); }",
+    );
+    assert!(!result, "Should not detect await inside nested async in retry function");
+}

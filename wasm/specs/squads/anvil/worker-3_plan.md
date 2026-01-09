@@ -7,12 +7,14 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] Add ES5 source map tests for generator transform patterns: yield expressions, generator delegation. Tests: `./wasm/test.sh source_map`
+- [ ] Add ES5 source map tests for spread/rest transform patterns: array spread, object spread, rest parameters, rest elements. Tests: `./wasm/test.sh source_map`
 
 ## Task Queue
-- [ ] Add ES5 source map tests for destructuring transform patterns: array destructuring, object destructuring, nested
+- [ ] Add ES5 source map tests for class expression patterns: anonymous, named, in return, with extends
 
 ## Completed
+- [x] Added destructuring transform ES5 source map tests (array basic, object basic, nested array, nested object, mixed, defaults, function params, rest patterns, loop patterns, comprehensive); 737 tests pass.
+- [x] Added generator transform ES5 source map tests (basic yield, yield with values, delegation, return value, try/catch, infinite, class iterator, class methods, async generator, comprehensive); 727 tests pass.
 - [x] Added async/await transform ES5 source map tests (try/catch basic, try/catch/finally, Promise chain, arrow functions, class methods, IIFE, nested try/catch, parallel await, error rethrow, comprehensive); 717 tests pass.
 - [x] Added for-of/for-in loop ES5 source map tests (basic for-of, basic for-in, for-of destructuring, for-in destructuring, for-of string, for-of Map/Set, nested for-of, break/continue, iterator, comprehensive); 707 tests pass.
 - [x] Added class accessor ES5 source map tests (basic getter/setter, static accessors, computed names, decorator, getter-only, setter-only, inherited, validation, lazy initialization, comprehensive); 697 tests pass.
