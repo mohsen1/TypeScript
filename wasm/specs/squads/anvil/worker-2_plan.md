@@ -7,10 +7,10 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-(none)
+Add ES5 Symbol patterns parity tests: well-known symbols, Symbol.for, Symbol.keyFor. Tests: `./wasm/test.sh emitter_parity`
 
 ## Task Queue
-- [ ] Add ES5 Symbol patterns parity tests: well-known symbols, Symbol.for, Symbol.keyFor
+- [ ] Add ES5 Proxy patterns parity tests: handler traps, revocable, Reflect integration
 
 ## Completed
 - [x] Added ES5 BigInt patterns parity tests (literal, arithmetic, comparison, method-calls) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (363 tests).
