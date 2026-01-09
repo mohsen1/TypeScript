@@ -19649,3 +19649,433 @@ class Pipeline<T> {
         output
     );
 }
+
+// ============================================================================
+// Promise pattern tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_promise_all_pattern() {
+    // Promise.all usage in class methods
+    let source = r#"
+class ParallelFetcher {
+    private urls: string[];
+
+    constructor(urls: string[]) {
+        this.urls = urls;
+    }
+
+    async fetchAll(): Promise<Response[]> {
+        const promises = this.urls.map(url => fetch(url));
+        return Promise.all(promises);
+    }
+
+    async fetchAllJson<T>(): Promise<T[]> {
+        const responses = await this.fetchAll();
+        const jsonPromises = responses.map(r => r.json());
+        return Promise.all(jsonPromises);
+    }
+
+    async fetchWithTimeout(timeout: number): Promise<Response[]> {
+        const fetchPromises = this.urls.map(url => fetch(url));
+        const timeoutPromise = new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error("Timeout")), timeout);
+        });
+        return Promise.all(fetchPromises);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function ParallelFetcher"),
+        "Expected ParallelFetcher function: {}",
+        output
+    );
+    assert!(
+        output.contains("Promise.all"),
+        "Expected Promise.all: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_promise_race_pattern() {
+    // Promise.race usage in class methods
+    let source = r#"
+class RacingFetcher {
+    private mirrors: string[];
+
+    constructor(mirrors: string[]) {
+        this.mirrors = mirrors;
+    }
+
+    async fetchFastest(): Promise<Response> {
+        const promises = this.mirrors.map(url => fetch(url));
+        return Promise.race(promises);
+    }
+
+    async fetchWithTimeout(url: string, timeout: number): Promise<Response> {
+        const fetchPromise = fetch(url);
+        const timeoutPromise = new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error("Request timeout")), timeout);
+        });
+        return Promise.race([fetchPromise, timeoutPromise]);
+    }
+
+    async fetchFirstSuccessful(): Promise<Response | null> {
+        try {
+            return await Promise.race(this.mirrors.map(url => fetch(url)));
+        } catch {
+            return null;
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function RacingFetcher"),
+        "Expected RacingFetcher function: {}",
+        output
+    );
+    assert!(
+        output.contains("Promise.race"),
+        "Expected Promise.race: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_promise_allsettled_pattern() {
+    // Promise.allSettled usage in class methods
+    let source = r#"
+interface SettledResult<T> {
+    status: "fulfilled" | "rejected";
+    value?: T;
+    reason?: any;
+}
+
+class BatchProcessor<T, R> {
+    private items: T[];
+    private processor: (item: T) => Promise<R>;
+
+    constructor(items: T[], processor: (item: T) => Promise<R>) {
+        this.items = items;
+        this.processor = processor;
+    }
+
+    async processAll(): Promise<PromiseSettledResult<R>[]> {
+        const promises = this.items.map(item => this.processor(item));
+        return Promise.allSettled(promises);
+    }
+
+    async getSuccessful(): Promise<R[]> {
+        const results = await this.processAll();
+        return results
+            .filter((r): r is PromiseFulfilledResult<R> => r.status === "fulfilled")
+            .map(r => r.value);
+    }
+
+    async getFailed(): Promise<any[]> {
+        const results = await this.processAll();
+        return results
+            .filter((r): r is PromiseRejectedResult => r.status === "rejected")
+            .map(r => r.reason);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function BatchProcessor"),
+        "Expected BatchProcessor function: {}",
+        output
+    );
+    assert!(
+        output.contains("Promise.allSettled"),
+        "Expected Promise.allSettled: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_promise_any_pattern() {
+    // Promise.any usage in class methods
+    let source = r#"
+class FallbackFetcher {
+    private primaryUrl: string;
+    private fallbackUrls: string[];
+
+    constructor(primaryUrl: string, fallbackUrls: string[]) {
+        this.primaryUrl = primaryUrl;
+        this.fallbackUrls = fallbackUrls;
+    }
+
+    async fetchAny(): Promise<Response> {
+        const allUrls = [this.primaryUrl, ...this.fallbackUrls];
+        const promises = allUrls.map(url => fetch(url));
+        return Promise.any(promises);
+    }
+
+    async fetchWithFallback(): Promise<Response> {
+        try {
+            return await fetch(this.primaryUrl);
+        } catch {
+            return Promise.any(this.fallbackUrls.map(url => fetch(url)));
+        }
+    }
+
+    async fetchFirstAvailable(): Promise<{ url: string; response: Response } | null> {
+        const allUrls = [this.primaryUrl, ...this.fallbackUrls];
+        try {
+            const response = await Promise.any(allUrls.map(url => fetch(url)));
+            return { url: this.primaryUrl, response };
+        } catch {
+            return null;
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function FallbackFetcher"),
+        "Expected FallbackFetcher function: {}",
+        output
+    );
+    assert!(
+        output.contains("Promise.any"),
+        "Expected Promise.any: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_promise_chaining_pipeline() {
+    // Promise chaining in class methods - DataPipeline
+    let source = r#"
+class DataPipeline<T> {
+    private source: Promise<T>;
+
+    constructor(source: Promise<T>) {
+        this.source = source;
+    }
+
+    map<U>(fn: (value: T) => U): DataPipeline<U> {
+        return new DataPipeline(this.source.then(fn));
+    }
+
+    flatMap<U>(fn: (value: T) => Promise<U>): DataPipeline<U> {
+        return new DataPipeline(this.source.then(fn));
+    }
+
+    catch(fn: (error: any) => T): DataPipeline<T> {
+        return new DataPipeline(this.source.catch(fn));
+    }
+
+    finally(fn: () => void): DataPipeline<T> {
+        return new DataPipeline(this.source.finally(fn));
+    }
+
+    async resolve(): Promise<T> {
+        return this.source;
+    }
+
+    tap(fn: (value: T) => void): DataPipeline<T> {
+        return new DataPipeline(
+            this.source.then(value => {
+                fn(value);
+                return value;
+            })
+        );
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function DataPipeline"),
+        "Expected DataPipeline function: {}",
+        output
+    );
+    assert!(
+        output.contains(".then") && output.contains(".catch"),
+        "Expected promise chaining methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_promise_combined() {
+    // Combined Promise patterns
+    let source = r#"
+class AsyncTaskRunner<T> {
+    private tasks: (() => Promise<T>)[];
+    private concurrency: number;
+
+    constructor(tasks: (() => Promise<T>)[], concurrency: number = 3) {
+        this.tasks = tasks;
+        this.concurrency = concurrency;
+    }
+
+    async runAll(): Promise<T[]> {
+        return Promise.all(this.tasks.map(task => task()));
+    }
+
+    async runAllSettled(): Promise<PromiseSettledResult<T>[]> {
+        return Promise.allSettled(this.tasks.map(task => task()));
+    }
+
+    async runFirst(): Promise<T> {
+        return Promise.race(this.tasks.map(task => task()));
+    }
+
+    async runAny(): Promise<T> {
+        return Promise.any(this.tasks.map(task => task()));
+    }
+
+    async runSequential(): Promise<T[]> {
+        const results: T[] = [];
+        for (const task of this.tasks) {
+            const result = await task();
+            results.push(result);
+        }
+        return results;
+    }
+
+    async runWithRetry(retries: number = 3): Promise<T[]> {
+        const runWithRetries = async (task: () => Promise<T>): Promise<T> => {
+            let lastError: Error | undefined;
+            for (let i = 0; i < retries; i++) {
+                try {
+                    return await task();
+                } catch (e) {
+                    lastError = e as Error;
+                }
+            }
+            throw lastError;
+        };
+        return Promise.all(this.tasks.map(runWithRetries));
+    }
+
+    static create<U>(tasks: (() => Promise<U>)[]): AsyncTaskRunner<U> {
+        return new AsyncTaskRunner(tasks);
+    }
+
+    static async delay(ms: number): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function AsyncTaskRunner"),
+        "Expected AsyncTaskRunner function: {}",
+        output
+    );
+    assert!(
+        output.contains("Promise.all"),
+        "Expected Promise.all: {}",
+        output
+    );
+    assert!(
+        output.contains("Promise.allSettled"),
+        "Expected Promise.allSettled: {}",
+        output
+    );
+    assert!(
+        output.contains("Promise.race"),
+        "Expected Promise.race: {}",
+        output
+    );
+    assert!(
+        output.contains("Promise.any"),
+        "Expected Promise.any: {}",
+        output
+    );
+    assert!(
+        output.contains("create") && output.contains("delay"),
+        "Expected static methods: {}",
+        output
+    );
+}
