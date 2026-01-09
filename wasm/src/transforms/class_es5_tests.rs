@@ -39100,54 +39100,49 @@ class EventBus<T> {
 }
 
 // =============================================================================
-// SUPER() ORDERING EDGE CASES IN DERIVED CONSTRUCTORS
+// ASYNC METHOD SUPER CALL PATTERN TESTS
 // =============================================================================
 
-/// Test super() with field initializers before and after in derived class
+/// Test ES5 class with async method calling super.method()
 #[test]
-fn test_class_es5_super_with_field_initializers() {
+fn test_class_es5_async_method_calling_super_method() {
     let source = r#"
-class Base {
-    baseValue: number;
-    constructor(value: number) {
-        this.baseValue = value;
-    }
-    getBaseValue(): number {
-        return this.baseValue;
-    }
-}
-
-class Derived extends Base {
-    derivedBefore: string = "before";
-    derivedAfter: string;
-
-    constructor(value: number, after: string) {
-        super(value);
-        this.derivedAfter = after;
+class BaseService {
+    protected async fetchData(): Promise<string> {
+        return "base data";
     }
 
-    getValues(): { before: string; after: string; base: number } {
-        return {
-            before: this.derivedBefore,
-            after: this.derivedAfter,
-            base: this.baseValue
-        };
+    protected async processItem(item: string): Promise<string> {
+        return item.toUpperCase();
+    }
+
+    protected getData(): string {
+        return "sync data";
     }
 }
 
-class MultiFieldDerived extends Base {
-    field1: number = 1;
-    field2: number = 2;
-    field3: number = 3;
-    computed: number;
-
-    constructor(value: number) {
-        super(value);
-        this.computed = this.field1 + this.field2 + this.field3;
+class DerivedService extends BaseService {
+    async fetchData(): Promise<string> {
+        const baseResult = await super.fetchData();
+        return baseResult + " extended";
     }
 
-    getSum(): number {
-        return this.field1 + this.field2 + this.field3 + this.computed;
+    async processItem(item: string): Promise<string> {
+        const processed = await super.processItem(item);
+        return "derived: " + processed;
+    }
+
+    async combinedOperation(): Promise<string> {
+        const data = await super.fetchData();
+        const processed = await super.processItem(data);
+        return processed;
+    }
+}
+
+class GrandchildService extends DerivedService {
+    async fetchData(): Promise<string> {
+        const parentResult = await super.fetchData();
+        return parentResult + " grandchild";
     }
 }
 "#;
@@ -39167,94 +39162,78 @@ class MultiFieldDerived extends Base {
 
     let output = printer.get_output().to_string();
 
-    // Base class should be ES5 constructor
+    // Classes should be converted
     assert!(
-        output.contains("function Base"),
-        "Expected ES5 Base class: {}",
+        output.contains("BaseService") && output.contains("DerivedService") && output.contains("GrandchildService"),
+        "Expected classes: {}",
         output
     );
 
-    // Derived class should be ES5 constructor
+    // Methods should exist
     assert!(
-        output.contains("function Derived"),
-        "Expected ES5 Derived class: {}",
+        output.contains("fetchData") && output.contains("processItem") && output.contains("combinedOperation"),
+        "Expected methods: {}",
         output
     );
 
-    // MultiFieldDerived class should be ES5 constructor
+    // Type annotations should be stripped
     assert!(
-        output.contains("function MultiFieldDerived"),
-        "Expected ES5 MultiFieldDerived class: {}",
-        output
-    );
-
-    // Should have _super call pattern
-    assert!(
-        output.contains("_super.call(this"),
-        "Expected _super.call(this) pattern: {}",
-        output
-    );
-
-    // Field initializers should be present
-    assert!(
-        output.contains("\"before\""),
-        "Expected field initializer 'before': {}",
+        !output.contains("Promise<string>") && !output.contains("protected async"),
+        "Expected type annotations to be stripped: {}",
         output
     );
 }
 
-/// Test super() with parameter properties in derived class
+/// Test ES5 class with async method with await before super call
 #[test]
-fn test_class_es5_super_with_parameter_properties() {
+fn test_class_es5_async_method_await_before_super() {
     let source = r#"
-class Animal {
-    name: string;
-    constructor(name: string) {
-        this.name = name;
+class BaseProcessor {
+    process(data: string): string {
+        return data.trim();
     }
-    speak(): string {
-        return this.name + " makes a sound";
+
+    validate(input: string): boolean {
+        return input.length > 0;
     }
 }
 
-class Dog extends Animal {
-    constructor(name: string, public breed: string, private age: number) {
-        super(name);
+class AsyncProcessor extends BaseProcessor {
+    private config: any;
+
+    async processAsync(data: string): Promise<string> {
+        const config = await this.loadConfig();
+        this.config = config;
+        return super.process(data);
     }
 
-    getBreed(): string {
-        return this.breed;
+    async validateAsync(input: string): Promise<boolean> {
+        await this.initialize();
+        const trimmed = input.trim();
+        return super.validate(trimmed);
     }
 
-    getAge(): number {
-        return this.age;
+    async complexFlow(data: string): Promise<string> {
+        const step1 = await Promise.resolve(data);
+        const step2 = await this.transform(step1);
+        await this.log("before super");
+        return super.process(step2);
     }
 
-    describe(): string {
-        return `${this.name} is a ${this.breed} aged ${this.age}`;
-    }
-}
-
-class Cat extends Animal {
-    constructor(
-        name: string,
-        public readonly color: string,
-        protected weight: number,
-        private indoor: boolean = true
-    ) {
-        super(name);
+    private async loadConfig(): Promise<any> {
+        return { enabled: true };
     }
 
-    getColor(): string {
-        return this.color;
+    private async initialize(): Promise<void> {
+        await Promise.resolve();
     }
 
-    isIndoor(): boolean {
-        return this.indoor;
+    private async transform(data: string): Promise<string> {
+        return data.toLowerCase();
     }
 
-    getWeight(): number {
-        return this.weight;
+    private async log(message: string): Promise<void> {
+        console.log(message);
     }
 }
 "#;
@@ -39274,221 +39253,296 @@ class Cat extends Animal {
 
     let output = printer.get_output().to_string();
 
-    // Animal class should be ES5 constructor
+    // Classes should be converted
     assert!(
-        output.contains("function Animal"),
-        "Expected ES5 Animal class: {}",
+        output.contains("BaseProcessor") && output.contains("AsyncProcessor"),
+        "Expected classes: {}",
         output
     );
 
-    // Dog class should be ES5 constructor
+    // Methods should exist
     assert!(
-        output.contains("function Dog"),
-        "Expected ES5 Dog class: {}",
+        output.contains("processAsync") && output.contains("validateAsync") && output.contains("complexFlow"),
+        "Expected methods: {}",
         output
     );
 
-    // Cat class should be ES5 constructor
+    // Type annotations should be stripped
     assert!(
-        output.contains("function Cat"),
-        "Expected ES5 Cat class: {}",
-        output
-    );
-
-    // Parameter properties should be assigned in constructor
-    assert!(
-        output.contains("this.breed") || output.contains(".breed ="),
-        "Expected breed parameter property: {}",
-        output
-    );
-
-    // Methods should be on prototype
-    assert!(
-        output.contains("getBreed") && output.contains("getAge") && output.contains("describe"),
-        "Expected Dog methods: {}",
+        !output.contains("private config: any") && !output.contains("Promise<string>"),
+        "Expected type annotations to be stripped: {}",
         output
     );
 }
 
-/// Test super() with private field initialization in derived class
+/// Test ES5 class with async method with await after super call
 #[test]
-fn test_class_es5_super_with_private_fields() {
+fn test_class_es5_async_method_await_after_super() {
     let source = r#"
-class SecureBase {
-    protected id: string;
-
-    constructor(id: string) {
-        this.id = id;
+class BaseLogger {
+    log(message: string): string {
+        return "[LOG] " + message;
     }
 
-    getId(): string {
-        return this.id;
+    format(data: any): string {
+        return JSON.stringify(data);
     }
 }
 
-class SecureDerived extends SecureBase {
-    #secret: string = "hidden";
-    #token: string;
-
-    constructor(id: string, token: string) {
-        super(id);
-        this.#token = token;
+class AsyncLogger extends BaseLogger {
+    async logAndNotify(message: string): Promise<void> {
+        const formatted = super.log(message);
+        await this.sendNotification(formatted);
     }
 
-    getSecret(): string {
-        return this.#secret;
+    async formatAndStore(data: any): Promise<string> {
+        const formatted = super.format(data);
+        await this.storeInDatabase(formatted);
+        await this.updateCache(formatted);
+        return formatted;
     }
 
-    getToken(): string {
-        return this.#token;
-    }
-
-    validate(): boolean {
-        return this.#token.length > 0 && this.#secret.length > 0;
-    }
-}
-
-class MultiPrivateDerived extends SecureBase {
-    #field1: number = 1;
-    #field2: number = 2;
-    #computed: number;
-
-    constructor(id: string) {
-        super(id);
-        this.#computed = this.#field1 + this.#field2;
-    }
-
-    getComputed(): number {
-        return this.#computed;
-    }
-
-    updateFields(a: number, b: number): void {
-        this.#field1 = a;
-        this.#field2 = b;
-        this.#computed = a + b;
-    }
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // SecureBase class should be ES5 constructor
-    assert!(
-        output.contains("function SecureBase"),
-        "Expected ES5 SecureBase class: {}",
-        output
-    );
-
-    // SecureDerived class should be ES5 constructor
-    assert!(
-        output.contains("function SecureDerived"),
-        "Expected ES5 SecureDerived class: {}",
-        output
-    );
-
-    // MultiPrivateDerived class should be ES5 constructor
-    assert!(
-        output.contains("function MultiPrivateDerived"),
-        "Expected ES5 MultiPrivateDerived class: {}",
-        output
-    );
-
-    // Private field helpers should be present
-    assert!(
-        output.contains("__classPrivateFieldSet") || output.contains("__classPrivateFieldGet") || output.contains("_secret") || output.contains("_token"),
-        "Expected private field handling: {}",
-        output
-    );
-
-    // Methods should be on prototype
-    assert!(
-        output.contains("getSecret") && output.contains("getToken") && output.contains("validate"),
-        "Expected SecureDerived methods: {}",
-        output
-    );
-}
-
-/// Test super() inside try/catch block in derived constructor
-#[test]
-fn test_class_es5_super_try_catch_ordering() {
-    let source = r#"
-class RiskyBase {
-    value: number;
-
-    constructor(value: number) {
-        if (value < 0) {
-            throw new Error("Negative value");
+    async logWithRetry(message: string): Promise<string> {
+        const result = super.log(message);
+        for (let i = 0; i < 3; i++) {
+            try {
+                await this.sendToServer(result);
+                break;
+            } catch {
+                await this.delay(1000);
+            }
         }
-        this.value = value;
+        return result;
     }
 
-    getValue(): number {
-        return this.value;
+    private async sendNotification(msg: string): Promise<void> {
+        await fetch("/notify", { method: "POST", body: msg });
+    }
+
+    private async storeInDatabase(data: string): Promise<void> {
+        await Promise.resolve();
+    }
+
+    private async updateCache(data: string): Promise<void> {
+        await Promise.resolve();
+    }
+
+    private async sendToServer(data: string): Promise<void> {
+        await fetch("/log", { method: "POST", body: data });
+    }
+
+    private async delay(ms: number): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("BaseLogger") && output.contains("AsyncLogger"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("logAndNotify") && output.contains("formatAndStore") && output.contains("logWithRetry"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Type annotations should be stripped
+    assert!(
+        !output.contains("Promise<void>") && !output.contains("Promise<string>"),
+        "Expected type annotations to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with async static method with super property
+#[test]
+fn test_class_es5_async_static_method_super_property() {
+    let source = r#"
+class BaseFactory {
+    static defaultConfig = { timeout: 5000 };
+
+    static create(): BaseFactory {
+        return new BaseFactory();
+    }
+
+    static getVersion(): string {
+        return "1.0.0";
     }
 }
 
-class SafeDerived extends RiskyBase {
-    fallbackValue: number;
-    initialized: boolean = false;
+class AsyncFactory extends BaseFactory {
+    static async createAsync(): Promise<AsyncFactory> {
+        await this.initialize();
+        const instance = super.create() as AsyncFactory;
+        return instance;
+    }
 
-    constructor(value: number, fallback: number) {
+    static async getVersionAsync(): Promise<string> {
+        await Promise.resolve();
+        const baseVersion = super.getVersion();
+        return baseVersion + "-async";
+    }
+
+    static async createWithConfig(config: any): Promise<AsyncFactory> {
+        const merged = { ...super.defaultConfig, ...config };
+        await this.applyConfig(merged);
+        return new AsyncFactory();
+    }
+
+    private static async initialize(): Promise<void> {
+        await Promise.resolve();
+    }
+
+    private static async applyConfig(config: any): Promise<void> {
+        await Promise.resolve();
+    }
+}
+
+class ExtendedFactory extends AsyncFactory {
+    static async createAsync(): Promise<ExtendedFactory> {
+        await Promise.resolve();
+        const base = await super.createAsync();
+        return base as ExtendedFactory;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("BaseFactory") && output.contains("AsyncFactory") && output.contains("ExtendedFactory"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("createAsync") && output.contains("getVersionAsync") && output.contains("createWithConfig"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Type annotations should be stripped
+    assert!(
+        !output.contains("Promise<AsyncFactory>") && !output.contains("Promise<string>"),
+        "Expected type annotations to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with async method with super in try/catch
+#[test]
+fn test_class_es5_async_method_super_in_try_catch() {
+    let source = r#"
+class BaseHandler {
+    handle(request: any): any {
+        return { success: true, data: request };
+    }
+
+    handleError(error: Error): any {
+        return { success: false, error: error.message };
+    }
+
+    cleanup(): void {
+        console.log("cleanup");
+    }
+}
+
+class SafeHandler extends BaseHandler {
+    async safeHandle(request: any): Promise<any> {
         try {
-            super(value);
-            this.initialized = true;
-        } catch (e) {
-            super(fallback);
-            this.fallbackValue = fallback;
+            const result = super.handle(request);
+            await this.logSuccess(result);
+            return result;
+        } catch (error) {
+            return super.handleError(error as Error);
         }
     }
 
-    wasSuccessful(): boolean {
-        return this.initialized;
+    async handleWithFinally(request: any): Promise<any> {
+        try {
+            await this.preProcess(request);
+            return super.handle(request);
+        } catch (error) {
+            const errorResult = super.handleError(error as Error);
+            await this.logError(error);
+            return errorResult;
+        } finally {
+            super.cleanup();
+            await this.postProcess();
+        }
     }
 
-    getFallback(): number {
-        return this.fallbackValue;
-    }
-}
-
-class NestedTryCatchDerived extends RiskyBase {
-    status: string = "pending";
-    errorCount: number = 0;
-
-    constructor(value: number) {
+    async nestedTryCatch(request: any): Promise<any> {
         try {
             try {
-                super(value);
-                this.status = "success";
-            } catch (innerError) {
-                this.errorCount++;
-                throw innerError;
+                await this.validate(request);
+                return super.handle(request);
+            } catch (validationError) {
+                await this.handleValidationError(validationError);
+                throw validationError;
             }
-        } catch (outerError) {
-            super(0);
-            this.status = "fallback";
-            this.errorCount++;
+        } catch (error) {
+            return super.handleError(error as Error);
         }
     }
 
-    getStatus(): string {
-        return this.status;
+    private async logSuccess(result: any): Promise<void> {
+        await Promise.resolve();
     }
 
-    getErrorCount(): number {
-        return this.errorCount;
+    private async logError(error: any): Promise<void> {
+        await Promise.resolve();
+    }
+
+    private async preProcess(request: any): Promise<void> {
+        await Promise.resolve();
+    }
+
+    private async postProcess(): Promise<void> {
+        await Promise.resolve();
+    }
+
+    private async validate(request: any): Promise<void> {
+        if (!request) throw new Error("Invalid request");
+    }
+
+    private async handleValidationError(error: any): Promise<void> {
+        await Promise.resolve();
     }
 }
 "#;
@@ -39508,110 +39562,172 @@ class NestedTryCatchDerived extends RiskyBase {
 
     let output = printer.get_output().to_string();
 
-    // RiskyBase class should be ES5 constructor
+    // Classes should be converted
     assert!(
-        output.contains("function RiskyBase"),
-        "Expected ES5 RiskyBase class: {}",
+        output.contains("BaseHandler") && output.contains("SafeHandler"),
+        "Expected classes: {}",
         output
     );
 
-    // SafeDerived class should be ES5 constructor
+    // Methods should exist
     assert!(
-        output.contains("function SafeDerived"),
-        "Expected ES5 SafeDerived class: {}",
+        output.contains("safeHandle") && output.contains("handleWithFinally") && output.contains("nestedTryCatch"),
+        "Expected methods: {}",
         output
     );
 
-    // NestedTryCatchDerived class should be ES5 constructor
+    // Type annotations should be stripped
     assert!(
-        output.contains("function NestedTryCatchDerived"),
-        "Expected ES5 NestedTryCatchDerived class: {}",
-        output
-    );
-
-    // Should have _super call pattern
-    assert!(
-        output.contains("_super.call(this") || output.contains("_this"),
-        "Expected _super or _this pattern: {}",
-        output
-    );
-
-    // Methods should be on prototype
-    assert!(
-        output.contains("wasSuccessful") && output.contains("getFallback"),
-        "Expected SafeDerived methods: {}",
+        !output.contains("Promise<any>") && !output.contains("request: any"),
+        "Expected type annotations to be stripped: {}",
         output
     );
 }
 
-/// Test super() with conditional field initialization in derived constructor
+/// Test ES5 class with combined async super call patterns
 #[test]
-fn test_class_es5_super_with_conditional_fields() {
+fn test_class_es5_combined_async_super_patterns() {
     let source = r#"
-class ConfigBase {
-    mode: string;
+class BaseRepository<T> {
+    protected items: T[] = [];
 
-    constructor(mode: string) {
-        this.mode = mode;
+    save(item: T): T {
+        this.items.push(item);
+        return item;
     }
 
-    getMode(): string {
-        return this.mode;
-    }
-}
-
-class ConditionalDerived extends ConfigBase {
-    debugEnabled: boolean;
-    logLevel: string;
-    maxRetries: number;
-
-    constructor(mode: string, debug?: boolean) {
-        super(mode);
-        this.debugEnabled = debug ?? false;
-        this.logLevel = this.debugEnabled ? "debug" : "info";
-        this.maxRetries = mode === "production" ? 3 : 10;
+    findAll(): T[] {
+        return [...this.items];
     }
 
-    isDebug(): boolean {
-        return this.debugEnabled;
+    delete(index: number): boolean {
+        if (index >= 0 && index < this.items.length) {
+            this.items.splice(index, 1);
+            return true;
+        }
+        return false;
     }
 
-    getLogLevel(): string {
-        return this.logLevel;
-    }
-
-    getMaxRetries(): number {
-        return this.maxRetries;
+    static getRepositoryName(): string {
+        return "BaseRepository";
     }
 }
 
-class TernaryFieldDerived extends ConfigBase {
-    timeout: number;
-    bufferSize: number;
-    enableCache: boolean;
+class AsyncRepository<T> extends BaseRepository<T> {
+    private eventHandlers: ((event: string, data: any) => void)[] = [];
 
-    constructor(mode: string, options?: { timeout?: number; buffer?: number }) {
-        super(mode);
-        this.timeout = options?.timeout ?? (mode === "fast" ? 1000 : 5000);
-        this.bufferSize = options?.buffer ?? 1024;
-        this.enableCache = mode !== "debug";
+    async saveAsync(item: T): Promise<T> {
+        await this.beforeSave(item);
+        try {
+            const saved = super.save(item);
+            await this.afterSave(saved);
+            await this.notifyHandlers("save", saved);
+            return saved;
+        } catch (error) {
+            await this.handleError("save", error);
+            throw error;
+        }
     }
 
-    getTimeout(): number {
-        return this.timeout;
+    async findAllAsync(): Promise<T[]> {
+        await this.ensureConnection();
+        const items = super.findAll();
+        await this.logAccess("findAll", items.length);
+        return items;
     }
 
-    getBufferSize(): number {
-        return this.bufferSize;
+    async deleteAsync(index: number): Promise<boolean> {
+        const item = this.items[index];
+        await this.beforeDelete(item);
+        try {
+            const result = super.delete(index);
+            if (result) {
+                await this.afterDelete(item);
+                await this.notifyHandlers("delete", { index, item });
+            }
+            return result;
+        } finally {
+            await this.cleanup();
+        }
     }
 
-    isCacheEnabled(): boolean {
-        return this.enableCache;
+    static async getRepositoryNameAsync(): Promise<string> {
+        await Promise.resolve();
+        const baseName = super.getRepositoryName();
+        return baseName + "Async";
     }
 
-    configure(timeout: number, buffer: number): void {
-        this.timeout = timeout;
-        this.bufferSize = buffer;
+    async batchSave(items: T[]): Promise<T[]> {
+        const results: T[] = [];
+        for (const item of items) {
+            await this.delay(10);
+            const saved = super.save(item);
+            results.push(saved);
+        }
+        await this.notifyHandlers("batchSave", results);
+        return results;
+    }
+
+    private async beforeSave(item: T): Promise<void> {
+        await Promise.resolve();
+    }
+
+    private async afterSave(item: T): Promise<void> {
+        await Promise.resolve();
+    }
+
+    private async beforeDelete(item: T): Promise<void> {
+        await Promise.resolve();
+    }
+
+    private async afterDelete(item: T): Promise<void> {
+        await Promise.resolve();
+    }
+
+    private async ensureConnection(): Promise<void> {
+        await Promise.resolve();
+    }
+
+    private async logAccess(operation: string, count: number): Promise<void> {
+        await Promise.resolve();
+    }
+
+    private async handleError(operation: string, error: any): Promise<void> {
+        await Promise.resolve();
+    }
+
+    private async cleanup(): Promise<void> {
+        await Promise.resolve();
+    }
+
+    private async delay(ms: number): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    private async notifyHandlers(event: string, data: any): Promise<void> {
+        for (const handler of this.eventHandlers) {
+            await Promise.resolve();
+            handler(event, data);
+        }
+    }
+}
+
+class CachedRepository<T> extends AsyncRepository<T> {
+    private cache: Map<string, T[]> = new Map();
+
+    async findAllAsync(): Promise<T[]> {
+        const cached = this.cache.get("all");
+        if (cached) {
+            return cached;
+        }
+        const items = await super.findAllAsync();
+        this.cache.set("all", items);
+        return items;
+    }
+
+    async saveAsync(item: T): Promise<T> {
+        this.cache.delete("all");
+        return super.saveAsync(item);
     }
 }
 "#;
@@ -39631,261 +39747,31 @@ class TernaryFieldDerived extends ConfigBase {
 
     let output = printer.get_output().to_string();
 
-    // ConfigBase class should be ES5 constructor
+    // Classes should be converted
     assert!(
-        output.contains("function ConfigBase"),
-        "Expected ES5 ConfigBase class: {}",
+        output.contains("BaseRepository") && output.contains("AsyncRepository") && output.contains("CachedRepository"),
+        "Expected classes: {}",
         output
     );
 
-    // ConditionalDerived class should be ES5 constructor
+    // Methods should exist
     assert!(
-        output.contains("function ConditionalDerived"),
-        "Expected ES5 ConditionalDerived class: {}",
+        output.contains("saveAsync") && output.contains("findAllAsync") && output.contains("deleteAsync") && output.contains("batchSave"),
+        "Expected methods: {}",
         output
     );
 
-    // TernaryFieldDerived class should be ES5 constructor
+    // Type annotations should be stripped
     assert!(
-        output.contains("function TernaryFieldDerived"),
-        "Expected ES5 TernaryFieldDerived class: {}",
+        !output.contains("protected items: T[]") && !output.contains("private cache: Map"),
+        "Expected type annotations to be stripped: {}",
         output
     );
 
-    // Methods should be on prototype
+    // Generic parameters should be stripped
     assert!(
-        output.contains("isDebug") && output.contains("getLogLevel") && output.contains("getMaxRetries"),
-        "Expected ConditionalDerived methods: {}",
-        output
-    );
-
-    // TernaryFieldDerived methods
-    assert!(
-        output.contains("getTimeout") && output.contains("getBufferSize") && output.contains("configure"),
-        "Expected TernaryFieldDerived methods: {}",
-        output
-    );
-}
-
-/// Test combined super() ordering patterns with multiple inheritance levels
-#[test]
-fn test_class_es5_super_combined_patterns() {
-    let source = r#"
-class Entity {
-    id: string;
-    createdAt: Date;
-
-    constructor(id: string) {
-        this.id = id;
-        this.createdAt = new Date();
-    }
-
-    getId(): string {
-        return this.id;
-    }
-
-    getCreatedAt(): Date {
-        return this.createdAt;
-    }
-}
-
-class NamedEntity extends Entity {
-    name: string;
-    displayName: string;
-
-    constructor(id: string, name: string) {
-        super(id);
-        this.name = name;
-        this.displayName = name.toUpperCase();
-    }
-
-    getName(): string {
-        return this.name;
-    }
-
-    getDisplayName(): string {
-        return this.displayName;
-    }
-
-    rename(newName: string): void {
-        this.name = newName;
-        this.displayName = newName.toUpperCase();
-    }
-}
-
-class User extends NamedEntity {
-    #password: string;
-    email: string;
-    role: string = "user";
-    active: boolean = true;
-    loginCount: number = 0;
-
-    constructor(id: string, name: string, email: string, password: string) {
-        super(id, name);
-        this.email = email;
-        this.#password = password;
-    }
-
-    getEmail(): string {
-        return this.email;
-    }
-
-    getRole(): string {
-        return this.role;
-    }
-
-    isActive(): boolean {
-        return this.active;
-    }
-
-    setRole(role: string): void {
-        this.role = role;
-    }
-
-    deactivate(): void {
-        this.active = false;
-    }
-
-    login(): void {
-        this.loginCount++;
-    }
-
-    getLoginCount(): number {
-        return this.loginCount;
-    }
-
-    validatePassword(input: string): boolean {
-        return this.#password === input;
-    }
-}
-
-class Admin extends User {
-    permissions: string[] = [];
-    level: number;
-    department: string;
-
-    constructor(
-        id: string,
-        name: string,
-        email: string,
-        password: string,
-        public adminCode: string,
-        level: number = 1
-    ) {
-        super(id, name, email, password);
-        this.role = "admin";
-        this.level = level;
-        this.department = "IT";
-    }
-
-    getPermissions(): string[] {
-        return this.permissions;
-    }
-
-    addPermission(permission: string): void {
-        this.permissions.push(permission);
-    }
-
-    getLevel(): number {
-        return this.level;
-    }
-
-    getDepartment(): string {
-        return this.department;
-    }
-
-    setDepartment(dept: string): void {
-        this.department = dept;
-    }
-
-    getAdminCode(): string {
-        return this.adminCode;
-    }
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Entity class should be ES5 constructor
-    assert!(
-        output.contains("function Entity"),
-        "Expected ES5 Entity class: {}",
-        output
-    );
-
-    // NamedEntity class should be ES5 constructor
-    assert!(
-        output.contains("function NamedEntity"),
-        "Expected ES5 NamedEntity class: {}",
-        output
-    );
-
-    // User class should be ES5 constructor
-    assert!(
-        output.contains("function User"),
-        "Expected ES5 User class: {}",
-        output
-    );
-
-    // Admin class should be ES5 constructor
-    assert!(
-        output.contains("function Admin"),
-        "Expected ES5 Admin class: {}",
-        output
-    );
-
-    // Should have _super call pattern in derived classes
-    assert!(
-        output.contains("_super.call(this"),
-        "Expected _super.call(this) pattern: {}",
-        output
-    );
-
-    // Entity methods
-    assert!(
-        output.contains("getId") && output.contains("getCreatedAt"),
-        "Expected Entity methods: {}",
-        output
-    );
-
-    // NamedEntity methods
-    assert!(
-        output.contains("getName") && output.contains("getDisplayName") && output.contains("rename"),
-        "Expected NamedEntity methods: {}",
-        output
-    );
-
-    // User methods
-    assert!(
-        output.contains("getEmail") && output.contains("getRole") && output.contains("login") && output.contains("validatePassword"),
-        "Expected User methods: {}",
-        output
-    );
-
-    // Admin methods
-    assert!(
-        output.contains("getPermissions") && output.contains("addPermission") && output.contains("getLevel") && output.contains("getAdminCode"),
-        "Expected Admin methods: {}",
-        output
-    );
-
-    // Field initializers should be present
-    assert!(
-        output.contains("\"user\"") && output.contains("\"admin\""),
-        "Expected role field initializers: {}",
+        !output.contains("BaseRepository<T>") && !output.contains("AsyncRepository<T>"),
+        "Expected generic parameters to be stripped: {}",
         output
     );
 }
