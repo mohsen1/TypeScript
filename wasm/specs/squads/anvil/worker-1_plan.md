@@ -8,12 +8,15 @@ Priority: 1
 Blocked: Awaiting next EM-Anvil assignment.
 
 ## Current Assignment
-- [ ] Add ES5 class tests for String.fromCodePoint/codePointAt/includes/startsWith/endsWith patterns in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
+- [ ] Add ES5 class tests for WeakMap/WeakSet patterns in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 tests for Object.getOwnPropertyNames/getOwnPropertySymbols patterns (6 tests): getOwnPropertyNames basic, getOwnPropertySymbols basic, get all property keys, property reflection, in constructor, combined. Ran `./wasm/test.sh class_es5_tests` (all 288 pass).
+- [x] Added ES5 tests for Array.find/findIndex/fill/copyWithin patterns (6 tests): find basic, findIndex basic, fill basic, copyWithin basic, in constructor, combined. Ran `./wasm/test.sh class_es5_tests` (all 283 pass).
+- [x] Added ES5 tests for String.fromCodePoint/codePointAt/includes/startsWith/endsWith patterns (6 tests): fromCodePoint basic, codePointAt basic, includes basic, startsWith/endsWith basic, in constructor, combined. Ran `./wasm/test.sh class_es5_tests` (all 278 pass).
 - [x] Added ES5 tests for Math.trunc/sign/cbrt/log2/log10/expm1 patterns (6 tests): trunc basic, sign basic, cbrt basic, log2/log10 basic, expm1 basic, combined. Ran `./wasm/test.sh class_es5_tests` (all 273 pass).
 - [x] Added ES5 tests for Number.isFinite/isNaN/isInteger/isSafeInteger patterns (6 tests): isFinite basic, isNaN basic, isInteger basic, isSafeInteger basic, in constructor, combined. Ran `./wasm/test.sh class_es5_tests` (all 268 pass).
 - [x] Added ES5 tests for Reflect.construct/apply patterns (6 tests): construct basic, apply basic, construct with newTarget, apply with context, in constructor, combined. Ran `./wasm/test.sh class_es5_tests` (all 263 pass).
