@@ -76,10 +76,13 @@ Currently WASM checker does NOT emit TS2564. The code structure exists but the c
 (empty - single focused task)
 
 ## Completed
-(previous work cleared - fresh start for Operation Conformance)
+- Implemented TS2564 property initialization check using type annotations when symbol types are `any`/`unknown`.
+- Added TS2564 tests for required property errors and `undefined` union exemption.
+- Ran `./wasm/test.sh` (fails at `cli::driver_tests::compile_class_with_generic_constructor`).
+- Rebuilt WASM and reran conformance (debug runner): 79/446 exact, 102/446 same count; TS2564 no longer in top missing. OOB crashes persist for private name/decorators/etc.
 
 ## Ready for Merge
-No
+Yes
 
 ## Notes
 - Coordinate with Worker 2 (also on TS2564 - they handle class field analysis)
