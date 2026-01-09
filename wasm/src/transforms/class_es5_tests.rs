@@ -24989,3 +24989,593 @@ class DeepTransformer<T extends object> {
         output
     );
 }
+
+// =============================================================================
+// CONDITIONAL TYPE PATTERNS - ES5 TRANSFORMATION TESTS
+// =============================================================================
+
+/// Test: infer keyword in class context
+/// Verifies that classes using infer keyword in conditional types transform correctly to ES5
+#[test]
+fn test_class_es5_infer_keyword_patterns() {
+    let source = r#"
+type ReturnType<T> = T extends (...args: any[]) => infer R ? R : never;
+type ParameterType<T> = T extends (arg: infer P) => any ? P : never;
+type UnwrapPromise<T> = T extends Promise<infer U> ? U : T;
+
+class TypeInferrer {
+    inferReturnType<T extends (...args: any[]) => any>(fn: T): ReturnType<T> {
+        return fn() as ReturnType<T>;
+    }
+
+    inferFirstParam<T extends (arg: any) => any>(fn: T): ParameterType<T> | undefined {
+        return undefined;
+    }
+
+    async unwrapValue<T>(value: T): Promise<UnwrapPromise<T>> {
+        if (value instanceof Promise) {
+            return await value as UnwrapPromise<T>;
+        }
+        return value as UnwrapPromise<T>;
+    }
+}
+
+class ArrayTypeExtractor {
+    extractElementType<T>(arr: T): T extends (infer E)[] ? E : never {
+        if (Array.isArray(arr) && arr.length > 0) {
+            return arr[0];
+        }
+        throw new Error("Cannot extract from empty or non-array");
+    }
+
+    extractTupleFirst<T extends [any, ...any[]]>(tuple: T): T extends [infer F, ...any[]] ? F : never {
+        return tuple[0] as any;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function TypeInferrer"),
+        "Expected TypeInferrer function: {}",
+        output
+    );
+    assert!(
+        output.contains("TypeInferrer.prototype.inferReturnType"),
+        "Expected inferReturnType method: {}",
+        output
+    );
+    assert!(
+        output.contains("TypeInferrer.prototype.inferFirstParam"),
+        "Expected inferFirstParam method: {}",
+        output
+    );
+    assert!(
+        output.contains("TypeInferrer.prototype.unwrapValue"),
+        "Expected unwrapValue async method: {}",
+        output
+    );
+    assert!(
+        output.contains("function ArrayTypeExtractor"),
+        "Expected ArrayTypeExtractor function: {}",
+        output
+    );
+    assert!(
+        output.contains("ArrayTypeExtractor.prototype.extractElementType"),
+        "Expected extractElementType method: {}",
+        output
+    );
+}
+
+/// Test: distributive conditional types
+/// Verifies that classes using distributive conditionals transform correctly to ES5
+#[test]
+fn test_class_es5_distributive_conditionals() {
+    let source = r#"
+type ToArray<T> = T extends any ? T[] : never;
+type NonNullableCustom<T> = T extends null | undefined ? never : T;
+type Flatten<T> = T extends any[] ? T[number] : T;
+
+class DistributiveProcessor<T> {
+    private value: T;
+
+    constructor(value: T) {
+        this.value = value;
+    }
+
+    toArrayType(): ToArray<T> {
+        return [this.value] as ToArray<T>;
+    }
+
+    ensureNonNull(): NonNullableCustom<T> {
+        if (this.value === null || this.value === undefined) {
+            throw new Error("Value is null or undefined");
+        }
+        return this.value as NonNullableCustom<T>;
+    }
+
+    flattenIfArray(): Flatten<T> {
+        if (Array.isArray(this.value)) {
+            return this.value[0] as Flatten<T>;
+        }
+        return this.value as Flatten<T>;
+    }
+}
+
+class UnionDistributor {
+    distributeOverUnion<T extends string | number>(value: T): T extends string ? string[] : number[] {
+        if (typeof value === "string") {
+            return value.split("") as any;
+        }
+        return [value] as any;
+    }
+
+    filterType<T, U>(value: T, guard: (v: T) => v is T & U): U | undefined {
+        if (guard(value)) {
+            return value;
+        }
+        return undefined;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function DistributiveProcessor"),
+        "Expected DistributiveProcessor function: {}",
+        output
+    );
+    assert!(
+        output.contains("this.value = value"),
+        "Expected constructor assignment: {}",
+        output
+    );
+    assert!(
+        output.contains("DistributiveProcessor.prototype.toArrayType"),
+        "Expected toArrayType method: {}",
+        output
+    );
+    assert!(
+        output.contains("DistributiveProcessor.prototype.ensureNonNull"),
+        "Expected ensureNonNull method: {}",
+        output
+    );
+    assert!(
+        output.contains("function UnionDistributor"),
+        "Expected UnionDistributor function: {}",
+        output
+    );
+    assert!(
+        output.contains("UnionDistributor.prototype.distributeOverUnion"),
+        "Expected distributeOverUnion method: {}",
+        output
+    );
+}
+
+/// Test: Extract utility type patterns
+/// Verifies that classes using Extract<T, U> type transform correctly to ES5
+#[test]
+fn test_class_es5_extract_type_patterns() {
+    let source = r#"
+type EventType = "click" | "scroll" | "keydown" | "keyup" | "focus" | "blur";
+type MouseEvent = Extract<EventType, "click" | "scroll">;
+type KeyEvent = Extract<EventType, "keydown" | "keyup">;
+type FocusEvent = Extract<EventType, "focus" | "blur">;
+
+class EventRegistry {
+    private mouseHandlers: Map<MouseEvent, Function[]> = new Map();
+    private keyHandlers: Map<KeyEvent, Function[]> = new Map();
+
+    registerMouseEvent(event: MouseEvent, handler: Function): void {
+        const handlers = this.mouseHandlers.get(event) || [];
+        handlers.push(handler);
+        this.mouseHandlers.set(event, handlers);
+    }
+
+    registerKeyEvent(event: KeyEvent, handler: Function): void {
+        const handlers = this.keyHandlers.get(event) || [];
+        handlers.push(handler);
+        this.keyHandlers.set(event, handlers);
+    }
+
+    triggerMouse(event: MouseEvent): void {
+        const handlers = this.mouseHandlers.get(event) || [];
+        handlers.forEach(h => h());
+    }
+}
+
+type Shape = { kind: "circle"; radius: number } | { kind: "square"; size: number } | { kind: "triangle"; base: number; height: number };
+type CircleShape = Extract<Shape, { kind: "circle" }>;
+type PolygonShape = Extract<Shape, { kind: "square" } | { kind: "triangle" }>;
+
+class ShapeProcessor {
+    processCircle(shape: CircleShape): number {
+        return Math.PI * shape.radius * shape.radius;
+    }
+
+    processPolygon(shape: PolygonShape): number {
+        if (shape.kind === "square") {
+            return shape.size * shape.size;
+        }
+        return 0.5 * shape.base * shape.height;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function EventRegistry"),
+        "Expected EventRegistry function: {}",
+        output
+    );
+    assert!(
+        output.contains("EventRegistry.prototype.registerMouseEvent"),
+        "Expected registerMouseEvent method: {}",
+        output
+    );
+    assert!(
+        output.contains("EventRegistry.prototype.registerKeyEvent"),
+        "Expected registerKeyEvent method: {}",
+        output
+    );
+    assert!(
+        output.contains("EventRegistry.prototype.triggerMouse"),
+        "Expected triggerMouse method: {}",
+        output
+    );
+    assert!(
+        output.contains("function ShapeProcessor"),
+        "Expected ShapeProcessor function: {}",
+        output
+    );
+    assert!(
+        output.contains("ShapeProcessor.prototype.processCircle") && output.contains("ShapeProcessor.prototype.processPolygon"),
+        "Expected ShapeProcessor methods: {}",
+        output
+    );
+}
+
+/// Test: Exclude utility type patterns
+/// Verifies that classes using Exclude<T, U> type transform correctly to ES5
+#[test]
+fn test_class_es5_exclude_type_patterns() {
+    let source = r#"
+type AllPermissions = "read" | "write" | "delete" | "admin" | "superadmin";
+type BasicPermissions = Exclude<AllPermissions, "admin" | "superadmin">;
+type AdminPermissions = Exclude<AllPermissions, "superadmin">;
+
+class PermissionManager {
+    private userPermissions: Set<BasicPermissions> = new Set();
+    private adminPermissions: Set<AdminPermissions> = new Set();
+
+    grantBasic(permission: BasicPermissions): void {
+        this.userPermissions.add(permission);
+    }
+
+    grantAdmin(permission: AdminPermissions): void {
+        this.adminPermissions.add(permission);
+    }
+
+    hasBasicPermission(permission: BasicPermissions): boolean {
+        return this.userPermissions.has(permission);
+    }
+
+    revokeBasic(permission: BasicPermissions): void {
+        this.userPermissions.delete(permission);
+    }
+}
+
+type PrimitiveType = string | number | boolean | null | undefined | symbol | bigint;
+type ObjectType = Exclude<unknown, PrimitiveType>;
+
+class TypeFilter {
+    filterPrimitives<T>(values: T[]): Exclude<T, null | undefined>[] {
+        return values.filter((v): v is Exclude<T, null | undefined> => v !== null && v !== undefined);
+    }
+
+    excludeFalsy<T>(value: T): Exclude<T, false | 0 | "" | null | undefined> | undefined {
+        if (value) {
+            return value as Exclude<T, false | 0 | "" | null | undefined>;
+        }
+        return undefined;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function PermissionManager"),
+        "Expected PermissionManager function: {}",
+        output
+    );
+    assert!(
+        output.contains("PermissionManager.prototype.grantBasic"),
+        "Expected grantBasic method: {}",
+        output
+    );
+    assert!(
+        output.contains("PermissionManager.prototype.grantAdmin"),
+        "Expected grantAdmin method: {}",
+        output
+    );
+    assert!(
+        output.contains("PermissionManager.prototype.hasBasicPermission"),
+        "Expected hasBasicPermission method: {}",
+        output
+    );
+    assert!(
+        output.contains("function TypeFilter"),
+        "Expected TypeFilter function: {}",
+        output
+    );
+    assert!(
+        output.contains("TypeFilter.prototype.filterPrimitives") && output.contains("TypeFilter.prototype.excludeFalsy"),
+        "Expected TypeFilter methods: {}",
+        output
+    );
+}
+
+/// Test: nested conditional types
+/// Verifies that classes using nested conditional types transform correctly to ES5
+#[test]
+fn test_class_es5_nested_conditional_types() {
+    let source = r#"
+type DeepUnwrap<T> = T extends Promise<infer U>
+    ? DeepUnwrap<U>
+    : T extends Array<infer E>
+        ? DeepUnwrap<E>[]
+        : T;
+
+type TypeName<T> = T extends string ? "string"
+    : T extends number ? "number"
+    : T extends boolean ? "boolean"
+    : T extends undefined ? "undefined"
+    : T extends Function ? "function"
+    : "object";
+
+class DeepUnwrapper {
+    async unwrap<T>(value: T): Promise<DeepUnwrap<T>> {
+        let result: any = value;
+        while (result instanceof Promise) {
+            result = await result;
+        }
+        return result;
+    }
+
+    unwrapArray<T extends any[]>(arr: T): DeepUnwrap<T> {
+        return arr.map(item => {
+            if (Array.isArray(item)) {
+                return this.unwrapArray(item);
+            }
+            return item;
+        }) as DeepUnwrap<T>;
+    }
+}
+
+class TypeNameResolver {
+    getTypeName<T>(value: T): TypeName<T> {
+        const type = typeof value;
+        if (type === "string") return "string" as TypeName<T>;
+        if (type === "number") return "number" as TypeName<T>;
+        if (type === "boolean") return "boolean" as TypeName<T>;
+        if (type === "undefined") return "undefined" as TypeName<T>;
+        if (type === "function") return "function" as TypeName<T>;
+        return "object" as TypeName<T>;
+    }
+
+    isType<T, N extends TypeName<any>>(value: T, name: N): value is T & { __typeName: N } {
+        return this.getTypeName(value) === name;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function DeepUnwrapper"),
+        "Expected DeepUnwrapper function: {}",
+        output
+    );
+    assert!(
+        output.contains("DeepUnwrapper.prototype.unwrap"),
+        "Expected unwrap async method: {}",
+        output
+    );
+    assert!(
+        output.contains("DeepUnwrapper.prototype.unwrapArray"),
+        "Expected unwrapArray method: {}",
+        output
+    );
+    assert!(
+        output.contains("function TypeNameResolver"),
+        "Expected TypeNameResolver function: {}",
+        output
+    );
+    assert!(
+        output.contains("TypeNameResolver.prototype.getTypeName"),
+        "Expected getTypeName method: {}",
+        output
+    );
+    assert!(
+        output.contains("TypeNameResolver.prototype.isType"),
+        "Expected isType method: {}",
+        output
+    );
+}
+
+/// Test: combined conditional type patterns
+/// Verifies that classes using multiple conditional type patterns together transform correctly to ES5
+#[test]
+fn test_class_es5_combined_conditional_types() {
+    let source = r#"
+type UnwrapFunction<T> = T extends (...args: infer A) => infer R ? { args: A; return: R } : never;
+type ExtractArrayItem<T> = T extends (infer U)[] ? U : T;
+type ExcludeNullish<T> = Exclude<T, null | undefined>;
+type ExtractAsync<T> = Extract<T, Promise<any>>;
+
+class FunctionAnalyzer<T extends (...args: any[]) => any> {
+    private fn: T;
+
+    constructor(fn: T) {
+        this.fn = fn;
+    }
+
+    getMetadata(): UnwrapFunction<T> {
+        return {
+            args: [] as any,
+            return: undefined as any
+        } as UnwrapFunction<T>;
+    }
+
+    invoke(...args: UnwrapFunction<T> extends { args: infer A } ? A extends any[] ? A : never : never): UnwrapFunction<T> extends { return: infer R } ? R : never {
+        return this.fn(...args);
+    }
+}
+
+class DataPipeline<T> {
+    private data: T[];
+
+    constructor(data: T[]) {
+        this.data = data;
+    }
+
+    extractItems(): ExtractArrayItem<T>[] {
+        return this.data.flatMap(item =>
+            Array.isArray(item) ? item : [item]
+        ) as ExtractArrayItem<T>[];
+    }
+
+    excludeNullish(): ExcludeNullish<T>[] {
+        return this.data.filter((item): item is ExcludeNullish<T> =>
+            item !== null && item !== undefined
+        );
+    }
+
+    async resolveAsync(): Promise<Awaited<ExtractAsync<T>>[]> {
+        const asyncItems = this.data.filter((item): item is ExtractAsync<T> =>
+            item instanceof Promise
+        );
+        return Promise.all(asyncItems);
+    }
+
+    transform<U>(fn: (item: ExcludeNullish<T>) => U): DataPipeline<U> {
+        const transformed = this.excludeNullish().map(fn);
+        return new DataPipeline(transformed);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function FunctionAnalyzer"),
+        "Expected FunctionAnalyzer function: {}",
+        output
+    );
+    assert!(
+        output.contains("this.fn = fn"),
+        "Expected FunctionAnalyzer constructor assignment: {}",
+        output
+    );
+    assert!(
+        output.contains("FunctionAnalyzer.prototype.getMetadata") && output.contains("FunctionAnalyzer.prototype.invoke"),
+        "Expected FunctionAnalyzer methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function DataPipeline"),
+        "Expected DataPipeline function: {}",
+        output
+    );
+    assert!(
+        output.contains("this.data = data"),
+        "Expected DataPipeline constructor assignment: {}",
+        output
+    );
+    assert!(
+        output.contains("DataPipeline.prototype.extractItems") && output.contains("DataPipeline.prototype.excludeNullish"),
+        "Expected DataPipeline extraction methods: {}",
+        output
+    );
+    assert!(
+        output.contains("DataPipeline.prototype.resolveAsync") && output.contains("DataPipeline.prototype.transform"),
+        "Expected DataPipeline async and transform methods: {}",
+        output
+    );
+}
