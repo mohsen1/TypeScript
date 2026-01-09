@@ -199,7 +199,7 @@ Focus:
 - [x] Fixed TS2403 false positives for subsequent variable declarations by tracking var-decl types separately from symbol type cache; added regression test for self-referential var initializer. Samples: `ambient/ambientDeclarationsExternal.ts`, `classes/classDeclarations/classAbstractKeyword/classAbstractInstantiations2.ts`, `classes/constructorDeclarations/constructorParameters/constructorParameterProperties.ts`, `es6/arrowFunction/emitArrowFunctionWhenUsingArguments17.ts`, `es6/arrowFunction/emitArrowFunctionWhenUsingArguments17_ES6.ts`, `es6/shorthandPropertyAssignment/objectLiteralShorthandProperties.ts`, `es6/shorthandPropertyAssignment/objectLiteralShorthandPropertiesES6.ts`, `es6/spread/arrayLiteralSpread.ts`, `es6/spread/arrayLiteralSpreadES5iterable.ts`, `types/intersection/intersectionTypeEquivalence.ts`. Conformance before: Duration 89.8s, Exact 1032/4928 (20.9%), Same 1138 (23.1%), Missing 2672 (54.2%), Extra 1517 (30.8%), top extra TS2403 90. After: Duration 456.6s, Exact 1024/4928 (20.8%), Same 1178 (23.9%), Missing 2547 (51.7%), Extra 1824 (37.0%), TS2403 not in top 10 extra. Process-pool count: extra TS2403 77 (4928 processed, 727 skipped, 778 crashed).
 
 ## Ready for Merge
-Yes
+No (merged 2026-01-09)
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize emitter fidelity (ES5 downleveling/source maps) before new features.

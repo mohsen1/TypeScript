@@ -7,10 +7,25 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-(Awaiting new assignment from EM-Anvil)
+Fix TS2355 false positives ("A function whose declared type is neither 'void' nor 'any' must return a value").
+
+Focus Areas (from GOALS.md):
+1. Throw statements not counted as exits
+2. Never-returning calls not recognized
+3. Unreachable code after return still analyzed
+
+Steps:
+1. Sync: `git fetch origin && git merge origin/rust --no-edit`
+2. Run conformance to capture 5-10 TS2355 failing samples
+3. Inspect return path analysis in `wasm/src/thin_checker.rs` and `wasm/src/checker/control_flow.rs`
+4. Implement minimal fix that reduces TS2355 count
+5. Add regression tests for throw exits and never-returning calls
+6. Run conformance before/after, record results
 
 ## Task Queue
-(empty - will receive new tasks from EM after completing current assignment)
+- Investigate throw statement handling in control flow
+- Check never-returning function detection
+- Validate unreachable code analysis
 
 
 ## Completed
@@ -181,7 +196,7 @@ Priority: 5
 - [x] Added async computed object literal source-map coverage in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
 
 ## Ready for Merge
-Yes
+No (merged 2026-01-09, new assignment given)
 
 ## Resume Notes
 - Branch: `worker/anvil-5`

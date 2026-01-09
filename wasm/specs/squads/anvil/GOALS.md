@@ -166,7 +166,14 @@ bash run-conformance.sh --all --workers=14
 
 ---
 ## Squad Status
-- Last Update: 2026-01-09 14:00
-- False Positives: **1766 tests (35.8%)** - target: <500
-- Workers: 5 available
+- Last EM Report: 2026-01-09 15:30
+- Workers Active: 5/5
+- Branches Pending Merge: None (all merged to squad/anvil)
+- Current Focus:
+  - W1: TS2304 (Cannot find name) - scope resolution
+  - W2: TS2403 (Subsequent variable) - continuing investigation
+  - W3: TS2339 (Property not exist) - private/mixin property access
+  - W4: Circular type diagnostics (TS2456)
+  - W5: TS2355 (Return analysis) - new assignment
+- Blockers: Fixed build error in solver/subtype.rs (undefined s_sym variable)
 - Strategy: Each worker owns one error code category, reduce false positives independently

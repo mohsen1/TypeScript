@@ -155,7 +155,7 @@ Active
 - Resolved `import = require('module')` against ambient module exports
 - Added default `tests/lib/lib.d.ts` loading in conformance harness scripts
 
-Ready for Merge: Yes
+Ready for Merge: No (merged 2026-01-09)
 
 ## Current Task: TS2339 property access fixes (new assignment)
 

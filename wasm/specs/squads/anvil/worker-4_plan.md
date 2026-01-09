@@ -43,7 +43,7 @@
 
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/anvil-4`
-- Ready for Merge: Yes
+- Ready for Merge: No (merged 2026-01-09)
 
 ## Follow-up (2025-01-09) - Recursive Mapped Types
 

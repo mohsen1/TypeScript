@@ -6,11 +6,25 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-- Idle; last completed task: TS2322 false positives fix (committed/pushed; Ready for Merge: Yes).
-- Awaiting next task from EM-Anvil.
+Fix TS2304 false positives ("Cannot find name 'X'" when X is clearly defined).
+
+Focus Areas (from GOALS.md):
+1. Namespace members not finding sibling exports
+2. Module augmentation not merging correctly
+3. Global ambient declarations not registered
+
+Steps:
+1. Sync: `git fetch origin && git merge origin/rust --no-edit`
+2. Run conformance to capture 5-10 TS2304 failing samples
+3. Inspect symbol resolution in `wasm/src/thin_binder.rs` and `wasm/src/thin_checker.rs`
+4. Implement minimal fix that reduces TS2304 count
+5. Add regression tests in `thin_checker_tests.rs` or `thin_binder_tests.rs`
+6. Run conformance before/after, record results
 
 ## Task Queue
-(empty - will receive new tasks from EM after completing current assignment)
+- Investigate namespace sibling export resolution
+- Check module augmentation symbol merging
+- Validate global ambient declaration registration
 
 ## Resume Checklist
 - Sync before work: `git fetch origin && git merge origin/rust --no-edit`
@@ -165,7 +179,7 @@ Priority: 1
 - [x] Investigated TS2322 false positives: resolved `typeof` type queries to value types when possible, resolved TypeQuery in subtype checks, added regression test, ran conformance before/after (see Notes).
 
 ## Ready for Merge
-Yes
+No (merged 2026-01-09, new assignment given)
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize emitter fidelity (ES5 downleveling/source maps) before new features.
