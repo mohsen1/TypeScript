@@ -1310,6 +1310,35 @@ impl<'a> ThinCheckerState<'a> {
         TypeId::ANY
     }
 
+    /// Get type from a type operator node (keyof T, readonly T, unique symbol).
+    /// Resolves the operand type first to ensure it's available in type_env for evaluation.
+    fn get_type_from_type_operator(&mut self, idx: NodeIndex) -> TypeId {
+        use crate::solver::{TypeKey, SymbolRef};
+
+        let Some(node) = self.ctx.arena.get(idx) else {
+            return TypeId::ANY;
+        };
+
+        let Some(type_op) = self.ctx.arena.get_type_operator(node) else {
+            return TypeId::ANY;
+        };
+
+        // Resolve the operand type using checker's get_type_from_type_node
+        // This ensures type references are resolved and available in type_env
+        let inner_type = self.get_type_from_type_node(type_op.type_node);
+
+        // Create the appropriate type based on the operator
+        match type_op.operator {
+            // KeyOfKeyword = 143
+            143 => self.ctx.types.intern(TypeKey::KeyOf(inner_type)),
+            // ReadonlyKeyword = 148
+            148 => self.ctx.types.intern(TypeKey::ReadonlyType(inner_type)),
+            // UniqueKeyword = 158 - unique symbol
+            158 => self.ctx.types.intern(TypeKey::UniqueSymbol(SymbolRef(idx.0))),
+            _ => inner_type,
+        }
+    }
+
     /// Get type from a type query node (typeof X).
     /// Creates a TypeQuery type with the actual SymbolId from the binder.
     fn get_type_from_type_query(&mut self, idx: NodeIndex) -> TypeId {
@@ -7875,6 +7904,11 @@ impl<'a> ThinCheckerState<'a> {
             if node.kind == syntax_kind_ext::TYPE_LITERAL {
                 // Type literals should use checker resolution so type parameters resolve correctly.
                 return self.get_type_from_type_literal(idx);
+            }
+            if node.kind == syntax_kind_ext::TYPE_OPERATOR {
+                // Handle type operators (keyof, readonly, unique) specially to ensure
+                // the operand type is resolved and available in type_env for evaluation.
+                return self.get_type_from_type_operator(idx);
             }
         }
 
