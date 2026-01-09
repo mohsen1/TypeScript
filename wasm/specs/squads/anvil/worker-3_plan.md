@@ -7,10 +7,10 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-(awaiting assignment)
+- [ ] Add ES5 source map tests for async/await transform patterns: try/catch in async, Promise chain transforms, async arrow functions. Tests: `./wasm/test.sh source_map`
 
 ## Task Queue
-(empty)
+- [ ] Add ES5 source map tests for generator transform patterns: yield expressions, generator delegation
 
 ## Completed
 - [x] Added for-of/for-in loop ES5 source map tests (basic for-of, basic for-in, for-of destructuring, for-in destructuring, for-of string, for-of Map/Set, nested for-of, break/continue, iterator, comprehensive); 707 tests pass.
