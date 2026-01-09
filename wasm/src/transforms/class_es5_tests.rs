@@ -12069,3 +12069,361 @@ class ArrayFactory {
         output
     );
 }
+
+// ============================================================================
+// Symbol.species Additional Tests (Full Pipeline)
+// ============================================================================
+
+#[test]
+fn test_class_es5_symbol_species_promise_like() {
+    // Promise-like class with Symbol.species for chaining
+    let source = r#"
+class CustomPromise<T> {
+    private value: T | null = null;
+    private resolved: boolean = false;
+
+    static get [Symbol.species](): typeof CustomPromise {
+        return CustomPromise;
+    }
+
+    constructor(executor: (resolve: (value: T) => void) => void) {
+        executor((value: T) => {
+            this.value = value;
+            this.resolved = true;
+        });
+    }
+
+    then<U>(fn: (value: T) => U): CustomPromise<U> {
+        const Species = (this.constructor as any)[Symbol.species] || CustomPromise;
+        return new Species((resolve: (v: U) => void) => {
+            if (this.resolved && this.value !== null) {
+                resolve(fn(this.value));
+            }
+        });
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function CustomPromise"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // then method should be present
+    assert!(
+        output.contains("then"),
+        "Expected then method: {}",
+        output
+    );
+
+    // Species reference should be present
+    assert!(
+        output.contains("Species") || output.contains("species"),
+        "Expected species reference: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_species_set_like() {
+    // Set-like class with Symbol.species
+    let source = r#"
+class CustomSet<T> {
+    private items: Set<T> = new Set();
+
+    static get [Symbol.species](): typeof CustomSet {
+        return CustomSet;
+    }
+
+    add(item: T): this {
+        this.items.add(item);
+        return this;
+    }
+
+    has(item: T): boolean {
+        return this.items.has(item);
+    }
+
+    filter(predicate: (item: T) => boolean): CustomSet<T> {
+        const Species = (this.constructor as any)[Symbol.species] || CustomSet;
+        const result = new Species();
+        this.items.forEach(item => {
+            if (predicate(item)) {
+                result.add(item);
+            }
+        });
+        return result;
+    }
+
+    get size(): number {
+        return this.items.size;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function CustomSet"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("add") && output.contains("has") && output.contains("filter"),
+        "Expected methods: {}",
+        output
+    );
+
+    // size getter should be present
+    assert!(
+        output.contains("size"),
+        "Expected size property: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_species_map_like() {
+    // Map-like class with Symbol.species for transformation methods
+    let source = r#"
+class CustomMap<K, V> {
+    private entries: Map<K, V> = new Map();
+
+    static get [Symbol.species](): typeof CustomMap {
+        return CustomMap;
+    }
+
+    set(key: K, value: V): this {
+        this.entries.set(key, value);
+        return this;
+    }
+
+    get(key: K): V | undefined {
+        return this.entries.get(key);
+    }
+
+    mapValues<U>(fn: (value: V) => U): CustomMap<K, U> {
+        const Species = (this.constructor as any)[Symbol.species] || CustomMap;
+        const result = new Species();
+        this.entries.forEach((value, key) => {
+            result.set(key, fn(value));
+        });
+        return result;
+    }
+
+    get size(): number {
+        return this.entries.size;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function CustomMap"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("set") && output.contains("get") && output.contains("mapValues"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_species_with_generics_and_constraints() {
+    // Symbol.species with complex generic constraints
+    let source = r#"
+interface Comparable<T> {
+    compareTo(other: T): number;
+}
+
+class SortedList<T extends Comparable<T>> {
+    private items: T[] = [];
+
+    static get [Symbol.species](): typeof SortedList {
+        return SortedList;
+    }
+
+    add(item: T): void {
+        this.items.push(item);
+        this.items.sort((a, b) => a.compareTo(b));
+    }
+
+    slice(start: number, end?: number): SortedList<T> {
+        const Species = (this.constructor as any)[Symbol.species] || SortedList;
+        const result = new Species();
+        const sliced = this.items.slice(start, end);
+        for (const item of sliced) {
+            result.items.push(item);
+        }
+        return result;
+    }
+
+    get length(): number {
+        return this.items.length;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function SortedList"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("add") && output.contains("slice"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Species reference should be present
+    assert!(
+        output.contains("Species") || output.contains("species"),
+        "Expected species reference: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_species_observable_pattern() {
+    // Observable pattern using Symbol.species
+    let source = r#"
+class Observable<T> {
+    private subscribers: ((value: T) => void)[] = [];
+
+    static get [Symbol.species](): typeof Observable {
+        return Observable;
+    }
+
+    subscribe(callback: (value: T) => void): void {
+        this.subscribers.push(callback);
+    }
+
+    emit(value: T): void {
+        for (const subscriber of this.subscribers) {
+            subscriber(value);
+        }
+    }
+
+    map<U>(transform: (value: T) => U): Observable<U> {
+        const Species = (this.constructor as any)[Symbol.species] || Observable;
+        const result = new Species();
+        this.subscribe((value: T) => {
+            result.emit(transform(value));
+        });
+        return result;
+    }
+
+    filter(predicate: (value: T) => boolean): Observable<T> {
+        const Species = (this.constructor as any)[Symbol.species] || Observable;
+        const result = new Species();
+        this.subscribe((value: T) => {
+            if (predicate(value)) {
+                result.emit(value);
+            }
+        });
+        return result;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function Observable"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("subscribe") && output.contains("emit") && output.contains("map") && output.contains("filter"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Species reference should be present
+    assert!(
+        output.contains("Species") || output.contains("species"),
+        "Expected species reference: {}",
+        output
+    );
+}
