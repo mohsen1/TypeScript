@@ -7,12 +7,16 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- [ ] Add async ES5 tests for async generator delegation patterns: yield*, nested. Tests: `./wasm/test.sh async_es5_tests`
+- [ ] Add async ES5 tests for async caching patterns: memoize, cache, invalidate, ttl. Tests: `./wasm/test.sh async_es5_tests`
 
 ## Task Queue
+- [ ] Add async ES5 tests for async batching patterns: batch, debounce, throttle, coalesce
 
 
 ## Completed
+- [x] Added 12 async cancellation pattern tests (abort_controller, signal, token, check, throw, cleanup, propagate, timeout, race, listener, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (868 tests PASS).
+- [x] Added 12 async error handling pattern tests (try/catch, finally, propagation, rethrow, wrap, catch_all, nested_try, multiple_catch, custom, cleanup, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (856 tests PASS).
+- [x] Added 12 async generator delegation pattern tests (yield*, nested, chain, return, throw, iterable, async iterable, multiple, conditional, try/finally, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (844 tests PASS).
 - [x] Added 12 async iterator pattern tests (next, return, throw, for-await-of, symbol, done, value, from, map, filter, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (832 tests PASS).
 - [x] Added 12 async timeout pattern tests (basic, deadline, cancel, race, abort, extend, remaining, expired, reset, clear, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (820 tests PASS).
 - [x] Added 12 async queue operations pattern tests (enqueue, dequeue, peek, drain, priority, size, clear, contains, iterator, batch, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (808 tests PASS).

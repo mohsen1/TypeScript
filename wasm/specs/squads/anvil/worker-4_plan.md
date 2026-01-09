@@ -7,12 +7,15 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [ ] Add ES5 class tests for interface implementation patterns: implements clause, multiple interfaces. Tests: `./wasm/test.sh class_es5_tests`
+Add ES5 class tests for type alias patterns: union, intersection, conditional. Tests: `./wasm/test.sh class_es5_tests`
 
 ## Task Queue
-- [ ] Add ES5 class tests for constructor signature patterns: overloads, optional params
+- [ ] Add ES5 class tests for mapped type patterns: Partial, Required, Readonly
 
 ## Completed
+- [x] Add ES5 class tests for generic constraint patterns. Tests: `./wasm/test.sh class_es5_tests`
+- [x] Add ES5 class tests for constructor signature patterns. Tests: `./wasm/test.sh class_es5_tests`
+- [x] Add ES5 class tests for interface implementation patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for abstract class implementation patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for class static block patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for decorator metadata patterns. Tests: `./wasm/test.sh class_es5_tests`

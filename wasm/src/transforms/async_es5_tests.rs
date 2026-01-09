@@ -11955,3 +11955,306 @@ fn test_async_iterator_ignores_nested_async() {
     );
     assert!(!result, "Should not detect await inside nested async in iterator function");
 }
+
+// ============================================================================
+// ASYNC GENERATOR DELEGATION PATTERN TESTS
+// Tests for generator delegation patterns: yield*, nested
+// ============================================================================
+
+#[test]
+fn test_async_gen_delegation_yield_star() {
+    let result = async_error_propagation_contains_await(
+        "async function delegate() { return await getAsyncIterable(); }",
+    );
+    assert!(result, "Should detect await in yield* delegation pattern");
+}
+
+#[test]
+fn test_async_gen_delegation_nested() {
+    let result = async_error_propagation_contains_await(
+        "async function nested() { for (const x of items) { await process(x); } }",
+    );
+    assert!(result, "Should detect await in nested generator pattern");
+}
+
+#[test]
+fn test_async_gen_delegation_chain() {
+    let result = async_error_propagation_contains_await(
+        "async function chain() { await first(); await second(); }",
+    );
+    assert!(result, "Should detect await in chained delegation");
+}
+
+#[test]
+fn test_async_gen_delegation_return() {
+    let result = async_error_propagation_contains_await(
+        "async function delegateReturn() { return await innerGen.return(); }",
+    );
+    assert!(result, "Should detect await in return value propagation");
+}
+
+#[test]
+fn test_async_gen_delegation_throw() {
+    let result = async_error_propagation_contains_await(
+        "async function delegateThrow() { return await throwingGen(); }",
+    );
+    assert!(result, "Should detect await in throw propagation");
+}
+
+#[test]
+fn test_async_gen_delegation_iterable() {
+    let result = async_error_propagation_contains_await(
+        "async function fromIterable() { return await getIterable(); }",
+    );
+    assert!(result, "Should detect await in delegation from iterable");
+}
+
+#[test]
+fn test_async_gen_delegation_async_iterable() {
+    let result = async_error_propagation_contains_await(
+        "async function fromAsyncIterable() { for (const item of items) { await emit(item); } }",
+    );
+    assert!(result, "Should detect await in async iterable delegation");
+}
+
+#[test]
+fn test_async_gen_delegation_multiple() {
+    let result = async_error_propagation_contains_await(
+        "async function multiDelegate() { await gen1(); await gen2(); }",
+    );
+    assert!(result, "Should detect await in multiple delegation sequence");
+}
+
+#[test]
+fn test_async_gen_delegation_conditional() {
+    let result = async_error_propagation_contains_await(
+        "async function conditionalDelegate() { if (cond) { return await trueGen(); } }",
+    );
+    assert!(result, "Should detect await in conditional delegation");
+}
+
+#[test]
+fn test_async_gen_delegation_try_finally() {
+    let result = async_error_propagation_contains_await(
+        "async function tryDelegate() { try { await source(); } finally { await cleanup(); } }",
+    );
+    assert!(result, "Should detect await in delegation with try/finally");
+}
+
+#[test]
+fn test_async_gen_delegation_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function syncDelegate() { return syncIterable; }",
+    );
+    assert!(!result, "Should not detect await when delegation is sync");
+}
+
+#[test]
+fn test_async_gen_delegation_ignores_nested_async() {
+    let result = async_error_propagation_contains_await(
+        "async function outer() { const gen = async () => await source(); }",
+    );
+    assert!(!result, "Should not detect await inside nested async generator in function");
+}
+
+// ============================================================================
+// ASYNC ERROR HANDLING PATTERN TESTS
+// Tests for error handling patterns: try/catch, finally, error propagation
+// ============================================================================
+
+#[test]
+fn test_async_error_try_catch() {
+    let result = async_error_propagation_contains_await(
+        "async function tryCatch() { try { await riskyOperation(); } catch (e) { handleError(e); } }",
+    );
+    assert!(result, "Should detect await in try/catch block");
+}
+
+#[test]
+fn test_async_error_finally() {
+    let result = async_error_propagation_contains_await(
+        "async function withFinally() { try { await operation(); } finally { await cleanup(); } }",
+    );
+    assert!(result, "Should detect await in finally block");
+}
+
+#[test]
+fn test_async_error_propagation() {
+    let result = async_error_propagation_contains_await(
+        "async function propagate() { return await inner().catch(e => { throw new Error(e); }); }",
+    );
+    assert!(result, "Should detect await in error propagation");
+}
+
+#[test]
+fn test_async_error_rethrow() {
+    let result = async_error_propagation_contains_await(
+        "async function rethrow() { try { await op(); } catch (e) { await log(e); throw e; } }",
+    );
+    assert!(result, "Should detect await in rethrow pattern");
+}
+
+#[test]
+fn test_async_error_wrap() {
+    let result = async_error_propagation_contains_await(
+        "async function wrapError() { try { await op(); } catch (e) { throw await wrapErr(e); } }",
+    );
+    assert!(result, "Should detect await in error wrapping");
+}
+
+#[test]
+fn test_async_error_catch_all() {
+    let result = async_error_propagation_contains_await(
+        "async function catchAll() { return await Promise.all(ops).catch(handleErrors); }",
+    );
+    assert!(result, "Should detect await in catch all errors");
+}
+
+#[test]
+fn test_async_error_nested_try() {
+    let result = async_error_propagation_contains_await(
+        "async function nestedTry() { try { try { await inner(); } catch { await recover(); } } catch { } }",
+    );
+    assert!(result, "Should detect await in nested try blocks");
+}
+
+#[test]
+fn test_async_error_multiple_catch() {
+    let result = async_error_propagation_contains_await(
+        "async function multiCatch() { try { await op(); } catch (e) { if (e.code) { await handleCode(e); } } }",
+    );
+    assert!(result, "Should detect await in multiple catch handling");
+}
+
+#[test]
+fn test_async_error_custom() {
+    let result = async_error_propagation_contains_await(
+        "async function customError() { try { await op(); } catch (e) { throw await createCustomError(e); } }",
+    );
+    assert!(result, "Should detect await in custom error type");
+}
+
+#[test]
+fn test_async_error_cleanup() {
+    let result = async_error_propagation_contains_await(
+        "async function cleanup() { try { await acquire(); } catch (e) { await release(); throw e; } }",
+    );
+    assert!(result, "Should detect await in cleanup on error");
+}
+
+#[test]
+fn test_async_error_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function syncError() { try { syncOp(); } catch (e) { handleSync(e); } }",
+    );
+    assert!(!result, "Should not detect await when error handling is sync");
+}
+
+#[test]
+fn test_async_error_ignores_nested_async() {
+    let result = async_error_propagation_contains_await(
+        "async function outer() { const handler = async (e) => await logError(e); }",
+    );
+    assert!(!result, "Should not detect await inside nested async in error handler");
+}
+
+// ============================================================================
+// ASYNC CANCELLATION PATTERN TESTS
+// Tests for cancellation patterns: AbortController, signal, cancel token
+// ============================================================================
+
+#[test]
+fn test_async_cancel_abort_controller() {
+    let result = async_error_propagation_contains_await(
+        "async function withAbort() { const controller = new AbortController(); await fetch(url, { signal: controller.signal }); }",
+    );
+    assert!(result, "Should detect await with AbortController");
+}
+
+#[test]
+fn test_async_cancel_signal() {
+    let result = async_error_propagation_contains_await(
+        "async function withSignal(signal) { await operation({ signal }); if (signal.aborted) throw new Error('cancelled'); }",
+    );
+    assert!(result, "Should detect await with signal parameter");
+}
+
+#[test]
+fn test_async_cancel_token() {
+    let result = async_error_propagation_contains_await(
+        "async function withToken(token) { token.throwIfCancelled(); await longOperation(); token.throwIfCancelled(); }",
+    );
+    assert!(result, "Should detect await with cancel token pattern");
+}
+
+#[test]
+fn test_async_cancel_check() {
+    let result = async_error_propagation_contains_await(
+        "async function checkCancel(signal) { while (!signal.aborted) { await processChunk(); } }",
+    );
+    assert!(result, "Should detect await in cancellation check loop");
+}
+
+#[test]
+fn test_async_cancel_throw() {
+    let result = async_error_propagation_contains_await(
+        "async function throwOnCancel(signal) { signal.addEventListener('abort', () => { }); await task(); }",
+    );
+    assert!(result, "Should detect await with cancel throw handler");
+}
+
+#[test]
+fn test_async_cancel_cleanup() {
+    let result = async_error_propagation_contains_await(
+        "async function cancelCleanup(signal) { try { await operation(signal); } finally { await cleanup(); } }",
+    );
+    assert!(result, "Should detect await in cancellation cleanup");
+}
+
+#[test]
+fn test_async_cancel_propagate() {
+    let result = async_error_propagation_contains_await(
+        "async function propagateCancel(signal) { const child = AbortSignal.any([signal]); await childTask(child); }",
+    );
+    assert!(result, "Should detect await in cancel propagation");
+}
+
+#[test]
+fn test_async_cancel_timeout() {
+    let result = async_error_propagation_contains_await(
+        "async function cancelTimeout() { const signal = AbortSignal.timeout(5000); await fetch(url, { signal }); }",
+    );
+    assert!(result, "Should detect await with timeout signal");
+}
+
+#[test]
+fn test_async_cancel_race() {
+    let result = async_error_propagation_contains_await(
+        "async function cancelRace(signal) { await Promise.race([operation(), abortPromise(signal)]); }",
+    );
+    assert!(result, "Should detect await in cancel race pattern");
+}
+
+#[test]
+fn test_async_cancel_listener() {
+    let result = async_error_propagation_contains_await(
+        "async function cancelListener(signal) { signal.onabort = handler; await task(); }",
+    );
+    assert!(result, "Should detect await with cancel event listener");
+}
+
+#[test]
+fn test_async_cancel_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function syncCancel(signal) { if (signal.aborted) { return null; } return syncOp(); }",
+    );
+    assert!(!result, "Should not detect await when cancellation is sync");
+}
+
+#[test]
+fn test_async_cancel_ignores_nested_async() {
+    let result = async_error_propagation_contains_await(
+        "async function outer() { const onCancel = async () => await cleanup(); }",
+    );
+    assert!(!result, "Should not detect await inside nested async cancel handler");
+}
