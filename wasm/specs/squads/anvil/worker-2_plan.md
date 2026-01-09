@@ -7,27 +7,13 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-Add ES5 mixin patterns parity tests
-
-Per GOALS.md Objective 1: ES5 downleveling correctness
-
-Steps:
-1. Add 6 ES5 mixin patterns parity tests to `wasm/src/thin_emitter/emitter_parity_tests.rs`:
-   - Basic mixin function pattern
-   - Mixin with generics
-   - Multiple mixin composition
-   - Mixin with static members
-   - Mixin with private fields
-   - Combined mixin patterns
-2. Run `./wasm/test.sh emitter_parity` to verify all tests pass
-3. Commit with message: `[wasm] emitter: add mixin patterns parity tests`
-4. Push to `origin/worker/anvil-2`
-5. Update this plan file and push
+(none - awaiting new assignment from EM-Anvil)
 
 ## Task Queue
 (empty)
 
 ## Completed
+- [x] Added ES5 mixin patterns parity tests (basic-function, generics, composition, static-members, private-fields, combined-patterns) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (413 tests).
 - [x] Added ES5 abstract class patterns parity tests (abstract-methods, implemented-methods, static-members, inheritance-chain, generics, combined-patterns) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (407 tests).
 - [x] Added ES5 private class features parity tests (inheritance-chain, static-initialization-order, async-patterns, accessor-computed-values, conditional-expr, combined-generics) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (401 tests).
 - [x] Added ES5 class decorator patterns parity tests (class-private-fields, method-computed-name, accessor-pair, parameter-constructor, inheritance-override, combined-all) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (395 tests).
