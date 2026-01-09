@@ -4865,3 +4865,191 @@ fn test_resolve_all_with_circular_extends_unknown() {
     assert_eq!(results[0], (t_name, TypeId::UNKNOWN));
     assert_eq!(results[1], (u_name, TypeId::UNKNOWN));
 }
+
+// =============================================================================
+// Additional Circular Generic Constraint Tests
+// =============================================================================
+
+#[test]
+fn test_circular_extends_three_way_cycle() {
+    // Test: <T extends U, U extends V, V extends T>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+    let v_name = interner.intern_string("V");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+    let var_v = ctx.fresh_type_param(v_name);
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let u_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: u_name,
+        constraint: None,
+        default: None,
+    }));
+    let v_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: v_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends U, U extends V, V extends T
+    ctx.add_upper_bound(var_t, u_type);
+    ctx.add_upper_bound(var_u, v_type);
+    ctx.add_upper_bound(var_v, t_type);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+
+    // All three resolve to unknown due to circular dependency with no concrete bounds
+    assert_eq!(results.len(), 3);
+    assert_eq!(results[0], (t_name, TypeId::UNKNOWN));
+    assert_eq!(results[1], (u_name, TypeId::UNKNOWN));
+    assert_eq!(results[2], (v_name, TypeId::UNKNOWN));
+}
+
+#[test]
+fn test_circular_extends_self_reference() {
+    // Test: <T extends T> - self-referential constraint
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends T (self-reference)
+    ctx.add_upper_bound(var_t, t_type);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+
+    // Self-reference with no other bounds resolves to unknown
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0], (t_name, TypeId::UNKNOWN));
+}
+
+#[test]
+fn test_circular_extends_with_lower_bound() {
+    // Test: <T extends U, U extends T> with T having a lower bound of string
+    // Lower bounds propagate through cyclic constraints.
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let u_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: u_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends U, U extends T
+    ctx.add_upper_bound(var_t, u_type);
+    ctx.add_upper_bound(var_u, t_type);
+
+    // Add a lower bound to T
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+
+    assert_eq!(results.len(), 2);
+    // T resolves to string (its lower bound)
+    assert_eq!(results[0], (t_name, TypeId::STRING));
+    // U also resolves to string - lower bounds propagate through cyclic constraints
+    assert_eq!(results[1], (u_name, TypeId::STRING));
+}
+
+#[test]
+fn test_circular_extends_both_have_lower_bounds() {
+    // Test: <T extends U, U extends T> with both having the same lower bound
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let u_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: u_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends U, U extends T
+    ctx.add_upper_bound(var_t, u_type);
+    ctx.add_upper_bound(var_u, t_type);
+
+    // Both have the same lower bound
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+    ctx.add_lower_bound(var_u, TypeId::STRING);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+
+    assert_eq!(results.len(), 2);
+    // Both resolve to string
+    assert_eq!(results[0], (t_name, TypeId::STRING));
+    assert_eq!(results[1], (u_name, TypeId::STRING));
+}
+
+#[test]
+fn test_circular_extends_unify_propagates() {
+    // Test: <T extends U, U extends T> then unify T with number
+    // Unification propagates through cyclic constraints.
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let u_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: u_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends U, U extends T
+    ctx.add_upper_bound(var_t, u_type);
+    ctx.add_upper_bound(var_u, t_type);
+
+    // Unify T directly with number
+    ctx.unify_var_type(var_t, TypeId::NUMBER).unwrap();
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+
+    assert_eq!(results.len(), 2);
+    // T resolves to number (unified)
+    assert_eq!(results[0], (t_name, TypeId::NUMBER));
+    // U also resolves to number - unification propagates through cyclic constraints
+    assert_eq!(results[1], (u_name, TypeId::NUMBER));
+}
