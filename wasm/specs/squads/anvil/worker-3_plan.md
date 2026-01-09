@@ -7,7 +7,7 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] Add async generator ES5 source map tests in `wasm/src/source_map_tests.rs`. Run `./wasm/test.sh source_map`.
+- [ ] Add for-await-of ES5 source map tests in `wasm/src/source_map_tests.rs`. Run `./wasm/test.sh source_map`.
 
 ## Task Queue
 - [ ] (empty)
