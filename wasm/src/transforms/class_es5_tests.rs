@@ -32614,3 +32614,667 @@ class SchemaValidator {
         output
     );
 }
+
+// ============================================================================
+// NOMINAL TYPE PATTERN TESTS
+// ============================================================================
+
+/// Test nominal type patterns: basic branded types
+#[test]
+fn test_class_es5_branded_types_basic() {
+    let source = r#"
+declare const BrandSymbol: unique symbol;
+
+type Brand<T, B> = T & { readonly [BrandSymbol]: B };
+
+type UserId = Brand<number, "UserId">;
+type OrderId = Brand<number, "OrderId">;
+
+class UserService {
+    private users: Map<UserId, string> = new Map();
+
+    createUserId(id: number): UserId {
+        return id as UserId;
+    }
+
+    addUser(id: UserId, name: string): void {
+        this.users.set(id, name);
+    }
+
+    getUser(id: UserId): string | undefined {
+        return this.users.get(id);
+    }
+}
+
+class OrderService {
+    private orders: Map<OrderId, UserId> = new Map();
+
+    createOrderId(id: number): OrderId {
+        return id as OrderId;
+    }
+
+    placeOrder(orderId: OrderId, userId: UserId): void {
+        this.orders.set(orderId, userId);
+    }
+
+    getOrderOwner(orderId: OrderId): UserId | undefined {
+        return this.orders.get(orderId);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted to ES5
+    assert!(
+        output.contains("function UserService") && output.contains("function OrderService"),
+        "Expected ES5 class constructors: {}",
+        output
+    );
+
+    // Methods should be on prototype
+    assert!(
+        output.contains("UserService.prototype.createUserId") &&
+        output.contains("OrderService.prototype.createOrderId"),
+        "Expected methods on prototype: {}",
+        output
+    );
+
+    // Map operations preserved
+    assert!(
+        output.contains(".set(") && output.contains(".get("),
+        "Expected Map operations: {}",
+        output
+    );
+}
+
+/// Test nominal type patterns: opaque types
+#[test]
+fn test_class_es5_opaque_types() {
+    let source = r#"
+declare const OpaqueTag: unique symbol;
+
+type Opaque<T, K> = T & { readonly [OpaqueTag]: K };
+
+type Email = Opaque<string, "Email">;
+type Password = Opaque<string, "Password">;
+type HashedPassword = Opaque<string, "HashedPassword">;
+
+class EmailValidator {
+    private emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    validate(input: string): Email | null {
+        if (this.emailRegex.test(input)) {
+            return input as Email;
+        }
+        return null;
+    }
+
+    toString(email: Email): string {
+        return email;
+    }
+}
+
+class PasswordService {
+    private minLength = 8;
+
+    createPassword(input: string): Password | null {
+        if (input.length >= this.minLength) {
+            return input as Password;
+        }
+        return null;
+    }
+
+    hash(password: Password): HashedPassword {
+        const hashed = "hashed_" + password;
+        return hashed as HashedPassword;
+    }
+
+    verify(password: Password, hashed: HashedPassword): boolean {
+        return ("hashed_" + password) === hashed;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("function EmailValidator") && output.contains("function PasswordService"),
+        "Expected ES5 class constructors: {}",
+        output
+    );
+
+    // Methods preserved
+    assert!(
+        output.contains("validate") && output.contains("hash") && output.contains("verify"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Regex preserved
+    assert!(
+        output.contains("emailRegex"),
+        "Expected regex field: {}",
+        output
+    );
+}
+
+/// Test nominal type patterns: type guards for branded types
+#[test]
+fn test_class_es5_branded_type_guards() {
+    let source = r#"
+declare const TypeBrand: unique symbol;
+
+type Branded<T, B extends string> = T & { readonly [TypeBrand]: B };
+
+type PositiveNumber = Branded<number, "PositiveNumber">;
+type NonEmptyString = Branded<string, "NonEmptyString">;
+type ValidUrl = Branded<string, "ValidUrl">;
+
+function isPositive(value: number): value is PositiveNumber {
+    return value > 0;
+}
+
+function isNonEmpty(value: string): value is NonEmptyString {
+    return value.length > 0;
+}
+
+function isValidUrl(value: string): value is ValidUrl {
+    return value.startsWith("http://") || value.startsWith("https://");
+}
+
+class NumberValidator {
+    assertPositive(value: number): PositiveNumber {
+        if (!isPositive(value)) {
+            throw new Error("Value must be positive");
+        }
+        return value;
+    }
+
+    double(value: PositiveNumber): PositiveNumber {
+        return (value * 2) as PositiveNumber;
+    }
+}
+
+class StringValidator {
+    assertNonEmpty(value: string): NonEmptyString {
+        if (!isNonEmpty(value)) {
+            throw new Error("String must not be empty");
+        }
+        return value;
+    }
+
+    assertValidUrl(value: string): ValidUrl {
+        if (!isValidUrl(value)) {
+            throw new Error("Invalid URL format");
+        }
+        return value;
+    }
+
+    concatenate(a: NonEmptyString, b: NonEmptyString): NonEmptyString {
+        return (a + b) as NonEmptyString;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("function NumberValidator") && output.contains("function StringValidator"),
+        "Expected ES5 class constructors: {}",
+        output
+    );
+
+    // Type guard functions preserved
+    assert!(
+        output.contains("isPositive") && output.contains("isNonEmpty") && output.contains("isValidUrl"),
+        "Expected type guard functions: {}",
+        output
+    );
+
+    // Methods on prototype
+    assert!(
+        output.contains("assertPositive") && output.contains("assertNonEmpty"),
+        "Expected assertion methods: {}",
+        output
+    );
+}
+
+/// Test nominal type patterns: branded numeric types
+#[test]
+fn test_class_es5_branded_numeric_types() {
+    let source = r#"
+declare const NumericBrand: unique symbol;
+
+type NumericBrand<B extends string> = number & { readonly [NumericBrand]: B };
+
+type Cents = NumericBrand<"Cents">;
+type Dollars = NumericBrand<"Dollars">;
+type Percentage = NumericBrand<"Percentage">;
+
+class MoneyConverter {
+    toCents(dollars: Dollars): Cents {
+        return (dollars * 100) as Cents;
+    }
+
+    toDollars(cents: Cents): Dollars {
+        return (cents / 100) as Dollars;
+    }
+
+    addCents(a: Cents, b: Cents): Cents {
+        return (a + b) as Cents;
+    }
+
+    addDollars(a: Dollars, b: Dollars): Dollars {
+        return (a + b) as Dollars;
+    }
+}
+
+class PercentageCalculator {
+    fromDecimal(value: number): Percentage {
+        return (value * 100) as Percentage;
+    }
+
+    toDecimal(percentage: Percentage): number {
+        return percentage / 100;
+    }
+
+    apply(value: Dollars, percentage: Percentage): Dollars {
+        return (value * (percentage / 100)) as Dollars;
+    }
+
+    combine(a: Percentage, b: Percentage): Percentage {
+        return (a + b) as Percentage;
+    }
+}
+
+class PriceCalculator {
+    private converter: MoneyConverter;
+    private percentCalc: PercentageCalculator;
+
+    constructor() {
+        this.converter = new MoneyConverter();
+        this.percentCalc = new PercentageCalculator();
+    }
+
+    applyDiscount(price: Dollars, discount: Percentage): Dollars {
+        const discountAmount = this.percentCalc.apply(price, discount);
+        return (price - discountAmount) as Dollars;
+    }
+
+    addTax(price: Dollars, taxRate: Percentage): Dollars {
+        const taxAmount = this.percentCalc.apply(price, taxRate);
+        return this.converter.toDollars(
+            this.converter.addCents(
+                this.converter.toCents(price),
+                this.converter.toCents(taxAmount)
+            )
+        );
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // All classes converted
+    assert!(
+        output.contains("function MoneyConverter") &&
+        output.contains("function PercentageCalculator") &&
+        output.contains("function PriceCalculator"),
+        "Expected ES5 class constructors: {}",
+        output
+    );
+
+    // Money conversion methods
+    assert!(
+        output.contains("toCents") && output.contains("toDollars"),
+        "Expected money conversion methods: {}",
+        output
+    );
+
+    // Percentage methods
+    assert!(
+        output.contains("fromDecimal") && output.contains("toDecimal"),
+        "Expected percentage methods: {}",
+        output
+    );
+}
+
+/// Test nominal type patterns: branded string types
+#[test]
+fn test_class_es5_branded_string_types() {
+    let source = r#"
+declare const StringBrand: unique symbol;
+
+type StringBrand<B extends string> = string & { readonly [StringBrand]: B };
+
+type UUID = StringBrand<"UUID">;
+type Slug = StringBrand<"Slug">;
+type JWT = StringBrand<"JWT">;
+
+class UUIDGenerator {
+    private counter = 0;
+
+    generate(): UUID {
+        this.counter++;
+        const uuid = "uuid-" + Date.now() + "-" + this.counter;
+        return uuid as UUID;
+    }
+
+    validate(input: string): UUID | null {
+        if (input.startsWith("uuid-")) {
+            return input as UUID;
+        }
+        return null;
+    }
+
+    compare(a: UUID, b: UUID): boolean {
+        return a === b;
+    }
+}
+
+class SlugGenerator {
+    fromTitle(title: string): Slug {
+        const slug = title
+            .toLowerCase()
+            .replace(/\s+/g, "-")
+            .replace(/[^a-z0-9-]/g, "");
+        return slug as Slug;
+    }
+
+    toUrl(baseUrl: string, slug: Slug): string {
+        return baseUrl + "/" + slug;
+    }
+
+    isValid(input: string): input is Slug {
+        return /^[a-z0-9-]+$/.test(input);
+    }
+}
+
+class JWTService {
+    private secret: string;
+
+    constructor(secret: string) {
+        this.secret = secret;
+    }
+
+    create(payload: object): JWT {
+        const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+        const body = btoa(JSON.stringify(payload));
+        const signature = btoa(this.secret + header + body);
+        return (header + "." + body + "." + signature) as JWT;
+    }
+
+    decode(token: JWT): object | null {
+        try {
+            const parts = token.split(".");
+            return JSON.parse(atob(parts[1]));
+        } catch {
+            return null;
+        }
+    }
+
+    validate(token: JWT): boolean {
+        const parts = token.split(".");
+        if (parts.length !== 3) return false;
+        const expectedSig = btoa(this.secret + parts[0] + parts[1]);
+        return parts[2] === expectedSig;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // All classes converted
+    assert!(
+        output.contains("function UUIDGenerator") &&
+        output.contains("function SlugGenerator") &&
+        output.contains("function JWTService"),
+        "Expected ES5 class constructors: {}",
+        output
+    );
+
+    // UUID methods
+    assert!(
+        output.contains("generate") && output.contains("validate"),
+        "Expected UUID methods: {}",
+        output
+    );
+
+    // Slug methods
+    assert!(
+        output.contains("fromTitle") && output.contains("toUrl"),
+        "Expected Slug methods: {}",
+        output
+    );
+
+    // JWT methods
+    assert!(
+        output.contains("create") && output.contains("decode"),
+        "Expected JWT methods: {}",
+        output
+    );
+}
+
+/// Test nominal type patterns: combined nominal patterns
+#[test]
+fn test_class_es5_nominal_combined_patterns() {
+    let source = r#"
+declare const NominalBrand: unique symbol;
+
+type Nominal<T, K extends string> = T & { readonly [NominalBrand]: K };
+
+type EntityId<E extends string> = Nominal<string, E>;
+type CustomerId = EntityId<"Customer">;
+type ProductId = EntityId<"Product">;
+type InvoiceId = EntityId<"Invoice">;
+
+type Currency = Nominal<number, "Currency">;
+type Quantity = Nominal<number, "Quantity">;
+
+interface LineItem {
+    productId: ProductId;
+    quantity: Quantity;
+    unitPrice: Currency;
+}
+
+class IdFactory {
+    private counters: Map<string, number> = new Map();
+
+    createId<E extends string>(prefix: E): EntityId<E> {
+        const count = (this.counters.get(prefix) || 0) + 1;
+        this.counters.set(prefix, count);
+        return (prefix + "-" + count) as EntityId<E>;
+    }
+
+    createCustomerId(): CustomerId {
+        return this.createId("Customer");
+    }
+
+    createProductId(): ProductId {
+        return this.createId("Product");
+    }
+
+    createInvoiceId(): InvoiceId {
+        return this.createId("Invoice");
+    }
+}
+
+class InvoiceBuilder {
+    private idFactory: IdFactory;
+    private customerId: CustomerId | null = null;
+    private items: LineItem[] = [];
+
+    constructor(idFactory: IdFactory) {
+        this.idFactory = idFactory;
+    }
+
+    setCustomer(customerId: CustomerId): this {
+        this.customerId = customerId;
+        return this;
+    }
+
+    addItem(productId: ProductId, quantity: Quantity, unitPrice: Currency): this {
+        this.items.push({ productId, quantity, unitPrice });
+        return this;
+    }
+
+    calculateTotal(): Currency {
+        let total = 0;
+        for (const item of this.items) {
+            total += item.quantity * item.unitPrice;
+        }
+        return total as Currency;
+    }
+
+    build(): { invoiceId: InvoiceId; customerId: CustomerId; items: LineItem[]; total: Currency } | null {
+        if (!this.customerId) return null;
+        return {
+            invoiceId: this.idFactory.createInvoiceId(),
+            customerId: this.customerId,
+            items: this.items,
+            total: this.calculateTotal()
+        };
+    }
+}
+
+class InventoryService {
+    private stock: Map<ProductId, Quantity> = new Map();
+
+    addStock(productId: ProductId, quantity: Quantity): void {
+        const current = this.stock.get(productId) || (0 as Quantity);
+        this.stock.set(productId, (current + quantity) as Quantity);
+    }
+
+    removeStock(productId: ProductId, quantity: Quantity): boolean {
+        const current = this.stock.get(productId) || (0 as Quantity);
+        if (current < quantity) return false;
+        this.stock.set(productId, (current - quantity) as Quantity);
+        return true;
+    }
+
+    getStock(productId: ProductId): Quantity {
+        return this.stock.get(productId) || (0 as Quantity);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // All classes converted
+    assert!(
+        output.contains("function IdFactory") &&
+        output.contains("function InvoiceBuilder") &&
+        output.contains("function InventoryService"),
+        "Expected ES5 class constructors: {}",
+        output
+    );
+
+    // IdFactory methods
+    assert!(
+        output.contains("createId") && output.contains("createCustomerId"),
+        "Expected IdFactory methods: {}",
+        output
+    );
+
+    // InvoiceBuilder methods
+    assert!(
+        output.contains("setCustomer") && output.contains("addItem") && output.contains("calculateTotal"),
+        "Expected InvoiceBuilder methods: {}",
+        output
+    );
+
+    // InventoryService methods
+    assert!(
+        output.contains("addStock") && output.contains("removeStock") && output.contains("getStock"),
+        "Expected InventoryService methods: {}",
+        output
+    );
+
+    // Map operations
+    assert!(
+        output.contains(".get(") && output.contains(".set("),
+        "Expected Map operations: {}",
+        output
+    );
+}
