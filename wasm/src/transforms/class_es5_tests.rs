@@ -8466,3 +8466,322 @@ namespace ApiService {
         output
     );
 }
+
+// =============================================================================
+// Class Expression with Generics Tests
+// =============================================================================
+
+#[test]
+fn test_class_es5_class_expression_generic_basic() {
+    // Basic class expression with generic type parameter
+    let source = r#"
+const Container = class<T> {
+    private value: T;
+
+    constructor(value: T) {
+        this.value = value;
+    }
+
+    getValue(): T {
+        return this.value;
+    }
+};
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Variable should be present
+    assert!(
+        output.contains("Container"),
+        "Expected Container variable: {}",
+        output
+    );
+
+    // Generic type parameter should be erased
+    assert!(
+        !output.contains("<T>"),
+        "Generic type parameter should be erased: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("getValue"),
+        "Expected getValue method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_class_expression_generic_multiple_params() {
+    // Class expression with multiple generic type parameters
+    let source = r#"
+const Pair = class<K, V> {
+    constructor(public key: K, public value: V) {}
+
+    getKey(): K {
+        return this.key;
+    }
+
+    getValue(): V {
+        return this.value;
+    }
+
+    swap(): Pair<V, K> {
+        return new Pair(this.value, this.key);
+    }
+};
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Variable should be present
+    assert!(
+        output.contains("Pair"),
+        "Expected Pair variable: {}",
+        output
+    );
+
+    // Generic type parameters should be erased
+    assert!(
+        !output.contains("<K, V>") && !output.contains("<V, K>"),
+        "Generic type parameters should be erased: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("getKey") && output.contains("getValue") && output.contains("swap"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_class_expression_generic_constraint() {
+    // Class expression with generic constraint
+    let source = r#"
+interface HasLength {
+    length: number;
+}
+
+const Measurable = class<T extends HasLength> {
+    constructor(private item: T) {}
+
+    getLength(): number {
+        return this.item.length;
+    }
+
+    getItem(): T {
+        return this.item;
+    }
+};
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Variable should be present
+    assert!(
+        output.contains("Measurable"),
+        "Expected Measurable variable: {}",
+        output
+    );
+
+    // Generic constraint should be erased
+    assert!(
+        !output.contains("extends HasLength"),
+        "Generic constraint should be erased: {}",
+        output
+    );
+
+    // Interface should be erased
+    assert!(
+        !output.contains("interface"),
+        "Interface should be erased: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("getLength") && output.contains("getItem"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_class_expression_generic_extends() {
+    // Generic class expression extending another class
+    let source = r#"
+class BaseCollection<T> {
+    protected items: T[] = [];
+
+    add(item: T): void {
+        this.items.push(item);
+    }
+}
+
+const SortedCollection = class<T> extends BaseCollection<T> {
+    sort(compareFn: (a: T, b: T) => number): T[] {
+        return this.items.sort(compareFn);
+    }
+
+    first(): T | undefined {
+        return this.items[0];
+    }
+};
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be present
+    assert!(
+        output.contains("BaseCollection") && output.contains("SortedCollection"),
+        "Expected BaseCollection and SortedCollection: {}",
+        output
+    );
+
+    // Generic type parameters should be erased
+    assert!(
+        !output.contains("<T>"),
+        "Generic type parameters should be erased: {}",
+        output
+    );
+
+    // Inheritance should be present
+    assert!(
+        output.contains("__extends") || output.contains("prototype"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("sort") && output.contains("first"),
+        "Expected sort and first methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_class_expression_generic_factory() {
+    // Generic class expression used in factory pattern
+    let source = r#"
+function createRepository<T>() {
+    return class Repository {
+        private data: T[] = [];
+
+        save(item: T): void {
+            this.data.push(item);
+        }
+
+        findAll(): T[] {
+            return this.data;
+        }
+
+        count(): number {
+            return this.data.length;
+        }
+    };
+}
+
+const UserRepo = createRepository<{ id: number; name: string }>();
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Factory function should be present
+    assert!(
+        output.contains("createRepository"),
+        "Expected createRepository function: {}",
+        output
+    );
+
+    // Class name should be present
+    assert!(
+        output.contains("Repository"),
+        "Expected Repository class: {}",
+        output
+    );
+
+    // Generic type parameter should be erased
+    assert!(
+        !output.contains("<T>"),
+        "Generic type parameter should be erased: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("save") && output.contains("findAll") && output.contains("count"),
+        "Expected save, findAll, and count methods: {}",
+        output
+    );
+
+    // Variable assignment should be present
+    assert!(
+        output.contains("UserRepo"),
+        "Expected UserRepo variable: {}",
+        output
+    );
+}
