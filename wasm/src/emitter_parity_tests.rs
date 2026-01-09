@@ -6475,3 +6475,210 @@ fn test_parity_es5_async_generator_yield_star() {
         output
     );
 }
+
+/// Parity test for ES5 nested namespaces.
+/// Nested namespaces should be lowered to nested objects.
+#[test]
+fn test_parity_es5_namespace_nested() {
+    let source = r#"namespace Outer {
+    export namespace Inner {
+        export function helper(): string {
+            return "help";
+        }
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify outer namespace exists
+    assert!(
+        output.contains("Outer"),
+        "Output should define Outer namespace: {}",
+        output
+    );
+    // No namespace keyword
+    assert!(
+        !output.contains("namespace Outer") && !output.contains("namespace Inner"),
+        "ES5 output should not contain namespace keyword: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 namespace with class.
+/// Namespace containing a class should be lowered properly.
+#[test]
+fn test_parity_es5_namespace_with_class() {
+    let source = r#"namespace Models {
+    export class User {
+        name: string;
+        constructor(name: string) {
+            this.name = name;
+        }
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify namespace exists
+    assert!(
+        output.contains("Models"),
+        "Output should define Models namespace: {}",
+        output
+    );
+    // No namespace keyword
+    assert!(
+        !output.contains("namespace Models"),
+        "ES5 output should not contain namespace keyword: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 namespace with interface.
+/// Interface inside namespace should be erased.
+#[test]
+fn test_parity_es5_namespace_with_interface() {
+    let source = r#"namespace Types {
+    export interface Config {
+        name: string;
+        value: number;
+    }
+    export const DEFAULT_NAME: string = "default";
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify namespace exists
+    assert!(
+        output.contains("Types"),
+        "Output should define Types namespace: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface Config"),
+        "ES5 output should not contain interface: {}",
+        output
+    );
+    // No namespace keyword
+    assert!(
+        !output.contains("namespace Types"),
+        "ES5 output should not contain namespace keyword: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": number"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 namespace with enum.
+/// Namespace containing an enum should be lowered properly.
+#[test]
+fn test_parity_es5_namespace_with_enum() {
+    let source = r#"namespace Status {
+    export enum Code {
+        OK = 200,
+        NotFound = 404,
+        Error = 500
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify namespace exists
+    assert!(
+        output.contains("Status"),
+        "Output should define Status namespace: {}",
+        output
+    );
+    // No namespace keyword
+    assert!(
+        !output.contains("namespace Status"),
+        "ES5 output should not contain namespace keyword: {}",
+        output
+    );
+    // No enum keyword
+    assert!(
+        !output.contains("enum Code"),
+        "ES5 output should not contain enum keyword: {}",
+        output
+    );
+}
