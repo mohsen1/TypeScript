@@ -7,12 +7,13 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] Add class expression source map tests in `wasm/src/source_map_tests.rs`. Run `./wasm/test.sh source_map`.
+(none)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added class expression source map tests (named, with extends, static methods, accessors, in function, with constructor, computed props, in array, in IIFE, combined); `./wasm/test.sh source_map` passes.
 - [x] Added enum transform source map tests (const enums, with initializers, member references, in namespaces, merged enums, reverse mappings, heterogeneous enums, in classes, in switch statements, combined); `./wasm/test.sh source_map` passes.
 - [x] Added decorator source map tests (with arguments, with expression, composition, static method, static property, getter, setter, metadata, inheritance, combined advanced); `./wasm/test.sh source_map` passes.
 - [x] Added private fields source map tests (basic, initialized, constructor, private method, access, assignment, static field, static method, inheritance, combined); `./wasm/test.sh source_map` passes.
