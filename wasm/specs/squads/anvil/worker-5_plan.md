@@ -7,7 +7,28 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-(none - awaiting new task from EM)
+Add async ES5 tests for generator yield delegation patterns
+
+Per GOALS.md Objective 1: ES5 downleveling correctness
+
+Steps:
+1. Add 12 async generator yield delegation tests to `wasm/src/transforms/async_es5_tests.rs`:
+   - async generator yield* basic
+   - yield* with async iterable
+   - yield* with return value
+   - yield* in try/catch
+   - yield* with await before
+   - yield* with await after
+   - nested yield* delegation
+   - yield* with break/continue
+   - async generator yield* in class
+   - body_contains_await for yield*
+   - ignores nested async
+   - Combined yield* patterns
+2. Run `./wasm/test.sh async_es5_tests` to verify all tests pass
+3. Commit with message: `[wasm] async_es5: add generator yield delegation tests`
+4. Push to `origin/worker/anvil-5`
+5. Update this plan file and push
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
