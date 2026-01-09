@@ -46,6 +46,7 @@ Implement TS2454 "Variable 'x' is used before being assigned" error.
 - Ran Docker conformance `run-conformance.sh --all --workers=6`: 4928 tests run, 17.6% exact (869), 20.2% same count (994), 1936 crashes, 727 skipped. Top missing: TS2322(135), TS7010(84), TS2339(76), TS2304(66), TS2695(46). Top extra: TS2304(494), TS1005(288), TS1109(171), TS7011(165), TS7010(164).
 - Fixed compilation error in solver/subtype.rs (s_sym undefined in TypeQuery match arm).
 - Added built-in utility type handling to reduce false TS2304 errors (Partial, Required, Pick, Omit, Record, Exclude, Extract, NonNullable, ReturnType, Parameters, etc.).
+- **TS2454 implementation complete**: Fixed `get_type_of_call_expression` to process arguments even when callee is `any`. Added 7 tests covering basic cases and conditional branches (all passing).
 
 ## Ready for Merge
 Yes
