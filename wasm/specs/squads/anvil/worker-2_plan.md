@@ -1,145 +1,53 @@
-# Anvil Worker 2 - TS2304 Namespace Scoping (Symbol Resolution)
+# Worker 2 Plan
 
-## Operation Conformance Assignment
+## Mission
+Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transforms, cli, lsp).
 
-**Mission**: Fix false positive TS2304 errors by improving symbol resolution in the checker.
+Status: Active
+Priority: 2
 
-**Target Error**: TS2304 "Cannot find name 'X'" - 75 false positives (shared with Worker 1)
-**Root Cause**: Symbol lookup doesn't properly traverse namespace parent chain
+## Current Assignment
+Fix TS2322 false positives (Type not assignable - 101 occurrences)
 
-## Problem Analysis
+Per GOALS.md Phase 10: False Positive Elimination
 
-Even with correct scope chains (Worker 1's fix), the checker must correctly traverse them:
+**Problem:** "Type 'X' is not assignable to type 'Y'" when it should be
 
-```typescript
-namespace Outer {
-  export interface Config { value: number; }
-  namespace Inner {
-    function process(c: Config) { } // TS2304 if symbol lookup fails
-  }
-}
-```
+Root Causes:
+1. Generic type inference too strict
+2. Literal types not widening correctly
+3. Union type assignability incomplete
+4. Contextual typing not applied
 
-The checker's `resolve_name` or equivalent must walk up the scope chain to find `Config`.
+Files: `thin_checker.rs`, `solver/subtype.rs`
 
-## Implementation Tasks
+Steps:
+1. Run conformance baseline: `cd wasm/differential-test && bash run-conformance.sh --all --workers=14`
+2. Record baseline TS2322 count and exact match %
+3. Investigate TS2322 false positive cases in conformance output
+4. Identify patterns and fix in checker/solver
+5. Run conformance again to verify reduction
+6. Commit with message: `[wasm] checker: fix TS2322 false positives`
+7. Push to `origin/worker/anvil-2`
+8. Update this plan file and push
 
-### Task 1: Audit Symbol Resolution in Checker
-**File**: `wasm/src/checker/mod.rs`
+## Task Queue
+(empty - will receive new tasks from EM after completing current assignment)
 
-1. Find the `resolve_name` / `resolve_symbol` function
-2. Trace how it walks scope chains
-3. Identify where namespace parent traversal fails
+## Completed
+- [x] ES5 template literal type parity tests (449+ tests added)
+- [x] TS2304 method type parameter resolution fix
+- [x] Extensive emitter parity test coverage
 
-### Task 2: Fix Symbol Lookup Traversal
-**File**: `wasm/src/checker/mod.rs`
-
-```rust
-// CURRENT (broken): Only checks current scope
-fn resolve_name(&self, name: &str, scope: ScopeId) -> Option<Symbol> {
-    self.scopes[scope].symbols.get(name)
-}
-
-// FIXED: Walk up scope chain
-fn resolve_name(&self, name: &str, scope: ScopeId) -> Option<Symbol> {
-    let mut current = Some(scope);
-    while let Some(scope_id) = current {
-        let scope = &self.scopes[scope_id];
-        if let Some(symbol) = scope.symbols.get(name) {
-            return Some(symbol.clone());
-        }
-        current = scope.parent;
-    }
-    None
-}
-```
-
-### Task 3: Handle Export Visibility
-**File**: `wasm/src/checker/mod.rs`
-
-When traversing from child to parent namespace, respect export visibility:
-```rust
-fn resolve_name(&self, name: &str, scope: ScopeId) -> Option<Symbol> {
-    let mut current = Some(scope);
-    let mut is_first_scope = true;
-    while let Some(scope_id) = current {
-        let scope = &self.scopes[scope_id];
-        if let Some(symbol) = scope.symbols.get(name) {
-            // In parent scopes, check if exported
-            if is_first_scope || symbol.is_exported() {
-                return Some(symbol.clone());
-            }
-        }
-        current = scope.parent;
-        is_first_scope = false;
-    }
-    None
-}
-```
-
-### Task 4: Write Regression Tests
-**File**: `wasm/src/checker/tests.rs`
-
-```typescript
-// Test 1: Exported type visible in nested namespace
-namespace A {
-  export type ID = string;
-  namespace B {
-    let x: ID; // Should resolve
-  }
-}
-
-// Test 2: Non-exported NOT visible
-namespace A {
-  type Internal = number;
-  namespace B {
-    let x: Internal; // Should error TS2304
-  }
-}
-
-// Test 3: Class resolution
-namespace Models {
-  export class User {}
-  namespace Helpers {
-    function getUser(): User { return new User(); }
-  }
-}
-```
-
-## Success Criteria
-
-- [x] Symbol lookup correctly traverses namespace parent chain
-- [x] Export visibility is respected
-- [ ] TS2304 false positives reduced significantly
-- [ ] No new false negatives (missing real errors)
-
-## Coordination
-
-- **Worker 1** fixes binder scope chains
-- This worker ensures checker uses those chains correctly
-- Test both fixes together for full coverage
-
-## Files to Modify
-
-1. `wasm/src/checker/mod.rs` - Symbol resolution fixes
-2. `wasm/src/checker/symbols.rs` - If symbol structures need updates
-3. Test files as needed
-
-## Verification
-
-Run after changes:
-```bash
-node wasm/differential-test/conformance-runner.mjs --max=200 -v 2>&1 | grep TS2304
-```
-
-Target: Combined with Worker 1, reduce TS2304 from 75 to <20.
-
-## Status
-Active - implementation done, awaiting push
-
-Ready for Merge: No (push blocked: git auth)
+## Ready for Merge
+No
 
 ## Notes
+- Project Direction: conformance-first; prioritize reducing false positives
+- Follow `wasm/specs/WASM_ARCHITECTURE.md`
+- Use Docker for Rust tests: `./wasm/test.sh`
+- Conformance tests: `cd wasm/differential-test && bash run-conformance.sh`
+- Commit format: `[wasm] checker: <description>`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/anvil-2`
-- **NEVER edit**: `STRUCTURE.md`, `GOALS.md`, other workers' plan files, or anything in `orchestrator/`
+- **NEVER edit**: `DIRECTOR_AGENT.md`, `SQUAD_LEAD_AGENT.md`, `MANAGER_AGENT.md`, `AGENTS.md`, `start_*.sh`
