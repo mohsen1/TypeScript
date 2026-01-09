@@ -6861,3 +6861,188 @@ fn test_parity_es5_enum_heterogeneous() {
         output
     );
 }
+
+/// Parity test for ES5 export with alias.
+/// Named exports with aliases should be lowered properly.
+#[test]
+fn test_parity_es5_export_alias() {
+    let source = r#"const internalName: string = "value";
+export { internalName as publicName };"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::CommonJS;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify CommonJS module marker
+    assert!(
+        output.contains("__esModule"),
+        "CommonJS output should include __esModule marker: {}",
+        output
+    );
+    // Internal name should exist
+    assert!(
+        output.contains("internalName"),
+        "Output should define internalName: {}",
+        output
+    );
+    // Type annotation should be erased
+    assert!(
+        !output.contains(": string"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 default export function.
+/// Default export function should be lowered to CommonJS.
+#[test]
+fn test_parity_es5_export_default_function() {
+    let source = r#"export default function greet(name: string): string {
+    return "Hello, " + name;
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::CommonJS;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify CommonJS module marker
+    assert!(
+        output.contains("__esModule"),
+        "CommonJS output should include __esModule marker: {}",
+        output
+    );
+    // Function should exist
+    assert!(
+        output.contains("greet"),
+        "Output should define greet function: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 export interface erasure.
+/// Interface exports should be erased entirely.
+#[test]
+fn test_parity_es5_export_interface() {
+    let source = r#"export interface User {
+    name: string;
+    age: number;
+}
+export const DEFAULT_AGE: number = 0;"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::CommonJS;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Interface should be erased
+    assert!(
+        !output.contains("interface User"),
+        "ES5 output should not contain interface: {}",
+        output
+    );
+    // Const should remain
+    assert!(
+        output.contains("DEFAULT_AGE"),
+        "Output should define DEFAULT_AGE: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": number"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 export type alias erasure.
+/// Type alias exports should be erased entirely.
+#[test]
+fn test_parity_es5_export_type_alias() {
+    let source = r#"export type ID = string | number;
+export type Handler = (event: Event) => void;
+export const VERSION: string = "1.0";"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::CommonJS;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type ID") && !output.contains("type Handler"),
+        "ES5 output should not contain type aliases: {}",
+        output
+    );
+    // Const should remain
+    assert!(
+        output.contains("VERSION"),
+        "Output should define VERSION: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
