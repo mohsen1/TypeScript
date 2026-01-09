@@ -18783,3 +18783,481 @@ class EventHandler {
         output
     );
 }
+
+// ============================================================================
+// Parameter Decorator Pattern Tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_param_decorator_constructor() {
+    // Constructor parameter decorators
+    let source = r#"
+const INJECT_METADATA = Symbol("inject");
+
+function inject(token: string) {
+    return function(target: any, propertyKey: string | symbol | undefined, parameterIndex: number) {
+        const existingParams = Reflect.getMetadata(INJECT_METADATA, target) || [];
+        existingParams[parameterIndex] = token;
+        Reflect.defineMetadata(INJECT_METADATA, existingParams, target);
+    };
+}
+
+function optional(target: any, propertyKey: string | symbol | undefined, parameterIndex: number) {
+    const existingOptional = Reflect.getMetadata("optional", target) || [];
+    existingOptional[parameterIndex] = true;
+    Reflect.defineMetadata("optional", existingOptional, target);
+}
+
+class DatabaseService {
+    query(sql: string): any[] { return []; }
+}
+
+class LoggerService {
+    log(message: string): void { console.log(message); }
+}
+
+class CacheService {
+    get(key: string): any { return null; }
+    set(key: string, value: any): void {}
+}
+
+class UserRepository {
+    constructor(
+        @inject("DatabaseService") private db: DatabaseService,
+        @inject("LoggerService") private logger: LoggerService,
+        @inject("CacheService") @optional private cache?: CacheService
+    ) {}
+
+    findAll(): any[] {
+        this.logger.log("Finding all users");
+        return this.db.query("SELECT * FROM users");
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("function UserRepository") || output.contains("UserRepository"),
+        "Expected UserRepository class: {}",
+        output
+    );
+
+    // Decorator functions should be present
+    assert!(
+        output.contains("inject") && output.contains("optional"),
+        "Expected parameter decorators: {}",
+        output
+    );
+
+    // Service classes should be present
+    assert!(
+        output.contains("DatabaseService") && output.contains("LoggerService"),
+        "Expected service classes: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_param_decorator_method() {
+    // Method parameter decorators
+    let source = r#"
+function validate(target: any, propertyKey: string, parameterIndex: number) {
+    const existingValidators = Reflect.getMetadata("validators", target, propertyKey) || [];
+    existingValidators.push(parameterIndex);
+    Reflect.defineMetadata("validators", existingValidators, target, propertyKey);
+}
+
+function required(target: any, propertyKey: string, parameterIndex: number) {
+    const existingRequired = Reflect.getMetadata("required", target, propertyKey) || [];
+    existingRequired.push(parameterIndex);
+    Reflect.defineMetadata("required", existingRequired, target, propertyKey);
+}
+
+function maxLength(length: number) {
+    return function(target: any, propertyKey: string, parameterIndex: number) {
+        const existingMaxLength = Reflect.getMetadata("maxLength", target, propertyKey) || {};
+        existingMaxLength[parameterIndex] = length;
+        Reflect.defineMetadata("maxLength", existingMaxLength, target, propertyKey);
+    };
+}
+
+function minValue(value: number) {
+    return function(target: any, propertyKey: string, parameterIndex: number) {
+        const existingMinValue = Reflect.getMetadata("minValue", target, propertyKey) || {};
+        existingMinValue[parameterIndex] = value;
+        Reflect.defineMetadata("minValue", existingMinValue, target, propertyKey);
+    };
+}
+
+class ProductService {
+    createProduct(
+        @validate @required @maxLength(100) name: string,
+        @validate @required description: string,
+        @validate @minValue(0) price: number,
+        @validate @minValue(0) quantity: number
+    ): any {
+        return { name, description, price, quantity };
+    }
+
+    updateProduct(
+        @required id: string,
+        @maxLength(100) name?: string,
+        description?: string,
+        @minValue(0) price?: number
+    ): any {
+        return { id, name, description, price };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function ProductService") || output.contains("ProductService"),
+        "Expected ProductService class: {}",
+        output
+    );
+
+    // Decorator functions should be present
+    assert!(
+        output.contains("validate") && output.contains("required"),
+        "Expected parameter decorators: {}",
+        output
+    );
+
+    // Class IIFE pattern should be present
+    assert!(
+        output.contains("(function ()") || output.contains("(function()"),
+        "Expected class IIFE pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_param_decorator_factory() {
+    // Decorator factories with params
+    let source = r#"
+function paramType(typeName: string) {
+    return function(target: any, propertyKey: string | symbol | undefined, parameterIndex: number) {
+        const types = Reflect.getMetadata("paramTypes", target, propertyKey as string) || {};
+        types[parameterIndex] = typeName;
+        Reflect.defineMetadata("paramTypes", types, target, propertyKey as string);
+    };
+}
+
+function range(min: number, max: number) {
+    return function(target: any, propertyKey: string, parameterIndex: number) {
+        const ranges = Reflect.getMetadata("ranges", target, propertyKey) || {};
+        ranges[parameterIndex] = { min, max };
+        Reflect.defineMetadata("ranges", ranges, target, propertyKey);
+    };
+}
+
+function pattern(regex: RegExp) {
+    return function(target: any, propertyKey: string, parameterIndex: number) {
+        const patterns = Reflect.getMetadata("patterns", target, propertyKey) || {};
+        patterns[parameterIndex] = regex;
+        Reflect.defineMetadata("patterns", patterns, target, propertyKey);
+    };
+}
+
+function transform(fn: (value: any) => any) {
+    return function(target: any, propertyKey: string, parameterIndex: number) {
+        const transforms = Reflect.getMetadata("transforms", target, propertyKey) || {};
+        transforms[parameterIndex] = fn;
+        Reflect.defineMetadata("transforms", transforms, target, propertyKey);
+    };
+}
+
+class ValidationService {
+    validateUser(
+        @paramType("string") @pattern(/^[a-zA-Z0-9]+$/) username: string,
+        @paramType("string") @pattern(/^[\w.-]+@[\w.-]+\.\w+$/) email: string,
+        @paramType("number") @range(18, 120) age: number
+    ): boolean {
+        return true;
+    }
+
+    processInput(
+        @transform((v: string) => v.trim().toLowerCase()) input: string,
+        @transform((v: number) => Math.abs(v)) value: number
+    ): { input: string; value: number } {
+        return { input, value };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function ValidationService") || output.contains("ValidationService"),
+        "Expected ValidationService class: {}",
+        output
+    );
+
+    // Decorator factories should be present
+    assert!(
+        output.contains("paramType") && output.contains("range"),
+        "Expected decorator factories: {}",
+        output
+    );
+
+    // Class IIFE pattern should be present
+    assert!(
+        output.contains("(function ()") || output.contains("(function()"),
+        "Expected class IIFE pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_param_decorator_combined() {
+    // Combined parameter and method decorators
+    let source = r#"
+function logMethod(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const original = descriptor.value;
+    descriptor.value = function(...args: any[]) {
+        console.log(`Calling ${propertyKey}`);
+        return original.apply(this, args);
+    };
+    return descriptor;
+}
+
+function validateParams(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const original = descriptor.value;
+    descriptor.value = function(...args: any[]) {
+        const required = Reflect.getMetadata("required", target, propertyKey) || [];
+        for (const index of required) {
+            if (args[index] === undefined || args[index] === null) {
+                throw new Error(`Parameter ${index} is required`);
+            }
+        }
+        return original.apply(this, args);
+    };
+    return descriptor;
+}
+
+function required(target: any, propertyKey: string, parameterIndex: number) {
+    const existingRequired = Reflect.getMetadata("required", target, propertyKey) || [];
+    existingRequired.push(parameterIndex);
+    Reflect.defineMetadata("required", existingRequired, target, propertyKey);
+}
+
+function body(target: any, propertyKey: string, parameterIndex: number) {
+    Reflect.defineMetadata("body", parameterIndex, target, propertyKey);
+}
+
+function query(name: string) {
+    return function(target: any, propertyKey: string, parameterIndex: number) {
+        const queries = Reflect.getMetadata("queries", target, propertyKey) || {};
+        queries[parameterIndex] = name;
+        Reflect.defineMetadata("queries", queries, target, propertyKey);
+    };
+}
+
+class ApiController {
+    @logMethod
+    @validateParams
+    createItem(
+        @required @body data: any,
+        @query("userId") userId: string
+    ): any {
+        return { ...data, userId };
+    }
+
+    @logMethod
+    @validateParams
+    getItems(
+        @required @query("page") page: number,
+        @query("limit") limit: number = 10,
+        @query("sort") sort?: string
+    ): any[] {
+        return [];
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function ApiController") || output.contains("ApiController"),
+        "Expected ApiController class: {}",
+        output
+    );
+
+    // Decorators should be present
+    assert!(
+        output.contains("logMethod") && output.contains("validateParams"),
+        "Expected method decorators: {}",
+        output
+    );
+
+    // Class IIFE pattern should be present
+    assert!(
+        output.contains("(function ()") || output.contains("(function()"),
+        "Expected class IIFE pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_param_decorator_di_pattern() {
+    // Dependency injection pattern with parameter decorators
+    let source = r#"
+const INJECTABLE_METADATA = Symbol("injectable");
+const INJECT_METADATA = Symbol("inject");
+
+function injectable() {
+    return function(target: any) {
+        Reflect.defineMetadata(INJECTABLE_METADATA, true, target);
+    };
+}
+
+function inject(token: string | symbol) {
+    return function(target: any, propertyKey: string | symbol | undefined, parameterIndex: number) {
+        const injections = Reflect.getMetadata(INJECT_METADATA, target) || [];
+        injections[parameterIndex] = token;
+        Reflect.defineMetadata(INJECT_METADATA, injections, target);
+    };
+}
+
+function lazy(target: any, propertyKey: string | symbol | undefined, parameterIndex: number) {
+    const lazyParams = Reflect.getMetadata("lazy", target) || [];
+    lazyParams[parameterIndex] = true;
+    Reflect.defineMetadata("lazy", lazyParams, target);
+}
+
+function scope(scopeName: string) {
+    return function(target: any, propertyKey: string | symbol | undefined, parameterIndex: number) {
+        const scopes = Reflect.getMetadata("scopes", target) || {};
+        scopes[parameterIndex] = scopeName;
+        Reflect.defineMetadata("scopes", scopes, target);
+    };
+}
+
+@injectable()
+class ConfigService {
+    get(key: string): string { return ""; }
+}
+
+@injectable()
+class HttpClient {
+    get(url: string): Promise<any> { return Promise.resolve({}); }
+}
+
+@injectable()
+class AuthService {
+    constructor(
+        @inject("ConfigService") private config: ConfigService,
+        @inject("HttpClient") @lazy private http: HttpClient
+    ) {}
+
+    async login(username: string, password: string): Promise<boolean> {
+        const authUrl = this.config.get("authUrl");
+        const result = await this.http.get(authUrl);
+        return result.success;
+    }
+}
+
+@injectable()
+class ApplicationService {
+    constructor(
+        @inject("AuthService") @scope("request") private auth: AuthService,
+        @inject("ConfigService") @scope("singleton") private config: ConfigService,
+        @inject("HttpClient") private http: HttpClient
+    ) {}
+
+    async initialize(): Promise<void> {
+        console.log("Application initialized");
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("ConfigService") && output.contains("AuthService"),
+        "Expected service classes: {}",
+        output
+    );
+
+    // DI decorators should be present
+    assert!(
+        output.contains("injectable") && output.contains("inject"),
+        "Expected DI decorators: {}",
+        output
+    );
+
+    // ApplicationService should be present
+    assert!(
+        output.contains("ApplicationService"),
+        "Expected ApplicationService class: {}",
+        output
+    );
+}
