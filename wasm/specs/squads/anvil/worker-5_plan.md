@@ -7,7 +7,7 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- [ ] Awaiting next task from EM-Anvil.
+- [ ] Add async ES5 tests for async/await in for-of loop patterns in `wasm/src/transforms/async_es5_tests.rs`. Run `./wasm/test.sh async_es5_tests`.
 
 ## Task Queue
 - [ ] (empty)
