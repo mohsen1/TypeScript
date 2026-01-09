@@ -5,10 +5,8 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 
 Status: Active
 Priority: 1
-Blocked: Awaiting next EM-Anvil assignment.
-
 ## Current Assignment
-- [ ] (empty - awaiting next task)
+- [ ] Add ES5 tests for Iterator/Iterable patterns (custom iterators, Symbol.iterator implementations, for-of with iterators, iterable class patterns) in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
 
 ## Task Queue
 - [ ] (empty)
