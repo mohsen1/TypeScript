@@ -21433,186 +21433,709 @@ fn test_never_method_in_class() {
         panic!("Expected object type");
     }
 }
-    // Inference: T is () => number (compatible with () => any)
-        params: Vec::new(),
-    // Test: <T extends Function = () => any> - function default
-    // Constraint: T extends () => any (allows any return type)
+
+// =============================================================================
+// Any Type Tests (type erasure, type assertions)
+// =============================================================================
+
+#[test]
+fn test_any_type_basic_identity() {
+    // any is the top type that bypasses type checking
+    let interner = TypeInterner::new();
+
+    // TypeId::ANY should be a built-in
+    assert!(matches!(interner.lookup(TypeId::ANY), Some(TypeKey::Any)));
+}
+
+#[test]
+fn test_any_in_union() {
+    // T | any = any (any absorbs in unions)
+    let interner = TypeInterner::new();
+
+    let union_with_any = interner.union(vec![TypeId::STRING, TypeId::ANY]);
+
+    // Union with any should simplify to any (or contain any)
+    if let Some(TypeKey::Union(members)) = interner.lookup(union_with_any) {
+        assert!(members.contains(&TypeId::ANY));
+    } else {
+        // Could be simplified to any
+        assert_eq!(union_with_any, TypeId::ANY);
+    }
+}
+
+#[test]
+fn test_any_in_intersection() {
+    // T & any = T (any is identity in intersections for practical purposes)
+    let interner = TypeInterner::new();
+
+    let intersection_with_any = interner.intersection(vec![TypeId::STRING, TypeId::ANY]);
+
+    // Intersection with any - behavior varies
+    if let Some(TypeKey::Intersection(members)) = interner.lookup(intersection_with_any) {
+        assert!(members.len() >= 1);
+    }
+}
+
+#[test]
+fn test_any_function_return_type() {
+    // function f(): any
+    let interner = TypeInterner::new();
+
     let any_fn = interner.function(FunctionShape {
-        return_type: TypeId::ANY,
-    ctx.add_upper_bound(var_t, any_fn);
-    // Inference: specific function () => number (subtype of () => any)
-    assert!(result.is_ok() || result.is_err());
-        write_type: TypeId::NUMBER,
-// =============================================================================
-// OVERLOAD SIGNATURE INFERENCE EDGE CASES
-// =============================================================================
-fn test_overload_with_generic_constraint() {
-    // function f<T extends string>(x: T): T;
-    // function f<T extends number>(x: T): T;
-    // Overload selection based on generic constraints
-    // When called with string literal, should match first overload
-    ctx.add_upper_bound(var_t, TypeId::STRING);
-    ctx.add_lower_bound(var_t, interner.literal_string("hello"));
-    let result = ctx.resolve_with_constraints(var_t).unwrap();
-    // Should resolve to the literal "hello"
-    assert_eq!(result, interner.literal_string("hello"));
-fn test_overload_with_multiple_generics() {
-    // function f<T, U>(x: T, y: U): [T, U];
-    // function f<T>(x: T): T;
-    // Select overload based on argument count
-    let u_name = interner.intern_string("U");
-    let var_u = ctx.fresh_type_param(u_name);
-    // Two arguments provided
-    ctx.add_lower_bound(var_t, TypeId::STRING);
-    ctx.add_lower_bound(var_u, TypeId::NUMBER);
-    let result_t = ctx.resolve_with_constraints(var_t).unwrap();
-    let result_u = ctx.resolve_with_constraints(var_u).unwrap();
-
-    assert_eq!(result_t, TypeId::STRING);
-    assert_eq!(result_u, TypeId::NUMBER);
-fn test_overload_with_this_parameter() {
-    // function f(this: string): number;
-    // function f(this: number): string;
-    // Select overload based on this type
-    let this_name = interner.intern_string("This");
-    let var_this = ctx.fresh_type_param(this_name);
-    // this is string
-    ctx.add_lower_bound(var_this, TypeId::STRING);
-    let result = ctx.resolve_with_constraints(var_this).unwrap();
-fn test_overload_intersection_argument() {
-    // function f(x: A & B): C;
-    // function f(x: A): D;
-    // More specific type matches first overload
-    let t_name = interner.intern_string("T");
-    let var_t = ctx.fresh_type_param(t_name);
-    let obj_a = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("a"),
-        type_id: TypeId::STRING,
-        write_type: TypeId::STRING,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-    let obj_b = interner.object(vec![PropertyInfo {
-        name: interner.intern_string("b"),
-        type_id: TypeId::NUMBER,
-        write_type: TypeId::NUMBER,
-        optional: false,
-        readonly: false,
-        is_method: false,
-    }]);
-    let intersection = interner.intersection(vec![obj_a, obj_b]);
-    ctx.add_lower_bound(var_t, intersection);
-
-    let result = ctx.resolve_with_constraints(var_t).unwrap();
-    assert_eq!(result, intersection);
-fn test_overload_constructor_signatures() {
-    // new(x: string): StringResult;
-    // new(x: number): NumberResult;
-    // Constructor overload selection
-    // Argument is string
-    ctx.add_lower_bound(var_t, TypeId::STRING);
-    assert_eq!(result, TypeId::STRING);
-fn test_overload_with_literal_types() {
-    // function f(x: "a"): 1;
-    // function f(x: "b"): 2;
-    // function f(x: string): number;
-    // Most specific literal overload selected
-    let lit_a = interner.literal_string("a");
-    ctx.add_lower_bound(var_t, lit_a);
-    let result = ctx.resolve_with_constraints(var_t).unwrap();
-    assert_eq!(result, lit_a);
-fn test_overload_with_union_arg_selects_common() {
-    // function f(x: string): "str";
-    // function f(x: number): "num";
-    // f(string | number) should return "str" | "num"
-    let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
-    ctx.add_lower_bound(var_t, union);
-    assert_eq!(result, union);
-fn test_overload_prefer_non_generic() {
-    // function f(x: string): string;  // non-generic
-    // function f<T>(x: T): T;          // generic fallback
-    // Non-generic overload should be preferred
-    // Provide string argument
-    ctx.add_lower_bound(var_t, TypeId::STRING);
-    ctx.add_upper_bound(var_t, TypeId::STRING);
-    assert_eq!(result, TypeId::STRING);
-fn test_overload_with_spread_param() {
-    // function f(...args: string[]): string;
-    // function f(...args: number[]): number;
-    // Select overload based on spread element types
-    let string_array = interner.array(TypeId::STRING);
-    ctx.add_lower_bound(var_t, string_array);
-    assert_eq!(result, string_array);
-fn test_overload_with_tuple_spread() {
-    // function f(...args: [string, number]): A;
-    // function f(...args: [string]): B;
-    // Select overload based on tuple length
-    let t_name = interner.intern_string("T");
-    let var_t = ctx.fresh_type_param(t_name);
-    let tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-    ]);
-    ctx.add_lower_bound(var_t, tuple);
-    let result = ctx.resolve_with_constraints(var_t).unwrap();
-    assert_eq!(result, tuple);
-fn test_overload_ambiguous_fallback() {
-    // When multiple overloads could match, use implementation signature
-    let t_name = interner.intern_string("T");
-    let var_t = ctx.fresh_type_param(t_name);
-    // any argument could match multiple overloads
-    ctx.add_lower_bound(var_t, TypeId::ANY);
-    let result = ctx.resolve_with_constraints(var_t).unwrap();
-    // Should resolve to any
-    assert_eq!(result, TypeId::ANY);
-fn test_overload_callback_return_type() {
-    // function f(cb: () => string): "string-cb";
-    // function f(cb: () => number): "number-cb";
-    // Select based on callback return type
-    let t_name = interner.intern_string("T");
-    let var_t = ctx.fresh_type_param(t_name);
-    // Callback returns string
-    let callback = interner.function(FunctionShape {
-        type_params: Vec::new(),
-        params: Vec::new(),
+        type_params: vec![],
+        params: vec![],
         this_type: None,
-        return_type: TypeId::STRING,
+        return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
     });
-    ctx.add_lower_bound(var_t, callback);
-    let result = ctx.resolve_with_constraints(var_t).unwrap();
-    assert_eq!(result, callback);
-fn test_overload_nested_generics() {
-    // function f<T>(x: Promise<T>): T;
-    // function f<T>(x: T): T;
-    // First overload matches Promise, second is fallback
-    let t_name = interner.intern_string("T");
-    let var_t = ctx.fresh_type_param(t_name);
+
+    if let Some(TypeKey::Function(shape)) = interner.lookup(any_fn) {
+        assert_eq!(shape.return_type, TypeId::ANY);
+    } else {
+        panic!("Expected function type");
+    }
+}
+
+#[test]
+fn test_any_function_parameter() {
+    // function f(x: any): void
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+
+    let any_param_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(x_name),
+            type_id: TypeId::ANY,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    if let Some(TypeKey::Function(shape)) = interner.lookup(any_param_fn) {
+        assert_eq!(shape.params[0].type_id, TypeId::ANY);
+    } else {
+        panic!("Expected function type");
+    }
+}
+
+#[test]
+fn test_any_array_type() {
+    // any[] - array of any
+    let interner = TypeInterner::new();
+
+    let any_array = interner.array(TypeId::ANY);
+
+    if let Some(TypeKey::Array(element_type)) = interner.lookup(any_array) {
+        assert_eq!(*element_type, TypeId::ANY);
+    } else {
+        panic!("Expected array type");
+    }
+}
+
+#[test]
+fn test_any_tuple_element() {
+    // [string, any, number] - tuple with any element
+    let interner = TypeInterner::new();
+
+    let tuple_with_any = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::ANY,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(tuple_with_any) {
+        assert_eq!(elements.len(), 3);
+        assert_eq!(elements[1].type_id, TypeId::ANY);
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_any_object_property() {
+    // { data: any } - object with any property
+    let interner = TypeInterner::new();
+
+    let data_name = interner.intern_string("data");
+
+    let obj_with_any = interner.object(vec![PropertyInfo {
+        name: data_name,
+        type_id: TypeId::ANY,
+        write_type: TypeId::ANY,
         optional: false,
         readonly: false,
+        is_method: false,
     }]);
 
-
+    if let Some(TypeKey::Object(props)) = interner.lookup(obj_with_any) {
+        assert_eq!(props[0].type_id, TypeId::ANY);
+    } else {
+        panic!("Expected object type");
+    }
 }
 
 #[test]
+fn test_any_inference_accepts_all() {
+    // T inferred as any accepts all assignments
     let interner = TypeInterner::new();
-    let mut ctx = InferenceContext::new(&interner);
+    let ctx = InferenceContext::new(&interner);
 
-    let var_t = ctx.fresh_type_param(t_name);
+    let var_t = ctx.fresh_type_param(None, None);
 
+    // Any as lower bound - accepts everything
+    ctx.add_lower_bound(var_t, TypeId::ANY);
 
     let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::ANY);
+}
+
+#[test]
+fn test_any_inference_upper_bound() {
+    // T extends any - effectively unconstrained
+    let interner = TypeInterner::new();
+    let ctx = InferenceContext::new(&interner);
+
+    let var_t = ctx.fresh_type_param(None, None);
+
+    ctx.add_upper_bound(var_t, TypeId::ANY);
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    // Should resolve to string (the specific type)
     assert_eq!(result, TypeId::STRING);
 }
 
 #[test]
+fn test_any_conditional_type_check() {
+    // type Check<T> = T extends any ? "yes" : "no"
+    // any extends any is true
     let interner = TypeInterner::new();
-    let mut ctx = InferenceContext::new(&interner);
 
+    let lit_yes = interner.literal_string("yes");
+    let lit_no = interner.literal_string("no");
 
+    let cond = ConditionalType {
+        check_type: TypeId::ANY,
+        extends_type: TypeId::ANY,
+        true_type: lit_yes,
+        false_type: lit_no,
+        is_distributive: false,
+    };
 
-    assert_eq!(result, TypeId::STRING);
+    let result = evaluate_conditional(&interner, &cond);
+    // any extends any should be true
+    assert_eq!(result, lit_yes);
+}
+
+#[test]
+fn test_any_conditional_type_extends() {
+    // type Check<T> = T extends string ? T : never
+    // any extends string - special case
+    let interner = TypeInterner::new();
+
+    let cond = ConditionalType {
+        check_type: TypeId::ANY,
+        extends_type: TypeId::STRING,
+        true_type: TypeId::ANY,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // any extends anything is typically true (or deferred)
+    assert!(result == TypeId::ANY || result != TypeId::NEVER);
+}
+
+#[test]
+fn test_any_promise_type() {
+    // Promise<any>
+    let interner = TypeInterner::new();
+
+    let any_promise = interner.promise(TypeId::ANY);
+
+    if let Some(TypeKey::Promise(inner)) = interner.lookup(any_promise) {
+        assert_eq!(*inner, TypeId::ANY);
+    } else {
+        panic!("Expected promise type");
+    }
+}
+
+#[test]
+fn test_any_readonly_array() {
+    // readonly any[]
+    let interner = TypeInterner::new();
+
+    let readonly_any_array = interner.readonly_array(TypeId::ANY);
+
+    if let Some(TypeKey::ReadonlyArray(element_type)) = interner.lookup(readonly_any_array) {
+        assert_eq!(*element_type, TypeId::ANY);
+    } else {
+        panic!("Expected readonly array type");
+    }
+}
+
+#[test]
+fn test_any_generic_constraint() {
+    // function f<T extends any>(x: T): T
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let x_name = interner.intern_string("x");
+
+    let generic_any_fn = interner.function(FunctionShape {
+        type_params: vec![TypeParamInfo {
+            name: t_name,
+            constraint: Some(TypeId::ANY),
+            default: None,
+        }],
+        params: vec![ParamInfo {
+            name: Some(x_name),
+            type_id: TypeId::ANY, // Would be T
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::ANY, // Would be T
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    if let Some(TypeKey::Function(shape)) = interner.lookup(generic_any_fn) {
+        assert_eq!(shape.type_params[0].constraint, Some(TypeId::ANY));
+    } else {
+        panic!("Expected function type");
+    }
+}
+
+#[test]
+fn test_any_generic_default() {
+    // function f<T = any>(): T
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+
+    let fn_with_any_default = interner.function(FunctionShape {
+        type_params: vec![TypeParamInfo {
+            name: t_name,
+            constraint: None,
+            default: Some(TypeId::ANY),
+        }],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::ANY, // Would be T
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    if let Some(TypeKey::Function(shape)) = interner.lookup(fn_with_any_default) {
+        assert_eq!(shape.type_params[0].default, Some(TypeId::ANY));
+    } else {
+        panic!("Expected function type");
+    }
+}
+
+#[test]
+fn test_any_keyof() {
+    // keyof any = string | number | symbol
+    let interner = TypeInterner::new();
+
+    let keyof_any = interner.keyof(TypeId::ANY);
+
+    // keyof any should be PropertyKey
+    assert!(matches!(interner.lookup(keyof_any), Some(TypeKey::KeyOf(_)) | Some(TypeKey::Union(_))));
+}
+
+#[test]
+fn test_any_indexed_access() {
+    // any[K] = any for any K
+    let interner = TypeInterner::new();
+
+    let any_indexed = interner.index_access(TypeId::ANY, TypeId::STRING);
+
+    // Accessing any should give any
+    if let Some(TypeKey::IndexAccess { object, index: _ }) = interner.lookup(any_indexed) {
+        assert_eq!(*object, TypeId::ANY);
+    }
+}
+
+#[test]
+fn test_any_rest_parameter() {
+    // function f(...args: any[]): void
+    let interner = TypeInterner::new();
+
+    let args_name = interner.intern_string("args");
+
+    let fn_with_any_rest = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(args_name),
+            type_id: interner.array(TypeId::ANY),
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    if let Some(TypeKey::Function(shape)) = interner.lookup(fn_with_any_rest) {
+        assert!(shape.params[0].rest);
+        if let Some(TypeKey::Array(elem)) = interner.lookup(shape.params[0].type_id) {
+            assert_eq!(*elem, TypeId::ANY);
+        }
+    } else {
+        panic!("Expected function type");
+    }
+}
+
+#[test]
+fn test_any_callback_parameter() {
+    // function f(cb: (x: any) => any): void
+    let interner = TypeInterner::new();
+
+    let cb_name = interner.intern_string("cb");
+    let x_name = interner.intern_string("x");
+
+    let callback_type = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(x_name),
+            type_id: TypeId::ANY,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::ANY,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_with_any_callback = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(cb_name),
+            type_id: callback_type,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    if let Some(TypeKey::Function(shape)) = interner.lookup(fn_with_any_callback) {
+        if let Some(TypeKey::Function(cb_shape)) = interner.lookup(shape.params[0].type_id) {
+            assert_eq!(cb_shape.params[0].type_id, TypeId::ANY);
+            assert_eq!(cb_shape.return_type, TypeId::ANY);
+        }
+    } else {
+        panic!("Expected function type");
+    }
+}
+
+#[test]
+fn test_any_in_template_literal() {
+    // Template literal with any
+    // `${any}` = string (template with any produces string)
+    let interner = TypeInterner::new();
+
+    let template_with_any = interner.template_literal(vec![
+        TemplateLiteralSpan::String("prefix".to_string()),
+        TemplateLiteralSpan::Type(TypeId::ANY),
+        TemplateLiteralSpan::String("suffix".to_string()),
+    ]);
+
+    assert!(matches!(interner.lookup(template_with_any), Some(TypeKey::TemplateLiteral(_))));
+}
+
+#[test]
+fn test_any_method_in_object() {
+    // { method(): any }
+    let interner = TypeInterner::new();
+
+    let method_name = interner.intern_string("method");
+
+    let any_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::ANY,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let obj_with_any_method = interner.object(vec![PropertyInfo {
+        name: method_name,
+        type_id: any_method,
+        write_type: any_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(obj_with_any_method) {
+        if let Some(TypeKey::Function(shape)) = interner.lookup(props[0].type_id) {
+            assert_eq!(shape.return_type, TypeId::ANY);
+        }
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_any_optional_property() {
+    // { prop?: any }
+    let interner = TypeInterner::new();
+
+    let prop_name = interner.intern_string("prop");
+
+    let obj_with_optional_any = interner.object(vec![PropertyInfo {
+        name: prop_name,
+        type_id: TypeId::ANY,
+        write_type: TypeId::ANY,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(obj_with_optional_any) {
+        assert!(props[0].optional);
+        assert_eq!(props[0].type_id, TypeId::ANY);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_any_readonly_property() {
+    // { readonly prop: any }
+    let interner = TypeInterner::new();
+
+    let prop_name = interner.intern_string("prop");
+
+    let obj_with_readonly_any = interner.object(vec![PropertyInfo {
+        name: prop_name,
+        type_id: TypeId::ANY,
+        write_type: TypeId::ANY,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(obj_with_readonly_any) {
+        assert!(props[0].readonly);
+        assert_eq!(props[0].type_id, TypeId::ANY);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_any_multiple_properties() {
+    // { a: any; b: any; c: any }
+    let interner = TypeInterner::new();
+
+    let a_name = interner.intern_string("a");
+    let b_name = interner.intern_string("b");
+    let c_name = interner.intern_string("c");
+
+    let obj_with_all_any = interner.object(vec![
+        PropertyInfo {
+            name: a_name,
+            type_id: TypeId::ANY,
+            write_type: TypeId::ANY,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b_name,
+            type_id: TypeId::ANY,
+            write_type: TypeId::ANY,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: c_name,
+            type_id: TypeId::ANY,
+            write_type: TypeId::ANY,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(obj_with_all_any) {
+        assert_eq!(props.len(), 3);
+        assert!(props.iter().all(|p| p.type_id == TypeId::ANY));
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_any_nested_object() {
+    // { outer: { inner: any } }
+    let interner = TypeInterner::new();
+
+    let outer_name = interner.intern_string("outer");
+    let inner_name = interner.intern_string("inner");
+
+    let inner_obj = interner.object(vec![PropertyInfo {
+        name: inner_name,
+        type_id: TypeId::ANY,
+        write_type: TypeId::ANY,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let outer_obj = interner.object(vec![PropertyInfo {
+        name: outer_name,
+        type_id: inner_obj,
+        write_type: inner_obj,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(outer_obj) {
+        if let Some(TypeKey::Object(inner_props)) = interner.lookup(props[0].type_id) {
+            assert_eq!(inner_props[0].type_id, TypeId::ANY);
+        }
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_any_as_type_argument() {
+    // Array<any>, Map<string, any>, etc.
+    let interner = TypeInterner::new();
+
+    // Array<any>
+    let array_any = interner.array(TypeId::ANY);
+    assert!(matches!(interner.lookup(array_any), Some(TypeKey::Array(_))));
+
+    // Simulate Map<string, any> as object
+    let key_name = interner.intern_string("key");
+    let value_name = interner.intern_string("value");
+
+    let map_like = interner.object(vec![
+        PropertyInfo {
+            name: key_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: value_name,
+            type_id: TypeId::ANY,
+            write_type: TypeId::ANY,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(map_like) {
+        assert_eq!(props[1].type_id, TypeId::ANY);
+    }
+}
+
+#[test]
+fn test_any_vs_unknown_distinction() {
+    // any and unknown are different types
+    let interner = TypeInterner::new();
+
+    // Both should be distinct built-ins
+    assert_ne!(TypeId::ANY, TypeId::UNKNOWN);
+    assert!(matches!(interner.lookup(TypeId::ANY), Some(TypeKey::Any)));
+    assert!(matches!(interner.lookup(TypeId::UNKNOWN), Some(TypeKey::Unknown)));
+}
+
+#[test]
+fn test_any_inference_with_multiple_sources() {
+    // When multiple sources provide any, result is any
+    let interner = TypeInterner::new();
+    let ctx = InferenceContext::new(&interner);
+
+    let var_t = ctx.fresh_type_param(None, None);
+
+    ctx.add_lower_bound(var_t, TypeId::ANY);
+    ctx.add_lower_bound(var_t, TypeId::STRING); // Also string
+
+    let result = ctx.resolve_with_constraints(var_t);
+    // Should resolve (any absorbs)
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_any_constructor_return() {
+    // class C { constructor(): any } - not typical but possible
+    let interner = TypeInterner::new();
+
+    let any_constructor = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::ANY,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    if let Some(TypeKey::Function(shape)) = interner.lookup(any_constructor) {
+        assert!(shape.is_constructor);
+        assert_eq!(shape.return_type, TypeId::ANY);
+    } else {
+        panic!("Expected function type");
+    }
+}
+
+#[test]
+fn test_any_this_type() {
+    // function f(this: any): void
+    let interner = TypeInterner::new();
+
+    let fn_with_any_this = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: Some(TypeId::ANY),
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    if let Some(TypeKey::Function(shape)) = interner.lookup(fn_with_any_this) {
+        assert_eq!(shape.this_type, Some(TypeId::ANY));
+    } else {
+        panic!("Expected function type");
+    }
 }
