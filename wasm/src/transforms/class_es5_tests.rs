@@ -12486,3 +12486,346 @@ class Graph<T> {
         output
     );
 }
+
+// ============================================================================
+// String.raw template pattern tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_string_raw_basic() {
+    // Basic String.raw usage
+    let source = r#"
+class PathHelper {
+    getWindowsPath(): string {
+        return String.raw`C:\Users\Documents\file.txt`;
+    }
+
+    getUnixPath(): string {
+        return String.raw`/home/user/documents/file.txt`;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("PathHelper"),
+        "Expected PathHelper class: {}",
+        output
+    );
+
+    // String.raw should be present
+    assert!(
+        output.contains("String.raw"),
+        "Expected String.raw: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("getWindowsPath") && output.contains("getUnixPath"),
+        "Expected getWindowsPath, getUnixPath methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_string_raw_with_expressions() {
+    // String.raw with embedded expressions
+    let source = r#"
+class TemplateBuilder {
+    private basePath: string = "C:\\Users";
+
+    buildPath(folder: string, file: string): string {
+        return String.raw`${this.basePath}\${folder}\${file}`;
+    }
+
+    buildRegex(pattern: string): string {
+        return String.raw`\b${pattern}\b`;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("TemplateBuilder"),
+        "Expected TemplateBuilder class: {}",
+        output
+    );
+
+    // String.raw should be present
+    assert!(
+        output.contains("String.raw"),
+        "Expected String.raw: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("buildPath") && output.contains("buildRegex"),
+        "Expected buildPath, buildRegex methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_string_raw_escape_sequences() {
+    // String.raw preserving escape sequences
+    let source = r#"
+class EscapeHandler {
+    getRawNewline(): string {
+        return String.raw`Line1\nLine2`;
+    }
+
+    getRawTab(): string {
+        return String.raw`Col1\tCol2`;
+    }
+
+    getRawBackslash(): string {
+        return String.raw`path\\to\\file`;
+    }
+
+    getRawUnicode(): string {
+        return String.raw`\u0041\u0042\u0043`;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("EscapeHandler"),
+        "Expected EscapeHandler class: {}",
+        output
+    );
+
+    // String.raw should be present
+    assert!(
+        output.contains("String.raw"),
+        "Expected String.raw: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("getRawNewline") && output.contains("getRawTab"),
+        "Expected getRawNewline, getRawTab methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_string_raw_static_property() {
+    // String.raw in static properties
+    let source = r#"
+class RegexPatterns {
+    static readonly EMAIL_PATTERN: string = String.raw`[\w\.\-]+@[\w\.\-]+\.\w+`;
+    static readonly URL_PATTERN: string = String.raw`https?:\/\/[\w\.\-\/]+`;
+    static readonly PHONE_PATTERN: string = String.raw`\+?\d{1,3}[\-\s]?\d{3,4}[\-\s]?\d{4}`;
+
+    static getPattern(type: string): string {
+        switch (type) {
+            case 'email': return this.EMAIL_PATTERN;
+            case 'url': return this.URL_PATTERN;
+            case 'phone': return this.PHONE_PATTERN;
+            default: return '';
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("RegexPatterns"),
+        "Expected RegexPatterns class: {}",
+        output
+    );
+
+    // String.raw should be present
+    assert!(
+        output.contains("String.raw"),
+        "Expected String.raw: {}",
+        output
+    );
+
+    // Static properties should be assigned
+    assert!(
+        output.contains("EMAIL_PATTERN") && output.contains("URL_PATTERN"),
+        "Expected EMAIL_PATTERN, URL_PATTERN properties: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_string_raw_in_constructor() {
+    // String.raw usage in constructor
+    let source = r#"
+class ConfigLoader {
+    private configPath: string;
+    private logPath: string;
+
+    constructor(basePath: string) {
+        this.configPath = String.raw`${basePath}\config\settings.json`;
+        this.logPath = String.raw`${basePath}\logs\app.log`;
+    }
+
+    getConfigPath(): string {
+        return this.configPath;
+    }
+
+    getLogPath(): string {
+        return this.logPath;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("ConfigLoader"),
+        "Expected ConfigLoader class: {}",
+        output
+    );
+
+    // String.raw should be present
+    assert!(
+        output.contains("String.raw"),
+        "Expected String.raw: {}",
+        output
+    );
+
+    // Constructor should have function body
+    assert!(
+        output.contains("function ConfigLoader"),
+        "Expected ConfigLoader constructor function: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_string_raw_multiline() {
+    // String.raw with multiline template
+    let source = r#"
+class SqlBuilder {
+    buildQuery(table: string, columns: string[]): string {
+        return String.raw`
+            SELECT ${columns.join(', ')}
+            FROM ${table}
+            WHERE deleted = false
+            ORDER BY created_at DESC
+        `;
+    }
+
+    buildInsert(table: string): string {
+        return String.raw`
+            INSERT INTO ${table}
+            (id, name, value)
+            VALUES
+            (\${id}, \${name}, \${value})
+        `;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be emitted
+    assert!(
+        output.contains("SqlBuilder"),
+        "Expected SqlBuilder class: {}",
+        output
+    );
+
+    // String.raw should be present
+    assert!(
+        output.contains("String.raw"),
+        "Expected String.raw: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("buildQuery") && output.contains("buildInsert"),
+        "Expected buildQuery, buildInsert methods: {}",
+        output
+    );
+}
