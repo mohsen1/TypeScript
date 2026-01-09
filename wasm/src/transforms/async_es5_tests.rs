@@ -9606,3 +9606,108 @@ fn test_async_arrow_pattern_nullish_assign_await() {
     );
     assert!(result, "Should detect await in nullish assignment");
 }
+
+// ============================================================================
+// ASYNC METHOD PATTERN TESTS
+// ============================================================================
+
+// Tests for async method patterns: async getter simulation, async static methods,
+// async with super calls, async with private field access, async class factory,
+// async method chaining.
+
+#[test]
+fn test_async_method_pattern_getter_simulation() {
+    // Simulating async getter via method
+    let result = async_class_method_extra_contains_await(
+        "class Foo { async getValue() { return await this.fetchValue(); } }",
+    );
+    assert!(result, "Should detect await in async getter simulation method");
+}
+
+#[test]
+fn test_async_method_pattern_static_basic() {
+    let result = async_static_method_contains_await(
+        "class Foo { static async create() { return await Foo.init(); } }",
+    );
+    assert!(result, "Should detect await in static async method");
+}
+
+#[test]
+fn test_async_method_pattern_static_factory() {
+    let result = async_static_method_contains_await(
+        "class Foo { static async fromData(data: any) { return await Foo.parse(data); } }",
+    );
+    assert!(result, "Should detect await in static factory method");
+}
+
+#[test]
+fn test_async_method_pattern_super_call() {
+    let result = async_class_method_extra_contains_await(
+        "class Foo extends Base { async init() { await super.init(); return await this.setup(); } }",
+    );
+    assert!(result, "Should detect await in method with super call");
+}
+
+#[test]
+fn test_async_method_pattern_super_property() {
+    let result = async_class_method_extra_contains_await(
+        "class Foo extends Base { async getValue() { return await super.getValue(); } }",
+    );
+    assert!(result, "Should detect await in super property call");
+}
+
+#[test]
+fn test_async_method_pattern_private_field_read() {
+    let result = async_class_method_extra_contains_await(
+        "class Foo { async getValue() { return await this.fetch(); } }",
+    );
+    assert!(result, "Should detect await in method reading private-like field");
+}
+
+#[test]
+fn test_async_method_pattern_private_field_write() {
+    let result = async_class_method_extra_contains_await(
+        "class Foo { async setValue() { await this.save(); } }",
+    );
+    assert!(result, "Should detect await in method writing to field");
+}
+
+#[test]
+fn test_async_method_pattern_class_factory() {
+    let result = async_static_method_contains_await(
+        "class Factory { static async create(type: string) { return await Factory.build(type); } }",
+    );
+    assert!(result, "Should detect await in class factory method");
+}
+
+#[test]
+fn test_async_method_pattern_chaining() {
+    let result = async_class_method_extra_contains_await(
+        "class Builder { async build() { return await this.validate(); } }",
+    );
+    assert!(result, "Should detect await in chainable method");
+}
+
+#[test]
+fn test_async_method_pattern_no_await() {
+    let result = async_class_method_extra_contains_await(
+        "class Foo { async getValue() { return this.cachedValue; } }",
+    );
+    assert!(!result, "Should not detect await when method has no await");
+}
+
+#[test]
+fn test_async_method_pattern_ignores_nested_async() {
+    let result = async_class_method_extra_contains_await(
+        "class Foo { async process() { const handler = async () => await inner(); } }",
+    );
+    assert!(!result, "Should not detect await inside nested async in method");
+}
+
+#[test]
+fn test_async_method_pattern_multiple_awaits() {
+    let result = async_class_method_extra_contains_await(
+        "class Foo { async process() { await this.step1(); await this.step2(); return await this.finalize(); } }",
+    );
+    assert!(result, "Should detect multiple awaits in method");
+}
