@@ -17487,3 +17487,578 @@ fn test_array_covariance_non_array() {
     // Should return never since string is not an array
     assert_eq!(result, TypeId::NEVER);
 }
+
+// =============================================================================
+// Omit, Pick, Partial, Required, and Record Utility Type Edge Cases
+// =============================================================================
+
+/// Test Pick<T, K> with union of literal keys.
+/// Pick<{ a: string, b: number, c: boolean }, "a" | "c"> = { a: string, c: boolean }
+#[test]
+fn test_pick_with_union_keys() {
+    let interner = TypeInterner::new();
+
+    // Source object: { a: string, b: number, c: boolean }
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("c"),
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Keys to pick: "a" | "c"
+    let key_a = interner.literal_string("a");
+    let key_c = interner.literal_string("c");
+    let keys = interner.union(vec![key_a, key_c]);
+
+    // Pick is implemented as: { [K in Keys]: T[K] }
+    let k_name = interner.intern_string("K");
+    let k_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: k_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: k_name,
+            constraint: None,
+            default: None,
+        },
+        constraint: keys,
+        name_type: None,
+        template: interner.intern(TypeKey::IndexAccess(source_obj, k_param)),
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Expected: { a: string, c: boolean }
+    let expected = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("c"),
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+    assert_eq!(result, expected);
+}
+
+/// Test Omit<T, K> with union of literal keys.
+/// Omit<{ a: string, b: number, c: boolean }, "b"> = { a: string, c: boolean }
+#[test]
+fn test_omit_with_union_keys() {
+    let interner = TypeInterner::new();
+
+    // Source object: { a: string, b: number, c: boolean }
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("c"),
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Keys to omit: "b"
+    let key_b = interner.literal_string("b");
+
+    // Omit is: { [K in Exclude<keyof T, OmitKeys>]: T[K] }
+    // For this test, we'll directly compute the remaining keys: "a" | "c"
+    let key_a = interner.literal_string("a");
+    let key_c = interner.literal_string("c");
+    let remaining_keys = interner.union(vec![key_a, key_c]);
+
+    let k_name = interner.intern_string("K");
+    let k_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: k_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: k_name,
+            constraint: None,
+            default: None,
+        },
+        constraint: remaining_keys,
+        name_type: None,
+        template: interner.intern(TypeKey::IndexAccess(source_obj, k_param)),
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Expected: { a: string, c: boolean }
+    let expected = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("c"),
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Omit key_b should not be in the output
+    let _ = key_b; // Used for documentation
+    assert_eq!(result, expected);
+}
+
+/// Test Partial<T> on a simple object.
+/// Partial<{ a: string, b: number }> = { a?: string, b?: number }
+#[test]
+fn test_partial_simple_object() {
+    let interner = TypeInterner::new();
+
+    // Source: { a: string, b: number }
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Partial: { [K in keyof T]?: T[K] }
+    let keyof_source = interner.intern(TypeKey::KeyOf(source_obj));
+
+    let k_name = interner.intern_string("K");
+    let k_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: k_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: k_name,
+            constraint: None,
+            default: None,
+        },
+        constraint: keyof_source,
+        name_type: None,
+        template: interner.intern(TypeKey::IndexAccess(source_obj, k_param)),
+        readonly_modifier: None,
+        optional_modifier: Some(MappedModifier::Add), // Makes all properties optional
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Expected: { a?: string, b?: number }
+    let expected = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: true, // Now optional
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: true, // Now optional
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+    assert_eq!(result, expected);
+}
+
+/// Test Required<T> on an object with optional properties.
+/// Required<{ a?: string, b?: number }> = { a: string, b: number }
+#[test]
+fn test_required_removes_optional() {
+    let interner = TypeInterner::new();
+
+    // Source: { a?: string, b?: number } (with optional properties)
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: true, // Optional
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: true, // Optional
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Required: { [K in keyof T]-?: T[K] }
+    let keyof_source = interner.intern(TypeKey::KeyOf(source_obj));
+
+    let k_name = interner.intern_string("K");
+    let k_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: k_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: k_name,
+            constraint: None,
+            default: None,
+        },
+        constraint: keyof_source,
+        name_type: None,
+        template: interner.intern(TypeKey::IndexAccess(source_obj, k_param)),
+        readonly_modifier: None,
+        optional_modifier: Some(MappedModifier::Remove), // Removes optional
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Required<T> removes the optional modifier from all properties.
+    // Verify result is an Object type with non-optional properties.
+    match interner.lookup(result).unwrap() {
+        TypeKey::Object(shape_id) => {
+            let shape = interner.object_shape(shape_id);
+            assert_eq!(shape.properties.len(), 2);
+            // MappedModifier::Remove correctly makes properties non-optional
+            assert!(!shape.properties[0].optional, "Required<T> should make property 'a' non-optional");
+            assert!(!shape.properties[1].optional, "Required<T> should make property 'b' non-optional");
+        }
+        _ => panic!("Expected Object type from Required<T> mapped type"),
+    }
+}
+
+/// Test Record<K, V> with union keys.
+/// Record<"a" | "b", number> = { a: number, b: number }
+#[test]
+fn test_record_with_union_keys() {
+    let interner = TypeInterner::new();
+
+    // Keys: "a" | "b"
+    let key_a = interner.literal_string("a");
+    let key_b = interner.literal_string("b");
+    let keys = interner.union(vec![key_a, key_b]);
+
+    // Record<K, V> = { [P in K]: V }
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("P"),
+            constraint: None,
+            default: None,
+        },
+        constraint: keys,
+        name_type: None,
+        template: TypeId::NUMBER, // V = number
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Expected: { a: number, b: number }
+    let expected = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+    assert_eq!(result, expected);
+}
+
+/// Test Record with string index signature.
+/// Record<string, boolean> = { [x: string]: boolean }
+#[test]
+fn test_record_with_string_index() {
+    let interner = TypeInterner::new();
+
+    // Record<string, boolean> = { [P in string]: boolean }
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("P"),
+            constraint: None,
+            default: None,
+        },
+        constraint: TypeId::STRING,
+        name_type: None,
+        template: TypeId::BOOLEAN,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Expected: { [x: string]: boolean } (string index signature)
+    let expected = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::BOOLEAN,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+    assert_eq!(result, expected);
+}
+
+/// Test Pick with keyof another type.
+/// Pick<T, keyof U> where U has subset of T's keys
+#[test]
+fn test_pick_with_keyof_constraint() {
+    let interner = TypeInterner::new();
+
+    // Source: { a: string, b: number, c: boolean }
+    let source = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("c"),
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Constraint object for keyof: { a: any, b: any }
+    let constraint_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::ANY,
+            write_type: TypeId::ANY,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::ANY,
+            write_type: TypeId::ANY,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // keyof constraint_obj = "a" | "b"
+    let keys = interner.intern(TypeKey::KeyOf(constraint_obj));
+
+    let k_name = interner.intern_string("K");
+    let k_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: k_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // Pick<Source, keyof ConstraintObj> = { [K in keyof ConstraintObj]: Source[K] }
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: k_name,
+            constraint: None,
+            default: None,
+        },
+        constraint: keys,
+        name_type: None,
+        template: interner.intern(TypeKey::IndexAccess(source, k_param)),
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Expected: { a: string, b: number } (picked from source using keyof constraint_obj)
+    let expected = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+    assert_eq!(result, expected);
+}
+
+/// Test Readonly<T> mapped type modifier.
+/// Readonly<{ a: string }> = { readonly a: string }
+#[test]
+fn test_readonly_mapped_modifier() {
+    let interner = TypeInterner::new();
+
+    // Source: { a: string, b: number }
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Readonly: { readonly [K in keyof T]: T[K] }
+    let keyof_source = interner.intern(TypeKey::KeyOf(source_obj));
+
+    let k_name = interner.intern_string("K");
+    let k_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: k_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: k_name,
+            constraint: None,
+            default: None,
+        },
+        constraint: keyof_source,
+        name_type: None,
+        template: interner.intern(TypeKey::IndexAccess(source_obj, k_param)),
+        readonly_modifier: Some(MappedModifier::Add), // Makes all properties readonly
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Expected: { readonly a: string, readonly b: number }
+    let expected = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: true, // Now readonly
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: true, // Now readonly
+            is_method: false,
+        },
+    ]);
+    assert_eq!(result, expected);
+}
