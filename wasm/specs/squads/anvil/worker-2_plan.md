@@ -7,12 +7,13 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] Add ES5 object spread parity tests (basic spread, multiple spreads, spread with overrides, nested spreads, computed properties with spread) in `wasm/src/emitter_parity_tests.rs`. Run `./wasm/test.sh emitter_parity`.
+- [ ] (awaiting assignment)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 object spread parity tests (typed, multiple, overrides, nested-deep, computed) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (238 tests).
 - [x] Added ES5 accessor parity tests (getter-inheritance, setter-validation, pair-caching, static, computed) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (233 tests).
 - [x] Added ES5 shorthand method parity tests (definitions, computed, async, generator) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (228 tests).
 - [x] Added ES5 computed property parity tests (template, binary, nested, conditional) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (224 tests).
