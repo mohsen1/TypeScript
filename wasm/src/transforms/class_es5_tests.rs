@@ -26850,3 +26850,563 @@ class LazyProperty {
         output
     );
 }
+
+// ============================================================================
+// USING DECLARATIONS PATTERN TESTS
+// ============================================================================
+
+/// Test ES5 class with sync using declarations
+#[test]
+fn test_class_es5_using_sync() {
+    let source = r#"
+// Sync using declarations
+class FileHandle {
+    private path: string;
+    private isOpen = true;
+
+    constructor(path: string) {
+        this.path = path;
+        console.log(`Opening file: ${path}`);
+    }
+
+    read(): string {
+        if (!this.isOpen) throw new Error("File is closed");
+        return `Contents of ${this.path}`;
+    }
+
+    write(content: string): void {
+        if (!this.isOpen) throw new Error("File is closed");
+        console.log(`Writing to ${this.path}: ${content}`);
+    }
+
+    [Symbol.dispose](): void {
+        if (this.isOpen) {
+            console.log(`Closing file: ${this.path}`);
+            this.isOpen = false;
+        }
+    }
+}
+
+class DatabaseConnection {
+    private connectionString: string;
+    private connected = true;
+
+    constructor(connectionString: string) {
+        this.connectionString = connectionString;
+        console.log(`Connecting to: ${connectionString}`);
+    }
+
+    query(sql: string): any[] {
+        if (!this.connected) throw new Error("Not connected");
+        return [{ result: sql }];
+    }
+
+    [Symbol.dispose](): void {
+        if (this.connected) {
+            console.log(`Disconnecting from: ${this.connectionString}`);
+            this.connected = false;
+        }
+    }
+}
+
+class LockManager {
+    private resource: string;
+    private locked = true;
+
+    constructor(resource: string) {
+        this.resource = resource;
+        console.log(`Acquiring lock on: ${resource}`);
+    }
+
+    execute<T>(fn: () => T): T {
+        if (!this.locked) throw new Error("Lock released");
+        return fn();
+    }
+
+    [Symbol.dispose](): void {
+        if (this.locked) {
+            console.log(`Releasing lock on: ${this.resource}`);
+            this.locked = false;
+        }
+    }
+}
+
+function processFiles() {
+    using file = new FileHandle("/tmp/test.txt");
+    file.write("Hello");
+    return file.read();
+}
+
+function transactionalQuery() {
+    using db = new DatabaseConnection("postgres://localhost/test");
+    using lock = new LockManager("users_table");
+    return lock.execute(() => db.query("SELECT * FROM users"));
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("FileHandle") && output.contains("DatabaseConnection") && output.contains("LockManager"),
+        "Expected sync using declaration classes: {}",
+        output
+    );
+
+    // Functions with using should be present
+    assert!(
+        output.contains("processFiles") && output.contains("transactionalQuery"),
+        "Expected functions with using declarations: {}",
+        output
+    );
+
+    // Symbol.dispose should be present in output
+    assert!(
+        output.contains("Symbol.dispose") || output.contains("dispose"),
+        "Expected Symbol.dispose pattern: {}",
+        output
+    );
+}
+
+/// Test ES5 class with async using declarations
+#[test]
+fn test_class_es5_using_async() {
+    let source = r#"
+// Async using declarations
+class AsyncFileHandle {
+    private path: string;
+    private isOpen = true;
+
+    constructor(path: string) {
+        this.path = path;
+    }
+
+    static async open(path: string): Promise<AsyncFileHandle> {
+        await new Promise(r => setTimeout(r, 10));
+        console.log(`Async opening file: ${path}`);
+        return new AsyncFileHandle(path);
+    }
+
+    async read(): Promise<string> {
+        if (!this.isOpen) throw new Error("File is closed");
+        await new Promise(r => setTimeout(r, 10));
+        return `Contents of ${this.path}`;
+    }
+
+    async write(content: string): Promise<void> {
+        if (!this.isOpen) throw new Error("File is closed");
+        await new Promise(r => setTimeout(r, 10));
+        console.log(`Async writing to ${this.path}: ${content}`);
+    }
+
+    async [Symbol.asyncDispose](): Promise<void> {
+        if (this.isOpen) {
+            await new Promise(r => setTimeout(r, 10));
+            console.log(`Async closing file: ${this.path}`);
+            this.isOpen = false;
+        }
+    }
+}
+
+class AsyncDatabaseConnection {
+    private connectionString: string;
+    private connected = true;
+
+    private constructor(connectionString: string) {
+        this.connectionString = connectionString;
+    }
+
+    static async connect(connectionString: string): Promise<AsyncDatabaseConnection> {
+        await new Promise(r => setTimeout(r, 50));
+        console.log(`Async connecting to: ${connectionString}`);
+        return new AsyncDatabaseConnection(connectionString);
+    }
+
+    async query(sql: string): Promise<any[]> {
+        if (!this.connected) throw new Error("Not connected");
+        await new Promise(r => setTimeout(r, 20));
+        return [{ result: sql }];
+    }
+
+    async [Symbol.asyncDispose](): Promise<void> {
+        if (this.connected) {
+            await new Promise(r => setTimeout(r, 30));
+            console.log(`Async disconnecting from: ${this.connectionString}`);
+            this.connected = false;
+        }
+    }
+}
+
+class AsyncTransaction {
+    private db: AsyncDatabaseConnection;
+    private committed = false;
+    private rolledBack = false;
+
+    constructor(db: AsyncDatabaseConnection) {
+        this.db = db;
+    }
+
+    async commit(): Promise<void> {
+        await new Promise(r => setTimeout(r, 10));
+        this.committed = true;
+        console.log("Transaction committed");
+    }
+
+    async rollback(): Promise<void> {
+        await new Promise(r => setTimeout(r, 10));
+        this.rolledBack = true;
+        console.log("Transaction rolled back");
+    }
+
+    async [Symbol.asyncDispose](): Promise<void> {
+        if (!this.committed && !this.rolledBack) {
+            await this.rollback();
+        }
+    }
+}
+
+async function asyncProcessFiles() {
+    await using file = await AsyncFileHandle.open("/tmp/async.txt");
+    await file.write("Async Hello");
+    return await file.read();
+}
+
+async function asyncTransactionalQuery() {
+    await using db = await AsyncDatabaseConnection.connect("postgres://localhost/test");
+    await using tx = new AsyncTransaction(db);
+    const result = await db.query("SELECT * FROM users");
+    await tx.commit();
+    return result;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("AsyncFileHandle") && output.contains("AsyncDatabaseConnection") && output.contains("AsyncTransaction"),
+        "Expected async using declaration classes: {}",
+        output
+    );
+
+    // Async functions should be present
+    assert!(
+        output.contains("asyncProcessFiles") && output.contains("asyncTransactionalQuery"),
+        "Expected async functions: {}",
+        output
+    );
+}
+
+/// Test ES5 class with dispose patterns
+#[test]
+fn test_class_es5_using_dispose_patterns() {
+    let source = r#"
+// Dispose patterns
+interface Disposable {
+    [Symbol.dispose](): void;
+}
+
+interface AsyncDisposable {
+    [Symbol.asyncDispose](): Promise<void>;
+}
+
+class ResourcePool<T extends Disposable> {
+    private resources: T[] = [];
+    private available: T[] = [];
+
+    constructor(private factory: () => T, private maxSize: number) {
+        for (let i = 0; i < maxSize; i++) {
+            const resource = factory();
+            this.resources.push(resource);
+            this.available.push(resource);
+        }
+    }
+
+    acquire(): T {
+        const resource = this.available.pop();
+        if (!resource) throw new Error("No available resources");
+        return resource;
+    }
+
+    release(resource: T): void {
+        if (this.resources.includes(resource)) {
+            this.available.push(resource);
+        }
+    }
+
+    [Symbol.dispose](): void {
+        for (const resource of this.resources) {
+            resource[Symbol.dispose]();
+        }
+        this.resources = [];
+        this.available = [];
+    }
+}
+
+class DisposableStack {
+    private stack: Disposable[] = [];
+
+    use<T extends Disposable>(resource: T): T {
+        this.stack.push(resource);
+        return resource;
+    }
+
+    defer(fn: () => void): void {
+        this.stack.push({ [Symbol.dispose]: fn });
+    }
+
+    [Symbol.dispose](): void {
+        while (this.stack.length > 0) {
+            const resource = this.stack.pop()!;
+            try {
+                resource[Symbol.dispose]();
+            } catch (e) {
+                console.error("Error during disposal:", e);
+            }
+        }
+    }
+}
+
+class Timer implements Disposable {
+    private startTime: number;
+    private name: string;
+
+    constructor(name: string) {
+        this.name = name;
+        this.startTime = Date.now();
+        console.log(`Timer '${name}' started`);
+    }
+
+    elapsed(): number {
+        return Date.now() - this.startTime;
+    }
+
+    [Symbol.dispose](): void {
+        console.log(`Timer '${this.name}' stopped: ${this.elapsed()}ms`);
+    }
+}
+
+function timedOperation() {
+    using timer = new Timer("operation");
+    using stack = new DisposableStack();
+
+    stack.defer(() => console.log("Cleanup 1"));
+    stack.defer(() => console.log("Cleanup 2"));
+
+    // Do some work
+    let sum = 0;
+    for (let i = 0; i < 1000; i++) {
+        sum += i;
+    }
+
+    console.log(`Operation completed: ${timer.elapsed()}ms`);
+    return sum;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("ResourcePool") && output.contains("DisposableStack") && output.contains("Timer"),
+        "Expected dispose pattern classes: {}",
+        output
+    );
+
+    // Function should be present
+    assert!(
+        output.contains("timedOperation"),
+        "Expected timedOperation function: {}",
+        output
+    );
+
+    // Interfaces should be stripped
+    assert!(
+        !output.contains("interface Disposable") && !output.contains("interface AsyncDisposable"),
+        "Expected interfaces to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with Symbol.dispose implementation
+#[test]
+fn test_class_es5_using_symbol_dispose() {
+    let source = r#"
+// Symbol.dispose implementation patterns
+class ManagedBuffer {
+    private buffer: ArrayBuffer;
+    private view: DataView;
+    private disposed = false;
+
+    constructor(size: number) {
+        this.buffer = new ArrayBuffer(size);
+        this.view = new DataView(this.buffer);
+        console.log(`Allocated ${size} bytes`);
+    }
+
+    write(offset: number, value: number): void {
+        if (this.disposed) throw new Error("Buffer disposed");
+        this.view.setInt32(offset, value);
+    }
+
+    read(offset: number): number {
+        if (this.disposed) throw new Error("Buffer disposed");
+        return this.view.getInt32(offset);
+    }
+
+    get size(): number {
+        return this.buffer.byteLength;
+    }
+
+    [Symbol.dispose](): void {
+        if (!this.disposed) {
+            console.log(`Freeing ${this.size} bytes`);
+            this.disposed = true;
+        }
+    }
+}
+
+class EventSubscription {
+    private target: EventTarget;
+    private type: string;
+    private handler: EventListener;
+    private active = true;
+
+    constructor(target: EventTarget, type: string, handler: EventListener) {
+        this.target = target;
+        this.type = type;
+        this.handler = handler;
+        target.addEventListener(type, handler);
+    }
+
+    [Symbol.dispose](): void {
+        if (this.active) {
+            this.target.removeEventListener(this.type, this.handler);
+            this.active = false;
+        }
+    }
+}
+
+class IntervalHandle {
+    private id: number;
+    private active = true;
+
+    constructor(callback: () => void, ms: number) {
+        this.id = setInterval(callback, ms) as unknown as number;
+    }
+
+    [Symbol.dispose](): void {
+        if (this.active) {
+            clearInterval(this.id);
+            this.active = false;
+        }
+    }
+}
+
+class TimeoutHandle {
+    private id: number;
+    private active = true;
+
+    constructor(callback: () => void, ms: number) {
+        this.id = setTimeout(callback, ms) as unknown as number;
+    }
+
+    cancel(): void {
+        if (this.active) {
+            clearTimeout(this.id);
+            this.active = false;
+        }
+    }
+
+    [Symbol.dispose](): void {
+        this.cancel();
+    }
+}
+
+function managedBufferDemo() {
+    using buffer = new ManagedBuffer(1024);
+    buffer.write(0, 42);
+    buffer.write(4, 100);
+    return buffer.read(0) + buffer.read(4);
+}
+
+function intervalDemo(callback: () => void) {
+    using interval = new IntervalHandle(callback, 100);
+    using timeout = new TimeoutHandle(() => {
+        console.log("Timeout completed");
+    }, 500);
+    // The handles will be disposed when the function returns
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("ManagedBuffer") && output.contains("EventSubscription") && output.contains("IntervalHandle"),
+        "Expected Symbol.dispose classes: {}",
+        output
+    );
+
+    // TimeoutHandle should be present
+    assert!(
+        output.contains("TimeoutHandle"),
+        "Expected TimeoutHandle class: {}",
+        output
+    );
+
+    // Functions should be present
+    assert!(
+        output.contains("managedBufferDemo") && output.contains("intervalDemo"),
+        "Expected demo functions: {}",
+        output
+    );
+}
