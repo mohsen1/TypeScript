@@ -1066,34 +1066,8 @@ impl BinderState {
 
     /// Check if two symbol flag sets can be merged.
     /// TypeScript allows merging:
-<<<<<<< HEAD
     /// - Interface + Interface
-    /// - Namespace + Namespace
-    /// - Namespace + Class/Function/Enum
-    /// - Function + Function (overloads)
-    fn can_merge_flags(existing_flags: u32, new_flags: u32) -> bool {
-        // Interface can merge with interface
-        if (existing_flags & symbol_flags::INTERFACE) != 0
-            && (new_flags & symbol_flags::INTERFACE) != 0
-        {
-            return true;
-        }
-
-        let existing_is_interface = (existing_flags & symbol_flags::INTERFACE) != 0;
-        let new_is_interface = (new_flags & symbol_flags::INTERFACE) != 0;
-        let existing_is_value = (existing_flags & symbol_flags::VALUE) != 0;
-        let new_is_value = (new_flags & symbol_flags::VALUE) != 0;
-        if (existing_is_interface && new_is_value) || (new_is_interface && existing_is_value) {
-            return true;
-        }
-        // Namespace/module can merge with namespace/module
-        if (existing_flags & symbol_flags::MODULE) != 0
-            && (new_flags & symbol_flags::MODULE) != 0
-        {
-            return true;
-        }
-=======
-    /// - Interface + Interface
+    /// - Interface + Class
     /// - Namespace + Namespace
     /// - Namespace + Class/Function/Enum
     /// - Function + Function (overloads)
@@ -1117,13 +1091,21 @@ impl BinderState {
             return true;
         }
 
+        // Interface can merge with value (more general case)
+        let existing_is_interface = (existing_flags & symbol_flags::INTERFACE) != 0;
+        let new_is_interface = (new_flags & symbol_flags::INTERFACE) != 0;
+        let existing_is_value = (existing_flags & symbol_flags::VALUE) != 0;
+        let new_is_value = (new_flags & symbol_flags::VALUE) != 0;
+        if (existing_is_interface && new_is_value) || (new_is_interface && existing_is_value) {
+            return true;
+        }
+
         // Namespace/module can merge with namespace/module
         if (existing_flags & symbol_flags::MODULE) != 0
             && (new_flags & symbol_flags::MODULE) != 0
         {
             return true;
         }
->>>>>>> origin/worker/forge-4
 
         // Namespace can merge with class, function, or enum
         if (existing_flags & symbol_flags::MODULE) != 0 {
