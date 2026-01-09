@@ -7,10 +7,10 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-(awaiting assignment)
+- [ ] Add ES5 source map tests for class accessor patterns: getter/setter transforms, static accessors, computed accessor names, accessor decorators. Tests: `./wasm/test.sh source_map`
 
 ## Task Queue
-(empty)
+- [ ] Add ES5 source map tests for for-of/for-in loop transforms: iterator patterns, destructuring in loops
 
 ## Completed
 - [x] Added JSX transform ES5 source map tests (basic element, fragment, spread attributes, self-closing, nested elements, expressions, component props, event handlers, conditional rendering, comprehensive); 687 tests pass.
