@@ -1889,6 +1889,17 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    /// Push a single type parameter (e.g., from a mapped type) into scope.
+    /// Returns the update needed for pop_type_parameters.
+    fn push_single_type_parameter(&mut self, param_idx: NodeIndex) -> Option<(String, Option<TypeId>)> {
+        use crate::solver::TypeKey;
+
+        let (info, name) = self.lower_type_parameter_info(param_idx)?;
+        let type_id = self.ctx.types.intern(TypeKey::TypeParameter(info));
+        let previous = self.ctx.type_parameter_scope.insert(name.clone(), type_id);
+        Some((name, previous))
+    }
+
     /// Get type of an interface declaration.
     /// This extracts call signatures, construct signatures, and properties
     /// to build a callable type if the interface has call signatures.
@@ -9171,9 +9182,12 @@ impl<'a> ThinCheckerState<'a> {
             // Type alias declarations - check the type for accessor body and parameter property errors
             syntax_kind_ext::TYPE_ALIAS_DECLARATION => {
                 if let Some(type_alias) = self.ctx.arena.get_type_alias(node) {
+                    // Push type parameters into scope before checking
+                    let (_params, updates) = self.push_type_parameters(&type_alias.type_parameters);
                     // Check the type for accessor bodies in ambient context and parameter properties
                     self.check_type_for_missing_names(type_alias.type_node);
                     self.check_type_for_parameter_properties(type_alias.type_node);
+                    self.pop_type_parameters(updates);
                 }
             }
             // Other type declarations - just register them, no expression checking needed
@@ -11636,13 +11650,17 @@ impl<'a> ThinCheckerState<'a> {
             }
             k if k == syntax_kind_ext::FUNCTION_TYPE || k == syntax_kind_ext::CONSTRUCTOR_TYPE => {
                 if let Some(func_type) = self.ctx.arena.get_function_type(node) {
+                    // Check constraint/default types before pushing params into scope
                     self.check_type_parameters_for_missing_names(&func_type.type_parameters);
+                    // Push type parameters into scope for parameter types and return type
+                    let (_params, updates) = self.push_type_parameters(&func_type.type_parameters);
                     for &param_idx in &func_type.parameters.nodes {
                         self.check_parameter_type_for_missing_names(param_idx);
                     }
                     if !func_type.type_annotation.is_none() {
                         self.check_type_for_missing_names(func_type.type_annotation);
                     }
+                    self.pop_type_parameters(updates);
                 }
             }
             k if k == syntax_kind_ext::ARRAY_TYPE => {
@@ -11698,7 +11716,10 @@ impl<'a> ThinCheckerState<'a> {
             }
             k if k == syntax_kind_ext::MAPPED_TYPE => {
                 if let Some(mapped) = self.ctx.arena.get_mapped_type(node) {
+                    // Check the type parameter's constraint/default for missing names first
                     self.check_type_parameter_node_for_missing_names(mapped.type_parameter);
+                    // Push the mapped type parameter into scope for name_type and type_node
+                    let update = self.push_single_type_parameter(mapped.type_parameter);
                     if !mapped.name_type.is_none() {
                         self.check_type_for_missing_names(mapped.name_type);
                     }
@@ -11709,6 +11730,10 @@ impl<'a> ThinCheckerState<'a> {
                         for &member_idx in &members.nodes {
                             self.check_type_member_for_missing_names(member_idx);
                         }
+                    }
+                    // Pop the mapped type parameter from scope
+                    if let Some((name, previous)) = update {
+                        self.pop_type_parameters(vec![(name, previous)]);
                     }
                 }
             }
